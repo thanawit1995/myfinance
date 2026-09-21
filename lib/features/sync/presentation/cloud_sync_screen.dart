@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/services/cloud_sync_provider.dart';
+import '../../../core/services/google_auth_service.dart';
 import '../../../core/services/google_drive_sync_service.dart';
 import '../../../core/theme/vault_theme.dart';
 
@@ -17,6 +18,7 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
   bool _isLoading = false;
   GoogleDriveSyncStatus? _status;
   List<PreSyncBackupInfo> _backups = [];
+  GoogleAuthUser? _googleUser;
 
   @override
   void initState() {
@@ -26,13 +28,119 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
 
   Future<void> _loadData() async {
     final syncService = ref.read(googleDriveSyncServiceProvider);
+    final authService = ref.read(googleAuthServiceProvider);
     final status = await syncService.getStatus();
     final backups = await syncService.getPreSyncBackups();
+    final user = await authService.getCurrentUser();
     if (mounted) {
       setState(() {
         _status = status;
         _backups = backups;
+        _googleUser = user;
       });
+    }
+  }
+
+  Future<void> _handleSignIn() async {
+    final authService = ref.read(googleAuthServiceProvider);
+    final syncService = ref.read(googleDriveSyncServiceProvider);
+    try {
+      if (authService.isSupportedPlatform) {
+        final user = await authService.signIn();
+        if (user != null) {
+          await _loadData();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('เข้าสู่ระบบด้วย ${user.email} สำเร็จ'),
+                backgroundColor: VaultTheme.positive(context),
+              ),
+            );
+          }
+        }
+      } else {
+        final emailController = TextEditingController();
+        final entered = await showDialog<String>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('เข้าสู่ระบบ Gmail สำหรับ Google Drive'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('กรุณากรอกอีเมล Gmail ของคุณเพื่อใช้สำรองข้อมูลไปยัง Google Drive:'),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Gmail / Google Account',
+                    prefixIcon: Icon(Icons.email_outlined),
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('ยกเลิก')),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, emailController.text.trim()),
+                child: const Text('บันทึก'),
+              ),
+            ],
+          ),
+        );
+        if (entered != null && entered.isNotEmpty) {
+          await authService.saveManualEmail(entered);
+          await syncService.detectOrGetDriveFolder();
+          await _loadData();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('บันทึกบัญชี $entered เรียบร้อยแล้ว'),
+                backgroundColor: VaultTheme.positive(context),
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('ไม่สามารถเข้าสู่ระบบได้: $e'),
+            backgroundColor: VaultTheme.negative(context),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleSignOut() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('ออกจากระบบ Google'),
+        content: Text('คุณต้องการออกจากระบบบัญชี ${_googleUser?.email ?? ""} ใช่หรือไม่?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('ยกเลิก')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('ออกจากระบบ'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await ref.read(googleAuthServiceProvider).signOut();
+      await _loadData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ออกจากระบบเรียบร้อยแล้ว')),
+        );
+      }
     }
   }
 
@@ -217,6 +325,84 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
           : ListView(
               padding: const EdgeInsets.all(20),
               children: [
+                // 0. Google Account Card
+                Card(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  color: VaultTheme.surface(context),
+                  elevation: 2,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: _googleUser != null
+                                ? Colors.teal.withValues(alpha: 0.15)
+                                : Colors.blue.withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: _googleUser != null
+                                ? Text(
+                                    _googleUser!.email.substring(0, 1).toUpperCase(),
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.teal),
+                                  )
+                                : const Icon(Icons.account_circle_outlined, color: Colors.blue, size: 26),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _googleUser != null
+                                    ? (_googleUser!.displayName ?? _googleUser!.email)
+                                    : 'เข้าสู่ระบบด้วย Gmail',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  color: VaultTheme.primaryText(context),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _googleUser != null
+                                    ? _googleUser!.email
+                                    : 'เชื่อมต่อบัญชี Google เพื่อสำรองข้อมูลไปยังไดรฟ์',
+                                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (_googleUser != null)
+                          TextButton(
+                            onPressed: _handleSignOut,
+                            child: const Text('ออกจากระบบ', style: TextStyle(color: Colors.red, fontSize: 12)),
+                          )
+                        else
+                          FilledButton.tonalIcon(
+                            style: FilledButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                            icon: const Icon(Icons.login, size: 16),
+                            label: const Text('เข้าสู่ระบบ'),
+                            onPressed: _handleSignIn,
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
                 // 1. Main Status Card
                 Card(
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

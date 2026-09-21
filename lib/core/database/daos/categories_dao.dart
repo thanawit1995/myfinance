@@ -79,4 +79,15 @@ class CategoriesDao extends DatabaseAccessor<AppDatabase> with _$CategoriesDaoMi
       ),
     );
   }
+
+  Future<int> softDeleteCategory(String id) {
+    final now = DateTime.now();
+    return (update(categories)..where((c) => c.id.equals(id))).write(
+      CategoriesCompanion(
+        isActive: const Value(false),
+        deletedAt: Value(now),
+        updatedAt: Value(now),
+      ),
+    );
+  }
 }

@@ -21,6 +21,7 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
     final theme = Theme.of(context);
     final accDao = ref.watch(accountsDaoProvider);
     final txDao = ref.watch(transactionsDaoProvider);
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
 
     return Scaffold(
       appBar: AppBar(
@@ -28,13 +29,15 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
         actions: [
           IconButton(
             icon: Icon(widget.account.isActive ? Icons.archive_outlined : Icons.unarchive_outlined),
-            tooltip: widget.account.isActive ? 'ปิดการใช้งานบัญชี' : 'เปิดการใช้งานบัญชี',
-            onPressed: _toggleActive,
+            tooltip: widget.account.isActive
+                ? (isThai ? 'ปิดการใช้งานบัญชี' : 'Deactivate account')
+                : (isThai ? 'เปิดการใช้งานบัญชี' : 'Activate account'),
+            onPressed: () => _toggleActive(isThai),
           ),
           IconButton(
             icon: const Icon(Icons.delete_outline, color: Colors.red),
-            tooltip: 'ลบบัญชีนี้ (ย้ายไปถังขยะ)',
-            onPressed: _confirmDeleteAccount,
+            tooltip: isThai ? 'ลบบัญชีนี้ (ย้ายไปถังขยะ)' : 'Delete account (Move to Trash)',
+            onPressed: () => _confirmDeleteAccount(isThai),
           ),
         ],
       ),
@@ -63,7 +66,7 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('ยอดคงเหลือปัจจุบัน', style: theme.textTheme.titleSmall),
+                    Text(isThai ? 'ยอดคงเหลือปัจจุบัน' : 'Current Balance', style: theme.textTheme.titleSmall),
                     const SizedBox(height: 6),
                     Text(
                       money.format(symbol: symbol),
@@ -75,7 +78,7 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
                     if (isUsd && fxRate != null) ...[
                       const SizedBox(height: 4),
                       Text(
-                        '≈ ${Money(thbEquivalent).format(symbol: '฿')} (อัตราแลกเปลี่ยน ${fxRate.toStringAsFixed(2)} ฿/\$)',
+                        '≈ ${Money(thbEquivalent).format(symbol: '฿')} (${isThai ? "อัตราแลกเปลี่ยน" : "FX Rate"} ${fxRate.toStringAsFixed(2)} ฿/\$)',
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: theme.colorScheme.primary,
@@ -84,7 +87,7 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
                     ],
                     const SizedBox(height: 4),
                     Text(
-                      'สกุลเงิน: ${widget.account.currencyCode} · ${widget.account.isDomestic ? 'ในประเทศ' : 'ต่างประเทศ'}',
+                      '${isThai ? "สกุลเงิน" : "Currency"}: ${widget.account.currencyCode} · ${widget.account.isDomestic ? (isThai ? 'ในประเทศ' : 'Domestic') : (isThai ? 'ต่างประเทศ' : 'Offshore')}',
                       style: theme.textTheme.bodySmall,
                     ),
                   ],
@@ -99,7 +102,10 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('ประวัติรายการในบัญชีนี้ (แตะเพื่อแก้ไข)', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                Text(
+                  isThai ? 'ประวัติรายการในบัญชีนี้ (แตะเพื่อแก้ไข)' : 'Transaction History (Tap to edit)',
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                ),
               ],
             ),
           ),
@@ -116,7 +122,10 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
                 final transactions = snapshot.data ?? [];
                 if (transactions.isEmpty) {
                   return Center(
-                    child: Text('ยังไม่มีรายการในบัญชีนี้', style: TextStyle(color: Colors.grey.shade600)),
+                    child: Text(
+                      isThai ? 'ยังไม่มีรายการในบัญชีนี้' : 'No transactions in this account',
+                      style: TextStyle(color: Colors.grey.shade600),
+                    ),
                   );
                 }
 
@@ -130,8 +139,12 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
                     final money = Money(tx.amountThbSatang);
                     final color = isExpense ? Colors.red.shade700 : Colors.green.shade700;
 
+                    final fallbackTitle = isExpense
+                        ? (isThai ? 'รายจ่าย/โอนออก' : 'Expense / Outflow')
+                        : (isThai ? 'รายรับ/โอนเข้า' : 'Income / Inflow');
+
                     return ListTile(
-                      title: Text(tx.note?.isNotEmpty == true ? tx.note! : (isExpense ? 'รายจ่าย/โอนออก' : 'รายรับ/โอนเข้า')),
+                      title: Text(tx.note?.isNotEmpty == true ? tx.note! : fallbackTitle),
                       subtitle: Text(DateFormat('d MMM yyyy, HH:mm').format(tx.transactionDate), style: const TextStyle(fontSize: 12)),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -161,13 +174,17 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
     );
   }
 
-  Future<void> _toggleActive() async {
+  Future<void> _toggleActive(bool isThai) async {
     final accDao = ref.read(accountsDaoProvider);
     if (widget.account.isActive) {
       await accDao.deactivateAccount(widget.account.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ปิดการใช้งานบัญชีแล้ว (ยอดเงินจะไม่นับรวมในทรัพย์สินรวม)')),
+          SnackBar(
+            content: Text(isThai
+                ? 'ปิดการใช้งานบัญชีแล้ว (ยอดเงินจะไม่นับรวมในทรัพย์สินรวม)'
+                : 'Account deactivated (excluded from total assets)'),
+          ),
         );
         Navigator.of(context).pop();
       }
@@ -175,27 +192,29 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
       await accDao.activateAccount(widget.account.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('เปิดการใช้งานบัญชีเรียบร้อยแล้ว')),
+          SnackBar(content: Text(isThai ? 'เปิดการใช้งานบัญชีเรียบร้อยแล้ว' : 'Account activated successfully')),
         );
         Navigator.of(context).pop();
       }
     }
   }
 
-  Future<void> _confirmDeleteAccount() async {
+  Future<void> _confirmDeleteAccount(bool isThai) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('ลบบัญชี'),
+        title: Text(isThai ? 'ลบบัญชี' : 'Delete Account'),
         content: Text(
-          'คุณต้องการลบบัญชี "${widget.account.name}" ใช่หรือไม่?\n\nบัญชีและรายการธุรกรรมทั้งหมดจะถูกย้ายไปที่ "ถังขยะ" ในหน้าตั้งค่า และสามารถกู้คืนได้ภายใน 30 วัน',
+          isThai
+              ? 'คุณต้องการลบบัญชี "${widget.account.name}" ใช่หรือไม่?\n\nบัญชีและรายการธุรกรรมทั้งหมดจะถูกย้ายไปที่ "ถังขยะ" ในหน้าตั้งค่า และสามารถกู้คืนได้ภายใน 30 วัน'
+              : 'Delete account "${widget.account.name}"?\n\nThe account and its transactions will be moved to "Trash Bin" in Settings and can be restored within 30 days.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('ยกเลิก')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(isThai ? 'ยกเลิก' : 'Cancel')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('ลบบัญชี (ย้ายลงถังขยะ)'),
+            child: Text(isThai ? 'ลบบัญชี (ย้ายลงถังขยะ)' : 'Delete (Move to Trash)'),
           ),
         ],
       ),
@@ -205,7 +224,11 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
       await ref.read(accountsDaoProvider).softDeleteAccount(widget.account.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('ย้ายบัญชี "${widget.account.name}" ไปที่ถังขยะเรียบร้อยแล้ว')),
+          SnackBar(
+            content: Text(isThai
+                ? 'ย้ายบัญชี "${widget.account.name}" ไปที่ถังขยะเรียบร้อยแล้ว'
+                : 'Account "${widget.account.name}" moved to Trash Bin'),
+          ),
         );
         Navigator.of(context).pop();
       }

@@ -39,6 +39,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
   }
 
   void _showHoldingOptions(BuildContext context, PortfolioAssetHolding holding) {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
@@ -53,12 +54,12 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                   child: Text(holding.asset.symbol.substring(0, 1)),
                 ),
                 title: Text('${holding.asset.symbol} - ${holding.asset.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text('ถืออยู่ ${holding.totalQuantity} หน่วย'),
+                subtitle: Text(isThai ? 'ถืออยู่ ${holding.totalQuantity} หน่วย' : 'Holding ${holding.totalQuantity} units'),
               ),
               const Divider(height: 1),
               ListTile(
                 leading: const Icon(Icons.add_shopping_cart, color: Colors.blue),
-                title: const Text('ซื้อเพิ่ม (Buy)'),
+                title: Text(isThai ? 'ซื้อเพิ่ม (Buy)' : 'Buy more (Buy)'),
                 onTap: () async {
                   Navigator.pop(context);
                   final ok = await BuySellTradeDialog.show(context, initialAsset: holding.asset, initialIsBuy: true);
@@ -67,7 +68,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
               ),
               ListTile(
                 leading: const Icon(Icons.sell, color: Colors.green),
-                title: const Text('ขายทำกำไร/ตัดขาดทุน (Sell FIFO)'),
+                title: Text(isThai ? 'ขายทำกำไร/ตัดขาดทุน (Sell FIFO)' : 'Sell (Sell FIFO)'),
                 onTap: () async {
                   Navigator.pop(context);
                   final ok = await BuySellTradeDialog.show(context, initialAsset: holding.asset, initialIsBuy: false);
@@ -76,7 +77,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
               ),
               ListTile(
                 leading: const Icon(Icons.receipt_long, color: Colors.purple),
-                title: const Text('ตรวจสอบ Lot และประวัติการตัดขาย (FIFO)'),
+                title: Text(isThai ? 'ตรวจสอบ Lot และประวัติการตัดขาย (FIFO)' : 'Inspect Lots & FIFO history'),
                 onTap: () {
                   Navigator.pop(context);
                   LotInspectionScreen.show(context, holding.asset);
@@ -84,7 +85,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
               ),
               ListTile(
                 leading: const Icon(Icons.edit, color: Colors.orange),
-                title: const Text('แก้ไขข้อมูลสินทรัพย์'),
+                title: Text(isThai ? 'แก้ไขข้อมูลสินทรัพย์' : 'Edit Asset Info'),
                 onTap: () async {
                   Navigator.pop(context);
                   final ok = await AssetFormDialog.show(context, assetToEdit: holding.asset);
@@ -99,17 +100,20 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
   }
 
   Future<void> _confirmDeleteAsset(Asset asset) async {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('ลบสินทรัพย์ ${asset.symbol}'),
-        content: Text('คุณต้องการลบสินทรัพย์ "${asset.name}" ออกจากระบบใช่หรือไม่?'),
+        title: Text(isThai ? 'ลบสินทรัพย์ ${asset.symbol}' : 'Delete Asset ${asset.symbol}'),
+        content: Text(isThai
+            ? 'คุณต้องการลบสินทรัพย์ "${asset.name}" ออกจากระบบใช่หรือไม่?'
+            : 'Are you sure you want to delete "${asset.name}" from the system?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('ยกเลิก')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(isThai ? 'ยกเลิก' : 'Cancel')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('ลบสินทรัพย์'),
+            child: Text(isThai ? 'ลบสินทรัพย์' : 'Delete Asset'),
           ),
         ],
       ),
@@ -120,15 +124,15 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('ลบสินทรัพย์ ${asset.symbol} ย้ายไปถังขยะเรียบร้อยแล้ว'),
+            content: Text(isThai ? 'ลบสินทรัพย์ ${asset.symbol} ย้ายไปถังขยะเรียบร้อยแล้ว' : '${asset.symbol} moved to trash bin'),
             action: SnackBarAction(
-              label: 'กู้คืน',
+              label: isThai ? 'กู้คืน' : 'Undo',
               onPressed: () async {
                 await ref.read(investmentsDaoProvider).restoreAsset(asset.id);
                 if (mounted) {
                   setState(() {});
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('กู้คืน ${asset.symbol} สำเร็จ')),
+                    SnackBar(content: Text(isThai ? 'กู้คืน ${asset.symbol} สำเร็จ' : 'Restored ${asset.symbol}')),
                   );
                 }
               },
@@ -142,23 +146,30 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
   }
 
   Future<void> _confirmDeleteTrade(InvestmentTradeRecord trade) async {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     final isBuy = trade.tradeType == 'buy';
-    final symbol = trade.asset?.symbol ?? 'สินทรัพย์';
+    final symbol = trade.asset?.symbol ?? (isThai ? 'สินทรัพย์' : 'Asset');
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('ยืนยันลบรายการ${isBuy ? "ซื้อ" : "ขาย"} $symbol'),
+        title: Text(isThai
+            ? 'ยืนยันลบรายการ${isBuy ? "ซื้อ" : "ขาย"} $symbol'
+            : 'Confirm Delete ${isBuy ? "Buy" : "Sell"} $symbol'),
         content: Text(
-          isBuy
-              ? 'คุณต้องการลบรายการซื้อ $symbol ใช่หรือไม่?\n\nระบบจะยกเลิก Lot นี้ และคำนวณต้นทุน/กำไร FIFO ใหม่ทั้งหมดให้อัตโนมัติ'
-              : 'คุณต้องการลบรายการขาย $symbol ใช่หรือไม่?\n\nระบบจะคืนหุ้นกลับเข้าพอร์ต และคำนวณต้นทุน/กำไร FIFO ใหม่ทั้งหมดให้อัตโนมัติ',
+          isThai
+              ? (isBuy
+                  ? 'คุณต้องการลบรายการซื้อ $symbol ใช่หรือไม่?\n\nระบบจะยกเลิก Lot นี้ และคำนวณต้นทุน/กำไร FIFO ใหม่ทั้งหมดให้อัตโนมัติ'
+                  : 'คุณต้องการลบรายการขาย $symbol ใช่หรือไม่?\n\nระบบจะคืนหุ้นกลับเข้าพอร์ต และคำนวณต้นทุน/กำไร FIFO ใหม่ทั้งหมดให้อัตโนมัติ')
+              : (isBuy
+                  ? 'Delete buy record for $symbol?\n\nThis lot will be cancelled and FIFO cost/gain recalculated automatically.'
+                  : 'Delete sell record for $symbol?\n\nShares will be returned to portfolio and FIFO cost/gain recalculated automatically.'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('ยกเลิก')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(isThai ? 'ยกเลิก' : 'Cancel')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('ลบรายการ'),
+            child: Text(isThai ? 'ลบรายการ' : 'Delete Record'),
           ),
         ],
       ),
@@ -169,7 +180,11 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
       if (mounted) {
         setState(() {});
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('ลบรายการ${isBuy ? "ซื้อ" : "ขาย"} $symbol เรียบร้อยแล้ว')),
+          SnackBar(
+            content: Text(isThai
+                ? 'ลบรายการ${isBuy ? "ซื้อ" : "ขาย"} $symbol เรียบร้อยแล้ว'
+                : 'Deleted ${isBuy ? "buy" : "sell"} $symbol'),
+          ),
         );
       }
     }
@@ -179,13 +194,14 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
   Widget build(BuildContext context) {
     final invDao = ref.watch(investmentsDaoProvider);
     final l10n = AppLocalizations.of(context);
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
 
     return Scaffold(
       appBar: AppBar(
-        title: Text((l10n?.portfolio ?? 'PORTFOLIO').toUpperCase()),
+        title: Text((l10n?.portfolio ?? (isThai ? 'พอร์ตการลงทุน' : 'PORTFOLIO')).toUpperCase()),
         actions: [
           IconButton(
-            tooltip: 'อัปเดตราคาตลาดสิ้นเดือน',
+            tooltip: isThai ? 'อัปเดตราคาตลาดสิ้นเดือน' : 'Update Monthly Valuation',
             icon: const Icon(Icons.price_change_outlined),
             onPressed: () async {
               final ok = await MonthlyValuationScreen.show(context);
@@ -193,7 +209,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
             },
           ),
           PopupMenuButton<String>(
-            tooltip: 'เมนูเพิ่มเติม',
+            tooltip: isThai ? 'เมนูเพิ่มเติม' : 'More Options',
             onSelected: (val) async {
               if (val == 'new_asset') {
                 final ok = await AssetFormDialog.show(context);
@@ -212,24 +228,24 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
               }
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(value: 'new_asset', child: Row(children: [Icon(Icons.add), SizedBox(width: 8), Text('เพิ่มสินทรัพย์ใหม่')])),
-              const PopupMenuItem(value: 'income', child: Row(children: [Icon(Icons.attach_money), SizedBox(width: 8), Text('บันทึกเงินปันผล/ดอกเบี้ย')])),
-              const PopupMenuItem(value: 'trash', child: Row(children: [Icon(Icons.delete_outline), SizedBox(width: 8), Text('ถังขยะหุ้น (กู้คืนหุ้นที่ลบ)')])),
+              PopupMenuItem(value: 'new_asset', child: Row(children: [const Icon(Icons.add), const SizedBox(width: 8), Text(isThai ? 'เพิ่มสินทรัพย์ใหม่' : 'Add New Asset')])),
+              PopupMenuItem(value: 'income', child: Row(children: [const Icon(Icons.attach_money), const SizedBox(width: 8), Text(isThai ? 'บันทึกเงินปันผล/ดอกเบี้ย' : 'Record Dividend / Interest')])),
+              PopupMenuItem(value: 'trash', child: Row(children: [const Icon(Icons.delete_outline), const SizedBox(width: 8), Text(isThai ? 'ถังขยะหุ้น (กู้คืนหุ้นที่ลบ)' : 'Trash Bin (Restore Assets)')])),
             ],
           ),
         ],
         bottom: TabBar(
           controller: _tabController,
           tabs: [
-            Tab(text: l10n?.holdings ?? 'สินทรัพย์ที่ถือครอง', icon: const Icon(Icons.pie_chart)),
-            Tab(text: l10n?.realizedPnl ?? 'กำไรที่รับรู้แล้ว', icon: const Icon(Icons.history)),
-            Tab(text: l10n?.history ?? 'ประวัติการซื้อ-ขาย', icon: const Icon(Icons.swap_horiz)),
+            Tab(text: l10n?.holdings ?? (isThai ? 'สินทรัพย์ที่ถือครอง' : 'Holdings'), icon: const Icon(Icons.pie_chart)),
+            Tab(text: l10n?.realizedPnl ?? (isThai ? 'กำไรที่รับรู้แล้ว' : 'Realized P&L'), icon: const Icon(Icons.history)),
+            Tab(text: l10n?.history ?? (isThai ? 'ประวัติการซื้อ-ขาย' : 'Trade History'), icon: const Icon(Icons.swap_horiz)),
           ],
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         icon: const Icon(Icons.swap_horiz),
-        label: Text(Localizations.localeOf(context).languageCode == 'th' ? 'ซื้อ / ขาย' : (l10n?.trade ?? 'Buy / Sell')),
+        label: Text(isThai ? 'ซื้อ / ขาย' : (l10n?.trade ?? 'Buy / Sell')),
         onPressed: () async {
           final ok = await BuySellTradeDialog.show(context);
           if (ok == true && mounted) setState(() {});
@@ -249,13 +265,13 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
             controller: _tabController,
             children: [
               // Tab 1: Holdings & Portfolio Overview
-              _buildHoldingsTab(context, summary, holdings),
+              _buildHoldingsTab(context, summary, holdings, isThai),
 
               // Tab 2: Realized Gain/Loss Summary
-              _buildRealizedGainLossTab(context, invDao),
+              _buildRealizedGainLossTab(context, invDao, isThai),
 
               // Tab 3: Trade History
-              _buildTradeHistoryTab(context, invDao),
+              _buildTradeHistoryTab(context, invDao, isThai),
             ],
           );
         },
@@ -263,7 +279,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
     );
   }
 
-  Widget _buildHoldingsTab(BuildContext context, PortfolioSummary? summary, List<PortfolioAssetHolding> holdings) {
+  Widget _buildHoldingsTab(BuildContext context, PortfolioSummary? summary, List<PortfolioAssetHolding> holdings, bool isThai) {
     final theme = Theme.of(context);
 
     if (summary == null || (holdings.isEmpty && summary.uninvestedAssets.isEmpty)) {
@@ -273,11 +289,11 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
           children: [
             Icon(Icons.show_chart, size: 64, color: Colors.grey.shade400),
             const SizedBox(height: 12),
-            const Text('ยังไม่มีสินทรัพย์ในพอร์ตการลงทุน', style: TextStyle(fontSize: 16, color: Colors.grey)),
+            Text(isThai ? 'ยังไม่มีสินทรัพย์ในพอร์ตการลงทุน' : 'No assets in portfolio yet', style: const TextStyle(fontSize: 16, color: Colors.grey)),
             const SizedBox(height: 16),
             FilledButton.icon(
               icon: const Icon(Icons.add),
-              label: const Text('เพิ่มสินทรัพย์และบันทึกซื้อ'),
+              label: Text(isThai ? 'เพิ่มสินทรัพย์และบันทึกซื้อ' : 'Add Asset & Record Buy'),
               onPressed: () async {
                 final ok = await AssetFormDialog.show(context);
                 if (ok == true && mounted) setState(() {});
@@ -323,7 +339,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'มูลค่าพอร์ตปัจจุบันรวม',
+                    isThai ? 'มูลค่าพอร์ตปัจจุบันรวม' : 'Total Portfolio Value',
                     style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: 4),
@@ -342,7 +358,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('ต้นทุนรวม', style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
+                          Text(isThai ? 'ต้นทุนรวม' : 'Total Cost Basis', style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
                           const SizedBox(height: 2),
                           Text(totalCostMoney.format(symbol: '฿'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                         ],
@@ -381,7 +397,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('กำไรจากราคา (Price P&L)', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
+                              Text(isThai ? 'กำไรจากราคา (Price P&L)' : 'Price P&L', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
                               const SizedBox(height: 2),
                               Text(
                                 '${summary.totalUnrealizedPriceGainLossThbSatang >= 0 ? '+' : ''}${pricePnlMoney.format(symbol: '฿')}',
@@ -406,7 +422,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('กำไรจากอัตราแลกเปลี่ยน (FX)', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
+                              Text(isThai ? 'กำไรจากอัตราแลกเปลี่ยน (FX)' : 'FX P&L', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
                               const SizedBox(height: 2),
                               Text(
                                 '${summary.totalUnrealizedFxGainLossThbSatang >= 0 ? '+' : ''}${fxPnlMoney.format(symbol: '฿')}',
@@ -440,7 +456,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     ),
                     icon: const Icon(Icons.add, size: 20),
-                    label: const Text('เพิ่มสินทรัพย์', style: TextStyle(fontWeight: FontWeight.bold)),
+                    label: Text(isThai ? 'เพิ่มสินทรัพย์' : 'Add Asset', style: const TextStyle(fontWeight: FontWeight.bold)),
                     onPressed: () async {
                       final ok = await AssetFormDialog.show(context);
                       if (ok == true && mounted) setState(() {});
@@ -452,7 +468,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     ),
                     icon: const Icon(Icons.price_change_outlined, size: 20),
-                    label: const Text('อัปเดตราคาตลาด', style: TextStyle(fontWeight: FontWeight.bold)),
+                    label: Text(isThai ? 'อัปเดตราคาตลาด' : 'Update Prices', style: const TextStyle(fontWeight: FontWeight.bold)),
                     onPressed: () async {
                       final ok = await MonthlyValuationScreen.show(context);
                       if (ok == true && mounted) setState(() {});
@@ -464,7 +480,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     ),
                     icon: const Icon(Icons.savings_outlined, size: 20),
-                    label: const Text('บันทึกเงินปันผล', style: TextStyle(fontWeight: FontWeight.bold)),
+                    label: Text(isThai ? 'บันทึกเงินปันผล' : 'Record Dividend', style: const TextStyle(fontWeight: FontWeight.bold)),
                     onPressed: () async {
                       final ok = await DividendIncomeDialog.show(context);
                       if (ok == true && mounted) setState(() {});
@@ -477,7 +493,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
           const SizedBox(height: 16),
 
           // 3. Asset Allocation Donut Chart
-          _buildAllocationChart(context, holdings, summary.totalValueThbSatang),
+          _buildAllocationChart(context, holdings, summary.totalValueThbSatang, isThai),
           const SizedBox(height: 16),
 
           // 4. Holdings List
@@ -485,9 +501,9 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('รายการสินทรัพย์ที่ถืออยู่ (${holdings.length})', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                Text(isThai ? 'รายการสินทรัพย์ที่ถืออยู่ (${holdings.length})' : 'Holdings (${holdings.length})', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                 Text(
-                  'แตะเพื่อจัดการ Lot หรือซื้อขาย',
+                  isThai ? 'แตะเพื่อจัดการ Lot หรือซื้อขาย' : 'Tap to manage lots or trade',
                   style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
               ],
@@ -502,9 +518,9 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                     children: [
                       Icon(Icons.inventory_2_outlined, size: 36, color: theme.colorScheme.primary),
                       const SizedBox(height: 8),
-                      Text('ยังไม่มีรายการที่ถือครองอยู่ในพอร์ต', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+                      Text(isThai ? 'ยังไม่มีรายการที่ถือครองอยู่ในพอร์ต' : 'No holdings in portfolio', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
                       const SizedBox(height: 4),
-                      Text('เลือกกดปุ่ม "ซื้อ" จากรายชื่อสินทรัพย์ด้านล่างเพื่อเริ่มบันทึกการลงทุน', style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
+                      Text(isThai ? 'เลือกกดปุ่ม "ซื้อ" จากรายชื่อสินทรัพย์ด้านล่างเพื่อเริ่มบันทึกการลงทุน' : 'Tap "Buy" on assets below to start investing', style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
                     ],
                   ),
                 ),
@@ -561,7 +577,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                   children: [
                     Text(h.asset.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
                     const SizedBox(height: 2),
-                    Text('ถือ: ${h.totalQuantity} หน่วย • ทุน: ${costMoney.format(symbol: '฿')}', style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
+                    Text(isThai ? 'ถือ: ${h.totalQuantity} หน่วย • ทุน: ${costMoney.format(symbol: '฿')}' : 'Hold: ${h.totalQuantity} units • Cost: ${costMoney.format(symbol: '฿')}', style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
                   ],
                 ),
                 trailing: Column(
@@ -599,11 +615,11 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'สินทรัพย์ที่รอเข้าซื้อ (${summary.uninvestedAssets.length})',
+                  isThai ? 'สินทรัพย์ที่รอเข้าซื้อ (${summary.uninvestedAssets.length})' : 'Watchlist / Uninvested (${summary.uninvestedAssets.length})',
                   style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  'ยังไม่มีรายการซื้อในพอร์ต',
+                  isThai ? 'ยังไม่มีรายการซื้อในพอร์ต' : 'No purchase records yet',
                   style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
               ],
@@ -658,12 +674,12 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                           final ok = await BuySellTradeDialog.show(context, initialAsset: asset, initialIsBuy: true);
                           if (ok == true && mounted) setState(() {});
                         },
-                        child: const Text('ซื้อ'),
+                        child: Text(isThai ? 'ซื้อ' : 'Buy'),
                       ),
                       const SizedBox(width: 4),
                       IconButton(
                         icon: const Icon(Icons.edit_outlined, size: 20),
-                        tooltip: 'แก้ไขข้อมูลสินทรัพย์',
+                        tooltip: isThai ? 'แก้ไขข้อมูลสินทรัพย์' : 'Edit Asset',
                         onPressed: () async {
                           final ok = await AssetFormDialog.show(context, assetToEdit: asset);
                           if (ok == true && mounted) setState(() {});
@@ -671,7 +687,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                       ),
                       IconButton(
                         icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
-                        tooltip: 'ลบสินทรัพย์',
+                        tooltip: isThai ? 'ลบสินทรัพย์' : 'Delete Asset',
                         onPressed: () => _confirmDeleteAsset(asset),
                       ),
                     ],
@@ -687,7 +703,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
     );
   }
 
-  Widget _buildAllocationChart(BuildContext context, List<PortfolioAssetHolding> holdings, int totalValue) {
+  Widget _buildAllocationChart(BuildContext context, List<PortfolioAssetHolding> holdings, int totalValue, bool isThai) {
     if (totalValue <= 0) return const SizedBox.shrink();
 
     // Group by asset type
@@ -730,7 +746,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('สัดส่วนตามประเภทสินทรัพย์', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            Text(isThai ? 'สัดส่วนตามประเภทสินทรัพย์' : 'Asset Allocation', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
             const SizedBox(height: 12),
             SizedBox(
               height: 140,
@@ -759,7 +775,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                             children: [
                               Container(width: 10, height: 10, color: colors[typeMap.keys.toList().indexOf(e.key) % colors.length]),
                               const SizedBox(width: 6),
-                              Expanded(child: Text(_assetTypeLabel(e.key), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
+                              Expanded(child: Text(_assetTypeLabel(e.key, isThai), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
                             ],
                           ),
                         );
@@ -775,28 +791,28 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
     );
   }
 
-  String _assetTypeLabel(String type) {
+  String _assetTypeLabel(String type, bool isThai) {
     switch (type) {
       case 'thai_stock':
-        return 'หุ้นไทย';
+        return isThai ? 'หุ้นไทย' : 'Thai Stock';
       case 'foreign_stock':
-        return 'หุ้นต่างประเทศ';
+        return isThai ? 'หุ้นต่างประเทศ' : 'Foreign Stock';
       case 'etf':
         return 'ETF';
       case 'mutual_fund':
-        return 'กองทุนรวม';
+        return isThai ? 'กองทุนรวม' : 'Mutual Fund';
       case 'crypto':
-        return 'คริปโต';
+        return isThai ? 'คริปโต' : 'Crypto';
       case 'gold':
-        return 'ทองคำ';
+        return isThai ? 'ทองคำ' : 'Gold';
       case 'bond':
-        return 'พันธบัตร/หุ้นกู้';
+        return isThai ? 'พันธบัตร/หุ้นกู้' : 'Bond';
       default:
         return type;
     }
   }
 
-  Widget _buildRealizedGainLossTab(BuildContext context, InvestmentsDao invDao) {
+  Widget _buildRealizedGainLossTab(BuildContext context, InvestmentsDao invDao, bool isThai) {
     return FutureBuilder<List<RealizedGainLossYearSummary>>(
       future: invDao.getRealizedGainLossByYear(),
       builder: (context, snapshot) {
@@ -806,8 +822,8 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
 
         final summaries = snapshot.data ?? [];
         if (summaries.isEmpty) {
-          return const Center(
-            child: Text('ยังไม่มีประวัติกำไร/ขาดทุนที่รับรู้แล้ว (ยังไม่มีการขายสินทรัพย์)'),
+          return Center(
+            child: Text(isThai ? 'ยังไม่มีประวัติกำไร/ขาดทุนที่รับรู้แล้ว (ยังไม่มีการขายสินทรัพย์)' : 'No realized gain/loss history yet (No sell transactions)'),
           );
         }
 
@@ -850,7 +866,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                             Icon(Icons.calendar_today_rounded, size: 16, color: Theme.of(context).colorScheme.primary),
                             const SizedBox(width: 8),
                             Text(
-                              'ปีภาษี ค.ศ. ${y.year} (พ.ศ. ${y.year + 543})',
+                              isThai ? 'ปีภาษี ค.ศ. ${y.year} (พ.ศ. ${y.year + 543})' : 'Tax Year ${y.year}',
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                             ),
                           ],
@@ -886,7 +902,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                           Expanded(
                             child: Column(
                               children: [
-                                Text('ยอดขายรวม', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                                Text(isThai ? 'ยอดขายรวม' : 'Total Sales', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                                 const SizedBox(height: 2),
                                 Text(sellPriceMoney.format(symbol: '฿'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                               ],
@@ -896,7 +912,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                           Expanded(
                             child: Column(
                               children: [
-                                Text('เงินต้นที่ขาย', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                                Text(isThai ? 'เงินต้นที่ขาย' : 'Cost Sold', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                                 const SizedBox(height: 2),
                                 Text(costMoney.format(symbol: '฿'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                               ],
@@ -907,7 +923,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                             Expanded(
                               child: Column(
                                 children: [
-                                  Text('ซื้อเพิ่มปีนี้', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                                  Text(isThai ? 'ซื้อเพิ่มปีนี้' : 'Bought This Year', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                                   const SizedBox(height: 2),
                                   Text(buyCostMoney.format(symbol: '฿'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.secondary)),
                                 ],
@@ -923,7 +939,9 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: Text(
-                        'กำไรจากราคา: ${priceMoney.format(symbol: '฿')}  •  จาก FX: ${fxMoney.format(symbol: '฿')}${y.totalFeeThbSatang > 0 ? '  •  ค่าธรรมเนียม: ${feeMoney.format(symbol: '฿')}' : ''}',
+                        isThai
+                            ? 'กำไรจากราคา: ${priceMoney.format(symbol: '฿')}  •  จาก FX: ${fxMoney.format(symbol: '฿')}${y.totalFeeThbSatang > 0 ? '  •  ค่าธรรมเนียม: ${feeMoney.format(symbol: '฿')}' : ''}'
+                            : 'Price P&L: ${priceMoney.format(symbol: '฿')}  •  FX: ${fxMoney.format(symbol: '฿')}${y.totalFeeThbSatang > 0 ? '  •  Fee: ${feeMoney.format(symbol: '฿')}' : ''}',
                         style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
                       ),
                     ),
@@ -938,7 +956,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                           Icon(Icons.pie_chart_outline_rounded, size: 14, color: Theme.of(context).colorScheme.primary),
                           const SizedBox(width: 6),
                           Text(
-                            'รายละเอียดหุ้นที่มีการซื้อขาย (${y.assetSummaries.length})',
+                            isThai ? 'รายละเอียดหุ้นที่มีการซื้อขาย (${y.assetSummaries.length})' : 'Traded Assets Details (${y.assetSummaries.length})',
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                           ),
                         ],
@@ -955,11 +973,13 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
 
                         String netQtyStr;
                         if (a.quantityBought > Decimal.zero && a.quantitySold > Decimal.zero) {
-                          netQtyStr = 'ซื้อ ${a.quantityBought} | ขาย ${a.quantitySold}';
+                          netQtyStr = isThai
+                              ? 'ซื้อ ${a.quantityBought} | ขาย ${a.quantitySold}'
+                              : 'Buy ${a.quantityBought} | Sell ${a.quantitySold}';
                         } else if (a.quantitySold > Decimal.zero) {
-                          netQtyStr = 'ขาย ${a.quantitySold} หน่วย';
+                          netQtyStr = isThai ? 'ขาย ${a.quantitySold} หน่วย' : 'Sell ${a.quantitySold} units';
                         } else {
-                          netQtyStr = 'ซื้อ ${a.quantityBought} หน่วย';
+                          netQtyStr = isThai ? 'ซื้อ ${a.quantityBought} หน่วย' : 'Buy ${a.quantityBought} units';
                         }
 
                         return Theme(
@@ -997,7 +1017,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                                       ),
                                     )
                                   : Text(
-                                      'ซื้อเข้า',
+                                      isThai ? 'ซื้อเข้า' : 'Bought',
                                       style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
                                     ),
                               children: [
@@ -1007,7 +1027,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text('ยอดขายรวม:', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                                      Text(isThai ? 'ยอดขายรวม:' : 'Total Sales:', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                                       Text(aSellPriceMoney.format(symbol: '฿'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
                                     ],
                                   ),
@@ -1015,7 +1035,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text('เงินต้นที่ขาย:', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                                      Text(isThai ? 'เงินต้นที่ขาย:' : 'Cost Sold:', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                                       Text(aCostMoney.format(symbol: '฿'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
                                     ],
                                   ),
@@ -1023,10 +1043,16 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text('กำไรราคา: ${aPriceMoney.format(symbol: '฿')} • FX: ${aFxMoney.format(symbol: '฿')}',
+                                      Text(
+                                          isThai
+                                              ? 'กำไรราคา: ${aPriceMoney.format(symbol: '฿')} • FX: ${aFxMoney.format(symbol: '฿')}'
+                                              : 'Price: ${aPriceMoney.format(symbol: '฿')} • FX: ${aFxMoney.format(symbol: '฿')}',
                                           style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                                       if (a.feeThbSatang > 0)
-                                        Text('ค่าธรรมเนียม: ${Money(a.feeThbSatang).format(symbol: '฿')}',
+                                        Text(
+                                            isThai
+                                                ? 'ค่าธรรมเนียม: ${Money(a.feeThbSatang).format(symbol: '฿')}'
+                                                : 'Fee: ${Money(a.feeThbSatang).format(symbol: '฿')}',
                                             style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                                     ],
                                   ),
@@ -1036,7 +1062,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text('เงินต้นที่ซื้อในปีนี้:', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                                      Text(isThai ? 'เงินต้นที่ซื้อในปีนี้:' : 'Bought This Year:', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                                       Text(aBuyCostMoney.format(symbol: '฿'), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.secondary)),
                                     ],
                                   ),
@@ -1057,7 +1083,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
     );
   }
 
-  Widget _buildTradeHistoryTab(BuildContext context, InvestmentsDao invDao) {
+  Widget _buildTradeHistoryTab(BuildContext context, InvestmentsDao invDao, bool isThai) {
     return FutureBuilder<List<InvestmentTradeRecord>>(
       future: invDao.getInvestmentTrades(),
       builder: (context, snapshot) {
@@ -1073,11 +1099,11 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
               children: [
                 Icon(Icons.swap_horiz, size: 64, color: Colors.grey.shade400),
                 const SizedBox(height: 12),
-                const Text('ยังไม่มีประวัติการซื้อ-ขายสินทรัพย์', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                Text(isThai ? 'ยังไม่มีประวัติการซื้อ-ขายสินทรัพย์' : 'No trade history yet', style: const TextStyle(fontSize: 16, color: Colors.grey)),
                 const SizedBox(height: 16),
                 FilledButton.icon(
                   icon: const Icon(Icons.add),
-                  label: const Text('บันทึก ซื้อ / ขาย'),
+                  label: Text(isThai ? 'บันทึก ซื้อ / ขาย' : 'Record Trade'),
                   onPressed: () async {
                     final ok = await BuySellTradeDialog.show(context);
                     if (ok == true && mounted) setState(() {});
@@ -1088,7 +1114,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
           );
         }
 
-        final dateFormat = DateFormat('d MMM yyyy, HH:mm', 'th_TH');
+        final dateFormat = DateFormat('d MMM yyyy, HH:mm', isThai ? 'th_TH' : 'en_US');
 
         return ListView.builder(
           padding: const EdgeInsets.all(16),
@@ -1134,7 +1160,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
-                                isBuy ? 'ซื้อ' : 'ขาย',
+                                isBuy ? (isThai ? 'ซื้อ' : 'BUY') : (isThai ? 'ขาย' : 'SELL'),
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
@@ -1176,7 +1202,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                             const SizedBox(width: 4),
                             IconButton(
                               icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                              tooltip: 'ลบรายการนี้',
+                              tooltip: isThai ? 'ลบรายการนี้' : 'Delete this trade',
                               visualDensity: VisualDensity.compact,
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(),
@@ -1212,7 +1238,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          '${trade.quantity} หน่วย @ ${Money(trade.priceOriginalSatang).format(symbol: trade.currencyCode == 'THB' ? '฿' : '\$')}',
+                          '${trade.quantity} ${isThai ? "หน่วย" : "units"} @ ${Money(trade.priceOriginalSatang).format(symbol: trade.currencyCode == 'THB' ? '฿' : '\$')}',
                           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                         ),
                         if (hasRealizedPnl)
@@ -1223,7 +1249,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              '${isRealizedProfit ? 'กำไร: +' : 'ขาดทุน: '}${Money(trade.realizedGainLossThbSatang!).format(symbol: '฿')}',
+                              '${isRealizedProfit ? (isThai ? 'กำไร: +' : 'Profit: +') : (isThai ? 'ขาดทุน: ' : 'Loss: ')}${Money(trade.realizedGainLossThbSatang!).format(symbol: '฿')}',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
@@ -1244,7 +1270,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                             children: [
                               if (trade.currencyCode != 'THB')
                                 Text(
-                                  'เรต: ${trade.fxRate}',
+                                  '${isThai ? "เรต" : "Rate"}: ${trade.fxRate}',
                                   style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
                                 ),
                               if (trade.currencyCode != 'THB' && trade.feeThbSatang > 0)
@@ -1254,7 +1280,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                                 ),
                               if (trade.feeThbSatang > 0)
                                 Text(
-                                  'ค่าธรรมเนียม: ${feeMoney.format(symbol: '฿')}',
+                                  '${isThai ? "ค่าธรรมเนียม" : "Fee"}: ${feeMoney.format(symbol: '฿')}',
                                   style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
                                 ),
                             ],
@@ -1271,7 +1297,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                                     Icon(Icons.receipt_long, size: 13, color: Theme.of(context).colorScheme.primary),
                                     const SizedBox(width: 3),
                                     Text(
-                                      'Lot FIFO',
+                                      isThai ? 'Lot FIFO' : 'FIFO Lots',
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.bold,

@@ -17,17 +17,19 @@ class AccountsScreen extends ConsumerStatefulWidget {
 
 class _AccountsScreenState extends ConsumerState<AccountsScreen> {
   @override
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final accDao = ref.watch(accountsDaoProvider);
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('บัญชีทั้งหมด'),
+        title: Text(isThai ? 'บัญชีทั้งหมด' : 'All Accounts'),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            tooltip: 'เพิ่มบัญชีใหม่',
+            tooltip: isThai ? 'เพิ่มบัญชีใหม่' : 'Add New Account',
             onPressed: () async {
               final added = await AddAccountDialog.show(context);
               if (added == true && mounted) {
@@ -45,7 +47,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
           }
         },
         icon: const Icon(Icons.add),
-        label: const Text('เพิ่มบัญชี'),
+        label: Text(isThai ? 'เพิ่มบัญชี' : 'Add Account'),
       ),
       body: FutureBuilder(
         future: Future.wait([
@@ -58,7 +60,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
           }
 
           if (snapshot.hasError) {
-            return Center(child: Text('เกิดข้อผิดพลาด: ${snapshot.error}'));
+            return Center(child: Text('${isThai ? "เกิดข้อผิดพลาด" : "Error"}: ${snapshot.error}'));
           }
 
           final accounts = snapshot.data![0] as List<Account>;
@@ -82,7 +84,12 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('ความมั่งคั่งสุทธิรวม (เฉพาะบัญชีที่เปิดใช้งาน)', style: theme.textTheme.titleSmall),
+                      Text(
+                        isThai
+                            ? 'ความมั่งคั่งสุทธิรวม (เฉพาะบัญชีที่เปิดใช้งาน)'
+                            : 'Total Net Worth (Active Accounts Only)',
+                        style: theme.textTheme.titleSmall,
+                      ),
                       const SizedBox(height: 6),
                       Text(
                         Money(totalNetWorth).format(symbol: '฿'),
@@ -98,26 +105,26 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
               const SizedBox(height: 16),
 
               if (domesticThb.isNotEmpty) ...[
-                _buildSectionHeader('บัญชีเงินบาทในประเทศ'),
-                ...domesticThb.map((a) => _buildAccountTile(context, a)),
+                _buildSectionHeader(isThai ? 'บัญชีเงินบาทในประเทศ' : 'Domestic Bank Accounts (THB)'),
+                ...domesticThb.map((a) => _buildAccountTile(context, a, isThai)),
                 const SizedBox(height: 12),
               ],
 
               if (fcd.isNotEmpty) ...[
-                _buildSectionHeader('บัญชีเงินตราต่างประเทศ (FCD)'),
-                ...fcd.map((a) => _buildAccountTile(context, a)),
+                _buildSectionHeader(isThai ? 'บัญชีเงินตราต่างประเทศ (FCD)' : 'Foreign Currency Deposit (FCD)'),
+                ...fcd.map((a) => _buildAccountTile(context, a, isThai)),
                 const SizedBox(height: 12),
               ],
 
               if (offshore.isNotEmpty) ...[
-                _buildSectionHeader('บัญชีต่างประเทศ (Offshore)'),
-                ...offshore.map((a) => _buildAccountTile(context, a)),
+                _buildSectionHeader(isThai ? 'บัญชีต่างประเทศ (Offshore)' : 'Offshore Accounts'),
+                ...offshore.map((a) => _buildAccountTile(context, a, isThai)),
                 const SizedBox(height: 12),
               ],
 
               if (creditCards.isNotEmpty) ...[
-                _buildSectionHeader('บัตรเครดิต'),
-                ...creditCards.map((a) => _buildCreditCardTile(context, a)),
+                _buildSectionHeader(isThai ? 'บัตรเครดิต' : 'Credit Cards'),
+                ...creditCards.map((a) => _buildCreditCardTile(context, a, isThai)),
                 const SizedBox(height: 12),
               ],
             ],
@@ -137,7 +144,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
     );
   }
 
-  Widget _buildAccountTile(BuildContext context, Account account) {
+  Widget _buildAccountTile(BuildContext context, Account account, bool isThai) {
     return FutureBuilder(
       future: ref.read(accountsDaoProvider).getAccountBalanceBreakdown(account.id),
       builder: (context, snapshot) {
@@ -166,7 +173,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                     decoration: BoxDecoration(
-                      color: Colors.green.shade100,
+                       color: Colors.green.shade100,
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text('USD', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green.shade900)),
@@ -175,7 +182,9 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
               ],
             ),
             subtitle: Text(
-              account.isActive ? 'เปิดใช้งาน' : 'ปิดใช้งาน (ไม่นับรวมสินทรัพย์)',
+              account.isActive
+                  ? (isThai ? 'เปิดใช้งาน' : 'Active')
+                  : (isThai ? 'ปิดใช้งาน (ไม่นับรวมสินทรัพย์)' : 'Inactive (Excluded from assets)'),
               style: TextStyle(fontSize: 12, color: account.isActive ? Colors.green : Colors.grey),
             ),
             trailing: Column(
@@ -188,7 +197,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                 ),
                 if (isUsd)
                   Text(
-                    '≈ ${thbMoney.format(symbol: '฿')} (เรต ${fxRate.toStringAsFixed(2)})',
+                    '≈ ${thbMoney.format(symbol: '฿')} (${isThai ? "เรต" : "Rate"} ${fxRate.toStringAsFixed(2)})',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -211,7 +220,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
     );
   }
 
-  Widget _buildCreditCardTile(BuildContext context, Account account) {
+  Widget _buildCreditCardTile(BuildContext context, Account account, bool isThai) {
     return FutureBuilder<int>(
       future: ref.read(accountsDaoProvider).getAccountBalanceSatang(account.id),
       builder: (context, snapshot) {
@@ -229,7 +238,12 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
               child: Icon(Icons.credit_card, color: Colors.deepOrange.shade700),
             ),
             title: Text(account.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text('สรุปยอดทุกวันที่ ${account.closingDay ?? 23}', style: const TextStyle(fontSize: 12)),
+            subtitle: Text(
+              isThai
+                  ? 'สรุปยอดทุกวันที่ ${account.closingDay ?? 23}'
+                  : 'Statement closes on day ${account.closingDay ?? 23}',
+              style: const TextStyle(fontSize: 12),
+            ),
             trailing: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -239,7 +253,9 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isDebt ? Colors.red.shade700 : Colors.black87),
                 ),
                 Text(
-                  isDebt ? 'ยอดหนี้คงค้าง' : 'ไม่มีหนี้',
+                  isDebt
+                      ? (isThai ? 'ยอดหนี้คงค้าง' : 'Outstanding balance')
+                      : (isThai ? 'ไม่มีหนี้' : 'Zero balance'),
                   style: TextStyle(fontSize: 11, color: isDebt ? Colors.red.shade700 : Colors.green),
                 ),
               ],

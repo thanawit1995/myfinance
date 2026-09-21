@@ -129,8 +129,9 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
     }
 
     if (mounted) {
+      final isThai = Localizations.localeOf(context).languageCode == 'th';
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('สร้างบัญชี "$name" เรียบร้อยแล้ว')),
+        SnackBar(content: Text(isThai ? 'สร้างบัญชี "$name" เรียบร้อยแล้ว' : 'Account "$name" created successfully')),
       );
       Navigator.of(context).pop(true);
     }
@@ -139,9 +140,10 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
   @override
   Widget build(BuildContext context) {
     final isCreditCard = _accountType == 'credit_card';
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
 
     return AlertDialog(
-      title: const Text('เพิ่มบัญชีใหม่'),
+      title: Text(isThai ? 'เพิ่มบัญชีใหม่' : 'Add New Account'),
       content: SizedBox(
         width: 420,
         child: Form(
@@ -154,14 +156,14 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                 // Account Name
                 TextFormField(
                   controller: _nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'ชื่อบัญชี *',
-                    hintText: 'เช่น กสิกรไทย, K-eSavings, บัตร KTC',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: isThai ? 'ชื่อบัญชี *' : 'Account Name *',
+                    hintText: isThai ? 'เช่น กสิกรไทย, K-eSavings, บัตร KTC' : 'e.g. Chase Checking, KBank, KTC Card',
+                    border: const OutlineInputBorder(),
                   ),
                   validator: (val) {
                     if (val == null || val.trim().isEmpty) {
-                      return 'กรุณากรอกชื่อบัญชี';
+                      return isThai ? 'กรุณากรอกชื่อบัญชี' : 'Please enter an account name';
                     }
                     return null;
                   },
@@ -170,17 +172,17 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
 
                 // Account Type Dropdown
                 DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(
-                    labelText: 'ประเภทบัญชี *',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: isThai ? 'ประเภทบัญชี *' : 'Account Type *',
+                    border: const OutlineInputBorder(),
                   ),
                   initialValue: _accountType,
-                  items: const [
-                    DropdownMenuItem(value: 'bank', child: Text('บัญชีเงินฝากธนาคาร (Bank)')),
-                    DropdownMenuItem(value: 'fcd', child: Text('บัญชีเงินตราต่างประเทศในไทย (FCD)')),
-                    DropdownMenuItem(value: 'offshore', child: Text('บัญชีต่างประเทศ (Offshore)')),
-                    DropdownMenuItem(value: 'credit_card', child: Text('บัตรเครดิต (Credit Card)')),
-                    DropdownMenuItem(value: 'cash', child: Text('เงินสด (Cash)')),
+                  items: [
+                    DropdownMenuItem(value: 'bank', child: Text(isThai ? 'บัญชีเงินฝากธนาคาร (Bank)' : 'Bank Account')),
+                    DropdownMenuItem(value: 'fcd', child: Text(isThai ? 'บัญชีเงินตราต่างประเทศ (FCD)' : 'Foreign Currency Deposit (FCD)')),
+                    DropdownMenuItem(value: 'offshore', child: Text(isThai ? 'บัญชีต่างประเทศ (Offshore)' : 'Offshore Account')),
+                    DropdownMenuItem(value: 'credit_card', child: Text(isThai ? 'บัตรเครดิต (Credit Card)' : 'Credit Card')),
+                    DropdownMenuItem(value: 'cash', child: Text(isThai ? 'เงินสด (Cash)' : 'Cash')),
                   ],
                   onChanged: _onTypeChanged,
                 ),
@@ -188,14 +190,14 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
 
                 // Currency Dropdown
                 DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(
-                    labelText: 'สกุลเงิน *',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: isThai ? 'สกุลเงิน *' : 'Currency *',
+                    border: const OutlineInputBorder(),
                   ),
                   initialValue: _currencyCode,
-                  items: const [
-                    DropdownMenuItem(value: 'THB', child: Text('THB - บาทไทย (฿)')),
-                    DropdownMenuItem(value: 'USD', child: Text('USD - ดอลลาร์สหรัฐ (\$)')),
+                  items: [
+                    DropdownMenuItem(value: 'THB', child: Text(isThai ? 'THB - บาทไทย (฿)' : 'THB - Thai Baht (฿)')),
+                    DropdownMenuItem(value: 'USD', child: Text(isThai ? 'USD - ดอลลาร์สหรัฐ (\$)' : 'USD - US Dollar (\$)')),
                   ],
                   onChanged: (val) {
                     if (val != null) {
@@ -214,11 +216,11 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                       FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                     ],
                     decoration: InputDecoration(
-                      labelText: 'ยอดยกมาเริ่มต้น',
+                      labelText: isThai ? 'ยอดยกมาเริ่มต้น' : 'Initial Balance',
                       hintText: '0.00',
                       prefixText: _currencyCode == 'USD' ? r'$ ' : '฿ ',
                       border: const OutlineInputBorder(),
-                      helperText: 'ระบบจะลงบันทึกเป็นยอดยกมาเริ่มต้นให้ทันที',
+                      helperText: isThai ? 'ระบบจะลงบันทึกเป็นยอดยกมาเริ่มต้นให้ทันที' : 'Initial balance will be recorded automatically',
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -236,15 +238,15 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                             FilteringTextInputFormatter.digitsOnly,
                             LengthLimitingTextInputFormatter(2),
                           ],
-                          decoration: const InputDecoration(
-                            labelText: 'วันตัดรอบบิล (1-31)',
+                          decoration: InputDecoration(
+                            labelText: isThai ? 'วันตัดรอบบิล (1-31)' : 'Closing Day (1-31)',
                             hintText: '23',
-                            border: OutlineInputBorder(),
+                            border: const OutlineInputBorder(),
                           ),
                           validator: (val) {
                             final day = int.tryParse(val ?? '');
                             if (day == null || day < 1 || day > 31) {
-                              return 'ใส่วันที่ 1-31';
+                              return isThai ? 'ใส่วันที่ 1-31' : 'Enter day 1-31';
                             }
                             return null;
                           },
@@ -259,10 +261,10 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                             FilteringTextInputFormatter.digitsOnly,
                             LengthLimitingTextInputFormatter(2),
                           ],
-                          decoration: const InputDecoration(
-                            labelText: 'วันครบกำหนดชำระ',
+                          decoration: InputDecoration(
+                            labelText: isThai ? 'วันครบกำหนดชำระ' : 'Payment Due Day',
                             hintText: '10',
-                            border: OutlineInputBorder(),
+                            border: const OutlineInputBorder(),
                           ),
                         ),
                       ),
@@ -275,11 +277,11 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                     ],
-                    decoration: const InputDecoration(
-                      labelText: 'วงเงินบัตรเครดิต (บาท)',
-                      hintText: 'เช่น 50000',
+                    decoration: InputDecoration(
+                      labelText: isThai ? 'วงเงินบัตรเครดิต (บาท)' : 'Credit Limit (THB)',
+                      hintText: isThai ? 'เช่น 50000' : 'e.g. 50000',
                       prefixText: '฿ ',
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -292,11 +294,11 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('ยกเลิก'),
+          child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
         ),
         FilledButton(
           onPressed: _submit,
-          child: const Text('บันทึกบัญชี'),
+          child: Text(isThai ? 'สร้างบัญชี' : 'Create Account'),
         ),
       ],
     );

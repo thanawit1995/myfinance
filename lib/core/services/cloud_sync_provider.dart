@@ -1,6 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../database/database_provider.dart';
+import 'google_auth_service.dart';
 import 'google_drive_sync_service.dart';
+
+final googleAuthServiceProvider = Provider<GoogleAuthService>((ref) {
+  return GoogleAuthService();
+});
 
 final googleDriveSyncServiceProvider = Provider<GoogleDriveSyncService>((ref) {
   return GoogleDriveSyncService(

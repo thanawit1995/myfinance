@@ -32,6 +32,8 @@ class VaultAddSheet extends StatelessWidget {
     final primaryTxt = VaultTheme.primaryText(context);
     final accentCol = VaultTheme.accent(context);
 
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
@@ -72,7 +74,7 @@ class VaultAddSheet extends StatelessWidget {
               icon: Icons.arrow_upward_rounded,
               iconColor: VaultTheme.negative(context),
               title: l10n?.expense ?? 'Expense',
-              subtitle: 'บันทึกค่าใช้จ่ายประจำวัน',
+              subtitle: isThai ? 'บันทึกค่าใช้จ่ายประจำวัน' : 'Record daily expense',
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
@@ -90,7 +92,7 @@ class VaultAddSheet extends StatelessWidget {
               icon: Icons.arrow_downward_rounded,
               iconColor: VaultTheme.positive(context),
               title: l10n?.income ?? 'Income',
-              subtitle: 'บันทึกเงินเดือน หรือรายรับอื่น',
+              subtitle: isThai ? 'บันทึกเงินเดือน หรือรายรับอื่น' : 'Record salary or other income',
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
@@ -108,7 +110,7 @@ class VaultAddSheet extends StatelessWidget {
               icon: Icons.swap_horiz_rounded,
               iconColor: accentCol,
               title: l10n?.transfer ?? 'Transfer',
-              subtitle: 'โอนเงินระหว่างบัญชี หรือแลกเปลี่ยน USD',
+              subtitle: isThai ? 'โอนเงินระหว่างบัญชี หรือแลกเปลี่ยน USD' : 'Transfer between accounts or USD FX',
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
@@ -126,7 +128,7 @@ class VaultAddSheet extends StatelessWidget {
               icon: Icons.candlestick_chart_outlined,
               iconColor: accentCol,
               title: l10n?.trade ?? 'Trade',
-              subtitle: 'บันทึกการซื้อขายหุ้น, คริปโต หรือทองคำ',
+              subtitle: isThai ? 'บันทึกการซื้อขายหุ้น, คริปโต หรือทองคำ' : 'Record stock, crypto, or gold trades',
               onTap: () {
                 Navigator.pop(context);
                 BuySellTradeDialog.show(context);

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../database/database_provider.dart';
 import '../security/auth_provider.dart';
@@ -142,106 +143,116 @@ class _MainShellState extends ConsumerState<MainShell> {
           )
         : null;
 
+    final bgCol = VaultTheme.background(context);
+    final overlayStyle = SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+      statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+      systemNavigationBarColor: bgCol,
+      systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+    );
+
     if (isWide) {
       // Desktop layout with NavigationRail
-      return Scaffold(
-        backgroundColor: VaultTheme.background(context),
-        floatingActionButton: fab,
-        body: Row(
-          children: [
-            NavigationRail(
-              minWidth: isLumi ? 92 : 72,
-              backgroundColor: isLumi ? const Color(0xFFFFF9F5) : VaultTheme.surface(context),
-              selectedIndex: _currentIndex,
-              onDestinationSelected: _onTabSelected,
-              labelType: NavigationRailLabelType.all,
-              indicatorColor: isLumi ? const Color(0xFFFFE5F2) : accentCol.withValues(alpha: 0.15),
-              indicatorShape: isLumi
-                  ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))
-                  : null,
-              selectedIconTheme: IconThemeData(
-                color: isLumi ? const Color(0xFFFF5B9A) : accentCol,
-              ),
-              unselectedIconTheme: IconThemeData(
-                color: isLumi ? const Color(0xFF87767F) : VaultTheme.secondaryText(context),
-              ),
-              selectedLabelTextStyle: TextStyle(
-                fontFamily: VaultTheme.fontFamily,
-                color: isLumi ? const Color(0xFFFF5B9A) : accentCol,
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-              ),
-              unselectedLabelTextStyle: TextStyle(
-                fontFamily: VaultTheme.fontFamily,
-                color: isLumi ? const Color(0xFF87767F) : VaultTheme.secondaryText(context),
-                fontSize: 12,
-              ),
-              leading: Padding(
-                padding: EdgeInsets.symmetric(vertical: isLumi ? 14 : 18),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (isLumi) ...[
+      return AnnotatedRegion<SystemUiOverlayStyle>(
+        value: overlayStyle,
+        child: Scaffold(
+          backgroundColor: VaultTheme.background(context),
+          floatingActionButton: fab,
+          body: Row(
+            children: [
+              NavigationRail(
+                minWidth: isLumi ? 92 : 76,
+                backgroundColor: isLumi ? const Color(0xFFFFF9F5) : VaultTheme.surface(context),
+                selectedIndex: _currentIndex,
+                onDestinationSelected: _onTabSelected,
+                labelType: NavigationRailLabelType.all,
+                indicatorColor: isLumi ? const Color(0xFFFFE5F2) : accentCol.withValues(alpha: 0.15),
+                indicatorShape: isLumi
+                    ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))
+                    : null,
+                selectedIconTheme: IconThemeData(
+                  color: isLumi ? const Color(0xFFFF5B9A) : accentCol,
+                ),
+                unselectedIconTheme: IconThemeData(
+                  color: isLumi ? const Color(0xFF87767F) : VaultTheme.secondaryText(context),
+                ),
+                selectedLabelTextStyle: TextStyle(
+                  fontFamily: VaultTheme.fontFamily,
+                  color: isLumi ? const Color(0xFFFF5B9A) : accentCol,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+                unselectedLabelTextStyle: TextStyle(
+                  fontFamily: VaultTheme.fontFamily,
+                  color: isLumi ? const Color(0xFF87767F) : VaultTheme.secondaryText(context),
+                  fontSize: 12,
+                ),
+                leading: Padding(
+                  padding: EdgeInsets.symmetric(vertical: isLumi ? 14 : 18),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
                       Container(
-                        width: 40,
-                        height: 40,
+                        width: 42,
+                        height: 42,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFFF0F5),
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: const Color(0xFFFF5B9A).withValues(alpha: 0.35),
+                            color: isLumi
+                                ? const Color(0xFFFF5B9A).withValues(alpha: 0.35)
+                                : accentCol.withValues(alpha: 0.35),
                             width: 1.5,
                           ),
                         ),
                         child: ClipOval(
                           child: Image.asset(
-                            'assets/images/lumi_mascot.png',
-                            width: 40,
-                            height: 40,
+                            'assets/images/app_logo.png',
+                            width: 42,
+                            height: 42,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => const Icon(
-                              Icons.favorite_rounded,
-                              color: Color(0xFFFF5B9A),
+                            errorBuilder: (_, _, _) => Icon(
+                              isLumi ? Icons.favorite_rounded : Icons.all_inclusive_rounded,
+                              color: isLumi ? const Color(0xFFFF5B9A) : accentCol,
                               size: 22,
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 4),
-                    ],
-                    Text(
-                      'JP Money',
-                      style: TextStyle(
-                        fontFamily: VaultTheme.fontFamily,
-                        fontSize: isLumi ? 13 : 15,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: isLumi ? 0.5 : 1.5,
-                        color: VaultTheme.primaryText(context),
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                      decoration: BoxDecoration(
-                        color: isLumi
-                            ? const Color(0xFFFF5B9A).withValues(alpha: 0.15)
-                            : accentCol.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        isLumi ? 'LUMI' : 'VAULT',
+                      const SizedBox(height: 6),
+                      Text(
+                        'OURS',
                         style: TextStyle(
                           fontFamily: VaultTheme.fontFamily,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.0,
-                          color: isLumi ? const Color(0xFFFF5B9A) : accentCol,
+                          fontSize: isLumi ? 13 : 15,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: isLumi ? 0.8 : 1.5,
+                          color: VaultTheme.primaryText(context),
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 3),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: isLumi
+                              ? const Color(0xFFFF5B9A).withValues(alpha: 0.15)
+                              : accentCol.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          isLumi ? 'LUMI' : 'VAULT',
+                          style: TextStyle(
+                            fontFamily: VaultTheme.fontFamily,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.0,
+                            color: isLumi ? const Color(0xFFFF5B9A) : accentCol,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
               destinations: [
                 NavigationRailDestination(
                   icon: const Icon(Icons.home_outlined),
@@ -274,10 +285,13 @@ class _MainShellState extends ConsumerState<MainShell> {
             Expanded(child: screens[_currentIndex]),
           ],
         ),
-      );
-    } else {
-      // Mobile layout with 5-destination NavigationBar
-      return Scaffold(
+      ),
+    );
+  } else {
+    // Mobile layout with 5-destination NavigationBar
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: overlayStyle,
+      child: Scaffold(
         backgroundColor: VaultTheme.background(context),
         body: screens[_currentIndex],
         floatingActionButton: fab,
@@ -321,7 +335,8 @@ class _MainShellState extends ConsumerState<MainShell> {
             ],
           ),
         ),
-      );
-    }
+      ),
+    );
+  }
   }
 }

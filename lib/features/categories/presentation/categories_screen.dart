@@ -416,6 +416,55 @@ class _CategoryListView extends ConsumerWidget {
                               }
                             },
                           ),
+                          if (!cat.isSystem) ...[
+                            const SizedBox(width: 6),
+                            IconButton(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.all(4),
+                              constraints: const BoxConstraints(),
+                              icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                              tooltip: isThai ? 'ลบหมวดหมู่นี้' : 'Delete category',
+                              onPressed: () async {
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: Text(isThai ? 'ยืนยันลบหมวดหมู่' : 'Confirm Delete Category'),
+                                    content: Text(
+                                      isThai
+                                          ? 'คุณต้องการลบหมวดหมู่ "$primaryName" ใช่หรือไม่?\n\n(รายการธุรกรรมเดิมที่เคยบันทึกไว้จะไม่สูญหาย)'
+                                          : 'Do you want to delete category "$primaryName"?\n\n(Existing recorded transactions will not be lost)',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(ctx).pop(false),
+                                        child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+                                      ),
+                                      FilledButton(
+                                        style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                                        onPressed: () => Navigator.of(ctx).pop(true),
+                                        child: Text(isThai ? 'ลบหมวดหมู่' : 'Delete'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+
+                                if (confirm == true) {
+                                  await dao.softDeleteCategory(cat.id);
+                                  onChanged();
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(isThai
+                                            ? 'ลบหมวดหมู่ "$primaryName" แล้ว'
+                                            : 'Deleted category "$primaryName"'),
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                            ),
+                          ],
                         ],
                       ),
                   ],

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/database/app_database.dart';
@@ -32,6 +32,7 @@ class CreditCardSummaryScreen extends ConsumerWidget {
             return const Center(child: Text('ไม่พบข้อมูลบัตรเครดิต'));
           }
 
+          final isThai = Localizations.localeOf(context).languageCode == 'th';
           final cycle = summary.cycle;
           final prevStatementMoney = Money(summary.previousStatementDebtSatang);
           final currentCycleMoney = Money(summary.currentCycleDebtSatang);
@@ -55,7 +56,7 @@ class CreditCardSummaryScreen extends ConsumerWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'รอบบิลปัจจุบัน',
+                            isThai ? 'รอบบิลปัจจุบัน' : 'Current Billing Cycle',
                             style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepOrange.shade900),
                           ),
                           Container(
@@ -65,7 +66,9 @@ class CreditCardSummaryScreen extends ConsumerWidget {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              cycle.daysRemaining == 0 ? 'ตัดรอบวันนี้!' : 'เหลืออีก ${cycle.daysRemaining} วัน',
+                              cycle.daysRemaining == 0
+                                  ? (isThai ? 'ตัดรอบวันนี้!' : 'Closes today!')
+                                  : (isThai ? 'เหลืออีก ${cycle.daysRemaining} วัน' : '${cycle.daysRemaining} days left'),
                               style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.deepOrange.shade900),
                             ),
                           ),
@@ -78,7 +81,9 @@ class CreditCardSummaryScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'วันครบกำหนดชำระ: วันที่ ${cycle.dueDay} ของเดือนถัดไป',
+                        isThai
+                            ? 'วันครบกำหนดชำระ: วันที่ ${cycle.dueDay} ของเดือนถัดไป'
+                            : 'Payment due: day ${cycle.dueDay} of next month',
                         style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                       ),
                     ],
@@ -87,7 +92,7 @@ class CreditCardSummaryScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
 
-              // 2 Breakdown Cards: ยอดรอบที่แล้ว (ต้องจ่าย) vs ยอดรอบปัจจุบัน (สะสมอยู่)
+              // 2 Breakdown Cards
               Row(
                 children: [
                   Expanded(
@@ -99,7 +104,10 @@ class CreditCardSummaryScreen extends ConsumerWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('ยอดรอบที่แล้ว\n(ต้องชำระรอบนี้)', style: TextStyle(fontSize: 12, color: Colors.red)),
+                            Text(
+                              isThai ? 'ยอดรอบที่แล้ว\n(ต้องชำระรอบนี้)' : 'Previous Statement\n(Due this cycle)',
+                              style: const TextStyle(fontSize: 12, color: Colors.red),
+                            ),
                             const SizedBox(height: 8),
                             Text(
                               prevStatementMoney.format(symbol: '฿'),
@@ -120,7 +128,10 @@ class CreditCardSummaryScreen extends ConsumerWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('ยอดรอบปัจจุบัน\n(กำลังสะสม)', style: TextStyle(fontSize: 12, color: Colors.deepOrange)),
+                            Text(
+                              isThai ? 'ยอดรอบปัจจุบัน\n(กำลังสะสม)' : 'Current Cycle\n(Unbilled)',
+                              style: const TextStyle(fontSize: 12, color: Colors.deepOrange),
+                            ),
                             const SizedBox(height: 8),
                             Text(
                               currentCycleMoney.format(symbol: '฿'),
@@ -141,7 +152,7 @@ class CreditCardSummaryScreen extends ConsumerWidget {
                 color: Colors.grey.shade100,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 child: ListTile(
-                  title: const Text('หนี้ค้างชำระรวมทั้งหมด'),
+                  title: Text(isThai ? 'หนี้ค้างชำระรวมทั้งหมด' : 'Total Outstanding Balance'),
                   trailing: Text(
                     totalDebtMoney.format(symbol: '฿'),
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
@@ -155,7 +166,9 @@ class CreditCardSummaryScreen extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'รายการในรอบบิลปัจจุบัน (${summary.currentCycleTransactions.length} รายการ)',
+                    isThai
+                        ? 'รายการในรอบบิลปัจจุบัน (${summary.currentCycleTransactions.length} รายการ)'
+                        : 'Current Cycle Transactions (${summary.currentCycleTransactions.length})',
                     style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                   ),
                 ],
@@ -163,9 +176,13 @@ class CreditCardSummaryScreen extends ConsumerWidget {
               const SizedBox(height: 8),
 
               if (summary.currentCycleTransactions.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Center(child: Text('ไม่มีรายการใช้จ่ายในรอบบิลนี้')),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: Text(
+                      isThai ? 'ไม่มีรายการใช้จ่ายในรอบบิลนี้' : 'No transactions in this billing cycle',
+                    ),
+                  ),
                 )
               else
                 ...summary.currentCycleTransactions.map((tx) {
@@ -173,7 +190,7 @@ class CreditCardSummaryScreen extends ConsumerWidget {
                   return Card(
                     margin: const EdgeInsets.symmetric(vertical: 4),
                     child: ListTile(
-                      title: Text(tx.note?.isNotEmpty == true ? tx.note! : 'รูดบัตรเครดิต'),
+                      title: Text(tx.note?.isNotEmpty == true ? tx.note! : (isThai ? 'รูดบัตรเครดิต' : 'Credit Card Charge')),
                       subtitle: Text(DateFormat('d MMM yyyy, HH:mm').format(tx.transactionDate)),
                       trailing: Text(
                         '-${money.format(symbol: '฿')}',

@@ -479,11 +479,18 @@
     * `flutter analyze`: **0 errors, 0 warnings**
     * `flutter build web --release`: คอมไพล์ผ่านสมบูรณ์ 100%
 
+- [x] **5.13 ประกอบไฟล์ติดตั้ง Android APK สำเร็จสมบูรณ์ (Release APK Ready)**:
+  - ติดตั้งคอมโพเนนต์ Android NDK (`ndk/28.2.13676358`) และ CMake เข้าสู่ Android SDK
+  - แก้ไข `MyFinanceWidgetProvider.kt` ป้องกัน Null Safety issue ใน Kotlin
+  - คอนฟิก `android/build.gradle.kts` ให้ปลั๊กอินภายนอก (เช่น `file_picker`) ขยับ `compileSdkVersion` เป็น 36 ตามข้อกำหนดของ Flutter Lifecycle
+  - แก้ไขโครงสร้างไฟล์ [`สร้างไฟล์_Android_APK.bat`](file:///c:/Projects/myfinance/สร้างไฟล์_Android_APK.bat) ให้ใช้คำสั่ง `goto` แทนบล็อกวงเล็บ ทำให้รันได้ลื่นไหล 100%
+  - สร้างไฟล์ติดตั้ง **`app-release.apk`** ขนาด **76.1 MB** สำเร็จสมบูรณ์ พร้อมติดตั้งลงมือถือ Android ได้ทันที
+
 ---
 
 ## 2. สิ่งที่ต้องทำในอนาคต (Future Enhancements)
 
-- [ ] การสร้าง Release Installer สำหรับ Windows (.msi / .exe) และ Android (.apk)
+- [ ] การสร้าง Release Installer สำหรับ Windows (.msi / .exe)
 - [ ] วิดเจ็ตเพิ่มเติมตามความต้องการใช้งานเพิ่มเติมในอนาคต
 
 ---
@@ -495,7 +502,8 @@
 - **ความปลอดภัยในการปิดระบบล็อกแอป**: ป้องกันการกดปิดสวิตช์ PIN โดยไม่ยืนยันตัวตน โดยบังคับให้ยืนยันตัวตนด้วย PIN เดิมหรือสแกนลายนิ้วมือก่อนเสมอ
 - **Foreign Key Constraint ในการนำเข้า Batch**: ในการนำเข้าธุรกรรมที่ผูกกับ `import_batches(id)` ต้องบันทึกแถว Batch ลงในตาราง `import_batches` ก่อนเริ่มลูปเพิ่มธุรกรรม เพื่อไม่ให้ SQLite ละเมิดข้อกำหนด Foreign Key
 - **ตัวแบ่งบรรทัดและเครื่องหมายจุลภาคในไฟล์ CSV**: ไฟล์ CSV ที่มีตัวเลขใส่เครื่องหมายจุลภาคคั่นหลักพัน เช่น `"THB 1,200.00"` ต้องครอบด้วยเครื่องหมายคำพูด (Quotes) และต้องปรับการแปลงตัวแบ่งบรรทัดทั้ง `\r\n` และ `\n` ให้เป็นมาตรฐานเดียวกัน เพื่อให้อ่านข้อมูลได้ถูกต้องบนทุกระบบปฏิบัติการ
-- **วงเล็บในคำสั่ง Windows Batch (.bat)**: บรรทัดคำสั่ง `cmd.exe` แปลความหมายวงเล็บปิด `)` ภายในบล็อก `if (...) else (...)` ว่าเป็นการปิดบล็อกคำสั่งก่อนเวลาอันควร ทำให้เกิด error สคริปต์หยุดทำงาน จึงเปลี่ยนมาเรียกใช้ PowerShell Script (`.ps1`) ที่รองรับ UTF-8 และมีโครงสร้างการทำงานที่เสถียรแทน
+- **วงเล็บในคำสั่ง Windows Batch (.bat)**: บรรทัดคำสั่ง `cmd.exe` แปลความหมายวงเล็บปิด `)` ภายในบล็อก `if (...) else (...)` ว่าเป็นการปิดบล็อกคำสั่งก่อนเวลาอันควร ทำให้เกิด error สคริปต์หยุดทำงาน จึงเปลี่ยนมาเรียกใช้ PowerShell Script (`.ps1`) หรือใช้โครงสร้าง `goto :LABEL` แทน
+- **Android NDK & compileSdkVersion 36 Mismatch**: การคอมไพล์แอปพลิเคชัน Android ที่มีแพ็กเกจ C++ / JNI (เช่น SQLite / Biometrics) ต้องการ NDK และการบังคับ `compileSdkVersion 36` ให้กับปลั๊กอินทั้งหมดใน `afterEvaluate` ของ `build.gradle.kts` เพื่อไม่ให้เกิด AAR metadata version check failure
 
 
 

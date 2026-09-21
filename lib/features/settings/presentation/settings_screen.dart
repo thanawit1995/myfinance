@@ -117,27 +117,38 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
                 const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.style_outlined),
-                  title: Text(l10n?.themeStyle ?? 'สไตล์ดีไซน์ (Design Theme)'),
-                  trailing: DropdownButton<AppThemeStyle>(
-                    value: widget.currentThemeStyle,
-                    underline: const SizedBox.shrink(),
-                    items: [
-                      DropdownMenuItem(
-                        value: AppThemeStyle.vault,
-                        child: Text(widget.currentLocale.languageCode == 'en' ? AppThemeStyle.vault.displayNameEn : AppThemeStyle.vault.displayNameTh),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      Icon(Icons.style_outlined, color: Theme.of(context).iconTheme.color),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Text(
+                          l10n?.themeStyle ?? 'สไตล์ดีไซน์ (Design Theme)',
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
                       ),
-                      DropdownMenuItem(
-                        value: AppThemeStyle.lumi,
-                        child: Text(widget.currentLocale.languageCode == 'en' ? AppThemeStyle.lumi.displayNameEn : AppThemeStyle.lumi.displayNameTh),
+                      DropdownButton<AppThemeStyle>(
+                        value: widget.currentThemeStyle,
+                        underline: const SizedBox.shrink(),
+                        items: [
+                          DropdownMenuItem(
+                            value: AppThemeStyle.vault,
+                            child: Text(widget.currentLocale.languageCode == 'en' ? AppThemeStyle.vault.displayNameEn : AppThemeStyle.vault.displayNameTh),
+                          ),
+                          DropdownMenuItem(
+                            value: AppThemeStyle.lumi,
+                            child: Text(widget.currentLocale.languageCode == 'en' ? AppThemeStyle.lumi.displayNameEn : AppThemeStyle.lumi.displayNameTh),
+                          ),
+                        ],
+                        onChanged: (style) {
+                          if (style != null && widget.onThemeStyleChanged != null) {
+                            widget.onThemeStyleChanged!(style);
+                          }
+                        },
                       ),
                     ],
-                    onChanged: (style) {
-                      if (style != null && widget.onThemeStyleChanged != null) {
-                        widget.onThemeStyleChanged!(style);
-                      }
-                    },
                   ),
                 ),
                 const Divider(height: 1),

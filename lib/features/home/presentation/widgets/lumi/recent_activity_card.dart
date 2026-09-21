@@ -1,0 +1,261 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../../../../../core/database/app_database.dart';
+import '../../../../../core/money/money.dart';
+import '../../../../../core/theme/vault_theme.dart';
+
+class RecentActivityCard extends StatelessWidget {
+  final List<Transaction> transactions;
+  final VoidCallback onViewAll;
+  final VoidCallback onAddTransaction;
+
+  const RecentActivityCard({
+    super.key,
+    required this.transactions,
+    required this.onViewAll,
+    required this.onAddTransaction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFF3DCE5), width: 1.0),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0CFF5B9A),
+            blurRadius: 14,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: const [
+                  Text('📝', style: TextStyle(fontSize: 14)),
+                  SizedBox(width: 6),
+                  Text(
+                    'บันทึกรายการล่าสุด',
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF332B32),
+                    ),
+                  ),
+                ],
+              ),
+              InkWell(
+                onTap: onViewAll,
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Text(
+                        'ดูทั้งหมด',
+                        style: TextStyle(
+                          fontFamily: VaultTheme.fontFamily,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFFF5B9A),
+                        ),
+                      ),
+                      SizedBox(width: 2),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 16,
+                        color: Color(0xFFFF5B9A),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          if (transactions.isEmpty)
+            _buildEmptyState(context)
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: transactions.length,
+              separatorBuilder: (_, _) => Divider(
+                color: const Color(0xFFF3DCE5).withValues(alpha: 0.6),
+                height: 16,
+                thickness: 0.75,
+              ),
+              itemBuilder: (context, index) {
+                final tx = transactions[index];
+                return _buildTransactionItem(context, tx);
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTransactionItem(BuildContext context, Transaction tx) {
+    final isIncome = tx.transactionType == 'income';
+    final isTransfer = tx.transactionType == 'transfer';
+
+    final Color amountColor = isIncome
+        ? const Color(0xFF2E8B57)
+        : (isTransfer ? const Color(0xFF1976D2) : const Color(0xFF332B32));
+
+    final String sign = isIncome ? '+' : (isTransfer ? '' : '-');
+
+    final dateStr = DateFormat('d MMM • HH:mm', 'th').format(tx.transactionDate);
+
+    // Title label
+    final String title = tx.note?.isNotEmpty == true
+        ? tx.note!
+        : (isTransfer ? 'โอนเงิน' : (isIncome ? 'รายรับ' : 'รายจ่าย'));
+
+    final iconColor = isIncome
+        ? const Color(0xFF2E8B57)
+        : (isTransfer ? const Color(0xFF1976D2) : const Color(0xFFFF5B9A));
+
+    final iconBgColor = isIncome
+        ? const Color(0xFFF0FAF2)
+        : (isTransfer ? const Color(0xFFEEF8FF) : const Color(0xFFFFF0F5));
+
+    final iconData = isIncome
+        ? Icons.arrow_downward_rounded
+        : (isTransfer ? Icons.swap_horiz_rounded : Icons.shopping_bag_outlined);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          // Pastel icon bubble
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: iconBgColor,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(iconData, color: iconColor, size: 20),
+          ),
+          const SizedBox(width: 12),
+
+          // Title & Date
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontFamily: VaultTheme.fontFamily,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF332B32),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  dateStr,
+                  style: const TextStyle(
+                    fontFamily: VaultTheme.fontFamily,
+                    fontSize: 11.5,
+                    color: Color(0xFF87767F),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Amount
+          Text(
+            '$sign${Money(tx.amountThbSatang).format(symbol: '฿')}',
+            style: VaultTheme.tabular(
+              fontSize: 14.5,
+              fontWeight: FontWeight.w700,
+              color: amountColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      alignment: Alignment.center,
+      child: Column(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: const BoxDecoration(
+              color: Color(0xFFFFF0F5),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.edit_note_rounded,
+              color: Color(0xFFFF5B9A),
+              size: 28,
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'ยังไม่มีรายการในเดือนนี้',
+            style: TextStyle(
+              fontFamily: VaultTheme.fontFamily,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF332B32),
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'เริ่มจดบันทึกรายรับหรือรายจ่ายรายการแรกเพื่อติดตามการเงินของคุณ',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: VaultTheme.fontFamily,
+              fontSize: 12,
+              color: Color(0xFF87767F),
+            ),
+          ),
+          const SizedBox(height: 14),
+          FilledButton.icon(
+            onPressed: onAddTransaction,
+            icon: const Icon(Icons.add, size: 16),
+            label: const Text(
+              'เพิ่มรายการแรก',
+              style: TextStyle(
+                fontFamily: VaultTheme.fontFamily,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFFF5B9A),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

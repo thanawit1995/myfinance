@@ -1,0 +1,1230 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import '../../../../core/database/app_database.dart';
+import '../../../../core/database/database_provider.dart';
+import '../../../../core/database/daos/projects_dao.dart';
+import '../../../../core/money/money.dart';
+import '../../../../core/theme/vault_theme.dart';
+import '../../../../core/database/daos/investments_dao.dart';
+import '../../../../core/widgets/vault_add_sheet.dart';
+import '../../summary/presentation/monthly_summary_screen.dart';
+import '../../../../l10n/app_localizations.dart';
+import 'widgets/lumi/lumi_desktop_layout.dart';
+
+class VaultHomeScreen extends ConsumerWidget {
+  final VoidCallback onNavigateToMoney;
+  final VoidCallback onNavigateToInvest;
+  final VoidCallback onNavigateToBudget;
+  final VoidCallback onNavigateToCreditCards;
+  final VoidCallback? onNavigateToPlan;
+  final VoidCallback onOpenSettings;
+
+  const VaultHomeScreen({
+    super.key,
+    required this.onNavigateToMoney,
+    required this.onNavigateToInvest,
+    required this.onNavigateToBudget,
+    required this.onNavigateToCreditCards,
+    this.onNavigateToPlan,
+    required this.onOpenSettings,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final now = DateTime.now();
+
+    return Scaffold(
+      backgroundColor: VaultTheme.background(context),
+      body: SafeArea(
+        child: RefreshIndicator(
+          color: VaultTheme.accent(context),
+          backgroundColor: VaultTheme.surface(context),
+          onRefresh: () async {
+            ref.invalidate(accountsDaoProvider);
+            ref.invalidate(transactionsDaoProvider);
+            ref.invalidate(investmentsDaoProvider);
+            ref.invalidate(budgetsDaoProvider);
+          },
+          child: FutureBuilder<_VaultHomeData>(
+            future: _loadHomeData(ref, now),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Center(
+                  child: CircularProgressIndicator(color: VaultTheme.accent(context)),
+                );
+              }
+
+              if (snapshot.hasError) {
+                return Center(
+                  child: Text(
+                    'เกิดข้อผิดพลาดในการโหลดข้อมูล: ${snapshot.error}',
+                    style: TextStyle(color: VaultTheme.negative(context)),
+                  ),
+                );
+              }
+
+              final data = snapshot.data!;
+              final isLumi = VaultTheme.isLumi(context);
+
+              if (isLumi) {
+                final bundle = LumiHomeDataBundle(
+                  netWorthSatang: data.netWorthSatang,
+                  momChangePercent: data.momChangePercent,
+                  cashFlowMonthSatang: data.cashFlowMonthSatang,
+                  totalIncomeSatang: data.totalIncomeMonthSatang,
+                  totalExpenseSatang: data.totalExpenseMonthSatang,
+                  remainingBudgetSatang: data.remainingBudgetSatang,
+                  totalBudgetSatang: data.totalBudgetMonthSatang,
+                  portfolioValueSatang: data.portfolioValueSatang,
+                  portfolioReturnPercent: data.portfolioReturnPercent,
+                  creditCardCurrentDebtSatang: data.creditCardCurrentDebtSatang,
+                  creditCardNextCloseText: data.creditCardNextCloseText,
+                  recentTransactions: data.recentTransactions,
+                  attentionMessage: data.attentionMessage,
+                  attentionIsWarning: data.attentionIsWarning,
+                  activeProjects: data.activeProjects,
+                );
+
+                return LumiDesktopLayout(
+                  data: bundle,
+                  headerWidget: _buildHeader(context, now),
+                  onNavigateToBudget: onNavigateToBudget,
+                  onNavigateToMoney: onNavigateToMoney,
+                  onNavigateToInvest: onNavigateToInvest,
+                  onNavigateToCreditCards: onNavigateToCreditCards,
+                  onNavigateToPlan: onNavigateToPlan ?? onNavigateToBudget,
+                  onViewMonthlySummary: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const MonthlySummaryScreen()),
+                    );
+                  },
+                  onAddTransaction: () {
+                    VaultAddSheet.show(context);
+                  },
+                );
+              }
+
+              // VAULT Mode: Quiet Luxury single-column dashboard
+              return ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                children: [
+                  // 1. Header แบบสงบนิ่ง: VAULT + เดือนปัจจุบัน + ไอคอนค้นหาและตั้งค่า
+                  _buildHeader(context, now),
+                  const SizedBox(height: 20),
+
+                  // 2. Master Budget — Hero card เดียวของหน้า
+                  _buildMasterBudgetCard(context, data, now),
+                  const SizedBox(height: 16),
+
+                  // 3. Today / Attention — แสดงเฉพาะสิ่งที่ต้องตัดสินใจหรือควรรู้
+                  _buildAttentionCard(context, data),
+                  const SizedBox(height: 20),
+
+                  // 4. Financial Position — Net Worth เด่นคู่กับแนวโน้ม vs last month
+                  _buildFinancialPosition(context, data),
+                  const SizedBox(height: 16),
+
+                  // 5. Snapshot — แถวเดียว 2 ช่อง: Portfolio และ Credit Card
+                  _buildSnapshotRow(context, data),
+                  const SizedBox(height: 24),
+
+                  // 6. Recent Activity — แสดง 3 รายการล่าสุดเท่านั้น
+                  _buildRecentActivity(context, data),
+                  const SizedBox(height: 80), // เว้นพื้นที่สำหรับปุ่มลอย FAB
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- 1. Quiet Luxury Header ---
+  Widget _buildHeader(BuildContext context, DateTime now) {
+    final l10n = AppLocalizations.of(context);
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+    final monthName = isThai
+        ? _getThaiMonth(now.month)
+        : DateFormat('MMMM').format(now);
+    final yearStr = '${now.year}';
+
+    final isLumi = VaultTheme.isLumi(context);
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        if (isLumi)
+          Expanded(
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFE5F2),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFFFF5C9D).withValues(alpha: 0.35),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFF5C9D).withValues(alpha: 0.15),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: ClipOval(
+                    child: Image.asset(
+                      'assets/images/lumi_mascot.png',
+                      width: 44,
+                      height: 44,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        now.hour < 12
+                            ? (l10n?.morningGreeting ?? 'Good morning ☀️')
+                            : (now.hour < 18
+                                ? (l10n?.afternoonGreeting ?? 'Good afternoon 🌤️')
+                                : (l10n?.eveningGreeting ?? 'Good evening 🌙')),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: VaultTheme.fontFamily,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: VaultTheme.primaryText(context),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'JP Money • Lumi • $monthName $yearStr',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: VaultTheme.fontFamily,
+                          fontSize: 12,
+                          color: VaultTheme.secondaryText(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'JP Money',
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 2.0,
+                      color: VaultTheme.primaryText(context),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: VaultTheme.accent(context).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'VAULT',
+                      style: TextStyle(
+                        fontFamily: VaultTheme.fontFamily,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.0,
+                        color: VaultTheme.accent(context),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '$monthName $yearStr',
+                style: TextStyle(
+                  fontFamily: VaultTheme.fontFamily,
+                  fontSize: 13,
+                  letterSpacing: 0.5,
+                  color: VaultTheme.secondaryText(context),
+                ),
+              ),
+            ],
+          ),
+        Row(
+          children: [
+            IconButton(
+              icon: Icon(
+                Icons.search_rounded,
+                size: 22,
+                color: VaultTheme.secondaryText(context),
+              ),
+              onPressed: onNavigateToMoney,
+              tooltip: 'ค้นหาธุรกรรม',
+            ),
+            IconButton(
+              icon: Icon(
+                Icons.tune_rounded,
+                size: 22,
+                color: VaultTheme.secondaryText(context),
+              ),
+              onPressed: onOpenSettings,
+              tooltip: 'การตั้งค่าและระบบความปลอดภัย',
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // --- 2. Master Budget Hero Card ---
+  Widget _buildMasterBudgetCard(BuildContext context, _VaultHomeData data, DateTime now) {
+    final remainingSatang = data.remainingBudgetSatang;
+    final totalBudgetSatang = data.totalBudgetMonthSatang;
+    final totalExpenseSatang = data.totalExpenseMonthSatang;
+
+    final percentRemaining = totalBudgetSatang > 0
+        ? ((remainingSatang / totalBudgetSatang) * 100).clamp(0, 100).toInt()
+        : 100;
+
+    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+    final daysRemaining = (daysInMonth - now.day).clamp(0, daysInMonth);
+
+    final isWarning = percentRemaining < 20;
+    final accentColor = VaultTheme.accent(context);
+    final barColor = isWarning
+        ? VaultTheme.negative(context)
+        : (percentRemaining < 40 ? accentColor : VaultTheme.mutedText(context));
+
+    final progressRatio = totalBudgetSatang > 0
+        ? (totalExpenseSatang / totalBudgetSatang).clamp(0.0, 1.0)
+        : 0.0;
+
+    final isLumi = VaultTheme.isLumi(context);
+    final ext = VaultTheme.extension(context);
+    final cardRadius = isLumi ? 24.0 : 16.0;
+
+    return InkWell(
+      onTap: onNavigateToBudget,
+      borderRadius: BorderRadius.circular(cardRadius),
+      child: Container(
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          gradient: isLumi ? ext?.masterBudgetGradient : null,
+          color: isLumi ? null : VaultTheme.surface(context),
+          borderRadius: BorderRadius.circular(cardRadius),
+          boxShadow: isLumi
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFFFF5C9D).withValues(alpha: 0.12),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ]
+              : null,
+          border: Border.all(
+            color: isWarning
+                ? VaultTheme.negative(context).withValues(alpha: 0.4)
+                : (isLumi ? const Color(0xFFFF5C9D).withValues(alpha: 0.25) : VaultTheme.border(context)),
+            width: isLumi ? 1.0 : 0.75,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    isLumi ? 'เงินที่ใช้ได้ในเดือนนี้ 🌸' : 'MASTER BUDGET',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: isLumi ? 13 : 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: isLumi ? 0.3 : 1.2,
+                      color: isLumi ? const Color(0xFF8A3052) : VaultTheme.secondaryText(context),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '$daysRemaining วันที่เหลือในรอบเดือน',
+                  style: TextStyle(
+                    fontFamily: VaultTheme.fontFamily,
+                    fontSize: 12,
+                    color: isLumi ? const Color(0xFF8A3052) : VaultTheme.mutedText(context),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            if (isLumi) ...[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          Money(remainingSatang).format(symbol: '฿'),
+                          style: VaultTheme.tabular(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF2B2338),
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'จากงบ ${Money(totalBudgetSatang).format(symbol: '฿')}',
+                          style: TextStyle(
+                            fontFamily: VaultTheme.fontFamily,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFF8A5C6F),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.asset(
+                      'assets/images/lumi_budget_character.png',
+                      width: 120,
+                      height: 105,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: LinearProgressIndicator(
+                        value: progressRatio,
+                        minHeight: 12,
+                        backgroundColor: Colors.white.withValues(alpha: 0.7),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          isWarning ? VaultTheme.negative(context) : const Color(0xFFFF5C9D),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    '${(progressRatio * 100).toInt()}%',
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF2B2338),
+                    ),
+                  ),
+                ],
+              ),
+            ] else ...[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    Money(remainingSatang).format(symbol: '฿'),
+                    style: VaultTheme.tabular(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w700,
+                      color: VaultTheme.primaryText(context),
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'เหลือให้ใช้ได้',
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: 14,
+                      color: VaultTheme.secondaryText(context),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'เหลือ $percentRemaining% ของงบประมาณรวมทั้งเดือน',
+                style: TextStyle(
+                  fontFamily: VaultTheme.fontFamily,
+                  fontSize: 13,
+                  color: VaultTheme.secondaryText(context),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(3),
+                child: LinearProgressIndicator(
+                  value: progressRatio,
+                  minHeight: 4,
+                  backgroundColor: VaultTheme.border(context),
+                  valueColor: AlwaysStoppedAnimation<Color>(barColor),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'ใช้ไปแล้ว ${Money(totalExpenseSatang).format(symbol: '฿')}',
+                    style: VaultTheme.tabular(
+                      fontSize: 12,
+                      color: VaultTheme.mutedText(context),
+                    ),
+                  ),
+                  Text(
+                    'งบทั้งหมด ${Money(totalBudgetSatang).format(symbol: '฿')}',
+                    style: VaultTheme.tabular(
+                      fontSize: 12,
+                      color: VaultTheme.mutedText(context),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- 3. Today / Attention Box ---
+  Widget _buildAttentionCard(BuildContext context, _VaultHomeData data) {
+    final isLumi = VaultTheme.isLumi(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: isLumi ? const Color(0xFFFFF7EF) : VaultTheme.surface(context),
+        borderRadius: BorderRadius.circular(isLumi ? 18 : 12),
+        border: Border.all(
+          color: data.attentionIsWarning
+              ? VaultTheme.accent(context).withValues(alpha: 0.5)
+              : (isLumi ? const Color(0xFFFFD5A5) : VaultTheme.border(context)),
+          width: 0.75,
+        ),
+      ),
+      child: Row(
+        children: [
+          if (isLumi)
+            Container(
+              width: 32,
+              height: 32,
+              margin: const EdgeInsets.only(right: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFFF9E44).withValues(alpha: 0.2),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.asset(
+                  'assets/images/lumi_cat_crisp.png',
+                  fit: BoxFit.cover,
+                ),
+              ),
+            )
+          else ...[
+            Text(
+              data.attentionIsWarning ? '⚠️' : '💡',
+              style: const TextStyle(fontSize: 18),
+            ),
+            const SizedBox(width: 12),
+          ],
+          Expanded(
+            child: Text(
+              isLumi
+                  ? (data.attentionIsWarning
+                      ? data.attentionMessage
+                      : 'Lumi Tips: การเงินดีเริ่มต้นจากวันละนิด • ${data.attentionMessage}')
+                  : data.attentionMessage,
+              style: TextStyle(
+                fontFamily: VaultTheme.fontFamily,
+                fontSize: 13,
+                height: 1.35,
+                color: VaultTheme.primaryText(context),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+  // --- 4. Financial Position ---
+  Widget _buildFinancialPosition(BuildContext context, _VaultHomeData data) {
+    final netWorthMoney = Money(data.netWorthSatang);
+    final momChangePercent = data.momChangePercent;
+    final isMomPositive = momChangePercent >= 0;
+    final isLumi = VaultTheme.isLumi(context);
+    final isDark = VaultTheme.isDark(context);
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: VaultTheme.surface(context),
+        borderRadius: BorderRadius.circular(isLumi ? 22 : 16),
+        border: Border.all(color: VaultTheme.border(context), width: 0.75),
+        boxShadow: isLumi && !isDark
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                isLumi ? 'ภาพรวมการเงิน' : 'FINANCIAL POSITION',
+                style: TextStyle(
+                  fontFamily: VaultTheme.fontFamily,
+                  fontSize: isLumi ? 14 : 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: isLumi ? 0.2 : 1.2,
+                  color: isLumi ? VaultTheme.primaryText(context) : VaultTheme.secondaryText(context),
+                ),
+              ),
+              if (isLumi)
+                InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const MonthlySummaryScreen()),
+                    );
+                  },
+                  child: const Text(
+                    'ดูทั้งหมด ›',
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFFFF5C9D),
+                    ),
+                  ),
+                )
+              else
+                Row(
+                  children: [
+                    Icon(
+                      isMomPositive ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                      size: 13,
+                      color: isMomPositive ? VaultTheme.positive(context) : VaultTheme.negative(context),
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      '${isMomPositive ? '+' : ''}${momChangePercent.toStringAsFixed(1)}% vs สิ้นเดือนก่อน',
+                      style: VaultTheme.tabular(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isMomPositive ? VaultTheme.positive(context) : VaultTheme.negative(context),
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                'สินทรัพย์สุทธิ',
+                style: TextStyle(
+                  fontFamily: VaultTheme.fontFamily,
+                  fontSize: 13,
+                  color: VaultTheme.secondaryText(context),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                netWorthMoney.format(symbol: '฿'),
+                style: VaultTheme.tabular(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  color: VaultTheme.primaryText(context),
+                ),
+              ),
+            ],
+          ),
+          if (isLumi) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Icon(
+                  isMomPositive ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+                  size: 14,
+                  color: isMomPositive ? const Color(0xFF38B278) : VaultTheme.negative(context),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '${isMomPositive ? 'เพิ่มขึ้น' : 'ลดลง'} ${isMomPositive ? '+' : ''}${momChangePercent.toStringAsFixed(1)}% จากเดือนที่แล้ว',
+                  style: TextStyle(
+                    fontFamily: VaultTheme.fontFamily,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isMomPositive ? const Color(0xFF38B278) : VaultTheme.negative(context),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 12),
+          Divider(color: VaultTheme.border(context), height: 1),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'กระแสเงินสดเดือนนี้: ${Money(data.cashFlowMonthSatang).format(symbol: '฿')}',
+                style: VaultTheme.tabular(
+                  fontSize: 12,
+                  color: VaultTheme.secondaryText(context),
+                ),
+              ),
+              Text(
+                'พอร์ตลงทุน: ${Money(data.portfolioValueSatang).format(symbol: '฿')}',
+                style: VaultTheme.tabular(
+                  fontSize: 12,
+                  color: VaultTheme.secondaryText(context),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- 5. Snapshot Row (Portfolio & Credit Card) ---
+  Widget _buildSnapshotRow(BuildContext context, _VaultHomeData data) {
+    final portReturnPercent = data.portfolioReturnPercent;
+    final isPortPositive = portReturnPercent >= 0;
+    final isLumi = VaultTheme.isLumi(context);
+    final isDark = VaultTheme.isDark(context);
+
+    return Row(
+      children: [
+        // Portfolio Snapshot
+        Expanded(
+          child: InkWell(
+            onTap: onNavigateToInvest,
+            borderRadius: BorderRadius.circular(isLumi ? 20 : 14),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: isLumi
+                    ? (isDark ? const Color(0xFF202923) : const Color(0xFFF7FCF5))
+                    : VaultTheme.surface(context),
+                borderRadius: BorderRadius.circular(isLumi ? 20 : 14),
+                border: Border.all(
+                  color: isLumi
+                      ? (isDark ? const Color(0xFF2C4533) : const Color(0xFFD5F7C4))
+                      : VaultTheme.border(context),
+                  width: isLumi ? 1.5 : 0.75,
+                ),
+                boxShadow: isLumi && !isDark
+                    ? [
+                        BoxShadow(
+                          color: const Color(0xFF329F5B).withValues(alpha: 0.06),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        isLumi ? 'พอร์ตการลงทุน 📈' : 'PORTFOLIO',
+                        style: TextStyle(
+                          fontFamily: VaultTheme.fontFamily,
+                          fontSize: isLumi ? 11 : 10,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: isLumi ? 0.2 : 1.0,
+                          color: isLumi ? (isDark ? const Color(0xFF7AE0A4) : const Color(0xFF257845)) : VaultTheme.secondaryText(context),
+                        ),
+                      ),
+                      Icon(Icons.chevron_right_rounded, size: 16, color: VaultTheme.mutedText(context)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    Money(data.portfolioValueSatang).format(symbol: '฿'),
+                    style: VaultTheme.tabular(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: VaultTheme.primaryText(context),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${isPortPositive ? '+' : ''}${portReturnPercent.toStringAsFixed(1)}% รวม',
+                    style: VaultTheme.tabular(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: isPortPositive ? VaultTheme.positive(context) : VaultTheme.negative(context),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+
+        // Credit Card Snapshot
+        Expanded(
+          child: InkWell(
+            onTap: onNavigateToCreditCards,
+            borderRadius: BorderRadius.circular(isLumi ? 20 : 14),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: isLumi
+                    ? (isDark ? const Color(0xFF1B2530) : const Color(0xFFF3F9FF))
+                    : VaultTheme.surface(context),
+                borderRadius: BorderRadius.circular(isLumi ? 20 : 14),
+                border: Border.all(
+                  color: isLumi
+                      ? (isDark ? const Color(0xFF283F54) : const Color(0xFFBFE9FF))
+                      : VaultTheme.border(context),
+                  width: isLumi ? 1.5 : 0.75,
+                ),
+                boxShadow: isLumi && !isDark
+                    ? [
+                        BoxShadow(
+                          color: const Color(0xFF4C9FFF).withValues(alpha: 0.06),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        isLumi ? 'บัตรเครดิต 💳' : 'CREDIT CARD',
+                        style: TextStyle(
+                          fontFamily: VaultTheme.fontFamily,
+                          fontSize: isLumi ? 11 : 10,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: isLumi ? 0.2 : 1.0,
+                          color: isLumi ? (isDark ? const Color(0xFF8AC7FF) : const Color(0xFF1E6DB8)) : VaultTheme.secondaryText(context),
+                        ),
+                      ),
+                      Icon(Icons.chevron_right_rounded, size: 16, color: VaultTheme.mutedText(context)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    Money(data.creditCardCurrentDebtSatang).format(symbol: '฿'),
+                    style: VaultTheme.tabular(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: VaultTheme.primaryText(context),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    isLumi ? 'ยอดค้างชำระปัจจุบัน' : data.creditCardNextCloseText,
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: 12,
+                      color: VaultTheme.secondaryText(context),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+
+  // --- 6. Recent Activity (3 รายการล่าสุด) ---
+  Widget _buildRecentActivity(BuildContext context, _VaultHomeData data) {
+    final isLumi = VaultTheme.isLumi(context);
+    final isDark = VaultTheme.isDark(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              isLumi ? 'รายการล่าสุด' : 'RECENT ACTIVITY',
+              style: TextStyle(
+                fontFamily: VaultTheme.fontFamily,
+                fontSize: isLumi ? 14 : 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: isLumi ? 0.2 : 1.2,
+                color: isLumi ? VaultTheme.primaryText(context) : VaultTheme.secondaryText(context),
+              ),
+            ),
+            TextButton(
+              onPressed: onNavigateToMoney,
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+                foregroundColor: isLumi ? const Color(0xFFFF5C9D) : VaultTheme.accent(context),
+              ),
+              child: Text(
+                isLumi ? 'ดูทั้งหมด ›' : 'ดูทั้งหมด →',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (data.recentTransactions.isEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            alignment: Alignment.center,
+            child: Text(
+              'ยังไม่มีรายการธุรกรรม',
+              style: TextStyle(
+                fontFamily: VaultTheme.fontFamily,
+                fontSize: 13,
+                color: VaultTheme.mutedText(context),
+              ),
+            ),
+          )
+        else
+          Container(
+            decoration: BoxDecoration(
+              color: VaultTheme.surface(context),
+              borderRadius: BorderRadius.circular(isLumi ? 22 : 16),
+              border: Border.all(color: VaultTheme.border(context), width: 0.75),
+              boxShadow: isLumi && !isDark
+                  ? [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.03),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: data.recentTransactions.length,
+              separatorBuilder: (_, index) => Divider(color: VaultTheme.border(context), height: 1),
+              itemBuilder: (context, idx) {
+                final tx = data.recentTransactions[idx];
+                final isIncome = tx.transactionType == 'income';
+                final isExpense = tx.transactionType == 'expense';
+                final isTransfer = tx.transactionType == 'transfer';
+
+                final sign = isIncome ? '+' : (isExpense ? '−' : '');
+                final amountColor = isIncome
+                    ? VaultTheme.positive(context)
+                    : (isExpense ? VaultTheme.negative(context) : VaultTheme.accent(context));
+
+                final currency = tx.currencyCode;
+                final symbol = currency == 'USD' ? '\$ ' : (currency == 'THB' ? '฿ ' : '$currency ');
+                final displayAmount = currency == 'USD'
+                    ? tx.amountOriginalSatang / 100.0
+                    : tx.amountThbSatang / 100.0;
+
+                final dateStr = DateFormat('d MMM').format(tx.transactionDate);
+
+                return ListTile(
+                  dense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  leading: isLumi
+                      ? Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: isIncome
+                                ? const Color(0xFFE8F5EE)
+                                : (isExpense ? const Color(0xFFFFECF0) : const Color(0xFFEFF4F9)),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            isIncome
+                                ? Icons.arrow_downward_rounded
+                                : (isExpense ? Icons.arrow_upward_rounded : Icons.swap_horiz_rounded),
+                            size: 20,
+                            color: amountColor,
+                          ),
+                        )
+                      : null,
+                  title: Text(
+                    tx.note?.isNotEmpty == true
+                        ? tx.note!
+                        : (isTransfer ? 'โอนเงิน' : (isIncome ? 'รายรับ' : 'รายจ่าย')),
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: VaultTheme.primaryText(context),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    dateStr,
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: 12,
+                      color: VaultTheme.mutedText(context),
+                    ),
+                  ),
+                  trailing: Text(
+                    '$sign $symbol${displayAmount.toStringAsFixed(2)}',
+                    style: VaultTheme.tabular(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: amountColor,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  // --- Data Loader ---
+  Future<_VaultHomeData> _loadHomeData(WidgetRef ref, DateTime now) async {
+    final txDao = ref.read(transactionsDaoProvider);
+    final accDao = ref.read(accountsDaoProvider);
+    final bgDao = ref.read(budgetsDaoProvider);
+    final ccDao = ref.read(creditCardDaoProvider);
+    final invDao = ref.read(investmentsDaoProvider);
+    final healthDao = ref.read(financialHealthDaoProvider);
+
+    // 1. Net worth & accounts
+    final netWorth = await accDao.getTotalNetWorthSatang();
+    final activeAccounts = await accDao.getActiveAccounts();
+
+    // 2. Month transactions
+    final startOfMonth = DateTime(now.year, now.month, 1);
+    final endOfMonth = DateTime(now.month == 12 ? now.year + 1 : now.year, now.month == 12 ? 1 : now.month + 1, 1);
+    final monthTx = await txDao.searchTransactions(startDate: startOfMonth, endDate: endOfMonth);
+
+    int totalIncome = 0;
+    int totalExpense = 0;
+    for (final t in monthTx) {
+      if (t.transactionType == 'income') {
+        totalIncome += t.amountThbSatang;
+      } else if (t.transactionType == 'expense') {
+        totalExpense += (t.amountThbSatang + t.feeThbSatang);
+      }
+    }
+    final cashFlow = totalIncome - totalExpense;
+
+    // 3. Budgets
+    final budgets = await bgDao.getBudgetStatusForMonth(now.year, now.month);
+    int totalBudget = 0;
+    for (final b in budgets) {
+      totalBudget += b.limitSatang;
+    }
+    if (totalBudget == 0) totalBudget = 3000000; // 30,000 THB default overall limit
+    final remainingBudget = (totalBudget - totalExpense).clamp(0, totalBudget);
+
+    // 4. Portfolio
+    PortfolioSummary? portSummary;
+    try {
+      portSummary = await invDao.getPortfolioSummary();
+    } catch (_) {}
+
+    final portValue = portSummary?.totalValueThbSatang ?? 0;
+    final portCost = portSummary?.totalCostThbSatang ?? 0;
+    final portReturnPercent = portCost > 0
+        ? ((portValue - portCost) / portCost * 100.0)
+        : 0.0;
+
+    // 5. Credit Cards
+    int ccDebt = 0;
+    String ccNextClose = 'ไม่มีหนี้ค้างชำระ';
+    bool ccHasWarning = false;
+    for (final a in activeAccounts) {
+      if (a.accountType == 'credit_card') {
+        final summary = await ccDao.getSummary(a.id, now);
+        if (summary != null) {
+          ccDebt += summary.currentCycleDebtSatang;
+          final daysToClose = summary.cycle.daysRemaining;
+          if (daysToClose <= 7 && daysToClose >= 0) {
+            ccNextClose = 'ตัดรอบในอีก $daysToClose วัน';
+            ccHasWarning = true;
+          } else {
+            ccNextClose = 'ตัดรอบวันที่ ${summary.cycle.statementDay}';
+          }
+        }
+      }
+    }
+
+    // 6. Recent 3 transactions
+    final recent = await txDao.getRecentTransactions(limit: 3);
+
+    // 7. Dynamic Attention Insight
+    String attentionMsg = 'อัตราการออมเดือนนี้อยู่ที่ ${(totalIncome > 0 ? ((totalIncome - totalExpense) / totalIncome * 100).clamp(0, 100).toInt() : 0)}%';
+    bool attentionWarn = false;
+
+    if (ccHasWarning && ccDebt > 0) {
+      attentionMsg = 'บัตรเครดิตจะตัดรอบในอีกไม่กี่วัน ยอดรอตัด ${Money(ccDebt).format(symbol: '฿')}';
+      attentionWarn = true;
+    } else if (remainingBudget < (totalBudget * 0.2)) {
+      attentionMsg = 'งบประมาณเดือนนี้เหลือต่ำกว่า 20% แล้ว โปรดระมัดระวังการใช้จ่าย';
+      attentionWarn = true;
+    } else {
+      try {
+        final forecast = await healthDao.getRunRateForecast();
+        if (forecast.recommendedDailySpendSatang > 0) {
+          attentionMsg = 'ใช้เงินได้เฉลี่ยวันละ ${Money(forecast.recommendedDailySpendSatang).format(symbol: '฿')} จนถึงสิ้นเดือน';
+        }
+      } catch (_) {}
+    }
+
+    // Active projects for Goals
+    final projDao = ref.read(projectsDaoProvider);
+    final projectsList = await projDao.getActiveProjects();
+    final List<ProjectStatus> activeProjectStatuses = [];
+    for (final p in projectsList.take(3)) {
+      final st = await projDao.getProjectStatus(p.id);
+      if (st != null) {
+        activeProjectStatuses.add(st);
+      }
+    }
+
+    // MoM change (approx from current net worth vs beginning of month cash flow)
+    final priorNetWorth = netWorth - cashFlow;
+    final momPercent = priorNetWorth > 0
+        ? (cashFlow / priorNetWorth * 100.0)
+        : 0.0;
+
+    return _VaultHomeData(
+      netWorthSatang: netWorth,
+      momChangePercent: momPercent,
+      cashFlowMonthSatang: cashFlow,
+      totalIncomeMonthSatang: totalIncome,
+      totalBudgetMonthSatang: totalBudget,
+      totalExpenseMonthSatang: totalExpense,
+      remainingBudgetSatang: remainingBudget,
+      portfolioValueSatang: portValue,
+      portfolioReturnPercent: portReturnPercent,
+      creditCardCurrentDebtSatang: ccDebt,
+      creditCardNextCloseText: ccNextClose,
+      recentTransactions: recent,
+      attentionMessage: attentionMsg,
+      attentionIsWarning: attentionWarn,
+      activeProjects: activeProjectStatuses,
+    );
+  }
+
+  String _getThaiMonth(int month) {
+    const names = [
+      'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+      'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+    ];
+    return names[(month - 1).clamp(0, 11)];
+  }
+}
+
+class _VaultHomeData {
+  final int netWorthSatang;
+  final double momChangePercent;
+  final int cashFlowMonthSatang;
+  final int totalIncomeMonthSatang;
+  final int totalBudgetMonthSatang;
+  final int totalExpenseMonthSatang;
+  final int remainingBudgetSatang;
+  final int portfolioValueSatang;
+  final double portfolioReturnPercent;
+  final int creditCardCurrentDebtSatang;
+  final String creditCardNextCloseText;
+  final List<Transaction> recentTransactions;
+  final String attentionMessage;
+  final bool attentionIsWarning;
+  final List<ProjectStatus> activeProjects;
+
+  const _VaultHomeData({
+    required this.netWorthSatang,
+    required this.momChangePercent,
+    required this.cashFlowMonthSatang,
+    required this.totalIncomeMonthSatang,
+    required this.totalBudgetMonthSatang,
+    required this.totalExpenseMonthSatang,
+    required this.remainingBudgetSatang,
+    required this.portfolioValueSatang,
+    required this.portfolioReturnPercent,
+    required this.creditCardCurrentDebtSatang,
+    required this.creditCardNextCloseText,
+    required this.recentTransactions,
+    required this.attentionMessage,
+    required this.attentionIsWarning,
+    required this.activeProjects,
+  });
+}

@@ -1,0 +1,1201 @@
+import 'package:drift/drift.dart' hide Column;
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
+import '../../../../core/database/app_database.dart';
+import '../../../../core/database/daos/budgets_dao.dart';
+import '../../../../core/database/daos/projects_dao.dart';
+import '../../../../core/database/database_provider.dart';
+import '../../../../core/money/money.dart';
+import '../../../../core/theme/vault_theme.dart';
+import '../../../../core/widgets/category_icon_helper.dart';
+import '../../categories/presentation/categories_screen.dart';
+import '../../categories/presentation/category_form_dialog.dart';
+
+class BudgetScreen extends ConsumerStatefulWidget {
+  const BudgetScreen({super.key});
+
+  @override
+  ConsumerState<BudgetScreen> createState() => _BudgetScreenState();
+}
+
+class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isLumi = VaultTheme.isLumi(context);
+    final accentColor = VaultTheme.accent(context);
+
+    return Scaffold(
+      backgroundColor: VaultTheme.background(context),
+      appBar: AppBar(
+        backgroundColor: VaultTheme.surface(context),
+        title: Text(
+          'งบประมาณและการวางแผน',
+          style: TextStyle(
+            fontFamily: VaultTheme.fontFamily,
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            color: VaultTheme.primaryText(context),
+          ),
+        ),
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: accentColor,
+          labelColor: accentColor,
+          unselectedLabelColor: VaultTheme.secondaryText(context),
+          tabs: const [
+            Tab(icon: Icon(Icons.pie_chart_outline), text: 'งบประมาณรายเดือน'),
+            Tab(icon: Icon(Icons.folder_special_outlined), text: 'โครงการพิเศษ'),
+          ],
+        ),
+        actions: [
+          if (_tabController.index == 0)
+            IconButton(
+              icon: const Icon(Icons.category_outlined),
+              tooltip: 'จัดการหมวดหมู่',
+              onPressed: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const CategoriesScreen()),
+                );
+                if (mounted) setState(() {});
+              },
+            ),
+          IconButton(
+            icon: const Icon(Icons.add),
+            tooltip: _tabController.index == 0 ? 'ตั้งงบหมวดหมู่' : 'สร้างโครงการใหม่',
+            onPressed: () {
+              if (_tabController.index == 0) {
+                _showAddBudgetDialog(context);
+              } else {
+                _showProjectFormDialog(context);
+              }
+            },
+          ),
+        ],
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildMonthlyBudgetsTab(context),
+          _buildProjectsTab(context),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: accentColor,
+        foregroundColor: Colors.white,
+        elevation: isLumi ? 3 : 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(isLumi ? 24 : 14)),
+        icon: const Icon(Icons.add),
+        label: Text(_tabController.index == 0 ? 'ตั้งงบหมวดหมู่' : 'สร้างโครงการใหม่'),
+        onPressed: () {
+          if (_tabController.index == 0) {
+            _showAddBudgetDialog(context);
+          } else {
+            _showProjectFormDialog(context);
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _buildMonthlyBudgetsTab(BuildContext context) {
+    final bgDao = ref.watch(budgetsDaoProvider);
+    final now = DateTime.now();
+    final isLumi = VaultTheme.isLumi(context);
+    final ext = VaultTheme.extension(context);
+
+    return FutureBuilder<List<CategoryBudgetStatus>>(
+      future: bgDao.getBudgetStatusForMonth(now.year, now.month),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              'เกิดข้อผิดพลาด: ${snapshot.error}',
+              style: TextStyle(color: VaultTheme.negative(context)),
+            ),
+          );
+        }
+
+        final budgets = snapshot.data ?? [];
+        if (budgets.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.pie_chart_outline, size: 64, color: VaultTheme.mutedText(context)),
+                const SizedBox(height: 16),
+                Text(
+                  'ยังไม่ได้ตั้งงบประมาณสำหรับหมวดหมู่ใดๆ',
+                  style: TextStyle(color: VaultTheme.secondaryText(context), fontSize: 15),
+                ),
+                const SizedBox(height: 14),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: VaultTheme.accent(context),
+                  ),
+                  icon: const Icon(Icons.add),
+                  label: const Text('ตั้งงบประมาณหมวดหมู่'),
+                  onPressed: () => _showAddBudgetDialog(context),
+                ),
+              ],
+            ),
+          );
+        }
+
+        int totalLimit = 0;
+        int totalSpent = 0;
+        for (final b in budgets) {
+          totalLimit += b.limitSatang;
+          totalSpent += b.spentSatang;
+        }
+
+        final totalRemaining = totalLimit - totalSpent;
+        final totalProgress = totalLimit > 0 ? (totalSpent / totalLimit).clamp(0.0, 1.0) : 0.0;
+
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            // Summary Banner
+            Container(
+              decoration: BoxDecoration(
+                gradient: isLumi ? ext?.masterBudgetGradient : null,
+                color: isLumi ? null : VaultTheme.surface(context),
+                borderRadius: BorderRadius.circular(isLumi ? 20 : 16),
+                border: Border.all(
+                  color: isLumi ? const Color(0xFFFF5C9D).withValues(alpha: 0.25) : VaultTheme.border(context),
+                  width: 0.75,
+                ),
+                boxShadow: isLumi
+                    ? [
+                        BoxShadow(
+                          color: const Color(0xFFFF5C9D).withValues(alpha: 0.1),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        )
+                      ]
+                    : null,
+              ),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isLumi ? 'สรุปงบประมาณรวมเดือนนี้ 🌸 (ไม่ Rollover)' : 'SUMMARY BUDGET (NON-ROLLOVER)',
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: isLumi ? 0.3 : 1.2,
+                      color: isLumi ? const Color(0xFF8A3052) : VaultTheme.secondaryText(context),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'เหลือ ${Money(totalRemaining).format(symbol: '฿')}',
+                        style: VaultTheme.tabular(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: VaultTheme.primaryText(context),
+                        ),
+                      ),
+                      Text(
+                        'งบรวม ${Money(totalLimit).format(symbol: '฿')}',
+                        style: VaultTheme.tabular(
+                          fontSize: 14,
+                          color: VaultTheme.secondaryText(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                      value: totalProgress,
+                      minHeight: 8,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        totalProgress >= 1.0
+                            ? VaultTheme.negative(context)
+                            : (totalProgress >= 0.8
+                                ? Colors.orange
+                                : (isLumi ? const Color(0xFFFF5C9D) : VaultTheme.accent(context))),
+                      ),
+                      backgroundColor: isLumi ? Colors.white.withValues(alpha: 0.6) : VaultTheme.border(context),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'งบประมาณแยกตามหมวดหมู่',
+                  style: TextStyle(
+                    fontFamily: VaultTheme.fontFamily,
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: VaultTheme.primaryText(context),
+                  ),
+                ),
+                Text(
+                  'แตะรายการเพื่อแก้ไข',
+                  style: TextStyle(
+                    fontFamily: VaultTheme.fontFamily,
+                    fontSize: 12,
+                    color: VaultTheme.secondaryText(context),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            ...budgets.map((b) => _buildBudgetTile(context, b)),
+            const SizedBox(height: 80),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildBudgetTile(BuildContext context, CategoryBudgetStatus b) {
+    final isLumi = VaultTheme.isLumi(context);
+    Color progressColor = Colors.green.shade600;
+    String statusText = 'ปกติ';
+
+    if (b.isExceeded) {
+      progressColor = VaultTheme.negative(context);
+      statusText = 'เกินงบแล้ว!';
+    } else if (b.isWarning) {
+      progressColor = Colors.orange.shade700;
+      statusText = 'ใกล้เต็มงบ (≥ 80%)';
+    } else if (isLumi) {
+      progressColor = const Color(0xFFFF5C9D);
+    }
+
+    final percentDisplay = (b.percentUsed * 100).toStringAsFixed(0);
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(isLumi ? 18 : 14),
+        side: BorderSide(color: VaultTheme.border(context), width: 0.75),
+      ),
+      color: VaultTheme.surface(context),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(isLumi ? 18 : 14),
+        onTap: () => _showEditBudgetDialog(context, b),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: progressColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          CategoryIconHelper.getIcon(b.icon),
+                          size: 18,
+                          color: progressColor,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        b.categoryNameTh,
+                        style: TextStyle(
+                          fontFamily: VaultTheme.fontFamily,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: VaultTheme.primaryText(context),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(Icons.edit_outlined, size: 14, color: VaultTheme.mutedText(context)),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: progressColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      statusText,
+                      style: TextStyle(
+                        fontFamily: VaultTheme.fontFamily,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: progressColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'ใช้ไป: ${Money(b.spentSatang).format(symbol: '฿')} ($percentDisplay%)',
+                    style: VaultTheme.tabular(
+                      fontSize: 13,
+                      color: VaultTheme.secondaryText(context),
+                    ),
+                  ),
+                  Text(
+                    'งบ: ${Money(b.limitSatang).format(symbol: '฿')}',
+                    style: VaultTheme.tabular(
+                      fontSize: 13,
+                      color: VaultTheme.secondaryText(context),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: LinearProgressIndicator(
+                  value: b.percentUsed.clamp(0.0, 1.0),
+                  minHeight: 6,
+                  valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+                  backgroundColor: VaultTheme.border(context),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  TextButton.icon(
+                    icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                    label: const Text('ลบงบประมาณ', style: TextStyle(fontSize: 12, color: Colors.red)),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    onPressed: () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('ยืนยันลบงบประมาณ'),
+                          content: Text(
+                            'ต้องการลบงบประมาณสำหรับ "${b.categoryNameTh}" หรือไม่?\n\n(ข้อมูลรายจ่ายที่บันทึกไปแล้วจะไม่หายไป)',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(false),
+                              child: const Text('ยกเลิก'),
+                            ),
+                            FilledButton(
+                              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                              onPressed: () => Navigator.of(ctx).pop(true),
+                              child: const Text('ลบ'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm == true) {
+                        await ref.read(budgetsDaoProvider).deleteBudget(b.budgetId);
+                        if (mounted) setState(() {});
+                      }
+                    },
+                  ),
+                  Text(
+                    b.remainingSatang >= 0
+                        ? 'เหลืออีก ${Money(b.remainingSatang).format(symbol: '฿')}'
+                        : 'เกินงบไป ${Money(b.remainingSatang.abs()).format(symbol: '฿')}',
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: b.remainingSatang >= 0 ? Colors.green.shade700 : VaultTheme.negative(context),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProjectsTab(BuildContext context) {
+    final projectsDao = ref.watch(projectsDaoProvider);
+    final isLumi = VaultTheme.isLumi(context);
+
+    return FutureBuilder<List<ProjectStatus>>(
+      future: projectsDao.getAllActiveProjectStatuses(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              'เกิดข้อผิดพลาด: ${snapshot.error}',
+              style: TextStyle(color: VaultTheme.negative(context)),
+            ),
+          );
+        }
+
+        final projectStatuses = snapshot.data ?? [];
+        if (projectStatuses.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.folder_special_outlined, size: 64, color: VaultTheme.mutedText(context)),
+                const SizedBox(height: 16),
+                Text(
+                  'ยังไม่มีโครงการพิเศษที่กำลังดำเนินการ',
+                  style: TextStyle(color: VaultTheme.secondaryText(context), fontSize: 15),
+                ),
+                const SizedBox(height: 14),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: VaultTheme.accent(context),
+                  ),
+                  icon: const Icon(Icons.add),
+                  label: const Text('สร้างโครงการใหม่'),
+                  onPressed: () => _showProjectFormDialog(context),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: projectStatuses.length + 1,
+          itemBuilder: (context, index) {
+            if (index == projectStatuses.length) {
+              return const SizedBox(height: 80);
+            }
+
+            final ps = projectStatuses[index];
+            final p = ps.project;
+            final percent = (ps.percentUsed * 100).toStringAsFixed(0);
+
+            Color progressColor = Colors.green.shade600;
+            String statusText = 'ปกติ';
+            if (ps.isOverBudget) {
+              progressColor = VaultTheme.negative(context);
+              statusText = 'เกินงบแล้ว!';
+            } else if (ps.percentUsed >= 0.8) {
+              progressColor = Colors.orange.shade700;
+              statusText = 'ใกล้เต็มงบ (≥ 80%)';
+            } else if (isLumi) {
+              progressColor = const Color(0xFFFF5C9D);
+            }
+
+            return Card(
+              margin: const EdgeInsets.only(bottom: 16),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(isLumi ? 20 : 16),
+                side: BorderSide(color: VaultTheme.border(context), width: 0.75),
+              ),
+              color: VaultTheme.surface(context),
+              child: ExpansionTile(
+                tilePadding: const EdgeInsets.all(16),
+                childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                title: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        p.name,
+                        style: TextStyle(
+                          fontFamily: VaultTheme.fontFamily,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: VaultTheme.primaryText(context),
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: progressColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        statusText,
+                        style: TextStyle(
+                          fontFamily: VaultTheme.fontFamily,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: progressColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 6),
+                    Text(
+                      'ระยะเวลา: ${p.startDate.day}/${p.startDate.month}/${p.startDate.year} - ${p.endDate.day}/${p.endDate.month}/${p.endDate.year} (เหลือ ${ps.daysLeft} วัน)',
+                      style: TextStyle(
+                        fontFamily: VaultTheme.fontFamily,
+                        fontSize: 12,
+                        color: VaultTheme.secondaryText(context),
+                      ),
+                    ),
+                    if (p.description != null && p.description!.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        p.description!,
+                        style: TextStyle(
+                          fontFamily: VaultTheme.fontFamily,
+                          fontSize: 12,
+                          color: VaultTheme.mutedText(context),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'ใช้ไป: ${Money(ps.spentSatang).format(symbol: "฿")} ($percent%)',
+                          style: VaultTheme.tabular(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: VaultTheme.primaryText(context),
+                          ),
+                        ),
+                        Text(
+                          'งบ: ${Money(p.targetBudgetSatang).format(symbol: "฿")}',
+                          style: VaultTheme.tabular(
+                            fontSize: 13,
+                            color: VaultTheme.secondaryText(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: LinearProgressIndicator(
+                        value: ps.percentUsed.clamp(0.0, 1.0),
+                        minHeight: 8,
+                        valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+                        backgroundColor: VaultTheme.border(context),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        ps.remainingSatang >= 0
+                            ? 'เหลืองบอีก ${Money(ps.remainingSatang).format(symbol: "฿")}'
+                            : 'เกินงบไป ${Money(ps.remainingSatang.abs()).format(symbol: "฿")}',
+                        style: TextStyle(
+                          fontFamily: VaultTheme.fontFamily,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: ps.remainingSatang >= 0 ? Colors.green.shade700 : VaultTheme.negative(context),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                children: [
+                  const Divider(),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'รายการใช้จ่ายในโครงการ (${ps.transactions.length})',
+                        style: TextStyle(
+                          fontFamily: VaultTheme.fontFamily,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: VaultTheme.primaryText(context),
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: Icon(Icons.edit_outlined, size: 20, color: VaultTheme.secondaryText(context)),
+                            tooltip: 'แก้ไขโครงการ',
+                            onPressed: () => _showProjectFormDialog(context, p),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                            tooltip: 'ลบโครงการ',
+                            onPressed: () async {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  title: const Text('ยืนยันลบโครงการ'),
+                                  content: Text('คุณต้องการลบโครงการ "${p.name}" ใช่หรือไม่?'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.of(ctx).pop(false),
+                                      child: const Text('ยกเลิก'),
+                                    ),
+                                    FilledButton(
+                                      style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                                      onPressed: () => Navigator.of(ctx).pop(true),
+                                      child: const Text('ลบโครงการ'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (confirm == true) {
+                                await ref.read(projectsDaoProvider).deleteProject(p.id);
+                                if (mounted) setState(() {});
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  if (ps.transactions.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Text(
+                        'ยังไม่มีรายการที่ผูกกับโครงการนี้\n(สามารถเลือกโครงการได้ในหน้า "บันทึกด่วน")',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: VaultTheme.mutedText(context), fontSize: 12),
+                      ),
+                    )
+                  else
+                    ...ps.transactions.map((tx) {
+                      final isTxExpense = tx.transactionType == 'expense';
+                      final amount = tx.amountThbSatang + tx.feeThbSatang;
+                      return ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          isTxExpense ? Icons.remove_circle_outline : Icons.add_circle_outline,
+                          color: isTxExpense ? VaultTheme.negative(context) : VaultTheme.positive(context),
+                          size: 20,
+                        ),
+                        title: Text(
+                          tx.note ?? (isTxExpense ? 'รายจ่ายโครงการ' : 'รายรับโครงการ'),
+                          style: TextStyle(
+                            fontFamily: VaultTheme.fontFamily,
+                            fontSize: 13,
+                            color: VaultTheme.primaryText(context),
+                          ),
+                        ),
+                        subtitle: Text(
+                          '${tx.transactionDate.day}/${tx.transactionDate.month}/${tx.transactionDate.year}',
+                          style: TextStyle(
+                            fontFamily: VaultTheme.fontFamily,
+                            fontSize: 11,
+                            color: VaultTheme.secondaryText(context),
+                          ),
+                        ),
+                        trailing: Text(
+                          '${isTxExpense ? "-" : "+"}${Money(amount).format(symbol: "฿")}',
+                          style: VaultTheme.tabular(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: isTxExpense ? VaultTheme.negative(context) : VaultTheme.positive(context),
+                          ),
+                        ),
+                      );
+                    }),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _showAddBudgetDialog(BuildContext context) async {
+    var categories = await ref.read(categoriesDaoProvider).getActiveCategories('expense');
+    String? selectedCatId = categories.isNotEmpty ? categories.first.id : null;
+    final amountController = TextEditingController();
+
+    if (!context.mounted) return;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            return AlertDialog(
+              title: const Text('ตั้งงบประมาณรายเดือน'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          decoration: const InputDecoration(
+                            labelText: 'เลือกหมวดหมู่',
+                            border: OutlineInputBorder(),
+                          ),
+                          initialValue: selectedCatId,
+                          items: categories
+                              .map((c) => DropdownMenuItem(
+                                    value: c.id,
+                                    child: Row(
+                                      children: [
+                                        Icon(CategoryIconHelper.getIcon(c.icon), size: 18),
+                                        const SizedBox(width: 8),
+                                        Text(c.nameTh),
+                                      ],
+                                    ),
+                                  ))
+                              .toList(),
+                          onChanged: (val) => setDialogState(() => selectedCatId = val),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Tooltip(
+                        message: 'สร้างหมวดหมู่ใหม่',
+                        child: IconButton.filled(
+                          icon: const Icon(Icons.add, size: 20),
+                          onPressed: () async {
+                            Navigator.of(ctx).pop('_create_new_category_');
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: amountController,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                    ],
+                    decoration: const InputDecoration(
+                      labelText: 'จำนวนเงินงบประมาณ (บาท)',
+                      prefixText: '฿ ',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('ยกเลิก')),
+                FilledButton(
+                  onPressed: () async {
+                    final amount = double.tryParse(amountController.text.trim()) ?? 0.0;
+                    if (amount > 0 && selectedCatId != null) {
+                      final satang = (amount * 100).round();
+                      await ref.read(budgetsDaoProvider).setBudget(categoryId: selectedCatId!, limitSatang: satang);
+                      if (ctx.mounted) Navigator.of(ctx).pop();
+                      if (mounted) setState(() {});
+                    }
+                  },
+                  child: const Text('บันทึก'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    ).then((result) async {
+      if (result == '_create_new_category_' && context.mounted) {
+        final newCat = await CategoryFormDialog.show(context, initialType: 'expense');
+        if (newCat != null && context.mounted) {
+          final updatedCategories = await ref.read(categoriesDaoProvider).getActiveCategories('expense');
+          if (context.mounted) {
+            String? preselect = newCat.id;
+            await _showAddBudgetDialogWithPreselect(context, updatedCategories, preselect);
+          }
+        }
+      }
+    });
+  }
+
+  Future<void> _showAddBudgetDialogWithPreselect(
+    BuildContext context,
+    List<Category> categories,
+    String? preselectedId,
+  ) async {
+    String? selectedCatId = preselectedId ?? (categories.isNotEmpty ? categories.first.id : null);
+    final amountController = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            return AlertDialog(
+              title: const Text('ตั้งงบประมาณรายเดือน'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          decoration: const InputDecoration(
+                            labelText: 'เลือกหมวดหมู่',
+                            border: OutlineInputBorder(),
+                          ),
+                          initialValue: selectedCatId,
+                          items: categories
+                              .map((c) => DropdownMenuItem(
+                                    value: c.id,
+                                    child: Row(
+                                      children: [
+                                        Icon(CategoryIconHelper.getIcon(c.icon), size: 18),
+                                        const SizedBox(width: 8),
+                                        Text(c.nameTh),
+                                      ],
+                                    ),
+                                  ))
+                              .toList(),
+                          onChanged: (val) => setDialogState(() => selectedCatId = val),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Tooltip(
+                        message: 'สร้างหมวดหมู่ใหม่',
+                        child: IconButton.filled(
+                          icon: const Icon(Icons.add, size: 20),
+                          onPressed: () async {
+                            Navigator.of(ctx).pop('_create_new_category_');
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: amountController,
+                    autofocus: true,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                    ],
+                    decoration: const InputDecoration(
+                      labelText: 'จำนวนเงินงบประมาณ (บาท)',
+                      prefixText: '฿ ',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('ยกเลิก')),
+                FilledButton(
+                  onPressed: () async {
+                    final amount = double.tryParse(amountController.text.trim()) ?? 0.0;
+                    if (amount > 0 && selectedCatId != null) {
+                      final satang = (amount * 100).round();
+                      await ref.read(budgetsDaoProvider).setBudget(categoryId: selectedCatId!, limitSatang: satang);
+                      if (ctx.mounted) Navigator.of(ctx).pop();
+                      if (mounted) setState(() {});
+                    }
+                  },
+                  child: const Text('บันทึก'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    ).then((result) async {
+      if (result == '_create_new_category_' && context.mounted) {
+        final newCat = await CategoryFormDialog.show(context, initialType: 'expense');
+        if (newCat != null && context.mounted) {
+          final updatedCategories = await ref.read(categoriesDaoProvider).getActiveCategories('expense');
+          if (context.mounted) {
+            String? preselect = newCat.id;
+            await _showAddBudgetDialogWithPreselect(context, updatedCategories, preselect);
+          }
+        }
+      }
+    });
+  }
+
+  Future<void> _showEditBudgetDialog(BuildContext context, CategoryBudgetStatus b) async {
+    final amountController = TextEditingController(text: (b.limitSatang / 100).toStringAsFixed(0));
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text('แก้ไขงบประมาณ: ${b.categoryNameTh}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'ใช้ไปแล้วในเดือนนี้: ${Money(b.spentSatang).format(symbol: "฿")}',
+                style: const TextStyle(fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: amountController,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                ],
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'งบประมาณใหม่ (บาท)',
+                  prefixText: '฿ ',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: ctx,
+                  builder: (confirmCtx) => AlertDialog(
+                    title: const Text('ยืนยันลบงบประมาณ'),
+                    content: Text(
+                        'คุณต้องการลบงบประมาณของหมวดหมู่ "${b.categoryNameTh}" ใช่หรือไม่? (ไม่กระทบกับบันทึกค่าใช้จ่ายที่มีอยู่)'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.of(confirmCtx).pop(false), child: const Text('ยกเลิก')),
+                      FilledButton(
+                        style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                        onPressed: () => Navigator.of(confirmCtx).pop(true),
+                        child: const Text('ลบงบประมาณ'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm == true) {
+                  await ref.read(budgetsDaoProvider).deleteBudget(b.budgetId);
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                  if (mounted) setState(() {});
+                }
+              },
+              child: const Text('ลบงบประมาณ'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('ยกเลิก'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final amount = double.tryParse(amountController.text.trim()) ?? 0.0;
+                if (amount > 0) {
+                  final satang = (amount * 100).round();
+                  await ref.read(budgetsDaoProvider).setBudget(categoryId: b.categoryId, limitSatang: satang);
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                  if (mounted) setState(() {});
+                }
+              },
+              child: const Text('บันทึก'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _showProjectFormDialog(BuildContext context, [Project? existing]) async {
+    final nameController = TextEditingController(text: existing?.name ?? '');
+    final descController = TextEditingController(text: existing?.description ?? '');
+    final budgetController = TextEditingController(
+      text: existing != null ? (existing.targetBudgetSatang / 100).toStringAsFixed(0) : '',
+    );
+    DateTime startDate = existing?.startDate ?? DateTime.now();
+    DateTime endDate = existing?.endDate ?? DateTime.now().add(const Duration(days: 30));
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            return AlertDialog(
+              title: Text(existing == null ? 'สร้างโครงการพิเศษใหม่' : 'แก้ไขโครงการ'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'ชื่อโครงการ *',
+                        hintText: 'เช่น เที่ยวญี่ปุ่น, รีโนเวทบ้าน, จัดงานแต่ง',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: budgetController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                      ],
+                      decoration: const InputDecoration(
+                        labelText: 'งบประมาณเป้าหมาย (บาท) *',
+                        prefixText: '฿ ',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: descController,
+                      decoration: const InputDecoration(
+                        labelText: 'คำอธิบาย / รายละเอียด (ไม่บังคับ)',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      maxLines: 2,
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.calendar_today, size: 16),
+                            label: Text(
+                              'เริ่ม: ${startDate.day}/${startDate.month}/${startDate.year}',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            onPressed: () async {
+                              final picked = await showDatePicker(
+                                context: dialogCtx,
+                                initialDate: startDate,
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime(2050),
+                              );
+                              if (picked != null) {
+                                setDialogState(() => startDate = picked);
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.event, size: 16),
+                            label: Text(
+                              'สิ้นสุด: ${endDate.day}/${endDate.month}/${endDate.year}',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            onPressed: () async {
+                              final picked = await showDatePicker(
+                                context: dialogCtx,
+                                initialDate: endDate,
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime(2050),
+                              );
+                              if (picked != null) {
+                                setDialogState(() => endDate = picked);
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('ยกเลิก')),
+                FilledButton(
+                  onPressed: () async {
+                    final name = nameController.text.trim();
+                    final budget = double.tryParse(budgetController.text.trim()) ?? 0.0;
+                    if (name.isEmpty || budget <= 0) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('กรุณาระบุชื่อโครงการและงบประมาณให้ถูกต้อง')),
+                      );
+                      return;
+                    }
+
+                    final satang = (budget * 100).round();
+                    final projectsDao = ref.read(projectsDaoProvider);
+                    final now = DateTime.now();
+
+                    if (existing == null) {
+                      await projectsDao.createProject(
+                        ProjectsCompanion.insert(
+                          id: const Uuid().v4(),
+                          name: name,
+                          description: Value(descController.text.trim().isEmpty ? null : descController.text.trim()),
+                          targetBudgetSatang: satang,
+                          startDate: startDate,
+                          endDate: endDate,
+                          isActive: const Value(true),
+                          createdAt: now,
+                          updatedAt: now,
+                        ),
+                      );
+                    } else {
+                      await projectsDao.updateProject(
+                        ProjectsCompanion(
+                          id: Value(existing.id),
+                          name: Value(name),
+                          description: Value(descController.text.trim().isEmpty ? null : descController.text.trim()),
+                          targetBudgetSatang: Value(satang),
+                          startDate: Value(startDate),
+                          endDate: Value(endDate),
+                          updatedAt: Value(now),
+                        ),
+                      );
+                    }
+
+                    if (ctx.mounted) Navigator.of(ctx).pop();
+                    if (mounted) setState(() {});
+                  },
+                  child: const Text('บันทึก'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+}

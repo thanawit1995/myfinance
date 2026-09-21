@@ -504,6 +504,7 @@
 - **ตัวแบ่งบรรทัดและเครื่องหมายจุลภาคในไฟล์ CSV**: ไฟล์ CSV ที่มีตัวเลขใส่เครื่องหมายจุลภาคคั่นหลักพัน เช่น `"THB 1,200.00"` ต้องครอบด้วยเครื่องหมายคำพูด (Quotes) และต้องปรับการแปลงตัวแบ่งบรรทัดทั้ง `\r\n` และ `\n` ให้เป็นมาตรฐานเดียวกัน เพื่อให้อ่านข้อมูลได้ถูกต้องบนทุกระบบปฏิบัติการ
 - **วงเล็บในคำสั่ง Windows Batch (.bat)**: บรรทัดคำสั่ง `cmd.exe` แปลความหมายวงเล็บปิด `)` ภายในบล็อก `if (...) else (...)` ว่าเป็นการปิดบล็อกคำสั่งก่อนเวลาอันควร ทำให้เกิด error สคริปต์หยุดทำงาน จึงเปลี่ยนมาเรียกใช้ PowerShell Script (`.ps1`) หรือใช้โครงสร้าง `goto :LABEL` แทน
 - **Android NDK & compileSdkVersion 36 Mismatch**: การคอมไพล์แอปพลิเคชัน Android ที่มีแพ็กเกจ C++ / JNI (เช่น SQLite / Biometrics) ต้องการ NDK และการบังคับ `compileSdkVersion 36` ให้กับปลั๊กอินทั้งหมดใน `afterEvaluate` ของ `build.gradle.kts` เพื่อไม่ให้เกิด AAR metadata version check failure
+- **Android App เด้งปิดทันทีตอนเปิด (Crash on Launch)**: ปลั๊กอิน `local_auth` (ระบบความปลอดภัยสแกนลายนิ้วมือ) บน Android กำหนดให้ Activity หลักต้องสืบทอดจาก `FlutterFragmentActivity` และใช้ธีม `Theme.AppCompat` ไม่สามารถใช้ `FlutterActivity` ปกติได้ เพราะจะเกิด `ClassCastException` ทันทีตอนเริ่มแอป แก้ไขโดยเปลี่ยน `MainActivity` เป็น `FlutterFragmentActivity`, เปลี่ยนธีมหน้าต่างเริ่มต้นเป็น `Theme.AppCompat` และเพิ่มสิทธิ์ `USE_BIOMETRIC` และ `INTERNET` ใน AndroidManifest.xml ให้สมบูรณ์
 
 
 

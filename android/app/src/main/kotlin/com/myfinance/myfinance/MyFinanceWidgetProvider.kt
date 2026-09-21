@@ -1,4 +1,4 @@
-﻿package com.myfinance.myfinance
+package com.myfinance.myfinance
 
 import android.appwidget.AppWidgetManager
 import android.content.Context
@@ -51,7 +51,7 @@ class MyFinanceWidget4x2 : HomeWidgetProvider() {
                 setTextViewText(R.id.remaining_text, remaining)
                 setTextViewText(R.id.spent_text, "ใช้ไป: $spent")
                 setTextViewText(R.id.budget_text, "งบ: $budget")
-                if (month.isNotEmpty()) {
+                if (!month.isNullOrEmpty()) {
                     setTextViewText(R.id.month_name, month)
                 }
                 setProgressBar(R.id.budget_progress, 100, progress, false)

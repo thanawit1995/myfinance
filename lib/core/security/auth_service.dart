@@ -49,8 +49,13 @@ class AuthService {
   }
 
   Future<bool> isPinConfigured() async {
-    final hash = await _secureStorage.read(key: _pinHashKey);
-    return hash != null && hash.isNotEmpty;
+    try {
+      final hash = await _secureStorage.read(key: _pinHashKey);
+      return hash != null && hash.isNotEmpty;
+    } catch (e) {
+      debugPrint('Error reading secure storage: $e');
+      return false;
+    }
   }
 
   Future<bool> isPinLockEnabled() async {

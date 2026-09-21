@@ -1,4 +1,4 @@
-﻿@echo off
+@echo off
 chcp 65001 > nul
 cd /d "%~dp0"
 cls
@@ -14,18 +14,19 @@ call flutter build apk --release
 if errorlevel 1 goto :BUILD_FAIL
 
 :BUILD_SUCCESS
+copy /y "%~dp0build\app\outputs\flutter-apk\app-release.apk" "%~dp0JP_Money.apk" > nul
 echo.
 echo ====================================================================
 echo   [ สำเร็จสมบูรณ์! ] สร้างไฟล์ติดตั้ง Android APK เรียบร้อยแล้ว
 echo ====================================================================
 echo.
 echo ตำแหน่งไฟล์ APK ที่พร้อมใช้งาน:
-echo %~dp0build\app\outputs\flutter-apk\app-release.apk
+echo %~dp0JP_Money.apk
 echo.
-echo คุณสามารถคัดลอกไฟล์ app-release.apk นี้ไปส่งทาง LINE หรือ Google Drive
+echo คุณสามารถส่งไฟล์ JP_Money.apk นี้ไปทาง LINE หรือ Google Drive
 echo เพื่อนำไปติดตั้งบนมือถือ Android ของคุณได้ทันทีครับ
 echo.
-explorer.exe "%~dp0build\app\outputs\flutter-apk"
+explorer.exe /select,"%~dp0JP_Money.apk"
 goto :END
 
 :BUILD_FAIL

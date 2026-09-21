@@ -1,15 +1,39 @@
+import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
 import 'core/theme/app_theme_style.dart';
 import 'core/theme/lumi_theme.dart';
 import 'core/theme/vault_theme.dart';
 import 'core/widgets/main_shell.dart';
 import 'l10n/app_localizations.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Catch synchronous Flutter framework errors
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+  };
+
+  // Catch asynchronous errors in the root isolate so the app does not crash instantly
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('Global unhandled error: $error\n$stack');
+    return true; // Handled
+  };
+
+  // Workaround for older Android versions to load sqlite3 cleanly
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+    try {
+      await applyWorkaroundToOpenSqlite3OnOldAndroidVersions();
+    } catch (e) {
+      debugPrint('Sqlite3 Android workaround error: $e');
+    }
+  }
+
   runApp(
     const ProviderScope(
       child: MyFinanceApp(),

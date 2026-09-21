@@ -44,8 +44,12 @@ class _MainShellState extends ConsumerState<MainShell> {
   void initState() {
     super.initState();
     // Process recurring transactions due on app launch in the background
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(recurringTransactionsDaoProvider).processDueRules();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        await ref.read(recurringTransactionsDaoProvider).processDueRules();
+      } catch (e) {
+        debugPrint('Error processing recurring rules: $e');
+      }
     });
   }
 

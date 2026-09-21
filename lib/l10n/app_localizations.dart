@@ -1052,6 +1052,144 @@ abstract class AppLocalizations {
   /// **'งบประมาณและโครงการ'**
   String get budgetAndProjects;
 
+  /// No description provided for @budgetTab.
+  ///
+  /// In th, this message translates to:
+  /// **'งบประมาณ'**
+  String get budgetTab;
+
+  /// No description provided for @manageCategories.
+  ///
+  /// In th, this message translates to:
+  /// **'จัดการหมวดหมู่'**
+  String get manageCategories;
+
+  /// No description provided for @expenseCategories.
+  ///
+  /// In th, this message translates to:
+  /// **'หมวดหมู่รายจ่าย'**
+  String get expenseCategories;
+
+  /// No description provided for @incomeCategories.
+  ///
+  /// In th, this message translates to:
+  /// **'หมวดหมู่รายรับ'**
+  String get incomeCategories;
+
+  /// No description provided for @addNewCategory.
+  ///
+  /// In th, this message translates to:
+  /// **'เพิ่มหมวดหมู่ใหม่'**
+  String get addNewCategory;
+
+  /// No description provided for @editCategory.
+  ///
+  /// In th, this message translates to:
+  /// **'แก้ไขหมวดหมู่'**
+  String get editCategory;
+
+  /// No description provided for @hideCategory.
+  ///
+  /// In th, this message translates to:
+  /// **'ซ่อนหมวดหมู่'**
+  String get hideCategory;
+
+  /// No description provided for @restoreCategory.
+  ///
+  /// In th, this message translates to:
+  /// **'กู้คืน'**
+  String get restoreCategory;
+
+  /// No description provided for @defaultBadge.
+  ///
+  /// In th, this message translates to:
+  /// **'ค่าเริ่มต้น'**
+  String get defaultBadge;
+
+  /// No description provided for @monthlyBudgetTab.
+  ///
+  /// In th, this message translates to:
+  /// **'งบประมาณรายเดือน'**
+  String get monthlyBudgetTab;
+
+  /// No description provided for @specialProjectsTab.
+  ///
+  /// In th, this message translates to:
+  /// **'โครงการพิเศษ'**
+  String get specialProjectsTab;
+
+  /// No description provided for @summaryBudgetNonRollover.
+  ///
+  /// In th, this message translates to:
+  /// **'สรุปงบประมาณรวมเดือนนี้ 🌸 (ไม่ Rollover)'**
+  String get summaryBudgetNonRollover;
+
+  /// No description provided for @budgetByCategory.
+  ///
+  /// In th, this message translates to:
+  /// **'งบประมาณแยกตามหมวดหมู่'**
+  String get budgetByCategory;
+
+  /// No description provided for @tapItemToEdit.
+  ///
+  /// In th, this message translates to:
+  /// **'แตะรายการเพื่อแก้ไข'**
+  String get tapItemToEdit;
+
+  /// No description provided for @budgetStatusNormal.
+  ///
+  /// In th, this message translates to:
+  /// **'ปกติ'**
+  String get budgetStatusNormal;
+
+  /// No description provided for @budgetStatusExceeded.
+  ///
+  /// In th, this message translates to:
+  /// **'เกินงบแล้ว!'**
+  String get budgetStatusExceeded;
+
+  /// No description provided for @budgetStatusWarning.
+  ///
+  /// In th, this message translates to:
+  /// **'ใกล้เต็มงบ (≥ 80%)'**
+  String get budgetStatusWarning;
+
+  /// No description provided for @deleteBudget.
+  ///
+  /// In th, this message translates to:
+  /// **'ลบงบประมาณ'**
+  String get deleteBudget;
+
+  /// No description provided for @confirmDeleteBudget.
+  ///
+  /// In th, this message translates to:
+  /// **'ยืนยันลบงบประมาณ'**
+  String get confirmDeleteBudget;
+
+  /// No description provided for @leftBudget.
+  ///
+  /// In th, this message translates to:
+  /// **'เหลือ'**
+  String get leftBudget;
+
+  /// No description provided for @totalBudgetLabel.
+  ///
+  /// In th, this message translates to:
+  /// **'งบรวม'**
+  String get totalBudgetLabel;
+
+  /// No description provided for @spentLabel.
+  ///
+  /// In th, this message translates to:
+  /// **'ใช้ไป'**
+  String get spentLabel;
+
+  /// No description provided for @budgetLabel.
+  ///
+  /// In th, this message translates to:
+  /// **'งบ'**
+  String get budgetLabel;
+
   /// No description provided for @tagline.
   ///
   /// In th, this message translates to:

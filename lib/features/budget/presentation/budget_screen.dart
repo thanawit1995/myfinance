@@ -10,6 +10,8 @@ import '../../../../core/database/database_provider.dart';
 import '../../../../core/money/money.dart';
 import '../../../../core/theme/vault_theme.dart';
 import '../../../../core/widgets/category_icon_helper.dart';
+import '../../../../core/widgets/category_name_helper.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../categories/presentation/categories_screen.dart';
 import '../../categories/presentation/category_form_dialog.dart';
 
@@ -42,13 +44,15 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
   Widget build(BuildContext context) {
     final isLumi = VaultTheme.isLumi(context);
     final accentColor = VaultTheme.accent(context);
+    final l10n = AppLocalizations.of(context);
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
 
     return Scaffold(
       backgroundColor: VaultTheme.background(context),
       appBar: AppBar(
         backgroundColor: VaultTheme.surface(context),
         title: Text(
-          'งบประมาณและการวางแผน',
+          l10n?.budgetAndProjects ?? 'งบประมาณและการวางแผน',
           style: TextStyle(
             fontFamily: VaultTheme.fontFamily,
             fontSize: 17,
@@ -61,16 +65,22 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
           indicatorColor: accentColor,
           labelColor: accentColor,
           unselectedLabelColor: VaultTheme.secondaryText(context),
-          tabs: const [
-            Tab(icon: Icon(Icons.pie_chart_outline), text: 'งบประมาณรายเดือน'),
-            Tab(icon: Icon(Icons.folder_special_outlined), text: 'โครงการพิเศษ'),
+          tabs: [
+            Tab(
+              icon: const Icon(Icons.pie_chart_outline),
+              text: l10n?.monthlyBudgetTab ?? 'งบประมาณรายเดือน',
+            ),
+            Tab(
+              icon: const Icon(Icons.folder_special_outlined),
+              text: l10n?.specialProjectsTab ?? 'โครงการพิเศษ',
+            ),
           ],
         ),
         actions: [
           if (_tabController.index == 0)
             IconButton(
               icon: const Icon(Icons.category_outlined),
-              tooltip: 'จัดการหมวดหมู่',
+              tooltip: l10n?.manageCategories ?? 'จัดการหมวดหมู่',
               onPressed: () async {
                 await Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const CategoriesScreen()),
@@ -80,7 +90,9 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
             ),
           IconButton(
             icon: const Icon(Icons.add),
-            tooltip: _tabController.index == 0 ? 'ตั้งงบหมวดหมู่' : 'สร้างโครงการใหม่',
+            tooltip: _tabController.index == 0
+                ? (isThai ? 'ตั้งงบหมวดหมู่' : 'Set Category Budget')
+                : (isThai ? 'สร้างโครงการใหม่' : 'New Project'),
             onPressed: () {
               if (_tabController.index == 0) {
                 _showAddBudgetDialog(context);
@@ -104,7 +116,9 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
         elevation: isLumi ? 3 : 2,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(isLumi ? 24 : 14)),
         icon: const Icon(Icons.add),
-        label: Text(_tabController.index == 0 ? 'ตั้งงบหมวดหมู่' : 'สร้างโครงการใหม่'),
+        label: Text(_tabController.index == 0
+            ? (isThai ? 'ตั้งงบหมวดหมู่' : 'Set Category Budget')
+            : (isThai ? 'สร้างโครงการใหม่' : 'New Project')),
         onPressed: () {
           if (_tabController.index == 0) {
             _showAddBudgetDialog(context);
@@ -121,6 +135,8 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
     final now = DateTime.now();
     final isLumi = VaultTheme.isLumi(context);
     final ext = VaultTheme.extension(context);
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+    final l10n = AppLocalizations.of(context);
 
     return FutureBuilder<List<CategoryBudgetStatus>>(
       future: bgDao.getBudgetStatusForMonth(now.year, now.month),
@@ -147,7 +163,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                 Icon(Icons.pie_chart_outline, size: 64, color: VaultTheme.mutedText(context)),
                 const SizedBox(height: 16),
                 Text(
-                  'ยังไม่ได้ตั้งงบประมาณสำหรับหมวดหมู่ใดๆ',
+                  isThai ? 'ยังไม่ได้ตั้งงบประมาณสำหรับหมวดหมู่ใดๆ' : 'No budget set for any category',
                   style: TextStyle(color: VaultTheme.secondaryText(context), fontSize: 15),
                 ),
                 const SizedBox(height: 14),
@@ -156,7 +172,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                     backgroundColor: VaultTheme.accent(context),
                   ),
                   icon: const Icon(Icons.add),
-                  label: const Text('ตั้งงบประมาณหมวดหมู่'),
+                  label: Text(isThai ? 'ตั้งงบประมาณหมวดหมู่' : 'Set Category Budget'),
                   onPressed: () => _showAddBudgetDialog(context),
                 ),
               ],
@@ -202,7 +218,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    isLumi ? 'สรุปงบประมาณรวมเดือนนี้ 🌸 (ไม่ Rollover)' : 'SUMMARY BUDGET (NON-ROLLOVER)',
+                    isLumi ? (l10n?.summaryBudgetNonRollover ?? 'สรุปงบประมาณรวมเดือนนี้ 🌸 (ไม่ Rollover)') : 'SUMMARY BUDGET (NON-ROLLOVER)',
                     style: TextStyle(
                       fontFamily: VaultTheme.fontFamily,
                       fontSize: 12,
@@ -216,7 +232,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'เหลือ ${Money(totalRemaining).format(symbol: '฿')}',
+                        '${l10n?.leftBudget ?? (isThai ? 'เหลือ' : 'Left')} ${Money(totalRemaining).format(symbol: '฿')}',
                         style: VaultTheme.tabular(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
@@ -224,7 +240,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                         ),
                       ),
                       Text(
-                        'งบรวม ${Money(totalLimit).format(symbol: '฿')}',
+                        '${l10n?.totalBudgetLabel ?? (isThai ? 'งบรวม' : 'Total')} ${Money(totalLimit).format(symbol: '฿')}',
                         style: VaultTheme.tabular(
                           fontSize: 14,
                           color: VaultTheme.secondaryText(context),
@@ -257,7 +273,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'งบประมาณแยกตามหมวดหมู่',
+                  l10n?.budgetByCategory ?? (isThai ? 'งบประมาณแยกตามหมวดหมู่' : 'Budget by Category'),
                   style: TextStyle(
                     fontFamily: VaultTheme.fontFamily,
                     fontSize: 15,
@@ -266,7 +282,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                   ),
                 ),
                 Text(
-                  'แตะรายการเพื่อแก้ไข',
+                  l10n?.tapItemToEdit ?? (isThai ? 'แตะรายการเพื่อแก้ไข' : 'Tap item to edit'),
                   style: TextStyle(
                     fontFamily: VaultTheme.fontFamily,
                     fontSize: 12,
@@ -287,15 +303,17 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
 
   Widget _buildBudgetTile(BuildContext context, CategoryBudgetStatus b) {
     final isLumi = VaultTheme.isLumi(context);
+    final l10n = AppLocalizations.of(context);
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     Color progressColor = Colors.green.shade600;
-    String statusText = 'ปกติ';
+    String statusText = l10n?.budgetStatusNormal ?? (isThai ? 'ปกติ' : 'Normal');
 
     if (b.isExceeded) {
       progressColor = VaultTheme.negative(context);
-      statusText = 'เกินงบแล้ว!';
+      statusText = l10n?.budgetStatusExceeded ?? (isThai ? 'เกินงบแล้ว!' : 'Over Budget!');
     } else if (b.isWarning) {
       progressColor = Colors.orange.shade700;
-      statusText = 'ใกล้เต็มงบ (≥ 80%)';
+      statusText = l10n?.budgetStatusWarning ?? (isThai ? 'ใกล้เต็มงบ (≥ 80%)' : 'Near Limit (≥ 80%)');
     } else if (isLumi) {
       progressColor = const Color(0xFFFF5C9D);
     }
@@ -321,34 +339,40 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: progressColor.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(8),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: progressColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            CategoryIconHelper.getIcon(b.icon),
+                            size: 18,
+                            color: progressColor,
+                          ),
                         ),
-                        child: Icon(
-                          CategoryIconHelper.getIcon(b.icon),
-                          size: 18,
-                          color: progressColor,
+                        const SizedBox(width: 10),
+                        Flexible(
+                          child: Text(
+                            b.localizedName(context),
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: VaultTheme.fontFamily,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: VaultTheme.primaryText(context),
+                            ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        b.categoryNameTh,
-                        style: TextStyle(
-                          fontFamily: VaultTheme.fontFamily,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          color: VaultTheme.primaryText(context),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Icon(Icons.edit_outlined, size: 14, color: VaultTheme.mutedText(context)),
-                    ],
+                        const SizedBox(width: 6),
+                        Icon(Icons.edit_outlined, size: 14, color: VaultTheme.mutedText(context)),
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
@@ -372,14 +396,14 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'ใช้ไป: ${Money(b.spentSatang).format(symbol: '฿')} ($percentDisplay%)',
+                    '${l10n?.spentLabel ?? (isThai ? 'ใช้ไป' : 'Spent')}: ${Money(b.spentSatang).format(symbol: '฿')} ($percentDisplay%)',
                     style: VaultTheme.tabular(
                       fontSize: 13,
                       color: VaultTheme.secondaryText(context),
                     ),
                   ),
                   Text(
-                    'งบ: ${Money(b.limitSatang).format(symbol: '฿')}',
+                    '${l10n?.budgetLabel ?? (isThai ? 'งบ' : 'Budget')}: ${Money(b.limitSatang).format(symbol: '฿')}',
                     style: VaultTheme.tabular(
                       fontSize: 13,
                       color: VaultTheme.secondaryText(context),
@@ -403,29 +427,35 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                 children: [
                   TextButton.icon(
                     icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
-                    label: const Text('ลบงบประมาณ', style: TextStyle(fontSize: 12, color: Colors.red)),
+                    label: Text(
+                      l10n?.deleteBudget ?? (isThai ? 'ลบงบประมาณ' : 'Delete Budget'),
+                      style: const TextStyle(fontSize: 12, color: Colors.red),
+                    ),
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
                     onPressed: () async {
+                      final catName = b.localizedName(context);
                       final confirm = await showDialog<bool>(
                         context: context,
                         builder: (ctx) => AlertDialog(
-                          title: const Text('ยืนยันลบงบประมาณ'),
+                          title: Text(l10n?.confirmDeleteBudget ?? (isThai ? 'ยืนยันลบงบประมาณ' : 'Confirm Delete Budget')),
                           content: Text(
-                            'ต้องการลบงบประมาณสำหรับ "${b.categoryNameTh}" หรือไม่?\n\n(ข้อมูลรายจ่ายที่บันทึกไปแล้วจะไม่หายไป)',
+                            isThai
+                                ? 'ต้องการลบงบประมาณสำหรับ "$catName" หรือไม่?\n\n(ข้อมูลรายจ่ายที่บันทึกไปแล้วจะไม่หายไป)'
+                                : 'Delete budget for "$catName"?\n\n(Recorded expenses will not be lost)',
                           ),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.of(ctx).pop(false),
-                              child: const Text('ยกเลิก'),
+                              child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
                             ),
                             FilledButton(
                               style: FilledButton.styleFrom(backgroundColor: Colors.red),
                               onPressed: () => Navigator.of(ctx).pop(true),
-                              child: const Text('ลบ'),
+                              child: Text(isThai ? 'ลบ' : 'Delete'),
                             ),
                           ],
                         ),
@@ -438,8 +468,8 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                   ),
                   Text(
                     b.remainingSatang >= 0
-                        ? 'เหลืออีก ${Money(b.remainingSatang).format(symbol: '฿')}'
-                        : 'เกินงบไป ${Money(b.remainingSatang.abs()).format(symbol: '฿')}',
+                        ? '${l10n?.leftBudget ?? (isThai ? 'เหลืออีก' : 'Left')} ${Money(b.remainingSatang).format(symbol: '฿')}'
+                        : '${isThai ? 'เกินงบไป' : 'Over by'} ${Money(b.remainingSatang.abs()).format(symbol: '฿')}',
                     style: TextStyle(
                       fontFamily: VaultTheme.fontFamily,
                       fontSize: 12,
@@ -759,10 +789,11 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
     await showDialog(
       context: context,
       builder: (ctx) {
+        final isThai = Localizations.localeOf(context).languageCode == 'th';
         return StatefulBuilder(
           builder: (dialogCtx, setDialogState) {
             return AlertDialog(
-              title: const Text('ตั้งงบประมาณรายเดือน'),
+              title: Text(isThai ? 'ตั้งงบประมาณรายเดือน' : 'Set Monthly Budget'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -772,9 +803,9 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                     children: [
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          decoration: const InputDecoration(
-                            labelText: 'เลือกหมวดหมู่',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: isThai ? 'เลือกหมวดหมู่' : 'Select Category',
+                            border: const OutlineInputBorder(),
                           ),
                           initialValue: selectedCatId,
                           items: categories
@@ -784,7 +815,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                                       children: [
                                         Icon(CategoryIconHelper.getIcon(c.icon), size: 18),
                                         const SizedBox(width: 8),
-                                        Text(c.nameTh),
+                                        Text(c.localizedName(context)),
                                       ],
                                     ),
                                   ))
@@ -794,7 +825,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                       ),
                       const SizedBox(width: 8),
                       Tooltip(
-                        message: 'สร้างหมวดหมู่ใหม่',
+                        message: isThai ? 'สร้างหมวดหมู่ใหม่' : 'New Category',
                         child: IconButton.filled(
                           icon: const Icon(Icons.add, size: 20),
                           onPressed: () async {
@@ -811,16 +842,16 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                     ],
-                    decoration: const InputDecoration(
-                      labelText: 'จำนวนเงินงบประมาณ (บาท)',
+                    decoration: InputDecoration(
+                      labelText: isThai ? 'จำนวนเงินงบประมาณ (บาท)' : 'Budget Amount (THB)',
                       prefixText: '฿ ',
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                 ],
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('ยกเลิก')),
+                TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(isThai ? 'ยกเลิก' : 'Cancel')),
                 FilledButton(
                   onPressed: () async {
                     final amount = double.tryParse(amountController.text.trim()) ?? 0.0;
@@ -831,7 +862,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                       if (mounted) setState(() {});
                     }
                   },
-                  child: const Text('บันทึก'),
+                  child: Text(isThai ? 'บันทึก' : 'Save'),
                 ),
               ],
             );
@@ -863,10 +894,11 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
     await showDialog(
       context: context,
       builder: (ctx) {
+        final isThai = Localizations.localeOf(ctx).languageCode == 'th';
         return StatefulBuilder(
           builder: (dialogCtx, setDialogState) {
             return AlertDialog(
-              title: const Text('ตั้งงบประมาณรายเดือน'),
+              title: Text(isThai ? 'ตั้งงบประมาณรายเดือน' : 'Set Monthly Budget'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -876,9 +908,9 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                     children: [
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          decoration: const InputDecoration(
-                            labelText: 'เลือกหมวดหมู่',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: isThai ? 'เลือกหมวดหมู่' : 'Select Category',
+                            border: const OutlineInputBorder(),
                           ),
                           initialValue: selectedCatId,
                           items: categories
@@ -888,7 +920,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                                       children: [
                                         Icon(CategoryIconHelper.getIcon(c.icon), size: 18),
                                         const SizedBox(width: 8),
-                                        Text(c.nameTh),
+                                        Text(c.localizedName(context)),
                                       ],
                                     ),
                                   ))
@@ -898,7 +930,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                       ),
                       const SizedBox(width: 8),
                       Tooltip(
-                        message: 'สร้างหมวดหมู่ใหม่',
+                        message: isThai ? 'สร้างหมวดหมู่ใหม่' : 'Create New Category',
                         child: IconButton.filled(
                           icon: const Icon(Icons.add, size: 20),
                           onPressed: () async {
@@ -916,16 +948,16 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                     ],
-                    decoration: const InputDecoration(
-                      labelText: 'จำนวนเงินงบประมาณ (บาท)',
+                    decoration: InputDecoration(
+                      labelText: isThai ? 'จำนวนเงินงบประมาณ (บาท)' : 'Budget Amount (THB)',
                       prefixText: '฿ ',
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                 ],
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('ยกเลิก')),
+                TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(isThai ? 'ยกเลิก' : 'Cancel')),
                 FilledButton(
                   onPressed: () async {
                     final amount = double.tryParse(amountController.text.trim()) ?? 0.0;
@@ -936,7 +968,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                       if (mounted) setState(() {});
                     }
                   },
-                  child: const Text('บันทึก'),
+                  child: Text(isThai ? 'บันทึก' : 'Save'),
                 ),
               ],
             );
@@ -959,18 +991,20 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
 
   Future<void> _showEditBudgetDialog(BuildContext context, CategoryBudgetStatus b) async {
     final amountController = TextEditingController(text: (b.limitSatang / 100).toStringAsFixed(0));
+    final catName = b.localizedName(context);
 
     await showDialog(
       context: context,
       builder: (ctx) {
+        final isThai = Localizations.localeOf(ctx).languageCode == 'th';
         return AlertDialog(
-          title: Text('แก้ไขงบประมาณ: ${b.categoryNameTh}'),
+          title: Text(isThai ? 'แก้ไขงบประมาณ: $catName' : 'Edit Budget: $catName'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'ใช้ไปแล้วในเดือนนี้: ${Money(b.spentSatang).format(symbol: "฿")}',
+                '${isThai ? "ใช้ไปแล้วในเดือนนี้" : "Spent this month"}: ${Money(b.spentSatang).format(symbol: "฿")}',
                 style: const TextStyle(fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 16),
@@ -981,10 +1015,10 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                 ],
                 autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'งบประมาณใหม่ (บาท)',
+                decoration: InputDecoration(
+                  labelText: isThai ? 'งบประมาณใหม่ (บาท)' : 'New Budget (THB)',
                   prefixText: '฿ ',
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                 ),
               ),
             ],
@@ -996,15 +1030,17 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                 final confirm = await showDialog<bool>(
                   context: ctx,
                   builder: (confirmCtx) => AlertDialog(
-                    title: const Text('ยืนยันลบงบประมาณ'),
+                    title: Text(isThai ? 'ยืนยันลบงบประมาณ' : 'Delete Budget'),
                     content: Text(
-                        'คุณต้องการลบงบประมาณของหมวดหมู่ "${b.categoryNameTh}" ใช่หรือไม่? (ไม่กระทบกับบันทึกค่าใช้จ่ายที่มีอยู่)'),
+                        isThai
+                            ? 'คุณต้องการลบงบประมาณของหมวดหมู่ "$catName" ใช่หรือไม่? (ไม่กระทบกับบันทึกค่าใช้จ่ายที่มีอยู่)'
+                            : 'Do you want to delete budget for "$catName"? (Does not affect existing transactions)'),
                     actions: [
-                      TextButton(onPressed: () => Navigator.of(confirmCtx).pop(false), child: const Text('ยกเลิก')),
+                      TextButton(onPressed: () => Navigator.of(confirmCtx).pop(false), child: Text(isThai ? 'ยกเลิก' : 'Cancel')),
                       FilledButton(
                         style: FilledButton.styleFrom(backgroundColor: Colors.red),
                         onPressed: () => Navigator.of(confirmCtx).pop(true),
-                        child: const Text('ลบงบประมาณ'),
+                        child: Text(isThai ? 'ลบงบประมาณ' : 'Delete Budget'),
                       ),
                     ],
                   ),
@@ -1015,11 +1051,11 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                   if (mounted) setState(() {});
                 }
               },
-              child: const Text('ลบงบประมาณ'),
+              child: Text(isThai ? 'ลบงบประมาณ' : 'Delete Budget'),
             ),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('ยกเลิก'),
+              child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
             ),
             FilledButton(
               onPressed: () async {
@@ -1031,7 +1067,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                   if (mounted) setState(() {});
                 }
               },
-              child: const Text('บันทึก'),
+              child: Text(isThai ? 'บันทึก' : 'Save'),
             ),
           ],
         );

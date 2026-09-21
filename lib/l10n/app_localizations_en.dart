@@ -521,5 +521,75 @@ class AppLocalizationsEn extends AppLocalizations {
   String get budgetAndProjects => 'Budget & Projects';
 
   @override
+  String get budgetTab => 'Budget';
+
+  @override
+  String get manageCategories => 'Manage Categories';
+
+  @override
+  String get expenseCategories => 'Expense Categories';
+
+  @override
+  String get incomeCategories => 'Income Categories';
+
+  @override
+  String get addNewCategory => 'Add Category';
+
+  @override
+  String get editCategory => 'Edit Category';
+
+  @override
+  String get hideCategory => 'Hide Category';
+
+  @override
+  String get restoreCategory => 'Restore';
+
+  @override
+  String get defaultBadge => 'Default';
+
+  @override
+  String get monthlyBudgetTab => 'Monthly Budget';
+
+  @override
+  String get specialProjectsTab => 'Special Projects';
+
+  @override
+  String get summaryBudgetNonRollover =>
+      'Monthly Budget Summary 🌸 (Non-Rollover)';
+
+  @override
+  String get budgetByCategory => 'Budget by Category';
+
+  @override
+  String get tapItemToEdit => 'Tap item to edit';
+
+  @override
+  String get budgetStatusNormal => 'Normal';
+
+  @override
+  String get budgetStatusExceeded => 'Over Budget!';
+
+  @override
+  String get budgetStatusWarning => 'Near Limit (≥ 80%)';
+
+  @override
+  String get deleteBudget => 'Delete Budget';
+
+  @override
+  String get confirmDeleteBudget => 'Confirm Delete Budget';
+
+  @override
+  String get leftBudget => 'Left';
+
+  @override
+  String get totalBudgetLabel => 'Total Budget';
+
+  @override
+  String get spentLabel => 'Spent';
+
+  @override
+  String get budgetLabel => 'Budget';
+
+  @override
   String get tagline => 'Our money, our journey.';
 }

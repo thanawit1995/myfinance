@@ -116,9 +116,12 @@ class _CategoryFormDialogState extends ConsumerState<CategoryFormDialog> {
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.categoryToEdit != null;
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
 
     return AlertDialog(
-      title: Text(isEditing ? 'แก้ไขหมวดหมู่' : 'สร้างหมวดหมู่ใหม่'),
+      title: Text(isEditing
+          ? (isThai ? 'แก้ไขหมวดหมู่' : 'Edit Category')
+          : (isThai ? 'สร้างหมวดหมู่ใหม่' : 'New Category')),
       content: SizedBox(
         width: 420,
         child: Form(
@@ -130,14 +133,20 @@ class _CategoryFormDialogState extends ConsumerState<CategoryFormDialog> {
               children: [
                 DropdownButtonFormField<String>(
                   initialValue: _categoryType,
-                  decoration: const InputDecoration(
-                    labelText: 'ประเภทหมวดหมู่',
+                  decoration: InputDecoration(
+                    labelText: isThai ? 'ประเภทหมวดหมู่' : 'Category Type',
                     isDense: true,
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'expense', child: Text('รายจ่าย (Expense)')),
-                    DropdownMenuItem(value: 'income', child: Text('รายรับ (Income)')),
+                  items: [
+                    DropdownMenuItem(
+                      value: 'expense',
+                      child: Text(isThai ? 'รายจ่าย (Expense)' : 'Expense'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'income',
+                      child: Text(isThai ? 'รายรับ (Income)' : 'Income'),
+                    ),
                   ],
                   onChanged: (val) {
                     if (val != null) setState(() => _categoryType = val);
@@ -146,26 +155,30 @@ class _CategoryFormDialogState extends ConsumerState<CategoryFormDialog> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _nameThController,
-                  decoration: const InputDecoration(
-                    labelText: 'ชื่อหมวดหมู่ (ภาษาไทย) *',
-                    hintText: 'เช่น ค่าอาหาร, กาแฟ, เงินเดือน',
+                  decoration: InputDecoration(
+                    labelText: isThai ? 'ชื่อหมวดหมู่ (ภาษาไทย) *' : 'Thai Name *',
+                    hintText: isThai ? 'เช่น ค่าอาหาร, กาแฟ, เงินเดือน' : 'e.g. ค่าอาหาร, กาแฟ',
                     isDense: true,
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                   ),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'กรุณาระบุชื่อ' : null,
+                  validator: (v) =>
+                      (v == null || v.trim().isEmpty) ? (isThai ? 'กรุณาระบุชื่อ' : 'Please enter name') : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _nameEnController,
-                  decoration: const InputDecoration(
-                    labelText: 'ชื่อภาษาอังกฤษ (English Name)',
-                    hintText: 'เช่น Food, Coffee, Salary',
+                  decoration: InputDecoration(
+                    labelText: isThai ? 'ชื่อภาษาอังกฤษ (English Name)' : 'English Name',
+                    hintText: isThai ? 'เช่น Food, Coffee, Salary' : 'e.g. Food, Coffee, Salary',
                     isDense: true,
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text('เลือกไอคอนสัญลักษณ์:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                Text(
+                  isThai ? 'เลือกไอคอนสัญลักษณ์:' : 'Choose an icon:',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 8),
                 Container(
                   height: 200,
@@ -201,17 +214,23 @@ class _CategoryFormDialogState extends ConsumerState<CategoryFormDialog> {
                                 child: Container(
                                   padding: const EdgeInsets.all(7),
                                   decoration: BoxDecoration(
-                                    color: isSelected ? Theme.of(context).colorScheme.primaryContainer : Colors.grey.shade100,
+                                    color: isSelected
+                                        ? Theme.of(context).colorScheme.primaryContainer
+                                        : Colors.grey.shade100,
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
-                                      color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey.shade300,
+                                      color: isSelected
+                                          ? Theme.of(context).colorScheme.primary
+                                          : Colors.grey.shade300,
                                       width: isSelected ? 2 : 1,
                                     ),
                                   ),
                                   child: Icon(
                                     CategoryIconHelper.getIcon(iconName),
                                     size: 22,
-                                    color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey.shade700,
+                                    color: isSelected
+                                        ? Theme.of(context).colorScheme.primary
+                                        : Colors.grey.shade700,
                                   ),
                                 ),
                               );
@@ -231,11 +250,13 @@ class _CategoryFormDialogState extends ConsumerState<CategoryFormDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('ยกเลิก'),
+          child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
         ),
         FilledButton(
           onPressed: _save,
-          child: Text(isEditing ? 'บันทึกการแก้ไข' : 'สร้างหมวดหมู่'),
+          child: Text(isEditing
+              ? (isThai ? 'บันทึกการแก้ไข' : 'Save Changes')
+              : (isThai ? 'สร้างหมวดหมู่' : 'Create Category')),
         ),
       ],
     );

@@ -4,7 +4,6 @@ import '../../../../core/database/database_provider.dart';
 import '../../../../core/money/money.dart';
 import '../domain/models/health_metric_result.dart';
 import '../domain/run_rate_calculator.dart';
-import '../../../../core/theme/vault_theme.dart';
 import 'health_settings_dialog.dart';
 import 'liabilities_insurance_screen.dart';
 import 'metric_detail_sheet.dart';
@@ -25,14 +24,15 @@ class _FinancialHealthScreenState extends ConsumerState<FinancialHealthScreen> {
   Widget build(BuildContext context) {
     final dao = ref.watch(financialHealthDaoProvider);
     final theme = Theme.of(context);
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('สุขภาพการเงินและพยากรณ์เงิน'),
+        title: Text(isThai ? 'สุขภาพการเงินและพยากรณ์เงิน' : 'Financial Health & Forecast'),
         actions: [
           IconButton(
             icon: const Icon(Icons.shield_outlined),
-            tooltip: 'ทะเบียนหนี้สินและประกัน',
+            tooltip: isThai ? 'ทะเบียนหนี้สินและประกัน' : 'Debts & Insurance',
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const LiabilitiesInsuranceScreen()),
@@ -41,7 +41,7 @@ class _FinancialHealthScreenState extends ConsumerState<FinancialHealthScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.tune),
-            tooltip: 'ตั้งค่าเกณฑ์สุขภาพการเงิน',
+            tooltip: isThai ? 'ตั้งค่าเกณฑ์สุขภาพการเงิน' : 'Health Metric Settings',
             onPressed: () async {
               final updated = await HealthSettingsDialog.show(context);
               if (updated == true) _refresh();
@@ -62,7 +62,7 @@ class _FinancialHealthScreenState extends ConsumerState<FinancialHealthScreen> {
             }
 
             if (snapshot.hasError) {
-              return Center(child: Text('เกิดข้อผิดพลาด: ${snapshot.error}'));
+              return Center(child: Text(isThai ? 'เกิดข้อผิดพลาด: ${snapshot.error}' : 'Error: ${snapshot.error}'));
             }
 
             final summary = snapshot.data![0] as FinancialHealthSummary;
@@ -83,12 +83,14 @@ class _FinancialHealthScreenState extends ConsumerState<FinancialHealthScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'ตัวชี้วัด 8 ด้าน (Financial Metrics)',
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    Expanded(
+                      child: Text(
+                        isThai ? 'ตัวชี้วัด 8 ด้าน (Financial Metrics)' : '8 Financial Health Metrics',
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      ),
                     ),
                     Text(
-                      'แตะเพื่อดูสูตรและที่มา',
+                      isThai ? 'แตะเพื่อดูสูตร' : 'Tap for details',
                       style: TextStyle(fontSize: 12, color: theme.colorScheme.primary),
                     ),
                   ],
@@ -112,8 +114,11 @@ class _FinancialHealthScreenState extends ConsumerState<FinancialHealthScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   child: ListTile(
                     leading: const Icon(Icons.assignment_outlined, color: Colors.indigo),
-                    title: const Text('จัดการทะเบียนหนี้สินและกรมธรรม์ประกัน', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    subtitle: const Text('บันทึกยอดหนี้ วงเงินบัตร และความคุ้มครองประกันภัย'),
+                    title: Text(
+                      isThai ? 'จัดการทะเบียนหนี้สินและกรมธรรม์ประกัน' : 'Manage Debts & Insurance Policies',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                    subtitle: Text(isThai ? 'บันทึกยอดหนี้ วงเงินบัตร และความคุ้มครองประกันภัย' : 'Track loan balances, credit limits and coverage'),
                     trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                     onTap: () {
                       Navigator.of(context).push(
@@ -133,9 +138,10 @@ class _FinancialHealthScreenState extends ConsumerState<FinancialHealthScreen> {
 
   Widget _buildScoreHeroCard(BuildContext context, FinancialHealthSummary summary) {
     final theme = Theme.of(context);
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     final score = summary.totalScore;
     final scoreColor = _getGradeColor(score);
-    final gradeLabel = _getGradeLabel(score);
+    final gradeLabel = _getGradeLabel(score, isThai);
 
     final liqScore = summary.metrics.where((m) => m.metricIndex == 1 || m.metricIndex == 2).fold(0, (s, m) => s + m.score);
     final debtScore = summary.metrics.where((m) => m.metricIndex == 3 || m.metricIndex == 4).fold(0, (s, m) => s + m.score);
@@ -143,9 +149,8 @@ class _FinancialHealthScreenState extends ConsumerState<FinancialHealthScreen> {
     final insScore = summary.metrics.where((m) => m.metricIndex == 7 || m.metricIndex == 8).fold(0, (s, m) => s + m.score);
 
     return Card(
-      elevation: 3,
+      elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      color: theme.colorScheme.surface,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -186,14 +191,14 @@ class _FinancialHealthScreenState extends ConsumerState<FinancialHealthScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'คะแนนสุขภาพการเงินรวม',
-                        style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                        isThai ? 'คะแนนสุขภาพการเงินรวม' : 'Overall Health Score',
+                        style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         gradeLabel,
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.bold,
                           color: scoreColor,
                         ),
@@ -219,13 +224,13 @@ class _FinancialHealthScreenState extends ConsumerState<FinancialHealthScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildPillarTile('สภาพคล่อง', liqScore, 30, Colors.blue.shade700),
+                _buildPillarTile(isThai ? 'สภาพคล่อง' : 'Liquidity', liqScore, 30, Colors.blue.shade700),
                 Container(height: 32, width: 1, color: Colors.grey.shade300),
-                _buildPillarTile('หนี้สิน', debtScore, 30, Colors.deepOrange.shade700),
+                _buildPillarTile(isThai ? 'หนี้สิน' : 'Debt', debtScore, 30, Colors.deepOrange.shade700),
                 Container(height: 32, width: 1, color: Colors.grey.shade300),
-                _buildPillarTile('ออม/ลงทุน', savScore, 20, Colors.green.shade700),
+                _buildPillarTile(isThai ? 'ออม/ลงทุน' : 'Savings', savScore, 20, Colors.green.shade700),
                 Container(height: 32, width: 1, color: Colors.grey.shade300),
-                _buildPillarTile('คุ้มครอง', insScore, 20, Colors.purple.shade700),
+                _buildPillarTile(isThai ? 'คุ้มครอง' : 'Insurance', insScore, 20, Colors.purple.shade700),
               ],
             ),
           ],
@@ -248,215 +253,204 @@ class _FinancialHealthScreenState extends ConsumerState<FinancialHealthScreen> {
   }
 
   Widget _buildRunRateCard(BuildContext context, RunRateForecast forecast) {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final isOverBudget = forecast.varianceSatang > 0;
-    final varianceColor = isOverBudget ? VaultTheme.negative(context) : VaultTheme.positive(context);
+    final varianceColor = isOverBudget ? Colors.red.shade700 : Colors.green.shade700;
     final variancePct = forecast.monthlyBudgetLimitSatang > 0
         ? (forecast.varianceSatang / forecast.monthlyBudgetLimitSatang * 100).abs()
         : 0.0;
-    final isLumi = VaultTheme.isLumi(context);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: VaultTheme.surface(context),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: VaultTheme.border(context), width: 0.8),
-        boxShadow: isLumi
-            ? [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(Icons.speed_rounded, color: theme.colorScheme.primary, size: 18),
                 ),
-              ]
-            : null,
-      ),
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: VaultTheme.accent(context).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    isThai ? 'พยากรณ์การใช้เงิน (Run-rate Forecast)' : 'Spending Forecast (Run-rate)',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
-                child: Icon(Icons.speed_rounded, color: VaultTheme.accent(context), size: 18),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                'พยากรณ์การใช้เงิน (Run-rate Forecast)',
-                style: TextStyle(
-                  fontFamily: VaultTheme.fontFamily,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: VaultTheme.primaryText(context),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Projected Month Spend vs Budget
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'คาดการณ์สิ้นเดือนนี้',
-                    style: TextStyle(
-                      fontFamily: VaultTheme.fontFamily,
-                      fontSize: 12,
-                      color: VaultTheme.secondaryText(context),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    Money(forecast.projectedMonthEndSatang).format(symbol: '฿'),
-                    style: TextStyle(
-                      fontFamily: VaultTheme.fontFamily,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: isOverBudget ? VaultTheme.negative(context) : VaultTheme.primaryText(context),
-                    ),
-                  ),
-                ],
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    'เพดานงบประมาณ',
-                    style: TextStyle(
-                      fontFamily: VaultTheme.fontFamily,
-                      fontSize: 12,
-                      color: VaultTheme.secondaryText(context),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    Money(forecast.monthlyBudgetLimitSatang).format(symbol: '฿'),
-                    style: TextStyle(
-                      fontFamily: VaultTheme.fontFamily,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: VaultTheme.primaryText(context),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Progress bar
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: LinearProgressIndicator(
-              value: forecast.monthlyBudgetLimitSatang > 0
-                  ? (forecast.projectedMonthEndSatang / forecast.monthlyBudgetLimitSatang).clamp(0.0, 1.0)
-                  : 0.0,
-              minHeight: 8,
-              backgroundColor: VaultTheme.border(context),
-              valueColor: AlwaysStoppedAnimation<Color>(
-                isOverBudget
-                    ? VaultTheme.negative(context)
-                    : (forecast.varianceSatang == 0 ? VaultTheme.positive(context) : Colors.orange),
-              ),
+              ],
             ),
-          ),
-          const SizedBox(height: 12),
+            const SizedBox(height: 16),
 
-          // Stats grid
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'ใช้ไปแล้ว: ${Money(forecast.accumulatedExpenseSatang).format(symbol: '฿')}',
-                style: TextStyle(
-                  fontFamily: VaultTheme.fontFamily,
-                  fontSize: 12,
-                  color: VaultTheme.secondaryText(context),
+            // Projected Month Spend vs Budget
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isThai ? 'คาดการณ์สิ้นเดือนนี้' : 'Projected End of Month',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        Money(forecast.projectedMonthEndSatang).format(symbol: '฿'),
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: isOverBudget ? Colors.red.shade700 : theme.colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              Text(
-                'ส่วนต่างงบ: ${isOverBudget ? "+" : ""}${Money(forecast.varianceSatang).format(symbol: '฿')} (${variancePct.toStringAsFixed(1)}%)',
-                style: TextStyle(
-                  fontFamily: VaultTheme.fontFamily,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: varianceColor,
-                ),
-              ),
-            ],
-          ),
-          Divider(height: 24, color: VaultTheme.border(context)),
-
-          // Recommended Daily Spend
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      'วงเงินที่ควรใช้ต่อวัน (เพื่อให้ไม่เกินงบ)',
+                      isThai ? 'เพดานงบประมาณ' : 'Monthly Budget',
                       style: TextStyle(
-                        fontFamily: VaultTheme.fontFamily,
-                        fontSize: 11.5,
-                        color: VaultTheme.secondaryText(context),
+                        fontSize: 12,
+                        color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${Money(forecast.recommendedDailySpendSatang).format(symbol: '฿')} / วัน',
+                      Money(forecast.monthlyBudgetLimitSatang).format(symbol: '฿'),
                       style: TextStyle(
-                        fontFamily: VaultTheme.fontFamily,
-                        fontSize: 15,
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: forecast.recommendedDailySpendSatang <= 0 ? VaultTheme.negative(context) : VaultTheme.positive(context),
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                   ],
                 ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Progress bar
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: forecast.monthlyBudgetLimitSatang > 0
+                    ? (forecast.projectedMonthEndSatang / forecast.monthlyBudgetLimitSatang).clamp(0.0, 1.0)
+                    : 0.0,
+                minHeight: 8,
+                backgroundColor: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  isOverBudget
+                      ? Colors.red.shade700
+                      : (forecast.varianceSatang == 0 ? Colors.green.shade700 : Colors.orange),
+                ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    'เหลืออีก',
-                    style: TextStyle(
-                      fontFamily: VaultTheme.fontFamily,
-                      fontSize: 11.5,
-                      color: VaultTheme.secondaryText(context),
-                    ),
+            ),
+            const SizedBox(height: 12),
+
+            // Stats grid (using Wrap so it never overflows)
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                Text(
+                  '${isThai ? "ใช้ไปแล้ว" : "Spent"}: ${Money(forecast.accumulatedExpenseSatang).format(symbol: '฿')}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${forecast.remainingDaysInMonth} วัน',
-                    style: TextStyle(
-                      fontFamily: VaultTheme.fontFamily,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: VaultTheme.primaryText(context),
-                    ),
+                ),
+                Text(
+                  '${isThai ? "ส่วนต่างงบ" : "Variance"}: ${isOverBudget ? "+" : ""}${Money(forecast.varianceSatang).format(symbol: '฿')} (${variancePct.toStringAsFixed(1)}%)',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: varianceColor,
                   ),
-                ],
-              ),
-            ],
-          ),
-        ],
+                ),
+              ],
+            ),
+            Divider(height: 24, color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
+
+            // Recommended Daily Spend
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isThai ? 'วงเงินที่ควรใช้ต่อวัน (เพื่อให้ไม่เกินงบ)' : 'Target Daily Spend (To Stay On Budget)',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${Money(forecast.recommendedDailySpendSatang).format(symbol: '฿')} / ${isThai ? "วัน" : "day"}',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: forecast.recommendedDailySpendSatang <= 0 ? Colors.red.shade700 : Colors.green.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      isThai ? 'เหลืออีก' : 'Remaining',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${forecast.remainingDaysInMonth} ${isThai ? "วัน" : "days"}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildMetricCard(BuildContext context, HealthMetricResult m) {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final statusColor = _getStatusColor(m.status);
 
     return Card(
@@ -501,20 +495,25 @@ class _FinancialHealthScreenState extends ConsumerState<FinancialHealthScreen> {
                       ],
                     ),
                     const SizedBox(height: 4),
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 2,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Text(
-                          'ปัจจุบัน: ${m.formattedValue}',
+                          '${isThai ? "ปัจจุบัน" : "Current"}: ${m.formattedValue}',
                           style: TextStyle(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w600,
                             color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
-                        const SizedBox(width: 8),
                         Text(
-                          '(เป้า: ${m.targetThreshold})',
-                          style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+                          '(${isThai ? "เป้า" : "Target"}: ${m.targetThreshold})',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                          ),
                         ),
                       ],
                     ),
@@ -531,10 +530,13 @@ class _FinancialHealthScreenState extends ConsumerState<FinancialHealthScreen> {
   }
 
   Widget _buildRecommendationsCard(BuildContext context, List<String> recs) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+
     return Card(
       elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      color: Colors.amber.shade50,
+      color: isDark ? const Color(0xFF2E2412) : Colors.amber.shade50,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -542,14 +544,14 @@ class _FinancialHealthScreenState extends ConsumerState<FinancialHealthScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.tips_and_updates_outlined, color: Colors.amber.shade900, size: 20),
+                Icon(Icons.tips_and_updates_outlined, color: isDark ? Colors.amber.shade400 : Colors.amber.shade900, size: 20),
                 const SizedBox(width: 8),
                 Text(
-                  'ข้อแนะนำเพื่อสุขภาพการเงินที่ดีขึ้น',
+                  isThai ? 'ข้อแนะนำเพื่อสุขภาพการเงินที่ดีขึ้น' : 'Financial Health Recommendations',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: Colors.amber.shade900,
+                    color: isDark ? Colors.amber.shade300 : Colors.amber.shade900,
                   ),
                 ),
               ],
@@ -561,11 +563,15 @@ class _FinancialHealthScreenState extends ConsumerState<FinancialHealthScreen> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('• ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber.shade900)),
+                    Text('• ', style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.amber.shade400 : Colors.amber.shade900)),
                     Expanded(
                       child: Text(
                         r,
-                        style: TextStyle(fontSize: 13, color: Colors.brown.shade900, height: 1.35),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark ? Colors.amber.shade100 : Colors.brown.shade900,
+                          height: 1.35,
+                        ),
                       ),
                     ),
                   ],
@@ -585,11 +591,11 @@ class _FinancialHealthScreenState extends ConsumerState<FinancialHealthScreen> {
     return Colors.red.shade700;
   }
 
-  String _getGradeLabel(int score) {
-    if (score >= 80) return 'ยอดเยี่ยม (สุขภาพการเงินแข็งแกร่ง)';
-    if (score >= 60) return 'ดี (มีความมั่นคง)';
-    if (score >= 40) return 'ปานกลาง (มีจุดที่ควรเฝ้าระวัง)';
-    return 'ควรปรับปรุง (มีความเสี่ยงทางการเงิน)';
+  String _getGradeLabel(int score, [bool isThai = true]) {
+    if (score >= 80) return isThai ? 'ยอดเยี่ยม (สุขภาพการเงินแข็งแกร่ง)' : 'Excellent (Strong)';
+    if (score >= 60) return isThai ? 'ดี (มีความมั่นคง)' : 'Good (Stable)';
+    if (score >= 40) return isThai ? 'ปานกลาง (มีจุดที่ควรเฝ้าระวัง)' : 'Moderate (Watchlist)';
+    return isThai ? 'ควรปรับปรุง (มีความเสี่ยงทางการเงิน)' : 'Needs Improvement (High Risk)';
   }
 
   Color _getStatusColor(HealthStatus status) {

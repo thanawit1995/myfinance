@@ -86,6 +86,7 @@ class PlanScreen extends ConsumerWidget {
 
   // --- 1. Tax Planning Card ---
   Widget _buildTaxCard(BuildContext context, _PlanDashboardData? data) {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     final estTaxSatang = data?.taxEstimatedSatang ?? 0;
     final whtSatang = data?.taxWhtSatang ?? 0;
     final reserveSatang = (estTaxSatang - whtSatang).clamp(0, estTaxSatang);
@@ -116,7 +117,7 @@ class PlanScreen extends ConsumerWidget {
                     Icon(Icons.account_balance_outlined, size: 20, color: VaultTheme.accent(context)),
                     const SizedBox(width: 8),
                     Text(
-                      'TAX PLANNING',
+                      isThai ? 'วางแผนภาษี (TAX PLANNING)' : 'TAX PLANNING',
                       style: TextStyle(
                         fontFamily: VaultTheme.fontFamily,
                         fontSize: 13,
@@ -132,7 +133,7 @@ class PlanScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 14),
             Text(
-              'ภาษีคาดการณ์ (ปี ${DateTime.now().year})',
+              isThai ? 'ภาษีคาดการณ์ (ปี ${DateTime.now().year})' : 'Estimated Tax (${DateTime.now().year})',
               style: TextStyle(
                 fontFamily: VaultTheme.fontFamily,
                 fontSize: 12,
@@ -151,18 +152,20 @@ class PlanScreen extends ConsumerWidget {
             const SizedBox(height: 12),
             Divider(color: VaultTheme.border(context), height: 1),
             const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              spacing: 8,
+              runSpacing: 4,
               children: [
                 Text(
-                  'หัก ณ ที่จ่ายแล้ว: ${Money(whtSatang).format(symbol: '฿')}',
+                  '${isThai ? "หัก ณ ที่จ่ายแล้ว" : "Withheld"}: ${Money(whtSatang).format(symbol: '฿')}',
                   style: VaultTheme.tabular(
                     fontSize: 12,
                     color: VaultTheme.secondaryText(context),
                   ),
                 ),
                 Text(
-                  'ควรสำรองเพิ่ม: ${Money(reserveSatang).format(symbol: '฿')}',
+                  '${isThai ? "ควรสำรองเพิ่ม" : "Reserve Needed"}: ${Money(reserveSatang).format(symbol: '฿')}',
                   style: VaultTheme.tabular(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -179,6 +182,7 @@ class PlanScreen extends ConsumerWidget {
 
   // --- 2. Foreign Remittance Card ---
   Widget _buildRemittanceCard(BuildContext context, _PlanDashboardData? data) {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     return InkWell(
       onTap: () {
         Navigator.push(
@@ -205,7 +209,7 @@ class PlanScreen extends ConsumerWidget {
                     Icon(Icons.public_rounded, size: 20, color: VaultTheme.accent(context)),
                     const SizedBox(width: 8),
                     Text(
-                      'FOREIGN REMITTANCE',
+                      isThai ? 'นำเข้าเงินได้ต่างประเทศ' : 'FOREIGN REMITTANCE',
                       style: TextStyle(
                         fontFamily: VaultTheme.fontFamily,
                         fontSize: 13,
@@ -223,33 +227,36 @@ class PlanScreen extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'เงินต้นคงเหลือในต่างประเทศ',
-                      style: TextStyle(
-                        fontFamily: VaultTheme.fontFamily,
-                        fontSize: 12,
-                        color: VaultTheme.secondaryText(context),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isThai ? 'เงินต้นคงเหลือในต่างประเทศ' : 'Offshore Principal',
+                        style: TextStyle(
+                          fontFamily: VaultTheme.fontFamily,
+                          fontSize: 12,
+                          color: VaultTheme.secondaryText(context),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '\$ ${(data?.foreignPrincipalUsdSatang ?? 0) / 100.0}',
-                      style: VaultTheme.tabular(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: VaultTheme.primaryText(context),
+                      const SizedBox(height: 2),
+                      Text(
+                        '\$ ${(data?.foreignPrincipalUsdSatang ?? 0) / 100.0}',
+                        style: VaultTheme.tabular(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: VaultTheme.primaryText(context),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      'นำเข้าไทยปีนี้',
+                      isThai ? 'นำเข้าไทยปีนี้' : 'Brought In This Year',
                       style: TextStyle(
                         fontFamily: VaultTheme.fontFamily,
                         fontSize: 12,
@@ -273,7 +280,9 @@ class PlanScreen extends ConsumerWidget {
             Divider(color: VaultTheme.border(context), height: 1),
             const SizedBox(height: 10),
             Text(
-              data?.remittanceAlertText ?? 'สถานะการนำเข้าเงินได้เป็นไปตามเกณฑ์',
+              data != null
+                  ? (isThai ? data.remittanceAlertTextTh : data.remittanceAlertTextEn)
+                  : (isThai ? 'สถานะการนำเข้าเงินได้เป็นไปตามเกณฑ์' : 'Remittance status compliant'),
               style: TextStyle(
                 fontFamily: VaultTheme.fontFamily,
                 fontSize: 12,
@@ -288,6 +297,7 @@ class PlanScreen extends ConsumerWidget {
 
   // --- 3. Financial Health Card ---
   Widget _buildHealthCard(BuildContext context, _PlanDashboardData? data) {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     final score = data?.healthScore ?? 85;
     final runway = data?.emergencyRunwayMonths ?? 6.0;
     final savingsRate = data?.savingsRatePercent ?? 30.0;
@@ -318,7 +328,7 @@ class PlanScreen extends ConsumerWidget {
                     Icon(Icons.shield_outlined, size: 20, color: VaultTheme.positive(context)),
                     const SizedBox(width: 8),
                     Text(
-                      'FINANCIAL HEALTH',
+                      isThai ? 'สุขภาพการเงิน' : 'FINANCIAL HEALTH',
                       style: TextStyle(
                         fontFamily: VaultTheme.fontFamily,
                         fontSize: 13,
@@ -360,7 +370,9 @@ class PlanScreen extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    data?.healthGrade ?? 'แข็งแกร่ง (Strong)',
+                    data != null
+                        ? (isThai ? data.healthGradeTh : data.healthGradeEn)
+                        : (isThai ? 'แข็งแกร่ง (Strong)' : 'Strong'),
                     style: TextStyle(
                       fontFamily: VaultTheme.fontFamily,
                       fontSize: 12,
@@ -374,18 +386,20 @@ class PlanScreen extends ConsumerWidget {
             const SizedBox(height: 12),
             Divider(color: VaultTheme.border(context), height: 1),
             const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              spacing: 8,
+              runSpacing: 4,
               children: [
                 Text(
-                  'เงินสำรองฉุกเฉิน: ${runway.toStringAsFixed(1)} เดือน',
+                  '${isThai ? "เงินสำรองฉุกเฉิน" : "Runway"}: ${runway.toStringAsFixed(1)} ${isThai ? "เดือน" : "mo"}',
                   style: VaultTheme.tabular(
                     fontSize: 12,
                     color: VaultTheme.secondaryText(context),
                   ),
                 ),
                 Text(
-                  'อัตราการออม: ${savingsRate.toStringAsFixed(0)}%',
+                  '${isThai ? "อัตราการออม" : "Savings Rate"}: ${savingsRate.toStringAsFixed(0)}%',
                   style: VaultTheme.tabular(
                     fontSize: 12,
                     color: VaultTheme.secondaryText(context),
@@ -411,7 +425,8 @@ class PlanScreen extends ConsumerWidget {
 
     int principalUsd = 0;
     int broughtInThb = 0;
-    String alertText = 'ติดตามเงินต้นและผลตอบแทนที่นำเข้าไทย';
+    String alertTh = 'ติดตามเงินต้นและผลตอบแทนที่นำเข้าไทย';
+    String alertEn = 'Track foreign principal and returns remitted to Thailand';
     try {
       final remDao = ref.read(remittancesDaoProvider);
       principalUsd = await remDao.getRemainingForeignPrincipalSatang();
@@ -420,21 +435,26 @@ class PlanScreen extends ConsumerWidget {
         broughtInThb += e.amountThbSatang;
       }
       if (broughtInEvents.isNotEmpty) {
-        alertText = 'นำเข้าเงินได้ปีนี้ ${broughtInEvents.length} รายการ';
+        alertTh = 'นำเข้าเงินได้ปีนี้ ${broughtInEvents.length} รายการ';
+        alertEn = '${broughtInEvents.length} remittances brought in this year';
       }
     } catch (_) {}
 
     int score = 85;
     double runway = 6.0;
     double savings = 32.0;
-    String grade = 'แข็งแกร่ง (Strong)';
+    String gradeTh = 'แข็งแกร่ง (Strong)';
+    String gradeEn = 'Strong';
     try {
       final healthDao = ref.read(financialHealthDaoProvider);
       final summary = await healthDao.getFinancialHealthSummary();
       score = summary.totalScore;
-      grade = summary.overallStatus == HealthStatus.pass
+      gradeTh = summary.overallStatus == HealthStatus.pass
           ? 'แข็งแกร่ง (Strong)'
           : (summary.overallStatus == HealthStatus.warning ? 'ปานกลาง (Fair)' : 'ควรปรับปรุง (Attention)');
+      gradeEn = summary.overallStatus == HealthStatus.pass
+          ? 'Strong'
+          : (summary.overallStatus == HealthStatus.warning ? 'Fair' : 'Attention');
       final emergencyMetric = summary.metrics.where((m) => m.code == 'emergency_fund').firstOrNull;
       final savingsMetric = summary.metrics.where((m) => m.code == 'savings_rate').firstOrNull;
       if (emergencyMetric != null) {
@@ -450,9 +470,11 @@ class PlanScreen extends ConsumerWidget {
       taxWhtSatang: wht,
       foreignPrincipalUsdSatang: principalUsd,
       remittanceBroughtInSatang: broughtInThb,
-      remittanceAlertText: alertText,
+      remittanceAlertTextTh: alertTh,
+      remittanceAlertTextEn: alertEn,
       healthScore: score,
-      healthGrade: grade,
+      healthGradeTh: gradeTh,
+      healthGradeEn: gradeEn,
       emergencyRunwayMonths: runway,
       savingsRatePercent: savings,
     );
@@ -464,9 +486,11 @@ class _PlanDashboardData {
   final int taxWhtSatang;
   final int foreignPrincipalUsdSatang;
   final int remittanceBroughtInSatang;
-  final String remittanceAlertText;
+  final String remittanceAlertTextTh;
+  final String remittanceAlertTextEn;
   final int healthScore;
-  final String healthGrade;
+  final String healthGradeTh;
+  final String healthGradeEn;
   final double emergencyRunwayMonths;
   final double savingsRatePercent;
 
@@ -475,9 +499,11 @@ class _PlanDashboardData {
     required this.taxWhtSatang,
     required this.foreignPrincipalUsdSatang,
     required this.remittanceBroughtInSatang,
-    required this.remittanceAlertText,
+    required this.remittanceAlertTextTh,
+    required this.remittanceAlertTextEn,
     required this.healthScore,
-    required this.healthGrade,
+    required this.healthGradeTh,
+    required this.healthGradeEn,
     required this.emergencyRunwayMonths,
     required this.savingsRatePercent,
   });

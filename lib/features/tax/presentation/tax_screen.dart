@@ -92,29 +92,15 @@ class _TaxScreenState extends ConsumerState<TaxScreen> {
   Widget build(BuildContext context) {
     final report = _taxReport;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('วางแผนภาษี (ภ.ง.ด. 90/91)'),
+        title: Text(isThai ? 'วางแผนภาษี (ภ.ง.ด. 90/91)' : 'Tax Planning (P.N.D. 90/91)'),
         actions: [
-          DropdownButton<int>(
-            value: _selectedTaxYear,
-            underline: const SizedBox.shrink(),
-            dropdownColor: Theme.of(context).cardColor,
-            items: _availableTaxYears().map((y) {
-              final beYear = y + 543;
-              return DropdownMenuItem(value: y, child: Text('ปีภาษี $y (พ.ศ. $beYear)'));
-            }).toList(),
-            onChanged: (y) {
-              if (y != null && y != _selectedTaxYear) {
-                setState(() => _selectedTaxYear = y);
-                _loadTaxData();
-              }
-            },
-          ),
           IconButton(
             icon: const Icon(Icons.tune),
-            tooltip: 'แก้ไขกฎภาษีและค่าลดหย่อน',
+            tooltip: isThai ? 'แก้ไขกฎภาษีและค่าลดหย่อน' : 'Tax Rules & Deductions',
             onPressed: () async {
               final rule = await ref.read(taxDaoProvider).getTaxRule(_selectedTaxYear);
               if (context.mounted) {
@@ -129,6 +115,7 @@ class _TaxScreenState extends ConsumerState<TaxScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
+            tooltip: isThai ? 'รีเฟรช' : 'Refresh',
             onPressed: _loadTaxData,
           ),
         ],
@@ -136,10 +123,58 @@ class _TaxScreenState extends ConsumerState<TaxScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : report == null
-              ? const Center(child: Text('ไม่พบข้อมูลสำหรับปีภาษีนี้'))
+              ? Center(child: Text(isThai ? 'ไม่พบข้อมูลสำหรับปีภาษีนี้' : 'No data found for this tax year'))
               : ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
+                    // Tax Year Selector Card (Moved from AppBar for clean mobile view)
+                    Card(
+                      elevation: 1,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(
+                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        child: Row(
+                          children: [
+                            Icon(Icons.calendar_month_outlined, size: 22, color: Theme.of(context).colorScheme.primary),
+                            const SizedBox(width: 10),
+                            Text(
+                              isThai ? 'ปีภาษี' : 'Tax Year',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                            const Spacer(),
+                            DropdownButtonHideUnderline(
+                              child: DropdownButton<int>(
+                                value: _selectedTaxYear,
+                                dropdownColor: Theme.of(context).cardColor,
+                                items: _availableTaxYears().map((y) {
+                                  final beYear = y + 543;
+                                  return DropdownMenuItem(
+                                    value: y,
+                                    child: Text(
+                                      isThai ? 'ค.ศ. $y (พ.ศ. $beYear)' : 'CE $y (B.E. $beYear)',
+                                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: (y) {
+                                  if (y != null && y != _selectedTaxYear) {
+                                    setState(() => _selectedTaxYear = y);
+                                    _loadTaxData();
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
                     // Legal Disclaimer Banner
                     Container(
                       padding: const EdgeInsets.all(12),
@@ -155,7 +190,9 @@ class _TaxScreenState extends ConsumerState<TaxScreen> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              'คำเตือน: โปรแกรมนี้เป็นเครื่องมือคำนวณและประมาณการเพื่อเตรียมเอกสารยื่นภาษีเท่านั้น ไม่ถือเป็นคำแนะนำทางภาษีหรือเอกสารรับรองของทางราชการ โปรดตรวจสอบรายละเอียดกับกรมสรรพากรก่อนยื่นแบบจริง',
+                              isThai
+                                  ? 'คำเตือน: โปรแกรมนี้เป็นเครื่องมือคำนวณและประมาณการเพื่อเตรียมเอกสารยื่นภาษีเท่านั้น ไม่ถือเป็นคำแนะนำทางภาษีหรือเอกสารรับรองของทางราชการ โปรดตรวจสอบรายละเอียดกับกรมสรรพากรก่อนยื่นแบบจริง'
+                                  : 'Disclaimer: This tool calculates and estimates tax figures for filing preparation only. It does not constitute official tax advice. Please verify with the Revenue Department before filing.',
                               style: TextStyle(
                                 fontSize: 12.5,
                                 color: isDark ? Colors.amber.shade100 : Colors.brown,
@@ -180,7 +217,9 @@ class _TaxScreenState extends ConsumerState<TaxScreen> {
                         child: Column(
                           children: [
                             Text(
-                              report.isRefund ? 'ยอดที่ขอคืนภาษีได้ (Tax Refund)' : 'ยอดที่ต้องชำระภาษีเพิ่มเติม (Tax Due)',
+                              report.isRefund
+                                  ? (isThai ? 'ยอดที่ขอคืนภาษีได้ (Tax Refund)' : 'Estimated Tax Refund')
+                                  : (isThai ? 'ยอดที่ต้องชำระภาษีเพิ่มเติม (Tax Due)' : 'Estimated Tax Due'),
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
@@ -201,16 +240,27 @@ class _TaxScreenState extends ConsumerState<TaxScreen> {
                               ),
                             ),
                             const SizedBox(height: 12),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                            Wrap(
+                              alignment: WrapAlignment.center,
+                              spacing: 8,
+                              runSpacing: 8,
                               children: [
-                                _buildSummaryPill('ภาษีขั้นบันได', '฿${_currencyFormat.format(report.computedTaxSatang / 100.0)}', isDark: isDark),
-                                const SizedBox(width: 12),
-                                _buildSummaryPill('หัก ณ ที่จ่าย (WHT)', '฿${_currencyFormat.format(report.totalWithholdingTaxSatang / 100.0)}', isDark: isDark),
-                                if (report.totalDividendTaxCreditSatang > 0) ...[
-                                  const SizedBox(width: 12),
-                                  _buildSummaryPill('เครดิตปันผล', '฿${_currencyFormat.format(report.totalDividendTaxCreditSatang / 100.0)}', isDark: isDark),
-                                ],
+                                _buildSummaryPill(
+                                  isThai ? 'ภาษีขั้นบันได' : 'Progressive Tax',
+                                  '฿${_currencyFormat.format(report.computedTaxSatang / 100.0)}',
+                                  isDark: isDark,
+                                ),
+                                _buildSummaryPill(
+                                  isThai ? 'หัก ณ ที่จ่าย (WHT)' : 'Withheld (WHT)',
+                                  '฿${_currencyFormat.format(report.totalWithholdingTaxSatang / 100.0)}',
+                                  isDark: isDark,
+                                ),
+                                if (report.totalDividendTaxCreditSatang > 0)
+                                  _buildSummaryPill(
+                                    isThai ? 'เครดิตปันผล' : 'Dividend Credit',
+                                    '฿${_currencyFormat.format(report.totalDividendTaxCreditSatang / 100.0)}',
+                                    isDark: isDark,
+                                  ),
                               ],
                             ),
                           ],
@@ -232,21 +282,25 @@ class _TaxScreenState extends ConsumerState<TaxScreen> {
                               children: [
                                 const Icon(Icons.analytics_outlined, color: Colors.blue),
                                 const SizedBox(width: 8),
-                                const Text(
-                                  'เปรียบเทียบกลยุทธ์เงินปันผลหุ้นไทย',
-                                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                                Text(
+                                  isThai ? 'เปรียบเทียบกลยุทธ์เงินปันผลหุ้นไทย' : 'Thai Stock Dividend Strategy Comparison',
+                                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 10),
                             Text(
                               report.dividendOptimization.isFinalTaxBetter
-                                  ? '💡 คำแนะนำ: เลือก Final Tax 10% ประหยัดกว่าการนำมารวมคำนวณ เป็นเงิน ฿${_currencyFormat.format(report.dividendOptimization.taxDifferenceSatang / 100.0)}'
-                                  : '💡 คำแนะนำ: รวมปันผลเพื่อขอเครดิตภาษี คุ้มกว่า Final Tax 10% ได้รับเงินคืนเพิ่ม ฿${_currencyFormat.format(report.dividendOptimization.taxDifferenceSatang / 100.0)}',
+                                  ? (isThai
+                                      ? '💡 คำแนะนำ: เลือก Final Tax 10% ประหยัดกว่าการนำมารวมคำนวณ เป็นเงิน ฿${_currencyFormat.format(report.dividendOptimization.taxDifferenceSatang / 100.0)}'
+                                      : '💡 Recommendation: Final Tax 10% saves ฿${_currencyFormat.format(report.dividendOptimization.taxDifferenceSatang / 100.0)} vs combining into progressive income')
+                                  : (isThai
+                                      ? '💡 คำแนะนำ: รวมปันผลเพื่อขอเครดิตภาษี คุ้มกว่า Final Tax 10% ได้รับเงินคืนเพิ่ม ฿${_currencyFormat.format(report.dividendOptimization.taxDifferenceSatang / 100.0)}'
+                                      : '💡 Recommendation: Combine dividends for tax credit, saving/refund ฿${_currencyFormat.format(report.dividendOptimization.taxDifferenceSatang / 100.0)} vs Final Tax 10%'),
                               style: TextStyle(
                                 fontSize: 13.5,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.blue.shade900,
+                                color: isDark ? Colors.blue.shade200 : Colors.blue.shade900,
                               ),
                             ),
                           ],
@@ -263,20 +317,54 @@ class _TaxScreenState extends ConsumerState<TaxScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('สรุปรายการภาษี ภ.ง.ด.', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                            Text(
+                              isThai ? 'สรุปรายการภาษี ภ.ง.ด.' : 'Tax Filing Summary (P.N.D.)',
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                            ),
                             const SizedBox(height: 12),
-                            _buildDataRow('1. เงินได้พึงประเมินรวม (Gross Income)', report.totalGrossIncomeSatang),
-                            _buildDataRow('2. หัก ค่าใช้จ่ายตามกฎหมาย', -report.totalExpenseDeductionsSatang, isDeduction: true),
-                            _buildDataRow('3. เงินได้หลังหักค่าใช้จ่าย', report.totalGrossIncomeSatang - report.totalExpenseDeductionsSatang),
-                            _buildDataRow('4. หัก ค่าลดหย่อนรวม', -report.totalAllowancesSatang, isDeduction: true),
+                            _buildDataRow(
+                              isThai ? '1. เงินได้พึงประเมินรวม (Gross Income)' : '1. Total Assessable Gross Income',
+                              report.totalGrossIncomeSatang,
+                            ),
+                            _buildDataRow(
+                              isThai ? '2. หัก ค่าใช้จ่ายตามกฎหมาย' : '2. Less Standard Expense Deduction',
+                              -report.totalExpenseDeductionsSatang,
+                              isDeduction: true,
+                            ),
+                            _buildDataRow(
+                              isThai ? '3. เงินได้หลังหักค่าใช้จ่าย' : '3. Income after Expense Deductions',
+                              report.totalGrossIncomeSatang - report.totalExpenseDeductionsSatang,
+                            ),
+                            _buildDataRow(
+                              isThai ? '4. หัก ค่าลดหย่อนรวม' : '4. Less Total Personal & Other Allowances',
+                              -report.totalAllowancesSatang,
+                              isDeduction: true,
+                            ),
                             const Divider(),
-                            _buildDataRow('5. เงินได้สุทธิ (Net Taxable Income)', report.netTaxableIncomeSatang, isBold: true),
-                            _buildDataRow('6. ภาษีคำนวณตามขั้นบันได (Progressive Tax)', report.computedTaxSatang),
-                            _buildDataRow('7. หัก ภาษีหัก ณ ที่จ่ายรวม (WHT)', -report.totalWithholdingTaxSatang, isDeduction: true),
-                            _buildDataRow('8. หัก เครดิตภาษีเงินปันผล', -report.totalDividendTaxCreditSatang, isDeduction: true),
+                            _buildDataRow(
+                              isThai ? '5. เงินได้สุทธิ (Net Taxable Income)' : '5. Net Taxable Income',
+                              report.netTaxableIncomeSatang,
+                              isBold: true,
+                            ),
+                            _buildDataRow(
+                              isThai ? '6. ภาษีคำนวณตามขั้นบันได (Progressive Tax)' : '6. Progressive Bracket Tax',
+                              report.computedTaxSatang,
+                            ),
+                            _buildDataRow(
+                              isThai ? '7. หัก ภาษีหัก ณ ที่จ่ายรวม (WHT)' : '7. Less Total Withholding Tax (WHT)',
+                              -report.totalWithholdingTaxSatang,
+                              isDeduction: true,
+                            ),
+                            _buildDataRow(
+                              isThai ? '8. หัก เครดิตภาษีเงินปันผล' : '8. Less Dividend Tax Credit',
+                              -report.totalDividendTaxCreditSatang,
+                              isDeduction: true,
+                            ),
                             const Divider(thickness: 1.5),
                             _buildDataRow(
-                              report.isRefund ? 'ยอดเงินคืนภาษี' : 'ยอดภาษีที่ต้องชำระเพิ่ม',
+                              report.isRefund
+                                  ? (isThai ? 'ยอดเงินคืนภาษี' : 'Net Tax Refund')
+                                  : (isThai ? 'ยอดภาษีที่ต้องชำระเพิ่ม' : 'Net Tax Due'),
                               report.netTaxDueSatang.abs(),
                               isBold: true,
                               textColor: report.isRefund ? Colors.green.shade800 : Colors.red.shade800,
@@ -292,8 +380,8 @@ class _TaxScreenState extends ConsumerState<TaxScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       child: ExpansionTile(
                         leading: const Icon(Icons.format_list_numbered, color: Colors.teal),
-                        title: const Text('ขั้นตอนการคำนวณทีละบรรทัด (Audit Trail)'),
-                        subtitle: const Text('ตรวจสอบสูตร ตัวเลข และขั้นบันไดภาษีอย่างละเอียด'),
+                        title: Text(isThai ? 'ขั้นตอนการคำนวณทีละบรรทัด (Audit Trail)' : 'Step-by-Step Calculation (Audit Trail)'),
+                        subtitle: Text(isThai ? 'ตรวจสอบสูตร ตัวเลข และขั้นบันไดภาษีอย่างละเอียด' : 'Detailed formulas, numbers and tax brackets'),
                         children: [
                           Container(
                             padding: const EdgeInsets.all(16),
@@ -344,7 +432,7 @@ class _TaxScreenState extends ConsumerState<TaxScreen> {
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                             icon: const Icon(Icons.table_chart_outlined),
-                            label: const Text('ส่งออก Excel (.xlsx)'),
+                            label: Text(isThai ? 'ส่งออก Excel (.xlsx)' : 'Export Excel'),
                             onPressed: _exportExcel,
                           ),
                         ),
@@ -358,7 +446,7 @@ class _TaxScreenState extends ConsumerState<TaxScreen> {
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                             icon: const Icon(Icons.picture_as_pdf_outlined),
-                            label: const Text('ส่งออก PDF (A4)'),
+                            label: Text(isThai ? 'ส่งออก PDF (A4)' : 'Export PDF'),
                             onPressed: _exportPdf,
                           ),
                         ),
@@ -371,15 +459,18 @@ class _TaxScreenState extends ConsumerState<TaxScreen> {
   }
 
   Widget _buildIncomeAuditCard(BuildContext context, TaxPreparationReport report, bool isDark) {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: ExpansionTile(
         leading: const Icon(Icons.receipt_long, color: Colors.indigo),
-        title: const Text('ตรวจสอบรายการเงินได้ (ราย Transaction)'),
+        title: Text(isThai ? 'ตรวจสอบรายการเงินได้ (ราย Transaction)' : 'Income Audit (Per Transaction)'),
         subtitle: Text(
           report.incomeTransactions.isEmpty
-              ? 'ไม่มีรายการเงินได้ในปีนี้'
-              : 'ทั้งหมด ${report.incomeTransactions.length} รายการ (มีวันที่และหัก ณ ที่จ่ายชัดเจน)',
+              ? (isThai ? 'ไม่มีรายการเงินได้ในปีนี้' : 'No income transactions this year')
+              : (isThai
+                  ? 'ทั้งหมด ${report.incomeTransactions.length} รายการ (มีวันที่และหัก ณ ที่จ่ายชัดเจน)'
+                  : '${report.incomeTransactions.length} transactions (dated with WHT details)'),
         ),
         children: [
           Container(
@@ -387,7 +478,10 @@ class _TaxScreenState extends ConsumerState<TaxScreen> {
             color: isDark ? const Color(0xFF0F172A) : Colors.grey.shade50,
             width: double.infinity,
             child: report.incomeTransactions.isEmpty
-                ? const Text('ไม่พบรายการเงินได้ในปีภาษีนี้', style: TextStyle(fontSize: 13, color: Colors.grey))
+                ? Text(
+                    isThai ? 'ไม่พบรายการเงินได้ในปีภาษีนี้' : 'No income recorded for this tax year',
+                    style: const TextStyle(fontSize: 13, color: Colors.grey),
+                  )
                 : Column(
                     children: report.incomeTransactions.map((tx) {
                       final dateStr = DateFormat('yyyy-MM-dd').format(tx.transactionDate);
@@ -439,7 +533,7 @@ class _TaxScreenState extends ConsumerState<TaxScreen> {
                                 ),
                                 if (tx.withholdingTaxSatang > 0)
                                   Text(
-                                    'หัก ณ ที่จ่าย ฿$whtStr',
+                                    '${isThai ? "หัก ณ ที่จ่าย" : "WHT"} ฿$whtStr',
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: isDark ? Colors.orange.shade300 : Colors.orange.shade800,
@@ -459,6 +553,7 @@ class _TaxScreenState extends ConsumerState<TaxScreen> {
   }
 
   Widget _buildRemittancesAuditCard(BuildContext context, TaxPreparationReport report, bool isDark) {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     final totalRemit = _currencyFormat.format(report.totalRemittanceSatang / 100.0);
     final taxable = _currencyFormat.format(report.totalRemittanceTaxableSatang / 100.0);
     final principal = _currencyFormat.format(report.totalRemittancePrincipalSatang / 100.0);
@@ -467,11 +562,13 @@ class _TaxScreenState extends ConsumerState<TaxScreen> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: ExpansionTile(
         leading: const Icon(Icons.flight_land, color: Colors.teal),
-        title: const Text('ตรวจสอบเงินโอนกลับเข้าไทย (FIFO / เงินต้น / กำไร)'),
+        title: Text(isThai ? 'ตรวจสอบเงินโอนกลับเข้าไทย (FIFO / เงินต้น / กำไร)' : 'Foreign Remittance Audit (FIFO / Principal / Profit)'),
         subtitle: Text(
           report.remittances.isEmpty
-              ? 'ไม่มีการโอนเงินกลับเข้าไทยในปีนี้'
-              : 'นำเข้าสุทธิ ฿$totalRemit (กำไร ฿$taxable / เงินต้นยกเว้น ฿$principal)',
+              ? (isThai ? 'ไม่มีการโอนเงินกลับเข้าไทยในปีนี้' : 'No foreign remittances this year')
+              : (isThai
+                  ? 'นำเข้าสุทธิ ฿$totalRemit (กำไร ฿$taxable / เงินต้นยกเว้น ฿$principal)'
+                  : 'Net inward ฿$totalRemit (Profit ฿$taxable / Exempt ฿$principal)'),
         ),
         children: [
           Container(
@@ -479,7 +576,10 @@ class _TaxScreenState extends ConsumerState<TaxScreen> {
             color: isDark ? const Color(0xFF0F172A) : Colors.grey.shade50,
             width: double.infinity,
             child: report.remittances.isEmpty
-                ? const Text('ไม่พบรายการโอนเงินกลับเข้าไทยในปีภาษีนี้', style: TextStyle(fontSize: 13, color: Colors.grey))
+                ? Text(
+                    isThai ? 'ไม่พบรายการโอนเงินกลับเข้าไทยในปีภาษีนี้' : 'No remittances recorded for this tax year',
+                    style: const TextStyle(fontSize: 13, color: Colors.grey),
+                  )
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [

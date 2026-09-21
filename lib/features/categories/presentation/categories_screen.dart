@@ -4,6 +4,7 @@ import '../../../../core/database/app_database.dart';
 import '../../../../core/database/database_provider.dart';
 import '../../../../core/theme/vault_theme.dart';
 import '../../../../core/widgets/category_icon_helper.dart';
+import '../../../../l10n/app_localizations.dart';
 import 'category_form_dialog.dart';
 
 class CategoriesScreen extends ConsumerStatefulWidget {
@@ -41,13 +42,15 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen>
   Widget build(BuildContext context) {
     final isLumi = VaultTheme.isLumi(context);
     final accentColor = VaultTheme.accent(context);
+    final l10n = AppLocalizations.of(context);
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
 
     return Scaffold(
       backgroundColor: VaultTheme.background(context),
       appBar: AppBar(
         backgroundColor: VaultTheme.surface(context),
         title: Text(
-          'จัดการหมวดหมู่รายรับ-รายจ่าย',
+          l10n?.manageCategories ?? 'จัดการหมวดหมู่รายรับ-รายจ่าย',
           style: TextStyle(
             fontFamily: VaultTheme.fontFamily,
             fontSize: 17,
@@ -60,14 +63,22 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen>
           indicatorColor: accentColor,
           labelColor: accentColor,
           unselectedLabelColor: VaultTheme.secondaryText(context),
-          tabs: const [
-            Tab(icon: Icon(Icons.arrow_upward, color: Colors.redAccent), text: 'หมวดหมู่รายจ่าย'),
-            Tab(icon: Icon(Icons.arrow_downward, color: Colors.green), text: 'หมวดหมู่รายรับ'),
+          tabs: [
+            Tab(
+              icon: const Icon(Icons.arrow_upward, color: Colors.redAccent),
+              text: l10n?.expenseCategories ?? 'หมวดหมู่รายจ่าย',
+            ),
+            Tab(
+              icon: const Icon(Icons.arrow_downward, color: Colors.green),
+              text: l10n?.incomeCategories ?? 'หมวดหมู่รายรับ',
+            ),
           ],
         ),
         actions: [
           Tooltip(
-            message: _showInactive ? 'ซ่อนหมวดหมู่ที่ปิดใช้งาน' : 'แสดงหมวดหมู่ที่ปิดใช้งาน',
+            message: _showInactive
+                ? (isThai ? 'ซ่อนหมวดหมู่ที่ปิดใช้งาน' : 'Hide inactive categories')
+                : (isThai ? 'แสดงหมวดหมู่ที่ปิดใช้งาน' : 'Show inactive categories'),
             child: IconButton(
               icon: Icon(
                 _showInactive ? Icons.visibility_off_outlined : Icons.visibility_outlined,
@@ -89,7 +100,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen>
           if (created != null) _refresh();
         },
         icon: const Icon(Icons.add),
-        label: const Text('เพิ่มหมวดหมู่ใหม่'),
+        label: Text(l10n?.addNewCategory ?? 'เพิ่มหมวดหมู่ใหม่'),
       ),
       body: TabBarView(
         controller: _tabController,
@@ -118,6 +129,8 @@ class _CategoryListView extends ConsumerWidget {
     final dao = ref.watch(categoriesDaoProvider);
     final isExpense = categoryType == 'expense';
     final isLumi = VaultTheme.isLumi(context);
+    final l10n = AppLocalizations.of(context);
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
 
     return FutureBuilder<List<Category>>(
       future: showInactive
@@ -131,7 +144,7 @@ class _CategoryListView extends ConsumerWidget {
         if (snapshot.hasError) {
           return Center(
             child: Text(
-              'เกิดข้อผิดพลาด: ${snapshot.error}',
+              '${isThai ? 'เกิดข้อผิดพลาด' : 'Error'}: ${snapshot.error}',
               style: TextStyle(color: VaultTheme.negative(context)),
             ),
           );
@@ -152,8 +165,10 @@ class _CategoryListView extends ConsumerWidget {
                 const SizedBox(height: 12),
                 Text(
                   showInactive
-                      ? 'ไม่มีหมวดหมู่ที่ถูกปิดใช้งาน'
-                      : 'ยังไม่มีหมวดหมู่สำหรับ${isExpense ? 'รายจ่าย' : 'รายรับ'}',
+                      ? (isThai ? 'ไม่มีหมวดหมู่ที่ถูกปิดใช้งาน' : 'No inactive categories')
+                      : (isThai
+                          ? 'ยังไม่มีหมวดหมู่สำหรับ${isExpense ? 'รายจ่าย' : 'รายรับ'}'
+                          : 'No categories for ${isExpense ? 'Expense' : 'Income'}'),
                   style: TextStyle(color: VaultTheme.secondaryText(context)),
                 ),
               ],
@@ -176,14 +191,16 @@ class _CategoryListView extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: Colors.orange.withValues(alpha: 0.4)),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.info_outline, size: 18, color: Colors.orange),
-                    SizedBox(width: 8),
+                    const Icon(Icons.info_outline, size: 18, color: Colors.orange),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'หมวดหมู่เหล่านี้ถูกซ่อนอยู่ กดปุ่ม "กู้คืน" เพื่อเปิดใช้งานอีกครั้ง',
-                        style: TextStyle(fontSize: 13, color: Colors.orange),
+                        isThai
+                            ? 'หมวดหมู่เหล่านี้ถูกซ่อนอยู่ กดปุ่ม "กู้คืน" เพื่อเปิดใช้งานอีกครั้ง'
+                            : 'These categories are hidden. Tap "Restore" to reactivate.',
+                        style: const TextStyle(fontSize: 13, color: Colors.orange),
                       ),
                     ),
                   ],
@@ -202,6 +219,12 @@ class _CategoryListView extends ConsumerWidget {
             }
 
             final cat = categories[catIndex];
+            final primaryName = isThai
+                ? cat.nameTh
+                : (cat.nameEn.trim().isNotEmpty ? cat.nameEn : cat.nameTh);
+            final secondaryName = isThai
+                ? cat.nameEn
+                : (cat.nameEn.trim().isNotEmpty ? cat.nameTh : '');
 
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
@@ -210,64 +233,92 @@ class _CategoryListView extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(isLumi ? 16 : 12),
                 side: BorderSide(color: VaultTheme.border(context)),
               ),
-              color: showInactive ? VaultTheme.surface(context).withValues(alpha: 0.5) : VaultTheme.surface(context),
-              child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: (showInactive
-                          ? Colors.grey
-                          : isExpense
-                              ? const Color(0xFFFF5C9D)
-                              : Colors.green)
-                      .withValues(alpha: 0.15),
-                  child: Icon(
-                    CategoryIconHelper.getIcon(cat.icon),
-                    color: showInactive
-                        ? Colors.grey
-                        : isExpense
-                            ? const Color(0xFFFF5C9D)
-                            : Colors.green,
-                  ),
-                ),
-                title: Text(
-                  cat.nameTh,
-                  style: TextStyle(
-                    fontFamily: VaultTheme.fontFamily,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                    color: showInactive ? VaultTheme.mutedText(context) : VaultTheme.primaryText(context),
-                  ),
-                ),
-                subtitle: Text(
-                  cat.nameEn,
-                  style: TextStyle(
-                    fontFamily: VaultTheme.fontFamily,
-                    fontSize: 12,
-                    color: VaultTheme.secondaryText(context),
-                  ),
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
+              color: showInactive
+                  ? VaultTheme.surface(context).withValues(alpha: 0.5)
+                  : VaultTheme.surface(context),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                child: Row(
                   children: [
-                    if (cat.isSystem)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        margin: const EdgeInsets.only(right: 6),
-                        decoration: BoxDecoration(
-                          color: VaultTheme.border(context).withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          'ค่าเริ่มต้น',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: VaultTheme.secondaryText(context),
-                          ),
-                        ),
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: (showInactive
+                              ? Colors.grey
+                              : isExpense
+                                  ? const Color(0xFFFF5C9D)
+                                  : Colors.green)
+                          .withValues(alpha: 0.15),
+                      child: Icon(
+                        CategoryIconHelper.getIcon(cat.icon),
+                        size: 20,
+                        color: showInactive
+                            ? Colors.grey
+                            : isExpense
+                                ? const Color(0xFFFF5C9D)
+                                : Colors.green,
                       ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  primaryName,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontFamily: VaultTheme.fontFamily,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14.5,
+                                    color: showInactive
+                                        ? VaultTheme.mutedText(context)
+                                        : VaultTheme.primaryText(context),
+                                  ),
+                                ),
+                              ),
+                              if (cat.isSystem) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: VaultTheme.border(context).withValues(alpha: 0.5),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    l10n?.defaultBadge ?? 'ค่าเริ่มต้น',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: VaultTheme.secondaryText(context),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          if (secondaryName.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              secondaryName,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: VaultTheme.fontFamily,
+                                fontSize: 12,
+                                color: VaultTheme.secondaryText(context),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     if (showInactive)
                       FilledButton.tonal(
                         style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           minimumSize: Size.zero,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
@@ -277,66 +328,96 @@ class _CategoryListView extends ConsumerWidget {
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('เปิดใช้งาน "${cat.nameTh}" แล้ว'),
+                                content: Text(isThai
+                                    ? 'เปิดใช้งาน "${cat.nameTh}" แล้ว'
+                                    : 'Restored "$primaryName"'),
                                 behavior: SnackBarBehavior.floating,
                               ),
                             );
                           }
                         },
-                        child: const Text('กู้คืน', style: TextStyle(fontSize: 13)),
+                        child: Text(
+                          l10n?.restoreCategory ?? 'กู้คืน',
+                          style: const TextStyle(fontSize: 12),
+                        ),
                       )
-                    else ...[
-                      IconButton(
-                        icon: Icon(Icons.edit_outlined, size: 20, color: VaultTheme.secondaryText(context)),
-                        tooltip: 'แก้ไขหมวดหมู่',
-                        onPressed: () async {
-                          final updated = await CategoryFormDialog.show(context, category: cat);
-                          if (updated != null) onChanged();
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.visibility_off_outlined, size: 20, color: Colors.orange),
-                        tooltip: cat.isSystem ? 'ซ่อนหมวดหมู่นี้ (กู้คืนได้ภายหลัง)' : 'ปิดใช้งานหมวดหมู่',
-                        onPressed: () async {
-                          final confirm = await showDialog<bool>(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              title: Text(cat.isSystem ? 'ซ่อนหมวดหมู่ค่าเริ่มต้น' : 'ยืนยันปิดใช้งาน'),
-                              content: Text(
-                                cat.isSystem
-                                    ? 'ต้องการซ่อนหมวดหมู่ "${cat.nameTh}" ไว้ก่อนหรือไม่?\n\nสามารถกู้คืนได้ตลอดเวลาโดยกดไอคอนตาในหน้านี้'
-                                    : 'ต้องการปิดใช้งานหมวดหมู่ "${cat.nameTh}" หรือไม่?\n\nสามารถกู้คืนได้ตลอดเวลา',
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.of(ctx).pop(false),
-                                  child: const Text('ยกเลิก'),
-                                ),
-                                FilledButton(
-                                  style: FilledButton.styleFrom(backgroundColor: Colors.orange),
-                                  onPressed: () => Navigator.of(ctx).pop(true),
-                                  child: const Text('ซ่อน / ปิดใช้งาน'),
-                                ),
-                              ],
-                            ),
-                          );
-
-                          if (confirm == true) {
-                            await dao.deactivateCategory(cat.id);
-                            onChanged();
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('ซ่อน "${cat.nameTh}" แล้ว — กดไอคอนตาเพื่อกู้คืน'),
-                                  behavior: SnackBarBehavior.floating,
-                                  duration: const Duration(seconds: 3),
+                    else
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.all(4),
+                            constraints: const BoxConstraints(),
+                            icon: Icon(Icons.edit_outlined,
+                                size: 18, color: VaultTheme.secondaryText(context)),
+                            tooltip: l10n?.editCategory ?? 'แก้ไขหมวดหมู่',
+                            onPressed: () async {
+                              final updated =
+                                  await CategoryFormDialog.show(context, category: cat);
+                              if (updated != null) onChanged();
+                            },
+                          ),
+                          const SizedBox(width: 6),
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.all(4),
+                            constraints: const BoxConstraints(),
+                            icon: const Icon(Icons.visibility_off_outlined,
+                                size: 18, color: Colors.orange),
+                            tooltip: cat.isSystem
+                                ? (isThai ? 'ซ่อนหมวดหมู่นี้' : 'Hide default category')
+                                : (isThai ? 'ปิดใช้งานหมวดหมู่' : 'Deactivate category'),
+                            onPressed: () async {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  title: Text(cat.isSystem
+                                      ? (isThai ? 'ซ่อนหมวดหมู่ค่าเริ่มต้น' : 'Hide Default Category')
+                                      : (isThai ? 'ยืนยันปิดใช้งาน' : 'Confirm Deactivation')),
+                                  content: Text(
+                                    cat.isSystem
+                                        ? (isThai
+                                            ? 'ต้องการซ่อนหมวดหมู่ "${cat.nameTh}" ไว้ก่อนหรือไม่?\n\nสามารถกู้คืนได้ตลอดเวลาโดยกดไอคอนตาในหน้านี้'
+                                            : 'Hide default category "$primaryName"?\n\nYou can restore it anytime via the eye icon.')
+                                        : (isThai
+                                            ? 'ต้องการปิดใช้งานหมวดหมู่ "${cat.nameTh}" หรือไม่?\n\nสามารถกู้คืนได้ตลอดเวลา'
+                                            : 'Deactivate category "$primaryName"?\n\nYou can restore it anytime.'),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.of(ctx).pop(false),
+                                      child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+                                    ),
+                                    FilledButton(
+                                      style:
+                                          FilledButton.styleFrom(backgroundColor: Colors.orange),
+                                      onPressed: () => Navigator.of(ctx).pop(true),
+                                      child: Text(isThai ? 'ซ่อน / ปิดใช้งาน' : 'Hide / Deactivate'),
+                                    ),
+                                  ],
                                 ),
                               );
-                            }
-                          }
-                        },
+
+                              if (confirm == true) {
+                                await dao.deactivateCategory(cat.id);
+                                onChanged();
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(isThai
+                                          ? 'ซ่อน "${cat.nameTh}" แล้ว — กดไอคอนตาเพื่อกู้คืน'
+                                          : 'Hidden "$primaryName" — tap eye icon to restore'),
+                                      behavior: SnackBarBehavior.floating,
+                                      duration: const Duration(seconds: 3),
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                          ),
+                        ],
                       ),
-                    ],
                   ],
                 ),
               ),

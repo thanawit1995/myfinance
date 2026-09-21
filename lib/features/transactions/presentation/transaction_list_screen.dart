@@ -5,6 +5,7 @@ import '../../../../core/database/app_database.dart';
 import '../../../../core/database/database_provider.dart';
 import '../../../../core/money/money.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/category_name_helper.dart';
 import 'edit_transaction_dialog.dart';
 
 class TransactionListScreen extends ConsumerStatefulWidget {
@@ -30,15 +31,16 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
   @override
   Widget build(BuildContext context) {
     final txDao = ref.watch(transactionsDaoProvider);
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('ประวัติรายการ'),
+        title: Text(isThai ? 'ประวัติรายการ' : 'Transactions'),
         actions: [
           IconButton(
             icon: const Icon(Icons.filter_list),
             onPressed: _showFilterDialog,
-            tooltip: 'ตัวกรอง',
+            tooltip: isThai ? 'ตัวกรอง' : 'Filter',
           ),
         ],
       ),
@@ -50,7 +52,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'ค้นหาบันทึกย่อ หรือ tag...',
+                hintText: isThai ? 'ค้นหาบันทึกย่อ หรือ tag...' : 'Search notes or tags...',
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
@@ -75,13 +77,13 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _typeChip(label: 'ทั้งหมด', value: null, icon: Icons.list_alt_rounded),
+                  _typeChip(label: isThai ? 'ทั้งหมด' : 'All', value: null, icon: Icons.list_alt_rounded),
                   const SizedBox(width: 8),
-                  _typeChip(label: 'รายรับ', value: 'income', icon: Icons.arrow_downward_rounded, color: Colors.green),
+                  _typeChip(label: isThai ? 'รายรับ' : 'Income', value: 'income', icon: Icons.arrow_downward_rounded, color: Colors.green),
                   const SizedBox(width: 8),
-                  _typeChip(label: 'รายจ่าย', value: 'expense', icon: Icons.arrow_upward_rounded, color: Colors.red),
+                  _typeChip(label: isThai ? 'รายจ่าย' : 'Expense', value: 'expense', icon: Icons.arrow_upward_rounded, color: Colors.red),
                   const SizedBox(width: 8),
-                  _typeChip(label: 'โอนเงิน', value: 'transfer', icon: Icons.swap_horiz_rounded, color: Colors.blueGrey),
+                  _typeChip(label: isThai ? 'โอนเงิน' : 'Transfer', value: 'transfer', icon: Icons.swap_horiz_rounded, color: Colors.blueGrey),
                 ],
               ),
             ),
@@ -101,12 +103,12 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
                     ),
                   if (_selectedAccountId != null)
                     Chip(
-                      label: const Text('บัญชีที่เลือก'),
+                      label: Text(isThai ? 'บัญชีที่เลือก' : 'Selected Account'),
                       onDeleted: () => setState(() => _selectedAccountId = null),
                     ),
                   if (_selectedCategoryId != null)
                     Chip(
-                      label: const Text('หมวดหมู่ที่เลือก'),
+                      label: Text(isThai ? 'หมวดหมู่ที่เลือก' : 'Selected Category'),
                       onDeleted: () => setState(() => _selectedCategoryId = null),
                     ),
                 ],
@@ -142,7 +144,10 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
                       children: [
                         Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey.shade400),
                         const SizedBox(height: 12),
-                        Text('ไม่พบรายการที่ตรงกับเงื่อนไข', style: TextStyle(color: Colors.grey.shade600)),
+                        Text(
+                          isThai ? 'ไม่พบรายการที่ตรงกับเงื่อนไข' : 'No transactions found',
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
                       ],
                     ),
                   );
@@ -178,7 +183,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                _formatDateHeader(date),
+                                _formatDateHeader(date, isThai),
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 13,
@@ -209,7 +214,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
                             separatorBuilder: (_, _) => const Divider(height: 1),
                             itemBuilder: (context, index) {
                               final tx = dayTxs[index];
-                              return _buildTransactionTile(context, tx);
+                              return _buildTransactionTile(context, tx, isThai);
                             },
                           ),
                         ),
@@ -263,17 +268,17 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
     );
   }
 
-  String _formatDateHeader(DateTime date) {
+  String _formatDateHeader(DateTime date, bool isThai) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final yesterday = today.subtract(const Duration(days: 1));
 
-    if (date == today) return 'วันนี้';
-    if (date == yesterday) return 'เมื่อวานนี้';
-    return DateFormat('d MMMM yyyy', 'th_TH').format(date);
+    if (date == today) return isThai ? 'วันนี้' : 'Today';
+    if (date == yesterday) return isThai ? 'เมื่อวานนี้' : 'Yesterday';
+    return DateFormat('d MMMM yyyy', isThai ? 'th_TH' : 'en_US').format(date);
   }
 
-  Widget _buildTransactionTile(BuildContext context, Transaction tx) {
+  Widget _buildTransactionTile(BuildContext context, Transaction tx, bool isThai) {
     final theme = Theme.of(context);
     final isExpense = tx.transactionType == 'expense';
     final isIncome = tx.transactionType == 'income';
@@ -289,6 +294,10 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
 
     final timeStr = DateFormat('HH:mm').format(tx.transactionDate);
 
+    final defaultNote = isExpense
+        ? (isThai ? 'รายจ่าย' : 'Expense')
+        : (isIncome ? (isThai ? 'รายรับ' : 'Income') : (isThai ? 'โอนเงิน' : 'Transfer'));
+
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
       leading: Container(
@@ -301,7 +310,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
         child: Icon(icon, color: color, size: 18),
       ),
       title: Text(
-        tx.note?.isNotEmpty == true ? tx.note! : (isExpense ? 'รายจ่าย' : (isIncome ? 'รายรับ' : 'โอนเงิน')),
+        tx.note?.isNotEmpty == true ? tx.note! : defaultNote,
         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
       ),
       subtitle: Text(
@@ -318,7 +327,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
           ),
           if (tx.feeThbSatang > 0)
             Text(
-              'ค่าธรรมเนียม: ${Money(tx.feeThbSatang).format(symbol: '฿')}',
+              '${isThai ? "ค่าธรรมเนียม" : "Fee"}: ${Money(tx.feeThbSatang).format(symbol: '฿')}',
               style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant),
             ),
         ],
@@ -329,22 +338,27 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
           setState(() {});
         }
       },
-      onLongPress: () => _confirmDelete(tx),
+      onLongPress: () => _confirmDelete(tx, isThai),
     );
   }
 
-  Future<void> _confirmDelete(Transaction tx) async {
+  Future<void> _confirmDelete(Transaction tx, bool isThai) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('ลบรายการ'),
-        content: const Text('คุณต้องการลบรายการนี้ใช่หรือไม่? (การลบจะถูกบันทึกลง Audit Log)'),
+        title: Text(isThai ? 'ลบรายการ' : 'Delete Transaction'),
+        content: Text(isThai
+            ? 'คุณต้องการลบรายการนี้ใช่หรือไม่? (การลบจะถูกบันทึกลง Audit Log)'
+            : 'Are you sure you want to delete this transaction? (Will be recorded in Audit Log)'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('ยกเลิก')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+          ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('ลบรายการ'),
+            child: Text(isThai ? 'ลบรายการ' : 'Delete'),
           ),
         ],
       ),
@@ -354,7 +368,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
       await ref.read(transactionsDaoProvider).softDeleteTransaction(tx.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ลบรายการเรียบร้อยแล้ว')),
+          SnackBar(content: Text(isThai ? 'ลบรายการเรียบร้อยแล้ว' : 'Transaction deleted')),
         );
         setState(() {});
       }
@@ -362,6 +376,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
   }
 
   Future<void> _showFilterDialog() async {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     final accounts = await ref.read(accountsDaoProvider).getActiveAccounts();
     final categories = await ref.read(categoriesDaoProvider).getActiveCategories();
 
@@ -380,7 +395,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('ตัวกรองข้อมูล', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  Text(isThai ? 'ตัวกรองข้อมูล' : 'Filter Transactions', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 16),
 
                   // Date range picker
@@ -388,7 +403,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
                     leading: const Icon(Icons.date_range),
                     title: Text(
                       _selectedDateRange == null
-                          ? 'เลือกช่วงวันที่'
+                          ? (isThai ? 'เลือกช่วงวันที่' : 'Select Date Range')
                           : '${DateFormat('d/M/y').format(_selectedDateRange!.start)} - ${DateFormat('d/M/y').format(_selectedDateRange!.end)}',
                     ),
                     onTap: () async {
@@ -407,10 +422,13 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
 
                   // Account dropdown
                   DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(labelText: 'กรองตามบัญชี', border: OutlineInputBorder()),
+                    decoration: InputDecoration(
+                      labelText: isThai ? 'กรองตามบัญชี' : 'Filter by Account',
+                      border: const OutlineInputBorder(),
+                    ),
                     initialValue: _selectedAccountId,
                     items: [
-                      const DropdownMenuItem(value: null, child: Text('ทุกบัญชี')),
+                      DropdownMenuItem(value: null, child: Text(isThai ? 'ทุกบัญชี' : 'All Accounts')),
                       ...accounts.map((a) => DropdownMenuItem(value: a.id, child: Text(a.name))),
                     ],
                     onChanged: (val) => setModalState(() => _selectedAccountId = val),
@@ -419,11 +437,14 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
 
                   // Category dropdown
                   DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(labelText: 'กรองตามหมวดหมู่', border: OutlineInputBorder()),
+                    decoration: InputDecoration(
+                      labelText: isThai ? 'กรองตามหมวดหมู่' : 'Filter by Category',
+                      border: const OutlineInputBorder(),
+                    ),
                     initialValue: _selectedCategoryId,
                     items: [
-                      const DropdownMenuItem(value: null, child: Text('ทุกหมวดหมู่')),
-                      ...categories.map((c) => DropdownMenuItem(value: c.id, child: Text(c.nameTh))),
+                      DropdownMenuItem(value: null, child: Text(isThai ? 'ทุกหมวดหมู่' : 'All Categories')),
+                      ...categories.map((c) => DropdownMenuItem(value: c.id, child: Text(c.localizedName(context)))),
                     ],
                     onChanged: (val) => setModalState(() => _selectedCategoryId = val),
                   ),
@@ -441,7 +462,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
                             });
                             setState(() => _selectedType = null);
                           },
-                          child: const Text('ล้างตัวกรองทั้งหมด'),
+                          child: Text(isThai ? 'ล้างตัวกรองทั้งหมด' : 'Clear Filters'),
                         ),
                       ),
                       const SizedBox(width: 12),

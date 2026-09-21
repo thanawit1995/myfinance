@@ -101,16 +101,18 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with SingleTickerProv
           indicatorColor: accentColor,
           labelColor: accentColor,
           unselectedLabelColor: VaultTheme.secondaryText(context),
-          indicatorSize: TabBarIndicatorSize.label,
-          labelStyle: TextStyle(
+          indicatorSize: TabBarIndicatorSize.tab,
+          tabAlignment: TabAlignment.fill,
+          labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+          labelStyle: const TextStyle(
             fontFamily: VaultTheme.fontFamily,
             fontSize: 13,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
           ),
           tabs: [
             Tab(text: l10n?.transactions ?? 'Transactions'),
             Tab(text: l10n?.accounts ?? 'Accounts'),
-            Tab(text: l10n?.budgetAndProjects ?? 'Budget & Projects'),
+            Tab(text: l10n?.budgetTab ?? 'Budget'),
           ],
         ),
       ),

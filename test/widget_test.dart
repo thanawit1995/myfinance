@@ -80,7 +80,7 @@ void main() {
     expect(find.text('เพิ่ม'), findsNothing);
 
     // Switch to Money -> Budget subtab
-    await tester.tap(find.text('งบประมาณและโครงการ'));
+    await tester.tap(find.text('งบประมาณ'));
     await tester.pumpAndSettle();
     // In Budget, Main FAB must be hidden
     expect(find.text('เพิ่ม'), findsNothing);

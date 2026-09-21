@@ -522,5 +522,75 @@ class AppLocalizationsTh extends AppLocalizations {
   String get budgetAndProjects => 'งบประมาณและโครงการ';
 
   @override
+  String get budgetTab => 'งบประมาณ';
+
+  @override
+  String get manageCategories => 'จัดการหมวดหมู่';
+
+  @override
+  String get expenseCategories => 'หมวดหมู่รายจ่าย';
+
+  @override
+  String get incomeCategories => 'หมวดหมู่รายรับ';
+
+  @override
+  String get addNewCategory => 'เพิ่มหมวดหมู่ใหม่';
+
+  @override
+  String get editCategory => 'แก้ไขหมวดหมู่';
+
+  @override
+  String get hideCategory => 'ซ่อนหมวดหมู่';
+
+  @override
+  String get restoreCategory => 'กู้คืน';
+
+  @override
+  String get defaultBadge => 'ค่าเริ่มต้น';
+
+  @override
+  String get monthlyBudgetTab => 'งบประมาณรายเดือน';
+
+  @override
+  String get specialProjectsTab => 'โครงการพิเศษ';
+
+  @override
+  String get summaryBudgetNonRollover =>
+      'สรุปงบประมาณรวมเดือนนี้ 🌸 (ไม่ Rollover)';
+
+  @override
+  String get budgetByCategory => 'งบประมาณแยกตามหมวดหมู่';
+
+  @override
+  String get tapItemToEdit => 'แตะรายการเพื่อแก้ไข';
+
+  @override
+  String get budgetStatusNormal => 'ปกติ';
+
+  @override
+  String get budgetStatusExceeded => 'เกินงบแล้ว!';
+
+  @override
+  String get budgetStatusWarning => 'ใกล้เต็มงบ (≥ 80%)';
+
+  @override
+  String get deleteBudget => 'ลบงบประมาณ';
+
+  @override
+  String get confirmDeleteBudget => 'ยืนยันลบงบประมาณ';
+
+  @override
+  String get leftBudget => 'เหลือ';
+
+  @override
+  String get totalBudgetLabel => 'งบรวม';
+
+  @override
+  String get spentLabel => 'ใช้ไป';
+
+  @override
+  String get budgetLabel => 'งบ';
+
+  @override
   String get tagline => 'Our money, our journey.';
 }

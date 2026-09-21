@@ -37,14 +37,15 @@ class _LiabilitiesInsuranceScreenState extends ConsumerState<LiabilitiesInsuranc
 
   @override
   Widget build(BuildContext context) {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     return Scaffold(
       appBar: AppBar(
-        title: const Text('ทะเบียนหนี้สินและกรมธรรม์ประกัน'),
+        title: Text(isThai ? 'ทะเบียนหนี้สินและกรมธรรม์ประกัน' : 'Debts & Insurance Registry'),
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(icon: Icon(Icons.credit_card_off_outlined), text: 'ภาระหนี้สิน'),
-            Tab(icon: Icon(Icons.security_outlined), text: 'กรมธรรม์ประกันภัย'),
+          tabs: [
+            Tab(icon: const Icon(Icons.credit_card_off_outlined), text: isThai ? 'ภาระหนี้สิน' : 'Debts'),
+            Tab(icon: const Icon(Icons.security_outlined), text: isThai ? 'กรมธรรม์ประกันภัย' : 'Insurance'),
           ],
         ),
       ),
@@ -68,6 +69,7 @@ class _LiabilitiesTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final dao = ref.watch(liabilitiesDaoProvider);
     final theme = Theme.of(context);
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
 
     return FutureBuilder(
       future: Future.wait([
@@ -83,7 +85,7 @@ class _LiabilitiesTab extends ConsumerWidget {
         }
 
         if (snapshot.hasError) {
-          return Center(child: Text('เกิดข้อผิดพลาด: ${snapshot.error}'));
+          return Center(child: Text(isThai ? 'เกิดข้อผิดพลาด: ${snapshot.error}' : 'Error: ${snapshot.error}'));
         }
 
         final items = snapshot.data![0] as List<Liability>;
@@ -101,7 +103,7 @@ class _LiabilitiesTab extends ConsumerWidget {
               if (created == true) onChanged();
             },
             icon: const Icon(Icons.add),
-            label: const Text('เพิ่มหนี้สิน'),
+            label: Text(isThai ? 'เพิ่มหนี้สิน' : 'Add Debt'),
           ),
           body: ListView(
             padding: const EdgeInsets.all(16),
@@ -121,7 +123,7 @@ class _LiabilitiesTab extends ConsumerWidget {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('ยอดหนี้รวมทั้งหมด', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                              Text(isThai ? 'ยอดหนี้รวมทั้งหมด' : 'Total Debt Balance', style: const TextStyle(fontSize: 12, color: Colors.grey)),
                               const SizedBox(height: 4),
                               Text(
                                 Money(totalDebtsSatang).format(symbol: '฿'),
@@ -135,7 +137,7 @@ class _LiabilitiesTab extends ConsumerWidget {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              const Text('ภาระผ่อนต่อเดือน', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                              Text(isThai ? 'ภาระผ่อนต่อเดือน' : 'Monthly Payment', style: const TextStyle(fontSize: 12, color: Colors.grey)),
                               const SizedBox(height: 4),
                               Text(
                                 Money(monthlyPaymentSatang).format(symbol: '฿'),
@@ -149,16 +151,18 @@ class _LiabilitiesTab extends ConsumerWidget {
                         ],
                       ),
                       const Divider(height: 24),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        spacing: 8,
+                        runSpacing: 4,
                         children: [
                           Text(
-                            'หนี้ระยะสั้น (<= 1 ปี): ${Money(shortTermSatang).format(symbol: '฿')}',
-                            style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700),
+                            '${isThai ? "หนี้ระยะสั้น (<= 1 ปี)" : "Short-term (<= 1 yr)"}: ${Money(shortTermSatang).format(symbol: '฿')}',
+                            style: TextStyle(fontSize: 12.5, color: theme.colorScheme.onSurfaceVariant),
                           ),
                           Text(
-                            'หนี้ระยะยาว: ${Money(totalDebtsSatang - shortTermSatang).format(symbol: '฿')}',
-                            style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700),
+                            '${isThai ? "หนี้ระยะยาว" : "Long-term"}: ${Money(totalDebtsSatang - shortTermSatang).format(symbol: '฿')}',
+                            style: TextStyle(fontSize: 12.5, color: theme.colorScheme.onSurfaceVariant),
                           ),
                         ],
                       ),
@@ -377,6 +381,8 @@ class _InsuranceTab extends ConsumerWidget {
         final medicalSatang = snapshot.data![2] as int;
         final premiumSatang = snapshot.data![3] as int;
 
+        final isThai = Localizations.localeOf(context).languageCode == 'th';
+
         return Scaffold(
           floatingActionButton: FloatingActionButton.extended(
             onPressed: () async {
@@ -384,7 +390,7 @@ class _InsuranceTab extends ConsumerWidget {
               if (created == true) onChanged();
             },
             icon: const Icon(Icons.add),
-            label: const Text('เพิ่มกรมธรรม์'),
+            label: Text(isThai ? 'เพิ่มกรมธรรม์' : 'Add Policy'),
           ),
           body: ListView(
             padding: const EdgeInsets.all(16),
@@ -407,7 +413,7 @@ class _InsuranceTab extends ConsumerWidget {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('ทุนประกันชีวิตรวม', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                              Text(isThai ? 'ทุนประกันชีวิตรวม' : 'Total Life Sum Insured', style: const TextStyle(fontSize: 12, color: Colors.grey)),
                               const SizedBox(height: 4),
                               Text(
                                 Money(sumInsuredSatang).format(symbol: '฿'),
@@ -421,7 +427,7 @@ class _InsuranceTab extends ConsumerWidget {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              const Text('เบี้ยประกันรวมต่อปี', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                              Text(isThai ? 'เบี้ยประกันรวมต่อปี' : 'Annual Premium', style: const TextStyle(fontSize: 12, color: Colors.grey)),
                               const SizedBox(height: 4),
                               Text(
                                 Money(premiumSatang).format(symbol: '฿'),
@@ -435,15 +441,17 @@ class _InsuranceTab extends ConsumerWidget {
                         ],
                       ),
                       const Divider(height: 24),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        spacing: 8,
+                        runSpacing: 4,
                         children: [
                           Text(
-                            'ความคุ้มครองค่ารักษา/โรคร้าย: ${Money(medicalSatang).format(symbol: '฿')}',
-                            style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700),
+                            '${isThai ? "ความคุ้มครองค่ารักษา/โรคร้าย" : "Medical & CI Coverage"}: ${Money(medicalSatang).format(symbol: '฿')}',
+                            style: TextStyle(fontSize: 12.5, color: theme.colorScheme.onSurfaceVariant),
                           ),
                           Text(
-                            '${items.length} ฉบับ',
+                            '${items.length} ${isThai ? "ฉบับ" : "policies"}',
                             style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
                           ),
                         ],

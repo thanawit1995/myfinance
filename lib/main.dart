@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
+import 'core/database/platform_workaround/sqlite_workaround.dart';
 import 'core/theme/app_theme_style.dart';
 import 'core/theme/lumi_theme.dart';
 import 'core/theme/vault_theme.dart';
@@ -25,14 +25,8 @@ void main() async {
     return true; // Handled
   };
 
-  // Workaround for older Android versions to load sqlite3 cleanly
-  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-    try {
-      await applyWorkaroundToOpenSqlite3OnOldAndroidVersions();
-    } catch (e) {
-      debugPrint('Sqlite3 Android workaround error: $e');
-    }
-  }
+  // Workaround for older Android versions to load sqlite3 cleanly (no-op on Web)
+  await applySqliteWorkaround();
 
   runApp(
     const ProviderScope(

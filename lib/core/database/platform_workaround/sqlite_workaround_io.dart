@@ -1,0 +1,13 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
+
+Future<void> applyPlatformSqliteWorkaround() async {
+  if (!kIsWeb && Platform.isAndroid) {
+    try {
+      await applyWorkaroundToOpenSqlite3OnOldAndroidVersions();
+    } catch (e) {
+      debugPrint('Sqlite3 Android workaround error: $e');
+    }
+  }
+}

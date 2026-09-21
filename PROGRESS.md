@@ -509,6 +509,7 @@
   2. การตั้งค่า `?android:colorBackground` ใน `drawable/launch_background.xml` และ `styles.xml` ทำให้ระบบ Android เกิด `Resources$NotFoundException / InflateException` ก่อนที่ Flutter Engine จะเริ่มต้นทำงาน แก้ไขโดยเปลี่ยนเป็น `@android:color/white` และ `@android:color/black` โดยตรง
   3. ไลบรารี SQLite native C++ (`sqlite3_flutter_libs`) ต้องการการแตกไฟล์ `.so` แบบ uncompressed (`packaging { jniLibs { useLegacyPackaging = true } }`) และการเรียกใช้ `applyWorkaroundToOpenSqlite3OnOldAndroidVersions()` ใน `main.dart` เพื่อป้องกัน `UnsatisfiedLinkError` บนเครื่อง Android หลากหลายรุ่น
   4. เพิ่มการดักจับข้อผิดพลาดทั่วทั้งระบบด้วย `PlatformDispatcher.instance.onError` และ `try/catch` ในจุดอ่าน Secure Storage และ Recurring Rules เมื่อเปิดแอป เพื่อป้องกันการแครชแบบฉับพลัน
+- **GitHub Actions Build Web ล้มเหลวเนื่องจาก `dart:ffi` ใน `sqlite3_flutter_libs`**: บนเว็บไม่มีโมดูล `dart:ffi` การเรียกใช้แพ็กเกจ SQLite โดยตรงใน `main.dart` ทำให้การคอมไพล์ Web บน GitHub Actions พัง แก้ไขโดยสร้างชั้นสวิตช์แบบข้ามแพลตฟอร์ม (Conditional Export) ทำให้ระบบเว็บคอมไพล์ผ่านฉลุย 100% ส่วน Android/Windows ยังคงทำงานร่วมกับ SQLite ได้เต็มประสิทธิภาพ
 
 
 

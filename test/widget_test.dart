@@ -74,13 +74,13 @@ void main() {
     expect(find.text('เพิ่ม'), findsOneWidget);
 
     // Switch to Money -> Accounts subtab
-    await tester.tap(find.text('บัญชี (Accounts)'));
+    await tester.tap(find.text('บัญชี'));
     await tester.pumpAndSettle();
     // In Accounts, Main FAB must be hidden (Accounts has its own button)
     expect(find.text('เพิ่ม'), findsNothing);
 
     // Switch to Money -> Budget subtab
-    await tester.tap(find.text('งบประมาณ & โครงการ'));
+    await tester.tap(find.text('งบประมาณและโครงการ'));
     await tester.pumpAndSettle();
     // In Budget, Main FAB must be hidden
     expect(find.text('เพิ่ม'), findsNothing);

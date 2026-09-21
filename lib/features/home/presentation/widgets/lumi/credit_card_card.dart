@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../../core/money/money.dart';
 import '../../../../../core/theme/vault_theme.dart';
+import '../../../../../l10n/app_localizations.dart';
 
 class CreditCardCard extends StatelessWidget {
   final int currentDebtSatang;
@@ -16,6 +17,7 @@ class CreditCardCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final hasDebt = currentDebtSatang > 0;
 
     return Material(
@@ -45,12 +47,12 @@ class CreditCardCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Row(
-                    children: const [
-                      Text('💳', style: TextStyle(fontSize: 14)),
-                      SizedBox(width: 6),
+                    children: [
+                      const Text('💳', style: TextStyle(fontSize: 14)),
+                      const SizedBox(width: 6),
                       Text(
-                        'บัตรเครดิต',
-                        style: TextStyle(
+                        l10n?.creditCardSummary ?? 'บัตรเครดิต',
+                        style: const TextStyle(
                           fontFamily: VaultTheme.fontFamily,
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
@@ -104,7 +106,9 @@ class CreditCardCard extends StatelessWidget {
 
               const SizedBox(height: 6),
               Text(
-                hasDebt ? 'ยอดรอเรียกเก็บรอบบิลปัจจุบัน' : 'ไม่มีหนี้ค้างชำระ ยอดเยี่ยมมาก! 🎉',
+                hasDebt
+                    ? (l10n?.creditCardPending ?? 'ยอดรอเรียกเก็บรอบบิลปัจจุบัน')
+                    : (l10n?.creditCardNoDebt ?? 'ไม่มีหนี้ค้างชำระ ยอดเยี่ยมมาก! 🎉'),
                 style: const TextStyle(
                   fontFamily: VaultTheme.fontFamily,
                   fontSize: 11.5,

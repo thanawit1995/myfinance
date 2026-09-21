@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/database/database_provider.dart';
 import '../../../../core/money/money.dart';
+import '../../../../core/theme/vault_theme.dart';
 import 'insurance_form_dialog.dart';
 import 'liability_form_dialog.dart';
 
@@ -390,9 +391,12 @@ class _InsuranceTab extends ConsumerWidget {
             children: [
               // Summary Card
               Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                elevation: 1,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: VaultTheme.border(context), width: 0.8),
+                ),
+                color: VaultTheme.surface(context),
                 child: Padding(
                   padding: const EdgeInsets.all(18),
                   child: Column(

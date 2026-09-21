@@ -1,6 +1,6 @@
 {
   "@@locale": "th",
-  "appTitle": "JP Money",
+  "appTitle": "OURS",
   "home": "หน้าแรก",
   "money": "การเงิน",
   "invest": "การลงทุน",
@@ -12,7 +12,7 @@
   "transactions": "รายการ",
   "quickAdd": "บันทึกด่วน",
   "quickAddKeypad": "บันทึกด่วน (3 แตะ)",
-  "portfolio": "พอร์ตลงทุน",
+  "portfolio": "พอร์ตการลงทุน",
   "accounts": "บัญชี",
   "budget": "งบประมาณ",
   "investments": "การลงทุน",
@@ -20,19 +20,19 @@
   "financialHealth": "สุขภาพการเงิน",
   "reports": "รายงาน",
   "settings": "ตั้งค่า",
-  "language": "ภาษา (Language)",
+  "language": "ภาษา",
   "thai": "ไทย",
   "english": "English",
   "settingsTitle": "ตั้งค่าระบบ",
   "languageAndAppearance": "ภาษาและรูปลักษณ์",
   "themeMode": "ธีมสีหน้าจอ",
-  "themeLight": "สว่าง (Light)",
-  "themeDark": "มืด (Dark)",
-  "themeSystem": "ตามระบบ (System)",
-  "themeStyle": "สไตล์ธีม (Theme Style)",
+  "themeLight": "สว่าง",
+  "themeDark": "มืด",
+  "themeSystem": "ตามระบบ",
+  "themeStyle": "สไตล์ดีไซน์",
   "themeStyleVault": "VAULT (Quiet Luxury)",
   "themeStyleLumi": "Lumi (Sunny Bloom พาสเทล)",
-  "security": "ความปลอดภัย (Security & PIN)",
+  "security": "ความปลอดภัยและรหัส PIN",
   "pinProtection": "ระบบล็อก PIN",
   "pinLockToggle": "ล็อกแอปด้วยรหัส PIN",
   "pinLockSubtitle": "ต้องใส่รหัส PIN หรือสแกนลายนิ้วมือเพื่อเข้าใช้งาน",
@@ -46,18 +46,18 @@
   "biometrics": "สแกนลายนิ้วมือ / ใบหน้า",
   "biometricsSubtitle": "ใช้ลายนิ้วมือปลดล็อกควบคู่กับ PIN",
   "biometricsNotSupported": "อุปกรณ์นี้ไม่รองรับเซนเซอร์สแกนลายนิ้วมือ",
-  "backup": "การสำรองข้อมูล (Local Backup)",
-  "personalCloudBackup": "สำรองและกู้คืนข้อมูล (Personal Cloud & Backup)",
-  "backupToJson": "สำรองข้อมูลลง Google Drive / เครื่อง (JSON Backup)",
-  "backupToJsonSubtitle": "สร้างไฟล์สำรองข้อมูลส่วนบุคคล นำไปเซฟลง Google Drive, iCloud หรือเครื่องได้ทันที",
-  "restoreFromJson": "กู้คืนข้อมูลจากไฟล์สำรอง (Restore Backup)",
-  "restoreFromJsonSubtitle": "เลือกไฟล์สำรองข้อมูล (.json) จาก Google Drive หรือเครื่องเพื่อกู้คืน",
-  "exportRawDb": "ส่งออกไฟล์ฐานข้อมูลดิบ (.db)",
-  "exportRawDbSubtitle": "สำรองไฟล์ SQLite เก็บไว้ในเครื่องหรือแชร์ออก (Windows/Android)",
-  "exportDatabase": "ส่งออกสำเนาฐานข้อมูล (Export .db)",
-  "trashBin": "ถังขยะกู้คืนข้อมูล (Trash Bin)",
-  "trashBinSubtitle": "ดูบัญชีที่ถูกลบ กู้คืน หรือลบถาวร (30 วัน)",
-  "recurringTransactions": "รายการประจำ (Recurring Rules)",
+  "backup": "การสำรองข้อมูล",
+  "personalCloudBackup": "สำรองและกู้คืนข้อมูล",
+  "backupToJson": "สำรองข้อมูล JSON",
+  "backupToJsonSubtitle": "สร้างไฟล์สำรองข้อมูลส่วนบุคคล นำไปเซฟลง Google Drive หรือเครื่องได้ทันที",
+  "restoreFromJson": "กู้คืนข้อมูลสำรอง",
+  "restoreFromJsonSubtitle": "เลือกไฟล์สำรองข้อมูล (.json) เพื่อนำเข้าและกู้คืน",
+  "exportRawDb": "ส่งออกไฟล์ฐานข้อมูล (.db)",
+  "exportRawDbSubtitle": "สำรองไฟล์ SQLite เก็บไว้ในเครื่องหรือแชร์ออก",
+  "exportDatabase": "ส่งออกสำเนาฐานข้อมูล (.db)",
+  "trashBin": "ถังขยะกู้คืนข้อมูล",
+  "trashBinSubtitle": "ดูรายการหรือบัญชีที่ถูกลบ กู้คืน หรือลบถาวร (30 วัน)",
+  "recurringTransactions": "รายการประจำอัตโนมัติ",
   "recurringRulesDesc": "ตั้งกฎสร้างรายการประจำอัตโนมัติ และดูพยากรณ์เงิน 30 วัน",
   "taxAndRemittance": "ภาษีและการเงินต่างประเทศ",
   "taxPlanning": "วางแผนภาษี (ภ.ง.ด. 90/91)",
@@ -66,16 +66,16 @@
   "foreignRemittanceDesc": "เกณฑ์ 180 วัน, ป.161/2566, ป.162/2566 เงินต้น/กำไร",
   "financialPlanning": "การวางแผนการเงินและระบบอัตโนมัติ",
   "financialHealthDesc": "ประเมิน 8 ตัวชี้วัด, Run-rate สิ้นเดือน/สิ้นปี และคำแนะนำ",
-  "liabilitiesInsurance": "ทะเบียนหนี้สินและกรมธรรม์ประกัน (Debts & Insurance)",
+  "liabilitiesInsurance": "ทะเบียนหนี้สินและประกันภัย",
   "liabilitiesInsuranceDesc": "จัดการภาระหนี้สิน ดอกเบี้ย และความคุ้มครองประกันภัย",
-  "categoriesManage": "จัดการหมวดหมู่รายรับ-รายจ่าย (Categories)",
+  "categoriesManage": "จัดการหมวดหมู่",
   "categoriesManageDesc": "สร้างหมวดหมู่ใหม่ กำหนดไอคอน และจัดหมวดหมู่",
-  "financialReports": "ระบบรายงานทางการเงิน 7 แบบ (Financial Reports)",
+  "financialReports": "รายงานทางการเงิน",
   "financialReportsDesc": "สรุปรายเดือน/ปี, งบกระแสเงินสด, งบดุล, พอร์ต, ส่งออก Excel & PDF",
   "cloudSyncTitle": "คลาวด์และนำเข้าข้อมูล",
-  "importWizard": "นำเข้าข้อมูลจาก Notion CSV (Import Wizard)",
+  "importWizard": "นำเข้าข้อมูล (Notion CSV)",
   "importWizardSubtitle": "ตัดลิงก์ relation, ตรวจจับรายการซ้ำ, กฎภาษี สธ. พร้อม Rollback 1 คลิก",
-  "googleDriveSync": "ซิงค์ข้อมูลผ่าน Google Drive (Cloud Sync)",
+  "googleDriveSync": "ซิงค์ข้อมูล Google Drive",
   "googleDriveSyncSubtitle": "สำรองและซิงค์ข้อมูลผ่าน Google Drive ส่วนตัวของคุณ ปลอดภัย 100%",
   "expense": "รายจ่าย",
   "income": "รายรับ",
@@ -85,7 +85,7 @@
   "selectAccount": "เลือกบัญชี",
   "category": "หมวดหมู่",
   "amount": "จำนวนเงิน",
-  "note": "บันทึกช่วยจำ (Note)",
+  "note": "บันทึกช่วยจำ",
   "save": "บันทึก",
   "duplicateLast": "ทำซ้ำล่าสุด",
   "usdAmountDestination": "ยอดเงินปลายทาง (USD)",
@@ -98,10 +98,10 @@
   "availableToSpend": "เงินที่ใช้ได้ในเดือนนี้",
   "budgetRemaining": "ของงบประมาณเดือนนี้",
   "viewAll": "ดูทั้งหมด",
-  "recentActivity": "ธุรกรรมล่าสุด",
+  "recentActivity": "บันทึกรายการล่าสุด",
   "holdings": "สินทรัพย์ที่ถือครอง",
   "realizedPnl": "กำไรที่รับรู้แล้ว",
-  "history": "ประวัติ",
+  "history": "ประวัติการซื้อ-ขาย",
   "projects": "โครงการ",
   "cashAndBank": "เงินสดและธนาคาร",
   "creditCards": "บัตรเครดิต",
@@ -133,5 +133,72 @@
     }
   },
   "exportSuccess": "ดาวน์โหลด / ส่งออกไฟล์สำรองข้อมูลสำเร็จ สามารถบันทึกลง Google Drive ของคุณได้เลย",
-  "appVersionFooter": "JP Money v1.0.0\nLocal-First Financial System"
+  "appVersionFooter": "OURS v1.0.0\nOur money, our journey.",
+  "masterBudget": "MASTER BUDGET",
+  "availableToSpendLumi": "เงินที่ใช้ได้ในเดือนนี้ 🌸",
+  "availableToSpendVault": "เหลือให้ใช้ได้",
+  "daysRemainingInCycle": "{days} วันที่เหลือในรอบเดือน",
+  "@daysRemainingInCycle": {
+    "placeholders": {
+      "days": { "type": "int" }
+    }
+  },
+  "fromBudget": "จากงบ {amount}",
+  "@fromBudget": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "ofTotalMonthlyBudget": "เหลือ {percent}% ของงบประมาณรวมทั้งเดือน",
+  "@ofTotalMonthlyBudget": {
+    "placeholders": {
+      "percent": { "type": "int" }
+    }
+  },
+  "usedSoFar": "ใช้ไปแล้ว",
+  "fromTotalBudget": "จากงบรวม",
+  "spendingProgress": "ความคืบหน้าการใช้เงิน",
+  "percentUsed": "ใช้ไป {percent}%",
+  "@percentUsed": {
+    "placeholders": {
+      "percent": { "type": "int" }
+    }
+  },
+  "noBudgetSet": "ยังไม่ได้ตั้งงบประมาณเดือนนี้",
+  "setBudgetAction": "ตั้งงบประมาณ",
+  "financialOverview": "ภาพรวมสถานะการเงิน",
+  "viewMonthlyReport": "ดูรายงานรายเดือน",
+  "netWorthDesc": "ความมั่งคั่งสุทธิ (สินทรัพย์ - หนี้สิน)",
+  "monthIncome": "รายรับ",
+  "monthExpense": "รายจ่าย",
+  "cashFlow": "กระแสเงินสด",
+  "creditCardSummary": "บัตรเครดิต",
+  "creditCardNoDebt": "ไม่มีหนี้ค้างชำระ ยอดเยี่ยมมาก! 🎉",
+  "creditCardPending": "ยอดรอเรียกเก็บรอบบิลปัจจุบัน",
+  "noTransactionsThisMonth": "ยังไม่มีรายการในเดือนนี้",
+  "noTransactionsDesc": "เริ่มจดบันทึกรายรับหรือรายจ่ายรายการแรกเพื่อติดตามการเงินของคุณ",
+  "addFirstTransaction": "เพิ่มรายการแรก",
+  "searchTransactions": "ค้นหาธุรกรรม",
+  "settingsAndSecurity": "การตั้งค่าและระบบความปลอดภัย",
+  "savingsRateStatus": "อัตราการออมเดือนนี้อยู่ที่ {percent}%",
+  "@savingsRateStatus": {
+    "placeholders": {
+      "percent": { "type": "int" }
+    }
+  },
+  "creditCardDueWarning": "บัตรเครดิตจะตัดรอบในอีกไม่กี่วัน ยอดรอตัด {amount}",
+  "@creditCardDueWarning": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "budgetLowWarning": "งบประมาณเดือนนี้เหลือต่ำกว่า 20% แล้ว โปรดระมัดระวังการใช้จ่าย",
+  "dailySpendRecommendation": "ใช้เงินได้เฉลี่ยวันละ {amount} จนถึงสิ้นเดือน",
+  "@dailySpendRecommendation": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "budgetAndProjects": "งบประมาณและโครงการ",
+  "tagline": "Our money, our journey."
 }

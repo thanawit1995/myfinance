@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/vault_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../transactions/presentation/transaction_list_screen.dart';
 import '../../accounts/presentation/accounts_screen.dart';
 import '../../budget/presentation/budget_screen.dart';
@@ -65,12 +66,15 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with SingleTickerProv
   Widget build(BuildContext context) {
     final accentColor = VaultTheme.accent(context);
 
+    final l10n = AppLocalizations.of(context);
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+
     return Scaffold(
       backgroundColor: VaultTheme.background(context),
       appBar: AppBar(
         backgroundColor: VaultTheme.surface(context),
         title: Text(
-          'MONEY',
+          (l10n?.money ?? 'MONEY').toUpperCase(),
           style: TextStyle(
             fontFamily: VaultTheme.fontFamily,
             fontSize: 18,
@@ -82,7 +86,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with SingleTickerProv
         actions: [
           IconButton(
             icon: const Icon(Icons.analytics_outlined),
-            tooltip: 'สรุปภาพรวมรายเดือน',
+            tooltip: l10n?.monthlyOverview ?? (isThai ? 'สรุปภาพรวมรายเดือน' : 'Monthly overview'),
             color: VaultTheme.secondaryText(context),
             onPressed: () {
               Navigator.push(
@@ -103,10 +107,10 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with SingleTickerProv
             fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
-          tabs: const [
-            Tab(text: 'รายการ (Transactions)'),
-            Tab(text: 'บัญชี (Accounts)'),
-            Tab(text: 'งบประมาณ & โครงการ'),
+          tabs: [
+            Tab(text: l10n?.transactions ?? 'Transactions'),
+            Tab(text: l10n?.accounts ?? 'Accounts'),
+            Tab(text: l10n?.budgetAndProjects ?? 'Budget & Projects'),
           ],
         ),
       ),

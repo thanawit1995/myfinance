@@ -1,13 +1,13 @@
 {
   "@@locale": "en",
-  "appTitle": "JP Money",
+  "appTitle": "OURS",
   "home": "Home",
   "money": "Money",
   "invest": "Invest",
   "plan": "Plan",
   "more": "More",
   "add": "Add",
-  "trade": "Trade",
+  "trade": "Buy / Sell",
   "dashboard": "Dashboard",
   "transactions": "Transactions",
   "quickAdd": "Quick Add",
@@ -21,7 +21,7 @@
   "reports": "Reports",
   "settings": "Settings",
   "language": "Language",
-  "thai": "Thai",
+  "thai": "ไทย",
   "english": "English",
   "settingsTitle": "Settings",
   "languageAndAppearance": "Language & Appearance",
@@ -29,7 +29,7 @@
   "themeLight": "Light",
   "themeDark": "Dark",
   "themeSystem": "System",
-  "themeStyle": "Theme Style",
+  "themeStyle": "Design Style",
   "themeStyleVault": "VAULT (Quiet Luxury)",
   "themeStyleLumi": "Lumi (Sunny Bloom Pastel)",
   "security": "Security & PIN",
@@ -46,19 +46,19 @@
   "biometrics": "Biometrics (Fingerprint / Face)",
   "biometricsSubtitle": "Use biometric unlock alongside PIN",
   "biometricsNotSupported": "Biometrics sensor not supported on this device",
-  "backup": "Data Backup (Local)",
+  "backup": "Data Backup",
   "personalCloudBackup": "Personal Cloud & Backup",
-  "backupToJson": "Backup to Google Drive / Device (JSON)",
-  "backupToJsonSubtitle": "Export personal backup file to save on your private Google Drive, iCloud, or local storage",
-  "restoreFromJson": "Restore from Backup File",
-  "restoreFromJsonSubtitle": "Select a backup file (.json) from Google Drive or device to restore",
+  "backupToJson": "Backup to JSON",
+  "backupToJsonSubtitle": "Export personal backup file to save to Google Drive or device storage",
+  "restoreFromJson": "Restore Backup",
+  "restoreFromJsonSubtitle": "Select a backup file (.json) to import and restore",
   "exportRawDb": "Export Raw Database (.db)",
-  "exportRawDbSubtitle": "Backup SQLite file on device or share (Windows/Android)",
+  "exportRawDbSubtitle": "Backup SQLite database file locally or share",
   "exportDatabase": "Export Database Backup (.db)",
   "trashBin": "Trash Bin & Recovery",
   "trashBinSubtitle": "View deleted accounts, restore, or permanently remove (30 days)",
   "recurringTransactions": "Recurring Rules",
-  "recurringRulesDesc": "Set recurring rules and view 30-day cash forecast",
+  "recurringRulesDesc": "Set automated recurring rules and view 30-day cash forecast",
   "taxAndRemittance": "Tax & Foreign Remittance",
   "taxPlanning": "Tax Planning (P.N.D. 90/91)",
   "taxPlanningDesc": "Progressive tax brackets, deductions, and dividend analysis",
@@ -70,10 +70,10 @@
   "liabilitiesInsuranceDesc": "Manage debt obligations, interest rates, and coverage",
   "categoriesManage": "Manage Categories",
   "categoriesManageDesc": "Create categories, customize icons, and organize",
-  "financialReports": "Financial Reports (7 Formats)",
+  "financialReports": "Financial Reports",
   "financialReportsDesc": "Monthly/annual summaries, cash flow, balance sheet, export Excel & PDF",
   "cloudSyncTitle": "Cloud & Data Import",
-  "importWizard": "Import from Notion CSV (Import Wizard)",
+  "importWizard": "Import Data (Notion CSV)",
   "importWizardSubtitle": "Parse relations, detect duplicates, and rollback in 1 click",
   "googleDriveSync": "Google Drive Sync",
   "googleDriveSyncSubtitle": "Backup and sync via your private Google Drive safely",
@@ -101,7 +101,7 @@
   "recentActivity": "Recent Activity",
   "holdings": "Holdings",
   "realizedPnl": "Realized P&L",
-  "history": "History",
+  "history": "Trade History",
   "projects": "Projects",
   "cashAndBank": "Cash & Bank",
   "creditCards": "Credit Cards",
@@ -133,5 +133,72 @@
     }
   },
   "exportSuccess": "Backup exported successfully! You can save it to your private Google Drive.",
-  "appVersionFooter": "JP Money v1.0.0\nLocal-First Financial System"
+  "appVersionFooter": "OURS v1.0.0\nOur money, our journey.",
+  "masterBudget": "MASTER BUDGET",
+  "availableToSpendLumi": "Available to spend 🌸",
+  "availableToSpendVault": "Available to spend",
+  "daysRemainingInCycle": "{days} days left in cycle",
+  "@daysRemainingInCycle": {
+    "placeholders": {
+      "days": { "type": "int" }
+    }
+  },
+  "fromBudget": "of {amount} budget",
+  "@fromBudget": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "ofTotalMonthlyBudget": "{percent}% of monthly budget remaining",
+  "@ofTotalMonthlyBudget": {
+    "placeholders": {
+      "percent": { "type": "int" }
+    }
+  },
+  "usedSoFar": "Spent so far",
+  "fromTotalBudget": "From total budget",
+  "spendingProgress": "Spending progress",
+  "percentUsed": "Used {percent}%",
+  "@percentUsed": {
+    "placeholders": {
+      "percent": { "type": "int" }
+    }
+  },
+  "noBudgetSet": "No budget set this month",
+  "setBudgetAction": "Set Budget",
+  "financialOverview": "Financial Overview",
+  "viewMonthlyReport": "Monthly Report",
+  "netWorthDesc": "Net Worth (Assets - Liabilities)",
+  "monthIncome": "Income",
+  "monthExpense": "Expense",
+  "cashFlow": "Cash Flow",
+  "creditCardSummary": "Credit Cards",
+  "creditCardNoDebt": "No balance due. Awesome! 🎉",
+  "creditCardPending": "Pending cycle balance",
+  "noTransactionsThisMonth": "No transactions this month",
+  "noTransactionsDesc": "Start tracking by recording your first transaction",
+  "addFirstTransaction": "Add First Transaction",
+  "searchTransactions": "Search transactions",
+  "settingsAndSecurity": "Settings & Security",
+  "savingsRateStatus": "Savings rate this month is {percent}%",
+  "@savingsRateStatus": {
+    "placeholders": {
+      "percent": { "type": "int" }
+    }
+  },
+  "creditCardDueWarning": "Credit card cycle closing soon. Pending: {amount}",
+  "@creditCardDueWarning": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "budgetLowWarning": "Monthly budget is below 20%. Please spend with caution.",
+  "dailySpendRecommendation": "Recommended daily spend: {amount} until month end",
+  "@dailySpendRecommendation": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "budgetAndProjects": "Budget & Projects",
+  "tagline": "Our money, our journey."
 }

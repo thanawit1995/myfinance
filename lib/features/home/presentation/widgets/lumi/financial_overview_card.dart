@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../../core/money/money.dart';
 import '../../../../../core/theme/vault_theme.dart';
+import '../../../../../l10n/app_localizations.dart';
 
 class FinancialOverviewCard extends StatelessWidget {
   final int netWorthSatang;
@@ -22,6 +23,7 @@ class FinancialOverviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final isNetWorthPositive = netWorthSatang >= 0;
     final isMoMPositive = momChangePercent >= 0;
 
@@ -42,17 +44,17 @@ class FinancialOverviewCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header row with "ดูรายงานรายเดือน ›"
+          // Header row with "Monthly Report ›"
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
-                children: const [
-                  Text('📊', style: TextStyle(fontSize: 14)),
-                  SizedBox(width: 6),
+                children: [
+                  const Text('📊', style: TextStyle(fontSize: 14)),
+                  const SizedBox(width: 6),
                   Text(
-                    'ภาพรวมสถานะการเงิน',
-                    style: TextStyle(
+                    l10n?.financialOverview ?? 'ภาพรวมสถานะการเงิน',
+                    style: const TextStyle(
                       fontFamily: VaultTheme.fontFamily,
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
@@ -68,21 +70,21 @@ class FinancialOverviewCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
-                    children: const [
+                    children: [
                       Text(
-                        'ดูรายงานรายเดือน',
-                        style: TextStyle(
+                        l10n?.viewMonthlyReport ?? 'ดูรายงานรายเดือน',
+                        style: const TextStyle(
                           fontFamily: VaultTheme.fontFamily,
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFFFF5B9A),
+                          color: Color(0xFFFF5C9D),
                         ),
                       ),
-                      SizedBox(width: 2),
-                      Icon(
+                      const SizedBox(width: 2),
+                      const Icon(
                         Icons.chevron_right_rounded,
                         size: 16,
-                        color: Color(0xFFFF5B9A),
+                        color: Color(0xFFFF5C9D),
                       ),
                     ],
                   ),
@@ -138,9 +140,9 @@ class FinancialOverviewCard extends StatelessWidget {
           ),
 
           const SizedBox(height: 4),
-          const Text(
-            'ความมั่งคั่งสุทธิ (สินทรัพย์ - หนี้สิน)',
-            style: TextStyle(
+          Text(
+            l10n?.netWorthDesc ?? 'ความมั่งคั่งสุทธิ (สินทรัพย์ - หนี้สิน)',
+            style: const TextStyle(
               fontFamily: VaultTheme.fontFamily,
               fontSize: 12,
               color: Color(0xFF87767F),
@@ -149,12 +151,12 @@ class FinancialOverviewCard extends StatelessWidget {
 
           const SizedBox(height: 18),
 
-          // Sub metrics: รายรับเดือนนี้ vs รายจ่ายเดือนนี้ vs กระแสเงินสด
+          // Sub metrics: Month Income vs Month Expense vs Cash Flow
           Row(
             children: [
               Expanded(
                 child: _buildMiniMetric(
-                  label: 'รายรับเดือนนี้',
+                  label: l10n?.monthIncome ?? 'รายรับเดือนนี้',
                   amountSatang: totalIncomeSatang,
                   color: const Color(0xFF2E8B57),
                   bgColor: const Color(0xFFF0FAF2),
@@ -163,7 +165,7 @@ class FinancialOverviewCard extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: _buildMiniMetric(
-                  label: 'รายจ่ายเดือนนี้',
+                  label: l10n?.monthExpense ?? 'รายจ่ายเดือนนี้',
                   amountSatang: totalExpenseSatang,
                   color: const Color(0xFFE64A63),
                   bgColor: const Color(0xFFFFF0F5),
@@ -172,7 +174,7 @@ class FinancialOverviewCard extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: _buildMiniMetric(
-                  label: 'กระแสเงินสด',
+                  label: l10n?.cashFlow ?? 'กระแสเงินสด',
                   amountSatang: cashFlowMonthSatang,
                   color: cashFlowMonthSatang >= 0 ? const Color(0xFF2E8B57) : const Color(0xFFE64A63),
                   bgColor: const Color(0xFFFFF9F5),
@@ -192,10 +194,10 @@ class FinancialOverviewCard extends StatelessWidget {
     required Color bgColor,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Column(
@@ -205,7 +207,7 @@ class FinancialOverviewCard extends StatelessWidget {
             label,
             style: const TextStyle(
               fontFamily: VaultTheme.fontFamily,
-              fontSize: 11,
+              fontSize: 10.5,
               fontWeight: FontWeight.w600,
               color: Color(0xFF87767F),
             ),

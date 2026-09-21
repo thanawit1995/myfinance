@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,6 +14,12 @@ import 'l10n/app_localizations.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Lock orientation to portrait for phones
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
 
   // Catch synchronous Flutter framework errors
   FlutterError.onError = (details) {
@@ -114,7 +121,7 @@ class _MyFinanceAppState extends State<MyFinanceApp> {
     final isLumi = _themeStyle == AppThemeStyle.lumi;
 
     return MaterialApp(
-      title: 'JP Money',
+      title: 'OURS',
       debugShowCheckedModeBanner: false,
       theme: isLumi ? LumiTheme.lightTheme : VaultTheme.lightTheme,
       darkTheme: isLumi ? LumiTheme.darkTheme : VaultTheme.darkTheme,

@@ -15,6 +15,8 @@ class LumiTipCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -70,7 +72,7 @@ class LumiTipCard extends StatelessWidget {
               ),
               const SizedBox(width: 14),
 
-              // ข้อความคำแนะนำ
+              // Advice content
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -78,7 +80,9 @@ class LumiTipCard extends StatelessWidget {
                     Row(
                       children: [
                         Text(
-                          isWarning ? 'แจ้งเตือนสำคัญ ⚠️' : 'คำแนะนำจาก Lumi 💡',
+                          isWarning
+                              ? (isThai ? 'แจ้งเตือนสำคัญ ⚠️' : 'Important Alert ⚠️')
+                              : (isThai ? 'คำแนะนำจาก Lumi 💡' : 'Lumi Insight 💡'),
                           style: TextStyle(
                             fontFamily: VaultTheme.fontFamily,
                             fontSize: 12,

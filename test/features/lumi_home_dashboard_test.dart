@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:myfinance/core/theme/lumi_theme.dart';
 import 'package:myfinance/features/home/presentation/widgets/lumi/budget_hero_card.dart';
 import 'package:myfinance/features/home/presentation/widgets/lumi/credit_card_card.dart';
 import 'package:myfinance/features/home/presentation/widgets/lumi/financial_overview_card.dart';
-import 'package:myfinance/features/home/presentation/widgets/lumi/goals_card.dart';
 import 'package:myfinance/features/home/presentation/widgets/lumi/lumi_desktop_layout.dart';
 import 'package:myfinance/features/home/presentation/widgets/lumi/lumi_tip_card.dart';
 import 'package:myfinance/features/home/presentation/widgets/lumi/portfolio_card.dart';
 import 'package:myfinance/features/home/presentation/widgets/lumi/recent_activity_card.dart';
+import 'package:myfinance/l10n/app_localizations.dart';
 
 void main() {
-  testWidgets('LumiDesktopLayout renders all 7 cards in 2-column desktop layout', (tester) async {
+  testWidgets('LumiDesktopLayout renders all 6 core cards in 2-column desktop layout', (tester) async {
     // Set screen size to Desktop (1280 x 900)
     tester.view.physicalSize = const Size(1280, 900);
     tester.view.devicePixelRatio = 1.0;
@@ -35,12 +36,22 @@ void main() {
       recentTransactions: [],
       attentionMessage: 'ใช้เงินได้เฉลี่ยวันละ ฿850 จนถึงสิ้นเดือน',
       attentionIsWarning: false,
-      activeProjects: [],
     );
 
     await tester.pumpWidget(
       MaterialApp(
         theme: LumiTheme.lightTheme,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [
+          Locale('th'),
+          Locale('en'),
+        ],
+        locale: const Locale('th'),
         home: Scaffold(
           body: LumiDesktopLayout(
             data: dummyBundle,
@@ -57,9 +68,9 @@ void main() {
       ),
     );
 
-    await tester.pump();
+    await tester.pumpAndSettle();
 
-    // Verify all 7 distinct Lumi cards render
+    // Verify all 6 distinct Lumi cards render
     expect(find.byType(BudgetHeroCard), findsOneWidget);
     expect(find.text('เงินที่ใช้ได้ในเดือนนี้ 🌸'), findsOneWidget);
 
@@ -70,9 +81,6 @@ void main() {
     expect(find.byType(FinancialOverviewCard), findsOneWidget);
     expect(find.text('ภาพรวมสถานะการเงิน'), findsOneWidget);
     expect(find.text('ดูรายงานรายเดือน'), findsOneWidget);
-
-    expect(find.byType(GoalsCard), findsOneWidget);
-    expect(find.text('เป้าหมายการเงิน'), findsOneWidget);
 
     expect(find.byType(PortfolioCard), findsOneWidget);
     expect(find.text('พอร์ตการลงทุน'), findsOneWidget);

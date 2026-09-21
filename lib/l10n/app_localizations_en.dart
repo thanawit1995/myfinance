@@ -10,7 +10,7 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get appTitle => 'JP Money';
+  String get appTitle => 'OURS';
 
   @override
   String get home => 'Home';
@@ -31,7 +31,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get add => 'Add';
 
   @override
-  String get trade => 'Trade';
+  String get trade => 'Buy / Sell';
 
   @override
   String get dashboard => 'Dashboard';
@@ -73,7 +73,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get language => 'Language';
 
   @override
-  String get thai => 'Thai';
+  String get thai => 'ไทย';
 
   @override
   String get english => 'English';
@@ -97,7 +97,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get themeSystem => 'System';
 
   @override
-  String get themeStyle => 'Theme Style';
+  String get themeStyle => 'Design Style';
 
   @override
   String get themeStyleVault => 'VAULT (Quiet Luxury)';
@@ -149,31 +149,31 @@ class AppLocalizationsEn extends AppLocalizations {
       'Biometrics sensor not supported on this device';
 
   @override
-  String get backup => 'Data Backup (Local)';
+  String get backup => 'Data Backup';
 
   @override
   String get personalCloudBackup => 'Personal Cloud & Backup';
 
   @override
-  String get backupToJson => 'Backup to Google Drive / Device (JSON)';
+  String get backupToJson => 'Backup to JSON';
 
   @override
   String get backupToJsonSubtitle =>
-      'Export personal backup file to save on your private Google Drive, iCloud, or local storage';
+      'Export personal backup file to save to Google Drive or device storage';
 
   @override
-  String get restoreFromJson => 'Restore from Backup File';
+  String get restoreFromJson => 'Restore Backup';
 
   @override
   String get restoreFromJsonSubtitle =>
-      'Select a backup file (.json) from Google Drive or device to restore';
+      'Select a backup file (.json) to import and restore';
 
   @override
   String get exportRawDb => 'Export Raw Database (.db)';
 
   @override
   String get exportRawDbSubtitle =>
-      'Backup SQLite file on device or share (Windows/Android)';
+      'Backup SQLite database file locally or share';
 
   @override
   String get exportDatabase => 'Export Database Backup (.db)';
@@ -190,7 +190,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get recurringRulesDesc =>
-      'Set recurring rules and view 30-day cash forecast';
+      'Set automated recurring rules and view 30-day cash forecast';
 
   @override
   String get taxAndRemittance => 'Tax & Foreign Remittance';
@@ -231,7 +231,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Create categories, customize icons, and organize';
 
   @override
-  String get financialReports => 'Financial Reports (7 Formats)';
+  String get financialReports => 'Financial Reports';
 
   @override
   String get financialReportsDesc =>
@@ -241,7 +241,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cloudSyncTitle => 'Cloud & Data Import';
 
   @override
-  String get importWizard => 'Import from Notion CSV (Import Wizard)';
+  String get importWizard => 'Import Data (Notion CSV)';
 
   @override
   String get importWizardSubtitle =>
@@ -327,7 +327,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get realizedPnl => 'Realized P&L';
 
   @override
-  String get history => 'History';
+  String get history => 'Trade History';
 
   @override
   String get projects => 'Projects';
@@ -409,6 +409,117 @@ class AppLocalizationsEn extends AppLocalizations {
       'Backup exported successfully! You can save it to your private Google Drive.';
 
   @override
-  String get appVersionFooter =>
-      'JP Money v1.0.0\nLocal-First Financial System';
+  String get appVersionFooter => 'OURS v1.0.0\nOur money, our journey.';
+
+  @override
+  String get masterBudget => 'MASTER BUDGET';
+
+  @override
+  String get availableToSpendLumi => 'Available to spend 🌸';
+
+  @override
+  String get availableToSpendVault => 'Available to spend';
+
+  @override
+  String daysRemainingInCycle(int days) {
+    return '$days days left in cycle';
+  }
+
+  @override
+  String fromBudget(String amount) {
+    return 'of $amount budget';
+  }
+
+  @override
+  String ofTotalMonthlyBudget(int percent) {
+    return '$percent% of monthly budget remaining';
+  }
+
+  @override
+  String get usedSoFar => 'Spent so far';
+
+  @override
+  String get fromTotalBudget => 'From total budget';
+
+  @override
+  String get spendingProgress => 'Spending progress';
+
+  @override
+  String percentUsed(int percent) {
+    return 'Used $percent%';
+  }
+
+  @override
+  String get noBudgetSet => 'No budget set this month';
+
+  @override
+  String get setBudgetAction => 'Set Budget';
+
+  @override
+  String get financialOverview => 'Financial Overview';
+
+  @override
+  String get viewMonthlyReport => 'Monthly Report';
+
+  @override
+  String get netWorthDesc => 'Net Worth (Assets - Liabilities)';
+
+  @override
+  String get monthIncome => 'Income';
+
+  @override
+  String get monthExpense => 'Expense';
+
+  @override
+  String get cashFlow => 'Cash Flow';
+
+  @override
+  String get creditCardSummary => 'Credit Cards';
+
+  @override
+  String get creditCardNoDebt => 'No balance due. Awesome! 🎉';
+
+  @override
+  String get creditCardPending => 'Pending cycle balance';
+
+  @override
+  String get noTransactionsThisMonth => 'No transactions this month';
+
+  @override
+  String get noTransactionsDesc =>
+      'Start tracking by recording your first transaction';
+
+  @override
+  String get addFirstTransaction => 'Add First Transaction';
+
+  @override
+  String get searchTransactions => 'Search transactions';
+
+  @override
+  String get settingsAndSecurity => 'Settings & Security';
+
+  @override
+  String savingsRateStatus(int percent) {
+    return 'Savings rate this month is $percent%';
+  }
+
+  @override
+  String creditCardDueWarning(String amount) {
+    return 'Credit card cycle closing soon. Pending: $amount';
+  }
+
+  @override
+  String get budgetLowWarning =>
+      'Monthly budget is below 20%. Please spend with caution.';
+
+  @override
+  String dailySpendRecommendation(String amount) {
+    return 'Recommended daily spend: $amount until month end';
+  }
+
+  @override
+  String get budgetAndProjects => 'Budget & Projects';
+
+  @override
+  String get tagline => 'Our money, our journey.';
 }

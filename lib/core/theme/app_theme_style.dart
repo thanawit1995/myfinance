@@ -7,18 +7,18 @@ extension AppThemeStyleX on AppThemeStyle {
   String get displayNameTh {
     switch (this) {
       case AppThemeStyle.vault:
-        return 'VAULT (เรียบหรู คลาสสิก)';
+        return 'VAULT';
       case AppThemeStyle.lumi:
-        return 'Lumi (สดใส อบอุ่น Sunny Bloom)';
+        return 'Lumi';
     }
   }
 
   String get displayNameEn {
     switch (this) {
       case AppThemeStyle.vault:
-        return 'VAULT (Quiet Luxury)';
+        return 'VAULT';
       case AppThemeStyle.lumi:
-        return 'Lumi (Sunny Bloom)';
+        return 'Lumi';
     }
   }
 }

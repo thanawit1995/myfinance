@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../../../core/database/app_database.dart';
-import '../../../../../core/database/daos/projects_dao.dart';
 import 'budget_hero_card.dart';
 import 'credit_card_card.dart';
 import 'financial_overview_card.dart';
-import 'goals_card.dart';
 import 'lumi_tip_card.dart';
 import 'portfolio_card.dart';
 import 'recent_activity_card.dart';
@@ -24,7 +22,6 @@ class LumiHomeDataBundle {
   final List<Transaction> recentTransactions;
   final String attentionMessage;
   final bool attentionIsWarning;
-  final List<ProjectStatus> activeProjects;
 
   const LumiHomeDataBundle({
     required this.netWorthSatang,
@@ -41,7 +38,6 @@ class LumiHomeDataBundle {
     required this.recentTransactions,
     required this.attentionMessage,
     required this.attentionIsWarning,
-    required this.activeProjects,
   });
 }
 
@@ -88,14 +84,14 @@ class LumiDesktopLayout extends StatelessWidget {
             headerWidget,
             const SizedBox(height: 20),
 
-            // 2. Main content area: 2 columns on desktop (58% / 42%), 1 column on tablet/mobile
+            // 2. Main content area: 2 columns on desktop, 1 column on tablet/mobile
             if (isDesktopGrid)
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Left Column (58%)
+                  // Left Column (55%)
                   Expanded(
-                    flex: 58,
+                    flex: 55,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -108,7 +104,7 @@ class LumiDesktopLayout extends StatelessWidget {
                         ),
                         const SizedBox(height: 18),
 
-                        // Lumi Tip Card
+                        // Lumi Tip / Advice Card
                         LumiTipCard(
                           message: data.attentionMessage,
                           isWarning: data.attentionIsWarning,
@@ -116,7 +112,7 @@ class LumiDesktopLayout extends StatelessWidget {
                         ),
                         const SizedBox(height: 18),
 
-                        // Financial Overview Card
+                        // Financial Overview Card (Net Worth & Cash Flow)
                         FinancialOverviewCard(
                           netWorthSatang: data.netWorthSatang,
                           momChangePercent: data.momChangePercent,
@@ -125,34 +121,18 @@ class LumiDesktopLayout extends StatelessWidget {
                           totalExpenseSatang: data.totalExpenseSatang,
                           onViewMonthlySummary: onViewMonthlySummary,
                         ),
-                        const SizedBox(height: 18),
-
-                        // Recent Activity Card
-                        RecentActivityCard(
-                          transactions: data.recentTransactions,
-                          onViewAll: onNavigateToMoney,
-                          onAddTransaction: onAddTransaction,
-                        ),
                       ],
                     ),
                   ),
 
                   const SizedBox(width: 20),
 
-                  // Right Column (42%)
+                  // Right Column (45%)
                   Expanded(
-                    flex: 42,
+                    flex: 45,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Goals Card
-                        GoalsCard(
-                          activeProjects: data.activeProjects,
-                          onAddGoal: onNavigateToPlan,
-                          onNavigateToPlan: onNavigateToPlan,
-                        ),
-                        const SizedBox(height: 18),
-
                         // Portfolio Summary Card
                         PortfolioCard(
                           portfolioValueSatang: data.portfolioValueSatang,
@@ -167,13 +147,21 @@ class LumiDesktopLayout extends StatelessWidget {
                           nextCloseText: data.creditCardNextCloseText,
                           onTap: onNavigateToCreditCards,
                         ),
+                        const SizedBox(height: 18),
+
+                        // Recent Activity Card
+                        RecentActivityCard(
+                          transactions: data.recentTransactions,
+                          onViewAll: onNavigateToMoney,
+                          onAddTransaction: onAddTransaction,
+                        ),
                       ],
                     ),
                   ),
                 ],
               )
             else
-              // Single-column layout for narrower screens (< 1024px)
+              // Single-column layout for mobile / tablet (< 1024px)
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -199,12 +187,6 @@ class LumiDesktopLayout extends StatelessWidget {
                     onViewMonthlySummary: onViewMonthlySummary,
                   ),
                   const SizedBox(height: 16),
-                  GoalsCard(
-                    activeProjects: data.activeProjects,
-                    onAddGoal: onNavigateToPlan,
-                    onNavigateToPlan: onNavigateToPlan,
-                  ),
-                  const SizedBox(height: 16),
                   PortfolioCard(
                     portfolioValueSatang: data.portfolioValueSatang,
                     returnPercent: data.portfolioReturnPercent,
@@ -225,7 +207,7 @@ class LumiDesktopLayout extends StatelessWidget {
                 ],
               ),
 
-            const SizedBox(height: 80), // Padding for bottom FAB
+            const SizedBox(height: 80), // Padding for bottom navigation / FAB
           ],
         ),
       ),

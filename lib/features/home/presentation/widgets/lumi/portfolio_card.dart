@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../../core/money/money.dart';
 import '../../../../../core/theme/vault_theme.dart';
+import '../../../../../l10n/app_localizations.dart';
 
 class PortfolioCard extends StatelessWidget {
   final int portfolioValueSatang;
@@ -16,7 +17,9 @@ class PortfolioCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final isPositive = returnPercent >= 0;
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
 
     return Material(
       color: Colors.transparent,
@@ -45,12 +48,12 @@ class PortfolioCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Row(
-                    children: const [
-                      Text('📈', style: TextStyle(fontSize: 14)),
-                      SizedBox(width: 6),
+                    children: [
+                      const Text('📈', style: TextStyle(fontSize: 14)),
+                      const SizedBox(width: 6),
                       Text(
-                        'พอร์ตการลงทุน',
-                        style: TextStyle(
+                        l10n?.portfolio ?? 'พอร์ตการลงทุน',
+                        style: const TextStyle(
                           fontFamily: VaultTheme.fontFamily,
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
@@ -112,9 +115,9 @@ class PortfolioCard extends StatelessWidget {
               ),
 
               const SizedBox(height: 6),
-              const Text(
-                'มูลค่าสินทรัพย์การลงทุนปัจจุบัน',
-                style: TextStyle(
+              Text(
+                isThai ? 'มูลค่าสินทรัพย์การลงทุนปัจจุบัน' : 'Current portfolio asset value',
+                style: const TextStyle(
                   fontFamily: VaultTheme.fontFamily,
                   fontSize: 11.5,
                   color: Color(0xFF5A7B69),

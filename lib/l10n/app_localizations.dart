@@ -101,7 +101,7 @@ abstract class AppLocalizations {
   /// No description provided for @appTitle.
   ///
   /// In th, this message translates to:
-  /// **'JP Money'**
+  /// **'OURS'**
   String get appTitle;
 
   /// No description provided for @home.
@@ -173,7 +173,7 @@ abstract class AppLocalizations {
   /// No description provided for @portfolio.
   ///
   /// In th, this message translates to:
-  /// **'พอร์ตลงทุน'**
+  /// **'พอร์ตการลงทุน'**
   String get portfolio;
 
   /// No description provided for @accounts.
@@ -221,7 +221,7 @@ abstract class AppLocalizations {
   /// No description provided for @language.
   ///
   /// In th, this message translates to:
-  /// **'ภาษา (Language)'**
+  /// **'ภาษา'**
   String get language;
 
   /// No description provided for @thai.
@@ -257,25 +257,25 @@ abstract class AppLocalizations {
   /// No description provided for @themeLight.
   ///
   /// In th, this message translates to:
-  /// **'สว่าง (Light)'**
+  /// **'สว่าง'**
   String get themeLight;
 
   /// No description provided for @themeDark.
   ///
   /// In th, this message translates to:
-  /// **'มืด (Dark)'**
+  /// **'มืด'**
   String get themeDark;
 
   /// No description provided for @themeSystem.
   ///
   /// In th, this message translates to:
-  /// **'ตามระบบ (System)'**
+  /// **'ตามระบบ'**
   String get themeSystem;
 
   /// No description provided for @themeStyle.
   ///
   /// In th, this message translates to:
-  /// **'สไตล์ธีม (Theme Style)'**
+  /// **'สไตล์ดีไซน์'**
   String get themeStyle;
 
   /// No description provided for @themeStyleVault.
@@ -293,7 +293,7 @@ abstract class AppLocalizations {
   /// No description provided for @security.
   ///
   /// In th, this message translates to:
-  /// **'ความปลอดภัย (Security & PIN)'**
+  /// **'ความปลอดภัยและรหัส PIN'**
   String get security;
 
   /// No description provided for @pinProtection.
@@ -377,73 +377,73 @@ abstract class AppLocalizations {
   /// No description provided for @backup.
   ///
   /// In th, this message translates to:
-  /// **'การสำรองข้อมูล (Local Backup)'**
+  /// **'การสำรองข้อมูล'**
   String get backup;
 
   /// No description provided for @personalCloudBackup.
   ///
   /// In th, this message translates to:
-  /// **'สำรองและกู้คืนข้อมูล (Personal Cloud & Backup)'**
+  /// **'สำรองและกู้คืนข้อมูล'**
   String get personalCloudBackup;
 
   /// No description provided for @backupToJson.
   ///
   /// In th, this message translates to:
-  /// **'สำรองข้อมูลลง Google Drive / เครื่อง (JSON Backup)'**
+  /// **'สำรองข้อมูล JSON'**
   String get backupToJson;
 
   /// No description provided for @backupToJsonSubtitle.
   ///
   /// In th, this message translates to:
-  /// **'สร้างไฟล์สำรองข้อมูลส่วนบุคคล นำไปเซฟลง Google Drive, iCloud หรือเครื่องได้ทันที'**
+  /// **'สร้างไฟล์สำรองข้อมูลส่วนบุคคล นำไปเซฟลง Google Drive หรือเครื่องได้ทันที'**
   String get backupToJsonSubtitle;
 
   /// No description provided for @restoreFromJson.
   ///
   /// In th, this message translates to:
-  /// **'กู้คืนข้อมูลจากไฟล์สำรอง (Restore Backup)'**
+  /// **'กู้คืนข้อมูลสำรอง'**
   String get restoreFromJson;
 
   /// No description provided for @restoreFromJsonSubtitle.
   ///
   /// In th, this message translates to:
-  /// **'เลือกไฟล์สำรองข้อมูล (.json) จาก Google Drive หรือเครื่องเพื่อกู้คืน'**
+  /// **'เลือกไฟล์สำรองข้อมูล (.json) เพื่อนำเข้าและกู้คืน'**
   String get restoreFromJsonSubtitle;
 
   /// No description provided for @exportRawDb.
   ///
   /// In th, this message translates to:
-  /// **'ส่งออกไฟล์ฐานข้อมูลดิบ (.db)'**
+  /// **'ส่งออกไฟล์ฐานข้อมูล (.db)'**
   String get exportRawDb;
 
   /// No description provided for @exportRawDbSubtitle.
   ///
   /// In th, this message translates to:
-  /// **'สำรองไฟล์ SQLite เก็บไว้ในเครื่องหรือแชร์ออก (Windows/Android)'**
+  /// **'สำรองไฟล์ SQLite เก็บไว้ในเครื่องหรือแชร์ออก'**
   String get exportRawDbSubtitle;
 
   /// No description provided for @exportDatabase.
   ///
   /// In th, this message translates to:
-  /// **'ส่งออกสำเนาฐานข้อมูล (Export .db)'**
+  /// **'ส่งออกสำเนาฐานข้อมูล (.db)'**
   String get exportDatabase;
 
   /// No description provided for @trashBin.
   ///
   /// In th, this message translates to:
-  /// **'ถังขยะกู้คืนข้อมูล (Trash Bin)'**
+  /// **'ถังขยะกู้คืนข้อมูล'**
   String get trashBin;
 
   /// No description provided for @trashBinSubtitle.
   ///
   /// In th, this message translates to:
-  /// **'ดูบัญชีที่ถูกลบ กู้คืน หรือลบถาวร (30 วัน)'**
+  /// **'ดูรายการหรือบัญชีที่ถูกลบ กู้คืน หรือลบถาวร (30 วัน)'**
   String get trashBinSubtitle;
 
   /// No description provided for @recurringTransactions.
   ///
   /// In th, this message translates to:
-  /// **'รายการประจำ (Recurring Rules)'**
+  /// **'รายการประจำอัตโนมัติ'**
   String get recurringTransactions;
 
   /// No description provided for @recurringRulesDesc.
@@ -497,7 +497,7 @@ abstract class AppLocalizations {
   /// No description provided for @liabilitiesInsurance.
   ///
   /// In th, this message translates to:
-  /// **'ทะเบียนหนี้สินและกรมธรรม์ประกัน (Debts & Insurance)'**
+  /// **'ทะเบียนหนี้สินและประกันภัย'**
   String get liabilitiesInsurance;
 
   /// No description provided for @liabilitiesInsuranceDesc.
@@ -509,7 +509,7 @@ abstract class AppLocalizations {
   /// No description provided for @categoriesManage.
   ///
   /// In th, this message translates to:
-  /// **'จัดการหมวดหมู่รายรับ-รายจ่าย (Categories)'**
+  /// **'จัดการหมวดหมู่'**
   String get categoriesManage;
 
   /// No description provided for @categoriesManageDesc.
@@ -521,7 +521,7 @@ abstract class AppLocalizations {
   /// No description provided for @financialReports.
   ///
   /// In th, this message translates to:
-  /// **'ระบบรายงานทางการเงิน 7 แบบ (Financial Reports)'**
+  /// **'รายงานทางการเงิน'**
   String get financialReports;
 
   /// No description provided for @financialReportsDesc.
@@ -539,7 +539,7 @@ abstract class AppLocalizations {
   /// No description provided for @importWizard.
   ///
   /// In th, this message translates to:
-  /// **'นำเข้าข้อมูลจาก Notion CSV (Import Wizard)'**
+  /// **'นำเข้าข้อมูล (Notion CSV)'**
   String get importWizard;
 
   /// No description provided for @importWizardSubtitle.
@@ -551,7 +551,7 @@ abstract class AppLocalizations {
   /// No description provided for @googleDriveSync.
   ///
   /// In th, this message translates to:
-  /// **'ซิงค์ข้อมูลผ่าน Google Drive (Cloud Sync)'**
+  /// **'ซิงค์ข้อมูล Google Drive'**
   String get googleDriveSync;
 
   /// No description provided for @googleDriveSyncSubtitle.
@@ -611,7 +611,7 @@ abstract class AppLocalizations {
   /// No description provided for @note.
   ///
   /// In th, this message translates to:
-  /// **'บันทึกช่วยจำ (Note)'**
+  /// **'บันทึกช่วยจำ'**
   String get note;
 
   /// No description provided for @save.
@@ -689,7 +689,7 @@ abstract class AppLocalizations {
   /// No description provided for @recentActivity.
   ///
   /// In th, this message translates to:
-  /// **'ธุรกรรมล่าสุด'**
+  /// **'บันทึกรายการล่าสุด'**
   String get recentActivity;
 
   /// No description provided for @holdings.
@@ -707,7 +707,7 @@ abstract class AppLocalizations {
   /// No description provided for @history.
   ///
   /// In th, this message translates to:
-  /// **'ประวัติ'**
+  /// **'ประวัติการซื้อ-ขาย'**
   String get history;
 
   /// No description provided for @projects.
@@ -863,8 +863,200 @@ abstract class AppLocalizations {
   /// No description provided for @appVersionFooter.
   ///
   /// In th, this message translates to:
-  /// **'JP Money v1.0.0\nLocal-First Financial System'**
+  /// **'OURS v1.0.0\nOur money, our journey.'**
   String get appVersionFooter;
+
+  /// No description provided for @masterBudget.
+  ///
+  /// In th, this message translates to:
+  /// **'MASTER BUDGET'**
+  String get masterBudget;
+
+  /// No description provided for @availableToSpendLumi.
+  ///
+  /// In th, this message translates to:
+  /// **'เงินที่ใช้ได้ในเดือนนี้ 🌸'**
+  String get availableToSpendLumi;
+
+  /// No description provided for @availableToSpendVault.
+  ///
+  /// In th, this message translates to:
+  /// **'เหลือให้ใช้ได้'**
+  String get availableToSpendVault;
+
+  /// No description provided for @daysRemainingInCycle.
+  ///
+  /// In th, this message translates to:
+  /// **'{days} วันที่เหลือในรอบเดือน'**
+  String daysRemainingInCycle(int days);
+
+  /// No description provided for @fromBudget.
+  ///
+  /// In th, this message translates to:
+  /// **'จากงบ {amount}'**
+  String fromBudget(String amount);
+
+  /// No description provided for @ofTotalMonthlyBudget.
+  ///
+  /// In th, this message translates to:
+  /// **'เหลือ {percent}% ของงบประมาณรวมทั้งเดือน'**
+  String ofTotalMonthlyBudget(int percent);
+
+  /// No description provided for @usedSoFar.
+  ///
+  /// In th, this message translates to:
+  /// **'ใช้ไปแล้ว'**
+  String get usedSoFar;
+
+  /// No description provided for @fromTotalBudget.
+  ///
+  /// In th, this message translates to:
+  /// **'จากงบรวม'**
+  String get fromTotalBudget;
+
+  /// No description provided for @spendingProgress.
+  ///
+  /// In th, this message translates to:
+  /// **'ความคืบหน้าการใช้เงิน'**
+  String get spendingProgress;
+
+  /// No description provided for @percentUsed.
+  ///
+  /// In th, this message translates to:
+  /// **'ใช้ไป {percent}%'**
+  String percentUsed(int percent);
+
+  /// No description provided for @noBudgetSet.
+  ///
+  /// In th, this message translates to:
+  /// **'ยังไม่ได้ตั้งงบประมาณเดือนนี้'**
+  String get noBudgetSet;
+
+  /// No description provided for @setBudgetAction.
+  ///
+  /// In th, this message translates to:
+  /// **'ตั้งงบประมาณ'**
+  String get setBudgetAction;
+
+  /// No description provided for @financialOverview.
+  ///
+  /// In th, this message translates to:
+  /// **'ภาพรวมสถานะการเงิน'**
+  String get financialOverview;
+
+  /// No description provided for @viewMonthlyReport.
+  ///
+  /// In th, this message translates to:
+  /// **'ดูรายงานรายเดือน'**
+  String get viewMonthlyReport;
+
+  /// No description provided for @netWorthDesc.
+  ///
+  /// In th, this message translates to:
+  /// **'ความมั่งคั่งสุทธิ (สินทรัพย์ - หนี้สิน)'**
+  String get netWorthDesc;
+
+  /// No description provided for @monthIncome.
+  ///
+  /// In th, this message translates to:
+  /// **'รายรับ'**
+  String get monthIncome;
+
+  /// No description provided for @monthExpense.
+  ///
+  /// In th, this message translates to:
+  /// **'รายจ่าย'**
+  String get monthExpense;
+
+  /// No description provided for @cashFlow.
+  ///
+  /// In th, this message translates to:
+  /// **'กระแสเงินสด'**
+  String get cashFlow;
+
+  /// No description provided for @creditCardSummary.
+  ///
+  /// In th, this message translates to:
+  /// **'บัตรเครดิต'**
+  String get creditCardSummary;
+
+  /// No description provided for @creditCardNoDebt.
+  ///
+  /// In th, this message translates to:
+  /// **'ไม่มีหนี้ค้างชำระ ยอดเยี่ยมมาก! 🎉'**
+  String get creditCardNoDebt;
+
+  /// No description provided for @creditCardPending.
+  ///
+  /// In th, this message translates to:
+  /// **'ยอดรอเรียกเก็บรอบบิลปัจจุบัน'**
+  String get creditCardPending;
+
+  /// No description provided for @noTransactionsThisMonth.
+  ///
+  /// In th, this message translates to:
+  /// **'ยังไม่มีรายการในเดือนนี้'**
+  String get noTransactionsThisMonth;
+
+  /// No description provided for @noTransactionsDesc.
+  ///
+  /// In th, this message translates to:
+  /// **'เริ่มจดบันทึกรายรับหรือรายจ่ายรายการแรกเพื่อติดตามการเงินของคุณ'**
+  String get noTransactionsDesc;
+
+  /// No description provided for @addFirstTransaction.
+  ///
+  /// In th, this message translates to:
+  /// **'เพิ่มรายการแรก'**
+  String get addFirstTransaction;
+
+  /// No description provided for @searchTransactions.
+  ///
+  /// In th, this message translates to:
+  /// **'ค้นหาธุรกรรม'**
+  String get searchTransactions;
+
+  /// No description provided for @settingsAndSecurity.
+  ///
+  /// In th, this message translates to:
+  /// **'การตั้งค่าและระบบความปลอดภัย'**
+  String get settingsAndSecurity;
+
+  /// No description provided for @savingsRateStatus.
+  ///
+  /// In th, this message translates to:
+  /// **'อัตราการออมเดือนนี้อยู่ที่ {percent}%'**
+  String savingsRateStatus(int percent);
+
+  /// No description provided for @creditCardDueWarning.
+  ///
+  /// In th, this message translates to:
+  /// **'บัตรเครดิตจะตัดรอบในอีกไม่กี่วัน ยอดรอตัด {amount}'**
+  String creditCardDueWarning(String amount);
+
+  /// No description provided for @budgetLowWarning.
+  ///
+  /// In th, this message translates to:
+  /// **'งบประมาณเดือนนี้เหลือต่ำกว่า 20% แล้ว โปรดระมัดระวังการใช้จ่าย'**
+  String get budgetLowWarning;
+
+  /// No description provided for @dailySpendRecommendation.
+  ///
+  /// In th, this message translates to:
+  /// **'ใช้เงินได้เฉลี่ยวันละ {amount} จนถึงสิ้นเดือน'**
+  String dailySpendRecommendation(String amount);
+
+  /// No description provided for @budgetAndProjects.
+  ///
+  /// In th, this message translates to:
+  /// **'งบประมาณและโครงการ'**
+  String get budgetAndProjects;
+
+  /// No description provided for @tagline.
+  ///
+  /// In th, this message translates to:
+  /// **'Our money, our journey.'**
+  String get tagline;
 }
 
 class _AppLocalizationsDelegate

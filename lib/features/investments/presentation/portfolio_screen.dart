@@ -14,6 +14,7 @@ import 'dividend_income_dialog.dart';
 import 'monthly_valuation_screen.dart';
 import 'lot_inspection_screen.dart';
 import '../../settings/presentation/trash_bin_screen.dart';
+import '../../../../l10n/app_localizations.dart';
 
 class PortfolioScreen extends ConsumerStatefulWidget {
   const PortfolioScreen({super.key});
@@ -177,10 +178,11 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
   @override
   Widget build(BuildContext context) {
     final invDao = ref.watch(investmentsDaoProvider);
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('พอร์ตการลงทุน (Portfolio)'),
+        title: Text((l10n?.portfolio ?? 'PORTFOLIO').toUpperCase()),
         actions: [
           IconButton(
             tooltip: 'อัปเดตราคาตลาดสิ้นเดือน',
@@ -218,16 +220,16 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
         ],
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(text: 'สินทรัพย์ที่ถือครอง', icon: Icon(Icons.pie_chart)),
-            Tab(text: 'กำไรที่รับรู้แล้ว', icon: Icon(Icons.history)),
-            Tab(text: 'ประวัติการซื้อ-ขาย', icon: Icon(Icons.swap_horiz)),
+          tabs: [
+            Tab(text: l10n?.holdings ?? 'สินทรัพย์ที่ถือครอง', icon: const Icon(Icons.pie_chart)),
+            Tab(text: l10n?.realizedPnl ?? 'กำไรที่รับรู้แล้ว', icon: const Icon(Icons.history)),
+            Tab(text: l10n?.history ?? 'ประวัติการซื้อ-ขาย', icon: const Icon(Icons.swap_horiz)),
           ],
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         icon: const Icon(Icons.swap_horiz),
-        label: const Text('ซื้อ / ขาย'),
+        label: Text(Localizations.localeOf(context).languageCode == 'th' ? 'ซื้อ / ขาย' : (l10n?.trade ?? 'Buy / Sell')),
         onPressed: () async {
           final ok = await BuySellTradeDialog.show(context);
           if (ok == true && mounted) setState(() {});

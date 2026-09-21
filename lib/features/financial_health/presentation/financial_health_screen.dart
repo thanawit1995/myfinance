@@ -4,6 +4,7 @@ import '../../../../core/database/database_provider.dart';
 import '../../../../core/money/money.dart';
 import '../domain/models/health_metric_result.dart';
 import '../domain/run_rate_calculator.dart';
+import '../../../../core/theme/vault_theme.dart';
 import 'health_settings_dialog.dart';
 import 'liabilities_insurance_screen.dart';
 import 'metric_detail_sheet.dart';
@@ -247,139 +248,210 @@ class _FinancialHealthScreenState extends ConsumerState<FinancialHealthScreen> {
   }
 
   Widget _buildRunRateCard(BuildContext context, RunRateForecast forecast) {
-    final theme = Theme.of(context);
     final isOverBudget = forecast.varianceSatang > 0;
-    final varianceColor = isOverBudget ? Colors.red.shade700 : Colors.green.shade700;
+    final varianceColor = isOverBudget ? VaultTheme.negative(context) : VaultTheme.positive(context);
     final variancePct = forecast.monthlyBudgetLimitSatang > 0
         ? (forecast.varianceSatang / forecast.monthlyBudgetLimitSatang * 100).abs()
         : 0.0;
+    final isLumi = VaultTheme.isLumi(context);
 
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      color: theme.colorScheme.primaryContainer.withValues(alpha: 0.25),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.speed, color: theme.colorScheme.primary, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  'พยากรณ์การใช้เงิน (Run-rate Forecast)',
-                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+    return Container(
+      decoration: BoxDecoration(
+        color: VaultTheme.surface(context),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: VaultTheme.border(context), width: 0.8),
+        boxShadow: isLumi
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
                 ),
-              ],
-            ),
-            const SizedBox(height: 14),
-
-            // Projected Month Spend vs Budget
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('คาดการณ์สิ้นเดือนนี้', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                    const SizedBox(height: 2),
-                    Text(
-                      Money(forecast.projectedMonthEndSatang).format(symbol: '฿'),
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: isOverBudget ? Colors.red.shade800 : theme.colorScheme.onSurface,
-                      ),
-                    ),
-                  ],
+              ]
+            : null,
+      ),
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: VaultTheme.accent(context).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const Text('เพดานงบประมาณ', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                    const SizedBox(height: 2),
-                    Text(
-                      Money(forecast.monthlyBudgetLimitSatang).format(symbol: '฿'),
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-
-            // Progress bar
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: LinearProgressIndicator(
-                value: forecast.monthlyBudgetLimitSatang > 0
-                    ? (forecast.projectedMonthEndSatang / forecast.monthlyBudgetLimitSatang).clamp(0.0, 1.0)
-                    : 0.0,
-                minHeight: 8,
-                backgroundColor: Colors.grey.shade300,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  isOverBudget ? Colors.red : (forecast.varianceSatang == 0 ? Colors.green : Colors.orange),
+                child: Icon(Icons.speed_rounded, color: VaultTheme.accent(context), size: 18),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'พยากรณ์การใช้เงิน (Run-rate Forecast)',
+                style: TextStyle(
+                  fontFamily: VaultTheme.fontFamily,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: VaultTheme.primaryText(context),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
+            ],
+          ),
+          const SizedBox(height: 16),
 
-            // Stats grid
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'ใช้ไปแล้ว: ${Money(forecast.accumulatedExpenseSatang).format(symbol: '฿')}',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                ),
-                Text(
-                  'ส่วนต่างงบ: ${isOverBudget ? "+" : ""}${Money(forecast.varianceSatang).format(symbol: '฿')} (${variancePct.toStringAsFixed(1)}%)',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: varianceColor),
-                ),
-              ],
-            ),
-            const Divider(height: 20),
-
-            // Recommended Daily Spend
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'วงเงินที่ควรใช้ต่อวัน (เพื่อให้ไม่เกินงบ)',
-                        style: TextStyle(fontSize: 11.5, color: Colors.grey),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${Money(forecast.recommendedDailySpendSatang).format(symbol: '฿')} / วัน',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: forecast.recommendedDailySpendSatang <= 0 ? Colors.red.shade700 : Colors.green.shade800,
-                        ),
-                      ),
-                    ],
+          // Projected Month Spend vs Budget
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'คาดการณ์สิ้นเดือนนี้',
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: 12,
+                      color: VaultTheme.secondaryText(context),
+                    ),
                   ),
+                  const SizedBox(height: 2),
+                  Text(
+                    Money(forecast.projectedMonthEndSatang).format(symbol: '฿'),
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: isOverBudget ? VaultTheme.negative(context) : VaultTheme.primaryText(context),
+                    ),
+                  ),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    'เพดานงบประมาณ',
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: 12,
+                      color: VaultTheme.secondaryText(context),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    Money(forecast.monthlyBudgetLimitSatang).format(symbol: '฿'),
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: VaultTheme.primaryText(context),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Progress bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: forecast.monthlyBudgetLimitSatang > 0
+                  ? (forecast.projectedMonthEndSatang / forecast.monthlyBudgetLimitSatang).clamp(0.0, 1.0)
+                  : 0.0,
+              minHeight: 8,
+              backgroundColor: VaultTheme.border(context),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                isOverBudget
+                    ? VaultTheme.negative(context)
+                    : (forecast.varianceSatang == 0 ? VaultTheme.positive(context) : Colors.orange),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Stats grid
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'ใช้ไปแล้ว: ${Money(forecast.accumulatedExpenseSatang).format(symbol: '฿')}',
+                style: TextStyle(
+                  fontFamily: VaultTheme.fontFamily,
+                  fontSize: 12,
+                  color: VaultTheme.secondaryText(context),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+              ),
+              Text(
+                'ส่วนต่างงบ: ${isOverBudget ? "+" : ""}${Money(forecast.varianceSatang).format(symbol: '฿')} (${variancePct.toStringAsFixed(1)}%)',
+                style: TextStyle(
+                  fontFamily: VaultTheme.fontFamily,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: varianceColor,
+                ),
+              ),
+            ],
+          ),
+          Divider(height: 24, color: VaultTheme.border(context)),
+
+          // Recommended Daily Spend
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('เหลืออีก', style: TextStyle(fontSize: 11.5, color: Colors.grey)),
+                    Text(
+                      'วงเงินที่ควรใช้ต่อวัน (เพื่อให้ไม่เกินงบ)',
+                      style: TextStyle(
+                        fontFamily: VaultTheme.fontFamily,
+                        fontSize: 11.5,
+                        color: VaultTheme.secondaryText(context),
+                      ),
+                    ),
                     const SizedBox(height: 2),
                     Text(
-                      '${forecast.remainingDaysInMonth} วัน',
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                      '${Money(forecast.recommendedDailySpendSatang).format(symbol: '฿')} / วัน',
+                      style: TextStyle(
+                        fontFamily: VaultTheme.fontFamily,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: forecast.recommendedDailySpendSatang <= 0 ? VaultTheme.negative(context) : VaultTheme.positive(context),
+                      ),
                     ),
                   ],
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    'เหลืออีก',
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: 11.5,
+                      color: VaultTheme.secondaryText(context),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${forecast.remainingDaysInMonth} วัน',
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: VaultTheme.primaryText(context),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

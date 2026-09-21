@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/database/database_provider.dart';
-import '../../../../core/database/daos/projects_dao.dart';
 import '../../../../core/money/money.dart';
 import '../../../../core/theme/vault_theme.dart';
 import '../../../../core/database/daos/investments_dao.dart';
@@ -47,7 +46,7 @@ class VaultHomeScreen extends ConsumerWidget {
             ref.invalidate(budgetsDaoProvider);
           },
           child: FutureBuilder<_VaultHomeData>(
-            future: _loadHomeData(ref, now),
+            future: _loadHomeData(ref, now, context),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return Center(
@@ -83,7 +82,6 @@ class VaultHomeScreen extends ConsumerWidget {
                   recentTransactions: data.recentTransactions,
                   attentionMessage: data.attentionMessage,
                   attentionIsWarning: data.attentionIsWarning,
-                  activeProjects: data.activeProjects,
                 );
 
                 return LumiDesktopLayout(
@@ -110,7 +108,7 @@ class VaultHomeScreen extends ConsumerWidget {
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 children: [
-                  // 1. Header แบบสงบนิ่ง: VAULT + เดือนปัจจุบัน + ไอคอนค้นหาและตั้งค่า
+                  // 1. Header: OURS + เดือนปัจจุบัน + ไอคอนค้นหาและตั้งค่า
                   _buildHeader(context, now),
                   const SizedBox(height: 20),
 
@@ -149,41 +147,42 @@ class VaultHomeScreen extends ConsumerWidget {
     final monthName = isThai
         ? _getThaiMonth(now.month)
         : DateFormat('MMMM').format(now);
-    final yearStr = '${now.year}';
-
+    final yearStr = now.year.toString();
     final isLumi = VaultTheme.isLumi(context);
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         if (isLumi)
           Expanded(
             child: Row(
               children: [
+                // Avatar badge
                 Container(
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFE5F2),
+                    color: Colors.white,
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: const Color(0xFFFF5C9D).withValues(alpha: 0.35),
-                      width: 1.5,
-                    ),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFFFF5C9D).withValues(alpha: 0.15),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
+                        color: const Color(0xFFFF5C9D).withValues(alpha: 0.18),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
                       ),
                     ],
+                    border: Border.all(color: const Color(0xFFFFD1E3), width: 1.5),
                   ),
                   child: ClipOval(
                     child: Image.asset(
-                      'assets/images/lumi_mascot.png',
-                      width: 44,
-                      height: 44,
+                      'assets/images/lumi_cat_crisp.png',
                       fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => const Icon(
+                        Icons.pets_rounded,
+                        color: Color(0xFFFF5C9D),
+                        size: 24,
+                      ),
                     ),
                   ),
                 ),
@@ -209,7 +208,7 @@ class VaultHomeScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'JP Money • Lumi • $monthName $yearStr',
+                        'OURS • Lumi • $monthName $yearStr',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -232,7 +231,7 @@ class VaultHomeScreen extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'JP Money',
+                    'OURS',
                     style: TextStyle(
                       fontFamily: VaultTheme.fontFamily,
                       fontSize: 22,
@@ -263,11 +262,11 @@ class VaultHomeScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                '$monthName $yearStr',
+                'Our money, our journey. • $monthName $yearStr',
                 style: TextStyle(
                   fontFamily: VaultTheme.fontFamily,
-                  fontSize: 13,
-                  letterSpacing: 0.5,
+                  fontSize: 12,
+                  letterSpacing: 0.3,
                   color: VaultTheme.secondaryText(context),
                 ),
               ),
@@ -282,7 +281,7 @@ class VaultHomeScreen extends ConsumerWidget {
                 color: VaultTheme.secondaryText(context),
               ),
               onPressed: onNavigateToMoney,
-              tooltip: 'ค้นหาธุรกรรม',
+              tooltip: l10n?.searchTransactions ?? 'ค้นหาธุรกรรม',
             ),
             IconButton(
               icon: Icon(
@@ -291,7 +290,7 @@ class VaultHomeScreen extends ConsumerWidget {
                 color: VaultTheme.secondaryText(context),
               ),
               onPressed: onOpenSettings,
-              tooltip: 'การตั้งค่าและระบบความปลอดภัย',
+              tooltip: l10n?.settingsAndSecurity ?? 'การตั้งค่าและระบบความปลอดภัย',
             ),
           ],
         ),
@@ -301,24 +300,21 @@ class VaultHomeScreen extends ConsumerWidget {
 
   // --- 2. Master Budget Hero Card ---
   Widget _buildMasterBudgetCard(BuildContext context, _VaultHomeData data, DateTime now) {
+    final l10n = AppLocalizations.of(context);
     final remainingSatang = data.remainingBudgetSatang;
     final totalBudgetSatang = data.totalBudgetMonthSatang;
     final totalExpenseSatang = data.totalExpenseMonthSatang;
+    final hasBudget = totalBudgetSatang > 0;
 
-    final percentRemaining = totalBudgetSatang > 0
+    final percentRemaining = hasBudget
         ? ((remainingSatang / totalBudgetSatang) * 100).clamp(0, 100).toInt()
         : 100;
 
     final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
     final daysRemaining = (daysInMonth - now.day).clamp(0, daysInMonth);
 
-    final isWarning = percentRemaining < 20;
-    final accentColor = VaultTheme.accent(context);
-    final barColor = isWarning
-        ? VaultTheme.negative(context)
-        : (percentRemaining < 40 ? accentColor : VaultTheme.mutedText(context));
-
-    final progressRatio = totalBudgetSatang > 0
+    final isWarning = hasBudget && percentRemaining < 20;
+    final progressRatio = hasBudget
         ? (totalExpenseSatang / totalBudgetSatang).clamp(0.0, 1.0)
         : 0.0;
 
@@ -359,7 +355,9 @@ class VaultHomeScreen extends ConsumerWidget {
               children: [
                 Expanded(
                   child: Text(
-                    isLumi ? 'เงินที่ใช้ได้ในเดือนนี้ 🌸' : 'MASTER BUDGET',
+                    isLumi
+                        ? (l10n?.availableToSpendLumi ?? 'เงินที่ใช้ได้ในเดือนนี้ 🌸')
+                        : (l10n?.masterBudget ?? 'MASTER BUDGET'),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -373,7 +371,7 @@ class VaultHomeScreen extends ConsumerWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  '$daysRemaining วันที่เหลือในรอบเดือน',
+                  l10n?.daysRemainingInCycle(daysRemaining) ?? '$daysRemaining วันที่เหลือในรอบเดือน',
                   style: TextStyle(
                     fontFamily: VaultTheme.fontFamily,
                     fontSize: 12,
@@ -383,7 +381,53 @@ class VaultHomeScreen extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 14),
-            if (isLumi) ...[
+            if (!hasBudget) ...[
+              // Friendly state when budget has not been set yet
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n?.noBudgetSet ?? 'ยังไม่ได้ตั้งงบประมาณเดือนนี้',
+                          style: TextStyle(
+                            fontFamily: VaultTheme.fontFamily,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: isLumi ? const Color(0xFF2B2338) : VaultTheme.primaryText(context),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '${l10n?.usedSoFar ?? 'ใช้ไปแล้ว'}: ${Money(totalExpenseSatang).format(symbol: '฿')}',
+                          style: TextStyle(
+                            fontFamily: VaultTheme.fontFamily,
+                            fontSize: 13,
+                            color: isLumi ? const Color(0xFF8A5C6F) : VaultTheme.secondaryText(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: onNavigateToBudget,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isLumi ? const Color(0xFFFF5C9D) : VaultTheme.accent(context),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    ),
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: Text(
+                      l10n?.setBudgetAction ?? '+ ตั้งงบประมาณ',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ] else if (isLumi) ...[
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -402,12 +446,13 @@ class VaultHomeScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'จากงบ ${Money(totalBudgetSatang).format(symbol: '฿')}',
-                          style: TextStyle(
+                          l10n?.fromBudget(Money(totalBudgetSatang).format(symbol: '฿')) ??
+                              'จากงบ ${Money(totalBudgetSatang).format(symbol: '฿')}',
+                          style: const TextStyle(
                             fontFamily: VaultTheme.fontFamily,
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
-                            color: const Color(0xFF8A5C6F),
+                            color: Color(0xFF8A5C6F),
                           ),
                         ),
                       ],
@@ -421,6 +466,7 @@ class VaultHomeScreen extends ConsumerWidget {
                       width: 120,
                       height: 105,
                       fit: BoxFit.contain,
+                      errorBuilder: (_, _, _) => const SizedBox.shrink(),
                     ),
                   ),
                 ],
@@ -444,11 +490,11 @@ class VaultHomeScreen extends ConsumerWidget {
                   const SizedBox(width: 12),
                   Text(
                     '${(progressRatio * 100).toInt()}%',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontFamily: VaultTheme.fontFamily,
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: const Color(0xFF2B2338),
+                      color: Color(0xFF2B2338),
                     ),
                   ),
                 ],
@@ -469,7 +515,7 @@ class VaultHomeScreen extends ConsumerWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'เหลือให้ใช้ได้',
+                    l10n?.availableToSpendVault ?? 'เหลือให้ใช้ได้',
                     style: TextStyle(
                       fontFamily: VaultTheme.fontFamily,
                       fontSize: 14,
@@ -480,7 +526,7 @@ class VaultHomeScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'เหลือ $percentRemaining% ของงบประมาณรวมทั้งเดือน',
+                l10n?.ofTotalMonthlyBudget(percentRemaining) ?? 'เหลือ $percentRemaining% ของงบประมาณรวมทั้งเดือน',
                 style: TextStyle(
                   fontFamily: VaultTheme.fontFamily,
                   fontSize: 13,
@@ -489,12 +535,14 @@ class VaultHomeScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
               ClipRRect(
-                borderRadius: BorderRadius.circular(3),
+                borderRadius: BorderRadius.circular(4),
                 child: LinearProgressIndicator(
                   value: progressRatio,
-                  minHeight: 4,
+                  minHeight: 6,
                   backgroundColor: VaultTheme.border(context),
-                  valueColor: AlwaysStoppedAnimation<Color>(barColor),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    isWarning ? VaultTheme.negative(context) : VaultTheme.accent(context),
+                  ),
                 ),
               ),
               const SizedBox(height: 10),
@@ -502,14 +550,14 @@ class VaultHomeScreen extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'ใช้ไปแล้ว ${Money(totalExpenseSatang).format(symbol: '฿')}',
+                    '${l10n?.usedSoFar ?? 'ใช้ไปแล้ว'} ${Money(totalExpenseSatang).format(symbol: '฿')}',
                     style: VaultTheme.tabular(
                       fontSize: 12,
                       color: VaultTheme.mutedText(context),
                     ),
                   ),
                   Text(
-                    'งบทั้งหมด ${Money(totalBudgetSatang).format(symbol: '฿')}',
+                    '${l10n?.fromTotalBudget ?? 'งบทั้งหมด'} ${Money(totalBudgetSatang).format(symbol: '฿')}',
                     style: VaultTheme.tabular(
                       fontSize: 12,
                       color: VaultTheme.mutedText(context),
@@ -527,6 +575,7 @@ class VaultHomeScreen extends ConsumerWidget {
   // --- 3. Today / Attention Box ---
   Widget _buildAttentionCard(BuildContext context, _VaultHomeData data) {
     final isLumi = VaultTheme.isLumi(context);
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -563,6 +612,7 @@ class VaultHomeScreen extends ConsumerWidget {
                 child: Image.asset(
                   'assets/images/lumi_cat_crisp.png',
                   fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => const Icon(Icons.pets, color: Color(0xFFFF9E44)),
                 ),
               ),
             )
@@ -578,7 +628,9 @@ class VaultHomeScreen extends ConsumerWidget {
               isLumi
                   ? (data.attentionIsWarning
                       ? data.attentionMessage
-                      : 'Lumi Tips: การเงินดีเริ่มต้นจากวันละนิด • ${data.attentionMessage}')
+                      : (isThai
+                          ? 'Lumi Tips: การเงินดีเริ่มต้นจากวันละนิด • ${data.attentionMessage}'
+                          : 'Lumi Insight: Small steps to financial freedom • ${data.attentionMessage}'))
                   : data.attentionMessage,
               style: TextStyle(
                 fontFamily: VaultTheme.fontFamily,
@@ -593,9 +645,10 @@ class VaultHomeScreen extends ConsumerWidget {
     );
   }
 
-
   // --- 4. Financial Position ---
   Widget _buildFinancialPosition(BuildContext context, _VaultHomeData data) {
+    final l10n = AppLocalizations.of(context);
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     final netWorthMoney = Money(data.netWorthSatang);
     final momChangePercent = data.momChangePercent;
     final isMomPositive = momChangePercent >= 0;
@@ -625,7 +678,9 @@ class VaultHomeScreen extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                isLumi ? 'ภาพรวมการเงิน' : 'FINANCIAL POSITION',
+                isLumi
+                    ? (l10n?.financialOverview ?? 'ภาพรวมการเงิน')
+                    : 'FINANCIAL POSITION',
                 style: TextStyle(
                   fontFamily: VaultTheme.fontFamily,
                   fontSize: isLumi ? 14 : 11,
@@ -642,9 +697,9 @@ class VaultHomeScreen extends ConsumerWidget {
                       MaterialPageRoute(builder: (_) => const MonthlySummaryScreen()),
                     );
                   },
-                  child: const Text(
-                    'ดูทั้งหมด ›',
-                    style: TextStyle(
+                  child: Text(
+                    '${l10n?.viewAll ?? 'ดูทั้งหมด'} ›',
+                    style: const TextStyle(
                       fontFamily: VaultTheme.fontFamily,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -662,7 +717,7 @@ class VaultHomeScreen extends ConsumerWidget {
                     ),
                     const SizedBox(width: 2),
                     Text(
-                      '${isMomPositive ? '+' : ''}${momChangePercent.toStringAsFixed(1)}% vs สิ้นเดือนก่อน',
+                      '${isMomPositive ? '+' : ''}${momChangePercent.toStringAsFixed(1)}% ${isThai ? 'vs สิ้นเดือนก่อน' : 'vs last month'}',
                       style: VaultTheme.tabular(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -679,7 +734,7 @@ class VaultHomeScreen extends ConsumerWidget {
             textBaseline: TextBaseline.alphabetic,
             children: [
               Text(
-                'สินทรัพย์สุทธิ',
+                l10n?.netWorth ?? 'สินทรัพย์สุทธิ',
                 style: TextStyle(
                   fontFamily: VaultTheme.fontFamily,
                   fontSize: 13,
@@ -708,7 +763,7 @@ class VaultHomeScreen extends ConsumerWidget {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  '${isMomPositive ? 'เพิ่มขึ้น' : 'ลดลง'} ${isMomPositive ? '+' : ''}${momChangePercent.toStringAsFixed(1)}% จากเดือนที่แล้ว',
+                  '${isMomPositive ? (isThai ? 'เพิ่มขึ้น' : '+') : (isThai ? 'ลดลง' : '-')}${isMomPositive ? '+' : ''}${momChangePercent.toStringAsFixed(1)}% ${isThai ? 'จากเดือนที่แล้ว' : 'vs last month'}',
                   style: TextStyle(
                     fontFamily: VaultTheme.fontFamily,
                     fontSize: 12,
@@ -726,14 +781,14 @@ class VaultHomeScreen extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'กระแสเงินสดเดือนนี้: ${Money(data.cashFlowMonthSatang).format(symbol: '฿')}',
+                '${l10n?.cashFlow ?? 'กระแสเงินสด'}: ${Money(data.cashFlowMonthSatang).format(symbol: '฿')}',
                 style: VaultTheme.tabular(
                   fontSize: 12,
                   color: VaultTheme.secondaryText(context),
                 ),
               ),
               Text(
-                'พอร์ตลงทุน: ${Money(data.portfolioValueSatang).format(symbol: '฿')}',
+                '${l10n?.portfolio ?? 'พอร์ตลงทุน'}: ${Money(data.portfolioValueSatang).format(symbol: '฿')}',
                 style: VaultTheme.tabular(
                   fontSize: 12,
                   color: VaultTheme.secondaryText(context),
@@ -748,6 +803,8 @@ class VaultHomeScreen extends ConsumerWidget {
 
   // --- 5. Snapshot Row (Portfolio & Credit Card) ---
   Widget _buildSnapshotRow(BuildContext context, _VaultHomeData data) {
+    final l10n = AppLocalizations.of(context);
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     final portReturnPercent = data.portfolioReturnPercent;
     final isPortPositive = portReturnPercent >= 0;
     final isLumi = VaultTheme.isLumi(context);
@@ -815,7 +872,7 @@ class VaultHomeScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${isPortPositive ? '+' : ''}${portReturnPercent.toStringAsFixed(1)}% รวม',
+                    '${isPortPositive ? '+' : ''}${portReturnPercent.toStringAsFixed(1)}% ${isThai ? 'รวม' : 'total'}',
                     style: VaultTheme.tabular(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -889,7 +946,11 @@ class VaultHomeScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    isLumi ? 'ยอดค้างชำระปัจจุบัน' : data.creditCardNextCloseText,
+                    isLumi
+                        ? (data.creditCardCurrentDebtSatang > 0
+                            ? (l10n?.creditCardPending ?? 'ยอดค้างชำระปัจจุบัน')
+                            : (l10n?.creditCardNoDebt ?? 'ไม่มีหนี้ค้างชำระ'))
+                        : data.creditCardNextCloseText,
                     style: TextStyle(
                       fontFamily: VaultTheme.fontFamily,
                       fontSize: 12,
@@ -907,9 +968,9 @@ class VaultHomeScreen extends ConsumerWidget {
     );
   }
 
-
   // --- 6. Recent Activity (3 รายการล่าสุด) ---
   Widget _buildRecentActivity(BuildContext context, _VaultHomeData data) {
+    final l10n = AppLocalizations.of(context);
     final isLumi = VaultTheme.isLumi(context);
     final isDark = VaultTheme.isDark(context);
 
@@ -920,7 +981,7 @@ class VaultHomeScreen extends ConsumerWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              isLumi ? 'รายการล่าสุด' : 'RECENT ACTIVITY',
+              isLumi ? (l10n?.recentActivity ?? 'รายการล่าสุด') : 'RECENT ACTIVITY',
               style: TextStyle(
                 fontFamily: VaultTheme.fontFamily,
                 fontSize: isLumi ? 14 : 11,
@@ -937,7 +998,7 @@ class VaultHomeScreen extends ConsumerWidget {
                 foregroundColor: isLumi ? const Color(0xFFFF5C9D) : VaultTheme.accent(context),
               ),
               child: Text(
-                isLumi ? 'ดูทั้งหมด ›' : 'ดูทั้งหมด →',
+                '${l10n?.viewAll ?? 'ดูทั้งหมด'} →',
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ),
@@ -949,7 +1010,7 @@ class VaultHomeScreen extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(vertical: 24),
             alignment: Alignment.center,
             child: Text(
-              'ยังไม่มีรายการธุรกรรม',
+              l10n?.noTransactionsThisMonth ?? 'ยังไม่มีรายการธุรกรรม',
               style: TextStyle(
                 fontFamily: VaultTheme.fontFamily,
                 fontSize: 13,
@@ -995,7 +1056,8 @@ class VaultHomeScreen extends ConsumerWidget {
                     ? tx.amountOriginalSatang / 100.0
                     : tx.amountThbSatang / 100.0;
 
-                final dateStr = DateFormat('d MMM').format(tx.transactionDate);
+                final locale = Localizations.localeOf(context).languageCode;
+                final dateStr = DateFormat('d MMM', locale).format(tx.transactionDate);
 
                 return ListTile(
                   dense: true,
@@ -1022,7 +1084,9 @@ class VaultHomeScreen extends ConsumerWidget {
                   title: Text(
                     tx.note?.isNotEmpty == true
                         ? tx.note!
-                        : (isTransfer ? 'โอนเงิน' : (isIncome ? 'รายรับ' : 'รายจ่าย')),
+                        : (isTransfer
+                            ? (l10n?.transfer ?? 'โอนเงิน')
+                            : (isIncome ? (l10n?.income ?? 'รายรับ') : (l10n?.expense ?? 'รายจ่าย'))),
                     style: TextStyle(
                       fontFamily: VaultTheme.fontFamily,
                       fontSize: 14,
@@ -1057,7 +1121,9 @@ class VaultHomeScreen extends ConsumerWidget {
   }
 
   // --- Data Loader ---
-  Future<_VaultHomeData> _loadHomeData(WidgetRef ref, DateTime now) async {
+  Future<_VaultHomeData> _loadHomeData(WidgetRef ref, DateTime now, BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     final txDao = ref.read(transactionsDaoProvider);
     final accDao = ref.read(accountsDaoProvider);
     final bgDao = ref.read(budgetsDaoProvider);
@@ -1085,14 +1151,13 @@ class VaultHomeScreen extends ConsumerWidget {
     }
     final cashFlow = totalIncome - totalExpense;
 
-    // 3. Budgets
+    // 3. Budgets (no fake default limit!)
     final budgets = await bgDao.getBudgetStatusForMonth(now.year, now.month);
     int totalBudget = 0;
     for (final b in budgets) {
       totalBudget += b.limitSatang;
     }
-    if (totalBudget == 0) totalBudget = 3000000; // 30,000 THB default overall limit
-    final remainingBudget = (totalBudget - totalExpense).clamp(0, totalBudget);
+    final remainingBudget = totalBudget > 0 ? (totalBudget - totalExpense).clamp(0, totalBudget) : 0;
 
     // 4. Portfolio
     PortfolioSummary? portSummary;
@@ -1108,7 +1173,7 @@ class VaultHomeScreen extends ConsumerWidget {
 
     // 5. Credit Cards
     int ccDebt = 0;
-    String ccNextClose = 'ไม่มีหนี้ค้างชำระ';
+    String ccNextClose = isThai ? 'ไม่มีหนี้ค้างชำระ' : 'No balance due';
     bool ccHasWarning = false;
     for (final a in activeAccounts) {
       if (a.accountType == 'credit_card') {
@@ -1117,10 +1182,10 @@ class VaultHomeScreen extends ConsumerWidget {
           ccDebt += summary.currentCycleDebtSatang;
           final daysToClose = summary.cycle.daysRemaining;
           if (daysToClose <= 7 && daysToClose >= 0) {
-            ccNextClose = 'ตัดรอบในอีก $daysToClose วัน';
+            ccNextClose = isThai ? 'ตัดรอบในอีก $daysToClose วัน' : 'Due in $daysToClose days';
             ccHasWarning = true;
           } else {
-            ccNextClose = 'ตัดรอบวันที่ ${summary.cycle.statementDay}';
+            ccNextClose = isThai ? 'ตัดรอบวันที่ ${summary.cycle.statementDay}' : 'Closes on day ${summary.cycle.statementDay}';
           }
         }
       }
@@ -1130,36 +1195,28 @@ class VaultHomeScreen extends ConsumerWidget {
     final recent = await txDao.getRecentTransactions(limit: 3);
 
     // 7. Dynamic Attention Insight
-    String attentionMsg = 'อัตราการออมเดือนนี้อยู่ที่ ${(totalIncome > 0 ? ((totalIncome - totalExpense) / totalIncome * 100).clamp(0, 100).toInt() : 0)}%';
+    final savingsPct = totalIncome > 0 ? ((totalIncome - totalExpense) / totalIncome * 100).clamp(0, 100).toInt() : 0;
+    String attentionMsg = l10n?.savingsRateStatus(savingsPct) ?? 'อัตราการออมเดือนนี้อยู่ที่ $savingsPct%';
     bool attentionWarn = false;
 
     if (ccHasWarning && ccDebt > 0) {
-      attentionMsg = 'บัตรเครดิตจะตัดรอบในอีกไม่กี่วัน ยอดรอตัด ${Money(ccDebt).format(symbol: '฿')}';
+      attentionMsg = l10n?.creditCardDueWarning(Money(ccDebt).format(symbol: '฿')) ??
+          'บัตรเครดิตจะตัดรอบในอีกไม่กี่วัน ยอดรอตัด ${Money(ccDebt).format(symbol: '฿')}';
       attentionWarn = true;
-    } else if (remainingBudget < (totalBudget * 0.2)) {
-      attentionMsg = 'งบประมาณเดือนนี้เหลือต่ำกว่า 20% แล้ว โปรดระมัดระวังการใช้จ่าย';
+    } else if (totalBudget > 0 && remainingBudget < (totalBudget * 0.2)) {
+      attentionMsg = l10n?.budgetLowWarning ?? 'งบประมาณเดือนนี้เหลือต่ำกว่า 20% แล้ว โปรดระมัดระวังการใช้จ่าย';
       attentionWarn = true;
     } else {
       try {
         final forecast = await healthDao.getRunRateForecast();
         if (forecast.recommendedDailySpendSatang > 0) {
-          attentionMsg = 'ใช้เงินได้เฉลี่ยวันละ ${Money(forecast.recommendedDailySpendSatang).format(symbol: '฿')} จนถึงสิ้นเดือน';
+          attentionMsg = l10n?.dailySpendRecommendation(Money(forecast.recommendedDailySpendSatang).format(symbol: '฿')) ??
+              'ใช้เงินได้เฉลี่ยวันละ ${Money(forecast.recommendedDailySpendSatang).format(symbol: '฿')} จนถึงสิ้นเดือน';
         }
       } catch (_) {}
     }
 
-    // Active projects for Goals
-    final projDao = ref.read(projectsDaoProvider);
-    final projectsList = await projDao.getActiveProjects();
-    final List<ProjectStatus> activeProjectStatuses = [];
-    for (final p in projectsList.take(3)) {
-      final st = await projDao.getProjectStatus(p.id);
-      if (st != null) {
-        activeProjectStatuses.add(st);
-      }
-    }
-
-    // MoM change (approx from current net worth vs beginning of month cash flow)
+    // MoM change
     final priorNetWorth = netWorth - cashFlow;
     final momPercent = priorNetWorth > 0
         ? (cashFlow / priorNetWorth * 100.0)
@@ -1180,7 +1237,6 @@ class VaultHomeScreen extends ConsumerWidget {
       recentTransactions: recent,
       attentionMessage: attentionMsg,
       attentionIsWarning: attentionWarn,
-      activeProjects: activeProjectStatuses,
     );
   }
 
@@ -1208,7 +1264,6 @@ class _VaultHomeData {
   final List<Transaction> recentTransactions;
   final String attentionMessage;
   final bool attentionIsWarning;
-  final List<ProjectStatus> activeProjects;
 
   const _VaultHomeData({
     required this.netWorthSatang,
@@ -1225,6 +1280,5 @@ class _VaultHomeData {
     required this.recentTransactions,
     required this.attentionMessage,
     required this.attentionIsWarning,
-    required this.activeProjects,
   });
 }

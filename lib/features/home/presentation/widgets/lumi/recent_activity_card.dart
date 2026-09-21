@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../../../../core/database/app_database.dart';
 import '../../../../../core/money/money.dart';
 import '../../../../../core/theme/vault_theme.dart';
+import '../../../../../l10n/app_localizations.dart';
 
 class RecentActivityCard extends StatelessWidget {
   final List<Transaction> transactions;
@@ -18,6 +19,8 @@ class RecentActivityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -40,12 +43,12 @@ class RecentActivityCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
-                children: const [
-                  Text('📝', style: TextStyle(fontSize: 14)),
-                  SizedBox(width: 6),
+                children: [
+                  const Text('📝', style: TextStyle(fontSize: 14)),
+                  const SizedBox(width: 6),
                   Text(
-                    'บันทึกรายการล่าสุด',
-                    style: TextStyle(
+                    l10n?.recentActivity ?? 'บันทึกรายการล่าสุด',
+                    style: const TextStyle(
                       fontFamily: VaultTheme.fontFamily,
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
@@ -61,21 +64,21 @@ class RecentActivityCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
-                    children: const [
+                    children: [
                       Text(
-                        'ดูทั้งหมด',
-                        style: TextStyle(
+                        l10n?.viewAll ?? 'ดูทั้งหมด',
+                        style: const TextStyle(
                           fontFamily: VaultTheme.fontFamily,
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFFFF5B9A),
+                          color: Color(0xFFFF5C9D),
                         ),
                       ),
-                      SizedBox(width: 2),
-                      Icon(
+                      const SizedBox(width: 2),
+                      const Icon(
                         Icons.chevron_right_rounded,
                         size: 16,
-                        color: Color(0xFFFF5B9A),
+                        color: Color(0xFFFF5C9D),
                       ),
                     ],
                   ),
@@ -109,6 +112,8 @@ class RecentActivityCard extends StatelessWidget {
   }
 
   Widget _buildTransactionItem(BuildContext context, Transaction tx) {
+    final l10n = AppLocalizations.of(context);
+    final locale = Localizations.localeOf(context).languageCode;
     final isIncome = tx.transactionType == 'income';
     final isTransfer = tx.transactionType == 'transfer';
 
@@ -116,14 +121,16 @@ class RecentActivityCard extends StatelessWidget {
         ? const Color(0xFF2E8B57)
         : (isTransfer ? const Color(0xFF1976D2) : const Color(0xFF332B32));
 
-    final String sign = isIncome ? '+' : (isTransfer ? '' : '-');
+    final String sign = isIncome ? '+' : (isTransfer ? '' : '−');
 
-    final dateStr = DateFormat('d MMM • HH:mm', 'th').format(tx.transactionDate);
+    final dateStr = DateFormat('d MMM • HH:mm', locale).format(tx.transactionDate);
 
     // Title label
     final String title = tx.note?.isNotEmpty == true
         ? tx.note!
-        : (isTransfer ? 'โอนเงิน' : (isIncome ? 'รายรับ' : 'รายจ่าย'));
+        : (isTransfer
+            ? (l10n?.transfer ?? 'โอนเงิน')
+            : (isIncome ? (l10n?.income ?? 'รายรับ') : (l10n?.expense ?? 'รายจ่าย')));
 
     final iconColor = isIncome
         ? const Color(0xFF2E8B57)
@@ -197,6 +204,8 @@ class RecentActivityCard extends StatelessWidget {
   }
 
   Widget _buildEmptyState(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
       alignment: Alignment.center,
@@ -216,9 +225,9 @@ class RecentActivityCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
-            'ยังไม่มีรายการในเดือนนี้',
-            style: TextStyle(
+          Text(
+            l10n?.noTransactionsThisMonth ?? 'ยังไม่มีรายการในเดือนนี้',
+            style: const TextStyle(
               fontFamily: VaultTheme.fontFamily,
               fontSize: 14,
               fontWeight: FontWeight.w700,
@@ -226,10 +235,10 @@ class RecentActivityCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'เริ่มจดบันทึกรายรับหรือรายจ่ายรายการแรกเพื่อติดตามการเงินของคุณ',
+          Text(
+            l10n?.noTransactionsDesc ?? 'เริ่มจดบันทึกรายรับหรือรายจ่ายรายการแรกเพื่อติดตามการเงินของคุณ',
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               fontFamily: VaultTheme.fontFamily,
               fontSize: 12,
               color: Color(0xFF87767F),
@@ -239,16 +248,16 @@ class RecentActivityCard extends StatelessWidget {
           FilledButton.icon(
             onPressed: onAddTransaction,
             icon: const Icon(Icons.add, size: 16),
-            label: const Text(
-              'เพิ่มรายการแรก',
-              style: TextStyle(
+            label: Text(
+              l10n?.addFirstTransaction ?? 'เพิ่มรายการแรก',
+              style: const TextStyle(
                 fontFamily: VaultTheme.fontFamily,
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
               ),
             ),
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFFF5B9A),
+              backgroundColor: const Color(0xFFFF5C9D),
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),

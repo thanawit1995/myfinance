@@ -10,7 +10,7 @@ class AppLocalizationsTh extends AppLocalizations {
   AppLocalizationsTh([String locale = 'th']) : super(locale);
 
   @override
-  String get appTitle => 'JP Money';
+  String get appTitle => 'OURS';
 
   @override
   String get home => 'หน้าแรก';
@@ -46,7 +46,7 @@ class AppLocalizationsTh extends AppLocalizations {
   String get quickAddKeypad => 'บันทึกด่วน (3 แตะ)';
 
   @override
-  String get portfolio => 'พอร์ตลงทุน';
+  String get portfolio => 'พอร์ตการลงทุน';
 
   @override
   String get accounts => 'บัญชี';
@@ -70,7 +70,7 @@ class AppLocalizationsTh extends AppLocalizations {
   String get settings => 'ตั้งค่า';
 
   @override
-  String get language => 'ภาษา (Language)';
+  String get language => 'ภาษา';
 
   @override
   String get thai => 'ไทย';
@@ -88,16 +88,16 @@ class AppLocalizationsTh extends AppLocalizations {
   String get themeMode => 'ธีมสีหน้าจอ';
 
   @override
-  String get themeLight => 'สว่าง (Light)';
+  String get themeLight => 'สว่าง';
 
   @override
-  String get themeDark => 'มืด (Dark)';
+  String get themeDark => 'มืด';
 
   @override
-  String get themeSystem => 'ตามระบบ (System)';
+  String get themeSystem => 'ตามระบบ';
 
   @override
-  String get themeStyle => 'สไตล์ธีม (Theme Style)';
+  String get themeStyle => 'สไตล์ดีไซน์';
 
   @override
   String get themeStyleVault => 'VAULT (Quiet Luxury)';
@@ -106,7 +106,7 @@ class AppLocalizationsTh extends AppLocalizations {
   String get themeStyleLumi => 'Lumi (Sunny Bloom พาสเทล)';
 
   @override
-  String get security => 'ความปลอดภัย (Security & PIN)';
+  String get security => 'ความปลอดภัยและรหัส PIN';
 
   @override
   String get pinProtection => 'ระบบล็อก PIN';
@@ -150,45 +150,44 @@ class AppLocalizationsTh extends AppLocalizations {
       'อุปกรณ์นี้ไม่รองรับเซนเซอร์สแกนลายนิ้วมือ';
 
   @override
-  String get backup => 'การสำรองข้อมูล (Local Backup)';
+  String get backup => 'การสำรองข้อมูล';
 
   @override
-  String get personalCloudBackup =>
-      'สำรองและกู้คืนข้อมูล (Personal Cloud & Backup)';
+  String get personalCloudBackup => 'สำรองและกู้คืนข้อมูล';
 
   @override
-  String get backupToJson =>
-      'สำรองข้อมูลลง Google Drive / เครื่อง (JSON Backup)';
+  String get backupToJson => 'สำรองข้อมูล JSON';
 
   @override
   String get backupToJsonSubtitle =>
-      'สร้างไฟล์สำรองข้อมูลส่วนบุคคล นำไปเซฟลง Google Drive, iCloud หรือเครื่องได้ทันที';
+      'สร้างไฟล์สำรองข้อมูลส่วนบุคคล นำไปเซฟลง Google Drive หรือเครื่องได้ทันที';
 
   @override
-  String get restoreFromJson => 'กู้คืนข้อมูลจากไฟล์สำรอง (Restore Backup)';
+  String get restoreFromJson => 'กู้คืนข้อมูลสำรอง';
 
   @override
   String get restoreFromJsonSubtitle =>
-      'เลือกไฟล์สำรองข้อมูล (.json) จาก Google Drive หรือเครื่องเพื่อกู้คืน';
+      'เลือกไฟล์สำรองข้อมูล (.json) เพื่อนำเข้าและกู้คืน';
 
   @override
-  String get exportRawDb => 'ส่งออกไฟล์ฐานข้อมูลดิบ (.db)';
+  String get exportRawDb => 'ส่งออกไฟล์ฐานข้อมูล (.db)';
 
   @override
   String get exportRawDbSubtitle =>
-      'สำรองไฟล์ SQLite เก็บไว้ในเครื่องหรือแชร์ออก (Windows/Android)';
+      'สำรองไฟล์ SQLite เก็บไว้ในเครื่องหรือแชร์ออก';
 
   @override
-  String get exportDatabase => 'ส่งออกสำเนาฐานข้อมูล (Export .db)';
+  String get exportDatabase => 'ส่งออกสำเนาฐานข้อมูล (.db)';
 
   @override
-  String get trashBin => 'ถังขยะกู้คืนข้อมูล (Trash Bin)';
+  String get trashBin => 'ถังขยะกู้คืนข้อมูล';
 
   @override
-  String get trashBinSubtitle => 'ดูบัญชีที่ถูกลบ กู้คืน หรือลบถาวร (30 วัน)';
+  String get trashBinSubtitle =>
+      'ดูรายการหรือบัญชีที่ถูกลบ กู้คืน หรือลบถาวร (30 วัน)';
 
   @override
-  String get recurringTransactions => 'รายการประจำ (Recurring Rules)';
+  String get recurringTransactions => 'รายการประจำอัตโนมัติ';
 
   @override
   String get recurringRulesDesc =>
@@ -219,23 +218,21 @@ class AppLocalizationsTh extends AppLocalizations {
       'ประเมิน 8 ตัวชี้วัด, Run-rate สิ้นเดือน/สิ้นปี และคำแนะนำ';
 
   @override
-  String get liabilitiesInsurance =>
-      'ทะเบียนหนี้สินและกรมธรรม์ประกัน (Debts & Insurance)';
+  String get liabilitiesInsurance => 'ทะเบียนหนี้สินและประกันภัย';
 
   @override
   String get liabilitiesInsuranceDesc =>
       'จัดการภาระหนี้สิน ดอกเบี้ย และความคุ้มครองประกันภัย';
 
   @override
-  String get categoriesManage => 'จัดการหมวดหมู่รายรับ-รายจ่าย (Categories)';
+  String get categoriesManage => 'จัดการหมวดหมู่';
 
   @override
   String get categoriesManageDesc =>
       'สร้างหมวดหมู่ใหม่ กำหนดไอคอน และจัดหมวดหมู่';
 
   @override
-  String get financialReports =>
-      'ระบบรายงานทางการเงิน 7 แบบ (Financial Reports)';
+  String get financialReports => 'รายงานทางการเงิน';
 
   @override
   String get financialReportsDesc =>
@@ -245,14 +242,14 @@ class AppLocalizationsTh extends AppLocalizations {
   String get cloudSyncTitle => 'คลาวด์และนำเข้าข้อมูล';
 
   @override
-  String get importWizard => 'นำเข้าข้อมูลจาก Notion CSV (Import Wizard)';
+  String get importWizard => 'นำเข้าข้อมูล (Notion CSV)';
 
   @override
   String get importWizardSubtitle =>
       'ตัดลิงก์ relation, ตรวจจับรายการซ้ำ, กฎภาษี สธ. พร้อม Rollback 1 คลิก';
 
   @override
-  String get googleDriveSync => 'ซิงค์ข้อมูลผ่าน Google Drive (Cloud Sync)';
+  String get googleDriveSync => 'ซิงค์ข้อมูล Google Drive';
 
   @override
   String get googleDriveSyncSubtitle =>
@@ -283,7 +280,7 @@ class AppLocalizationsTh extends AppLocalizations {
   String get amount => 'จำนวนเงิน';
 
   @override
-  String get note => 'บันทึกช่วยจำ (Note)';
+  String get note => 'บันทึกช่วยจำ';
 
   @override
   String get save => 'บันทึก';
@@ -322,7 +319,7 @@ class AppLocalizationsTh extends AppLocalizations {
   String get viewAll => 'ดูทั้งหมด';
 
   @override
-  String get recentActivity => 'ธุรกรรมล่าสุด';
+  String get recentActivity => 'บันทึกรายการล่าสุด';
 
   @override
   String get holdings => 'สินทรัพย์ที่ถือครอง';
@@ -331,7 +328,7 @@ class AppLocalizationsTh extends AppLocalizations {
   String get realizedPnl => 'กำไรที่รับรู้แล้ว';
 
   @override
-  String get history => 'ประวัติ';
+  String get history => 'ประวัติการซื้อ-ขาย';
 
   @override
   String get projects => 'โครงการ';
@@ -413,6 +410,117 @@ class AppLocalizationsTh extends AppLocalizations {
       'ดาวน์โหลด / ส่งออกไฟล์สำรองข้อมูลสำเร็จ สามารถบันทึกลง Google Drive ของคุณได้เลย';
 
   @override
-  String get appVersionFooter =>
-      'JP Money v1.0.0\nLocal-First Financial System';
+  String get appVersionFooter => 'OURS v1.0.0\nOur money, our journey.';
+
+  @override
+  String get masterBudget => 'MASTER BUDGET';
+
+  @override
+  String get availableToSpendLumi => 'เงินที่ใช้ได้ในเดือนนี้ 🌸';
+
+  @override
+  String get availableToSpendVault => 'เหลือให้ใช้ได้';
+
+  @override
+  String daysRemainingInCycle(int days) {
+    return '$days วันที่เหลือในรอบเดือน';
+  }
+
+  @override
+  String fromBudget(String amount) {
+    return 'จากงบ $amount';
+  }
+
+  @override
+  String ofTotalMonthlyBudget(int percent) {
+    return 'เหลือ $percent% ของงบประมาณรวมทั้งเดือน';
+  }
+
+  @override
+  String get usedSoFar => 'ใช้ไปแล้ว';
+
+  @override
+  String get fromTotalBudget => 'จากงบรวม';
+
+  @override
+  String get spendingProgress => 'ความคืบหน้าการใช้เงิน';
+
+  @override
+  String percentUsed(int percent) {
+    return 'ใช้ไป $percent%';
+  }
+
+  @override
+  String get noBudgetSet => 'ยังไม่ได้ตั้งงบประมาณเดือนนี้';
+
+  @override
+  String get setBudgetAction => 'ตั้งงบประมาณ';
+
+  @override
+  String get financialOverview => 'ภาพรวมสถานะการเงิน';
+
+  @override
+  String get viewMonthlyReport => 'ดูรายงานรายเดือน';
+
+  @override
+  String get netWorthDesc => 'ความมั่งคั่งสุทธิ (สินทรัพย์ - หนี้สิน)';
+
+  @override
+  String get monthIncome => 'รายรับ';
+
+  @override
+  String get monthExpense => 'รายจ่าย';
+
+  @override
+  String get cashFlow => 'กระแสเงินสด';
+
+  @override
+  String get creditCardSummary => 'บัตรเครดิต';
+
+  @override
+  String get creditCardNoDebt => 'ไม่มีหนี้ค้างชำระ ยอดเยี่ยมมาก! 🎉';
+
+  @override
+  String get creditCardPending => 'ยอดรอเรียกเก็บรอบบิลปัจจุบัน';
+
+  @override
+  String get noTransactionsThisMonth => 'ยังไม่มีรายการในเดือนนี้';
+
+  @override
+  String get noTransactionsDesc =>
+      'เริ่มจดบันทึกรายรับหรือรายจ่ายรายการแรกเพื่อติดตามการเงินของคุณ';
+
+  @override
+  String get addFirstTransaction => 'เพิ่มรายการแรก';
+
+  @override
+  String get searchTransactions => 'ค้นหาธุรกรรม';
+
+  @override
+  String get settingsAndSecurity => 'การตั้งค่าและระบบความปลอดภัย';
+
+  @override
+  String savingsRateStatus(int percent) {
+    return 'อัตราการออมเดือนนี้อยู่ที่ $percent%';
+  }
+
+  @override
+  String creditCardDueWarning(String amount) {
+    return 'บัตรเครดิตจะตัดรอบในอีกไม่กี่วัน ยอดรอตัด $amount';
+  }
+
+  @override
+  String get budgetLowWarning =>
+      'งบประมาณเดือนนี้เหลือต่ำกว่า 20% แล้ว โปรดระมัดระวังการใช้จ่าย';
+
+  @override
+  String dailySpendRecommendation(String amount) {
+    return 'ใช้เงินได้เฉลี่ยวันละ $amount จนถึงสิ้นเดือน';
+  }
+
+  @override
+  String get budgetAndProjects => 'งบประมาณและโครงการ';
+
+  @override
+  String get tagline => 'Our money, our journey.';
 }

@@ -76,394 +76,356 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final isThai = widget.currentLocale.languageCode == 'th';
 
     return Scaffold(
       backgroundColor: VaultTheme.background(context),
       appBar: AppBar(
         backgroundColor: VaultTheme.surface(context),
+        elevation: 0,
+        scrolledUnderElevation: 1,
         title: Text(
           (l10n?.more ?? 'MORE').toUpperCase(),
           style: TextStyle(
             fontFamily: VaultTheme.fontFamily,
             fontSize: 18,
             fontWeight: FontWeight.w700,
-            letterSpacing: 2.5,
+            letterSpacing: 2.0,
             color: VaultTheme.primaryText(context),
           ),
         ),
       ),
       body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         children: [
           // 1. Language & Appearance
           _buildSectionHeader(l10n?.languageAndAppearance ?? 'ภาษาและรูปลักษณ์'),
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.language),
-                  title: Text(l10n?.language ?? 'ภาษา (Language)'),
-                  trailing: DropdownButton<Locale>(
-                    value: widget.currentLocale,
-                    underline: const SizedBox.shrink(),
-                    items: [
-                      DropdownMenuItem(value: const Locale('th'), child: Text(l10n?.thai ?? 'ไทย (Thai)')),
-                      DropdownMenuItem(value: const Locale('en'), child: Text(l10n?.english ?? 'English')),
-                    ],
-                    onChanged: (loc) {
-                      if (loc != null) widget.onLocaleChanged(loc);
-                    },
-                  ),
+          _buildSectionCard([
+            _buildDropdownRow<Locale>(
+              icon: Icons.language_rounded,
+              iconColor: Colors.blue,
+              title: l10n?.language ?? 'ภาษา',
+              value: widget.currentLocale,
+              items: [
+                DropdownMenuItem(value: const Locale('th'), child: Text(l10n?.thai ?? 'ไทย')),
+                DropdownMenuItem(value: const Locale('en'), child: Text(l10n?.english ?? 'English')),
+              ],
+              onChanged: (loc) {
+                if (loc != null) widget.onLocaleChanged(loc);
+              },
+            ),
+            _buildDivider(),
+            _buildDropdownRow<AppThemeStyle>(
+              icon: Icons.style_rounded,
+              iconColor: const Color(0xFFFF5C9D),
+              title: l10n?.themeStyle ?? 'สไตล์ดีไซน์',
+              value: widget.currentThemeStyle,
+              items: const [
+                DropdownMenuItem(
+                  value: AppThemeStyle.vault,
+                  child: Text('VAULT'),
                 ),
-                const Divider(height: 1),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    children: [
-                      Icon(Icons.style_outlined, color: Theme.of(context).iconTheme.color),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Text(
-                          l10n?.themeStyle ?? 'สไตล์ดีไซน์ (Design Theme)',
-                          style: Theme.of(context).textTheme.bodyLarge,
-                        ),
-                      ),
-                      DropdownButton<AppThemeStyle>(
-                        value: widget.currentThemeStyle,
-                        underline: const SizedBox.shrink(),
-                        items: [
-                          DropdownMenuItem(
-                            value: AppThemeStyle.vault,
-                            child: Text(widget.currentLocale.languageCode == 'en' ? AppThemeStyle.vault.displayNameEn : AppThemeStyle.vault.displayNameTh),
-                          ),
-                          DropdownMenuItem(
-                            value: AppThemeStyle.lumi,
-                            child: Text(widget.currentLocale.languageCode == 'en' ? AppThemeStyle.lumi.displayNameEn : AppThemeStyle.lumi.displayNameTh),
-                          ),
-                        ],
-                        onChanged: (style) {
-                          if (style != null && widget.onThemeStyleChanged != null) {
-                            widget.onThemeStyleChanged!(style);
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.palette_outlined),
-                  title: Text(l10n?.themeMode ?? 'ธีมสีหน้าจอ'),
-                  trailing: DropdownButton<ThemeMode>(
-                    value: widget.currentThemeMode,
-                    underline: const SizedBox.shrink(),
-                    items: [
-                      DropdownMenuItem(value: ThemeMode.light, child: Text(l10n?.themeLight ?? 'สว่าง (Light)')),
-                      DropdownMenuItem(value: ThemeMode.dark, child: Text(l10n?.themeDark ?? 'มืด (Dark)')),
-                      DropdownMenuItem(value: ThemeMode.system, child: Text(l10n?.themeSystem ?? 'ตามระบบ (System)')),
-                    ],
-                    onChanged: (m) {
-                      if (m != null) widget.onThemeModeChanged(m);
-                    },
-                  ),
+                DropdownMenuItem(
+                  value: AppThemeStyle.lumi,
+                  child: Text('Lumi'),
                 ),
               ],
+              onChanged: (style) {
+                if (style != null && widget.onThemeStyleChanged != null) {
+                  widget.onThemeStyleChanged!(style);
+                }
+              },
             ),
-          ),
-          const SizedBox(height: 16),
+            _buildDivider(),
+            _buildDropdownRow<ThemeMode>(
+              icon: Icons.palette_rounded,
+              iconColor: Colors.purple,
+              title: l10n?.themeMode ?? 'ธีมสีหน้าจอ',
+              value: widget.currentThemeMode,
+              items: [
+                DropdownMenuItem(value: ThemeMode.light, child: Text(l10n?.themeLight ?? 'สว่าง')),
+                DropdownMenuItem(value: ThemeMode.dark, child: Text(l10n?.themeDark ?? 'มืด')),
+                DropdownMenuItem(value: ThemeMode.system, child: Text(l10n?.themeSystem ?? 'ตามระบบ')),
+              ],
+              onChanged: (m) {
+                if (m != null) widget.onThemeModeChanged(m);
+              },
+            ),
+          ]),
+
+          const SizedBox(height: 18),
 
           // 2. Security (PIN & Biometric)
-          _buildSectionHeader(l10n?.security ?? 'ความปลอดภัย (Security & PIN)'),
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            child: Column(
-              children: [
-                SwitchListTile(
-                  secondary: Icon(
-                    Icons.lock_outline,
-                    color: _isPinLockEnabled ? VaultTheme.accent(context) : null,
-                  ),
-                  title: Text(l10n?.pinLockToggle ?? 'ล็อกแอปด้วยรหัส PIN'),
-                  subtitle: Text(
-                    _isPinLockEnabled
-                        ? (l10n?.pinLockSubtitle ?? 'เปิดใช้งานการล็อกแอป')
-                        : (l10n?.pinDisabled ?? 'ปิดใช้งาน (เข้าแอปได้ทันทีโดยไม่ต้องใส่รหัส)'),
-                  ),
-                  value: _isPinLockEnabled,
-                  onChanged: (val) async {
-                    final auth = ref.read(authServiceProvider);
-                    if (val) {
-                      if (!_isPinConfigured) {
-                        await _showSetupPinDialog();
-                      } else {
-                        await auth.setPinLockEnabled(true);
-                        setState(() => _isPinLockEnabled = true);
-                      }
-                    } else {
-                      // Confirm with PIN or Biometrics before turning OFF
-                      final messenger = ScaffoldMessenger.of(context);
-                      final unlocked = await PinLockDialog.show(context);
-                      if (!mounted) return;
-                      if (unlocked) {
-                        await auth.setPinLockEnabled(false);
-                        if (!mounted) return;
-                        setState(() => _isPinLockEnabled = false);
-                        messenger.showSnackBar(
-                          SnackBar(content: Text(l10n?.pinDisabled ?? 'ปิดใช้งานระบบล็อก PIN แล้ว')),
-                        );
-                      }
-                    }
-                  },
+          _buildSectionHeader(l10n?.security ?? 'ความปลอดภัยและรหัส PIN'),
+          _buildSectionCard([
+            _buildSwitchRow(
+              icon: Icons.lock_outline_rounded,
+              iconColor: Colors.indigo,
+              title: l10n?.pinLockToggle ?? 'ล็อกแอปด้วยรหัส PIN',
+              subtitle: _isPinLockEnabled
+                  ? (l10n?.pinLockSubtitle ?? 'เปิดใช้งานการล็อกแอป')
+                  : (l10n?.pinDisabled ?? 'ปิดใช้งาน'),
+              value: _isPinLockEnabled,
+              onChanged: (val) async {
+                final auth = ref.read(authServiceProvider);
+                if (val) {
+                  if (!_isPinConfigured) {
+                    await _showSetupPinDialog();
+                  } else {
+                    await auth.setPinLockEnabled(true);
+                    setState(() => _isPinLockEnabled = true);
+                  }
+                } else {
+                  final messenger = ScaffoldMessenger.of(context);
+                  final unlocked = await PinLockDialog.show(context);
+                  if (!mounted) return;
+                  if (unlocked) {
+                    await auth.setPinLockEnabled(false);
+                    if (!mounted) return;
+                    setState(() => _isPinLockEnabled = false);
+                    messenger.showSnackBar(
+                      SnackBar(content: Text(l10n?.pinDisabled ?? 'ปิดใช้งานระบบล็อก PIN แล้ว')),
+                    );
+                  }
+                }
+              },
+            ),
+            if (_isPinLockEnabled) ...[
+              _buildDivider(),
+              _buildTile(
+                icon: Icons.pin_rounded,
+                iconColor: Colors.teal,
+                title: l10n?.pinCode ?? 'รหัสผ่าน PIN 6 หลัก',
+                subtitle: _isPinConfigured
+                    ? (l10n?.pinConfigured ?? 'ตั้งรหัส PIN เรียบร้อยแล้ว')
+                    : (l10n?.pinNotConfigured ?? 'ยังไม่ได้ตั้งรหัส PIN'),
+                trailing: TextButton(
+                  onPressed: _showSetupPinDialog,
+                  child: Text(_isPinConfigured ? (l10n?.changePin ?? 'เปลี่ยน') : (l10n?.setupPin ?? 'ตั้งค่า')),
                 ),
-                if (_isPinLockEnabled) ...[
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.pin),
-                    title: Text(l10n?.pinCode ?? 'รหัสผ่าน PIN 6 หลัก'),
-                    subtitle: Text(_isPinConfigured ? (l10n?.pinConfigured ?? 'ตั้งรหัส PIN เรียบร้อยแล้ว') : (l10n?.pinNotConfigured ?? 'ยังไม่ได้ตั้งรหัส PIN')),
-                    trailing: TextButton(
-                      onPressed: _showSetupPinDialog,
-                      child: Text(_isPinConfigured ? (l10n?.changePin ?? 'เปลี่ยน PIN') : (l10n?.setupPin ?? 'ตั้งค่า PIN')),
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  SwitchListTile(
-                    secondary: const Icon(Icons.fingerprint),
-                    title: Text(l10n?.biometrics ?? 'สแกนลายนิ้วมือ / ใบหน้า'),
-                    subtitle: Text(
-                      _isBiometricSupported
-                          ? (l10n?.biometricsSubtitle ?? 'ใช้ลายนิ้วมือปลดล็อกควบคู่กับ PIN')
-                          : (l10n?.biometricsNotSupported ?? 'อุปกรณ์นี้ไม่รองรับเซนเซอร์สแกนลายนิ้วมือ'),
-                    ),
-                    value: _isBiometricSupported && _isBiometricEnabled,
-                    onChanged: _isBiometricSupported
-                        ? (val) async {
-                            await ref.read(authServiceProvider).setBiometricsEnabled(val);
-                            setState(() => _isBiometricEnabled = val);
-                          }
-                        : null,
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.timer_outlined),
-                    title: Text(l10n?.sessionTimeout ?? 'ระยะเวลาจำสถานะปลดล็อก'),
-                    subtitle: Text('$_sessionTimeoutMinutes ${widget.currentLocale.languageCode == 'en' ? 'min' : 'นาที'}'),
-                    trailing: DropdownButton<int>(
-                      value: _sessionTimeoutMinutes,
-                      underline: const SizedBox.shrink(),
-                      items: [
-                        DropdownMenuItem(value: 5, child: Text('5 ${widget.currentLocale.languageCode == 'en' ? 'min' : 'นาที'}')),
-                        DropdownMenuItem(value: 15, child: Text('15 ${widget.currentLocale.languageCode == 'en' ? 'min' : 'นาที'}')),
-                        DropdownMenuItem(value: 30, child: Text('30 ${widget.currentLocale.languageCode == 'en' ? 'min' : 'นาที'}')),
-                        DropdownMenuItem(value: 60, child: Text('60 ${widget.currentLocale.languageCode == 'en' ? 'min' : 'นาที'}')),
-                      ],
-                      onChanged: (val) async {
-                        if (val != null) {
-                          await ref.read(authServiceProvider).setSessionTimeoutMinutes(val);
-                          setState(() => _sessionTimeoutMinutes = val);
-                        }
-                      },
-                    ),
-                  ),
+              ),
+              _buildDivider(),
+              _buildSwitchRow(
+                icon: Icons.fingerprint_rounded,
+                iconColor: Colors.amber.shade800,
+                title: l10n?.biometrics ?? 'สแกนลายนิ้วมือ / ใบหน้า',
+                subtitle: _isBiometricSupported
+                    ? (l10n?.biometricsSubtitle ?? 'ใช้ลายนิ้วมือปลดล็อกควบคู่กับ PIN')
+                    : (l10n?.biometricsNotSupported ?? 'อุปกรณ์นี้ไม่รองรับเซนเซอร์สแกนลายนิ้วมือ'),
+                value: _isBiometricSupported && _isBiometricEnabled,
+                onChanged: _isBiometricSupported
+                    ? (val) async {
+                        await ref.read(authServiceProvider).setBiometricsEnabled(val);
+                        setState(() => _isBiometricEnabled = val);
+                      }
+                    : null,
+              ),
+              _buildDivider(),
+              _buildDropdownRow<int>(
+                icon: Icons.timer_outlined,
+                iconColor: Colors.deepPurple,
+                title: l10n?.sessionTimeout ?? 'ระยะเวลาจำสถานะปลดล็อก',
+                value: _sessionTimeoutMinutes,
+                items: [
+                  DropdownMenuItem(value: 5, child: Text('5 ${isThai ? 'นาที' : 'min'}')),
+                  DropdownMenuItem(value: 15, child: Text('15 ${isThai ? 'นาที' : 'min'}')),
+                  DropdownMenuItem(value: 30, child: Text('30 ${isThai ? 'นาที' : 'min'}')),
+                  DropdownMenuItem(value: 60, child: Text('60 ${isThai ? 'นาที' : 'min'}')),
                 ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
+                onChanged: (val) async {
+                  if (val != null) {
+                    await ref.read(authServiceProvider).setSessionTimeoutMinutes(val);
+                    setState(() => _sessionTimeoutMinutes = val);
+                  }
+                },
+              ),
+            ],
+          ]),
 
-          // 3. Financial Planning & Automation (Phase 3)
+          const SizedBox(height: 18),
+
+          // 3. Financial Planning & Tools
           _buildSectionHeader(l10n?.financialPlanning ?? 'การวางแผนการเงินและระบบอัตโนมัติ'),
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.health_and_safety_outlined, color: Colors.teal),
-                  title: Text(l10n?.financialHealth ?? 'สุขภาพการเงินและพยากรณ์เงิน (Financial Health)'),
-                  subtitle: Text(l10n?.financialHealthDesc ?? 'ประเมิน 8 ตัวชี้วัด, Run-rate สิ้นเดือน/สิ้นปี และคำแนะนำ'),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const FinancialHealthScreen()),
-                    );
-                  },
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.credit_card_off_outlined, color: Colors.deepOrange),
-                  title: Text(l10n?.liabilitiesInsurance ?? 'ทะเบียนหนี้สินและกรมธรรม์ประกัน (Debts & Insurance)'),
-                  subtitle: Text(l10n?.liabilitiesInsuranceDesc ?? 'จัดการภาระหนี้สิน ดอกเบี้ย และความคุ้มครองประกันภัย'),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const LiabilitiesInsuranceScreen()),
-                    );
-                  },
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.repeat, color: Colors.blue),
-                  title: Text(l10n?.recurringTransactions ?? 'รายการธุรกรรมอัตโนมัติ (Recurring Transactions)'),
-                  subtitle: Text(l10n?.recurringRulesDesc ?? 'ตั้งกฎสร้างรายการประจำอัตโนมัติ และดูพยากรณ์เงิน 30 วัน'),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const RecurringRulesScreen()),
-                    );
-                  },
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.category_outlined, color: Colors.purple),
-                  title: Text(l10n?.categoriesManage ?? 'จัดการหมวดหมู่รายรับ-รายจ่าย (Categories)'),
-                  subtitle: Text(l10n?.categoriesManageDesc ?? 'สร้างหมวดหมู่ใหม่ กำหนดไอคอน และจัดหมวดหมู่'),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const CategoriesScreen()),
-                    );
-                  },
-                ),
-              ],
+          _buildSectionCard([
+            _buildTile(
+              icon: Icons.health_and_safety_rounded,
+              iconColor: Colors.teal,
+              title: l10n?.financialHealth ?? 'สุขภาพการเงินและพยากรณ์เงิน',
+              subtitle: l10n?.financialHealthDesc ?? 'ประเมิน 8 ตัวชี้วัด, Run-rate สิ้นเดือน และคำแนะนำ',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const FinancialHealthScreen()),
+                );
+              },
             ),
-          ),
-          const SizedBox(height: 16),
+            _buildDivider(),
+            _buildTile(
+              icon: Icons.credit_card_off_rounded,
+              iconColor: Colors.deepOrange,
+              title: l10n?.liabilitiesInsurance ?? 'ทะเบียนหนี้สินและประกันภัย',
+              subtitle: l10n?.liabilitiesInsuranceDesc ?? 'จัดการภาระหนี้สิน ดอกเบี้ย และความคุ้มครองประกันภัย',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const LiabilitiesInsuranceScreen()),
+                );
+              },
+            ),
+            _buildDivider(),
+            _buildTile(
+              icon: Icons.repeat_rounded,
+              iconColor: Colors.blue,
+              title: l10n?.recurringTransactions ?? 'รายการประจำอัตโนมัติ',
+              subtitle: l10n?.recurringRulesDesc ?? 'ตั้งกฎสร้างรายการประจำ และดูพยากรณ์เงิน 30 วัน',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const RecurringRulesScreen()),
+                );
+              },
+            ),
+            _buildDivider(),
+            _buildTile(
+              icon: Icons.category_rounded,
+              iconColor: Colors.purple,
+              title: l10n?.categoriesManage ?? 'จัดการหมวดหมู่',
+              subtitle: l10n?.categoriesManageDesc ?? 'สร้างหมวดหมู่ใหม่ กำหนดไอคอน และจัดหมวดหมู่',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const CategoriesScreen()),
+                );
+              },
+            ),
+          ]),
 
-          // 4. Tax & Financial Reports (Phase 4)
+          const SizedBox(height: 18),
+
+          // 4. Tax & Financial Reports
           _buildSectionHeader(l10n?.taxAndRemittance ?? 'ภาษีและการเงินต่างประเทศ'),
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.calculate_outlined, color: Colors.indigo),
-                  title: Text(l10n?.taxPlanning ?? 'วางแผนและคำนวณภาษี (ภ.ง.ด. 90/91)'),
-                  subtitle: Text(l10n?.taxPlanningDesc ?? 'คำนวณภาษีขั้นบันได, หักค่าใช้จ่าย, ลดหย่อน, เปรียบเทียบปันผล'),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const TaxScreen()),
-                    );
-                  },
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.flight_takeoff, color: Colors.teal),
-                  title: Text(l10n?.foreignRemittance ?? 'ติดตามเงินได้ต่างประเทศ (Foreign Remittance)'),
-                  subtitle: Text(l10n?.foreignRemittanceDesc ?? 'เกณฑ์ 180 วัน, ป.161/2566, ป.162/2566 เงินต้น/กำไร'),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const ForeignRemittanceScreen()),
-                    );
-                  },
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.assessment_outlined, color: Colors.blueAccent),
-                  title: Text(l10n?.financialReports ?? 'ระบบรายงานทางการเงิน 7 แบบ (Financial Reports)'),
-                  subtitle: Text(l10n?.financialReportsDesc ?? 'สรุปรายเดือน/ปี, งบกระแสเงินสด, งบดุล, พอร์ต, ส่งออก Excel & PDF'),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const ReportsScreen()),
-                    );
-                  },
-                ),
-              ],
+          _buildSectionCard([
+            _buildTile(
+              icon: Icons.calculate_rounded,
+              iconColor: Colors.indigo,
+              title: l10n?.taxPlanning ?? 'วางแผนภาษี (ภ.ง.ด. 90/91)',
+              subtitle: l10n?.taxPlanningDesc ?? 'คำนวณภาษีขั้นบันได, หักค่าใช้จ่าย, ลดหย่อน, เปรียบเทียบปันผล',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const TaxScreen()),
+                );
+              },
             ),
-          ),
-          const SizedBox(height: 16),
+            _buildDivider(),
+            _buildTile(
+              icon: Icons.flight_takeoff_rounded,
+              iconColor: Colors.teal,
+              title: l10n?.foreignRemittance ?? 'ติดตามเงินได้ต่างประเทศ',
+              subtitle: l10n?.foreignRemittanceDesc ?? 'เกณฑ์ 180 วัน, ป.161/2566, ป.162/2566 เงินต้น/กำไร',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ForeignRemittanceScreen()),
+                );
+              },
+            ),
+            _buildDivider(),
+            _buildTile(
+              icon: Icons.assessment_rounded,
+              iconColor: Colors.blueAccent,
+              title: l10n?.financialReports ?? 'รายงานทางการเงิน',
+              subtitle: l10n?.financialReportsDesc ?? 'สรุปรายเดือน/ปี, งบกระแสเงินสด, งบดุล, ส่งออก Excel & PDF',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ReportsScreen()),
+                );
+              },
+            ),
+          ]),
 
-          // 5. Cloud Sync & Import (Phase 5)
-          _buildSectionHeader(l10n?.cloudSyncTitle ?? 'คลาวด์และนำเข้าข้อมูล (Cloud Sync & Import)'),
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.table_view_outlined, color: Colors.teal),
-                  title: Text(l10n?.importWizard ?? 'นำเข้าข้อมูลจาก Notion CSV (Import Wizard)'),
-                  subtitle: Text(l10n?.importWizardSubtitle ?? 'ตัดลิงก์ relation, ตรวจจับรายการซ้ำ, กฎภาษี สธ. พร้อม Rollback 1 คลิก'),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const ImportWizardScreen()),
-                    );
-                  },
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.cloud_sync_outlined, color: Colors.teal),
-                  title: Text(l10n?.googleDriveSync ?? 'ซิงค์ข้อมูลผ่าน Google Drive (Cloud Sync)'),
-                  subtitle: Text(l10n?.googleDriveSyncSubtitle ?? 'สำรองและซิงค์ข้อมูลผ่าน Google Drive ส่วนตัวของคุณ ปลอดภัย 100%'),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const CloudSyncScreen()),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
 
-          // 6. Backup & Restore (Personal Cloud & Hybrid Backup)
-          _buildSectionHeader(l10n?.personalCloudBackup ?? 'สำรองและกู้คืนข้อมูล (Personal Cloud & Backup)'),
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.cloud_upload_outlined, color: Colors.blue),
-                  title: Text(l10n?.backupToJson ?? 'สำรองข้อมูลลง Google Drive / เครื่อง (JSON Backup)'),
-                  subtitle: Text(l10n?.backupToJsonSubtitle ?? 'สร้างไฟล์สำรองข้อมูลส่วนบุคคล นำไปเซฟลง Google Drive, iCloud หรือเครื่องได้ทันที'),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: _handleExportHybridBackup,
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.cloud_download_outlined, color: Colors.teal),
-                  title: Text(l10n?.restoreFromJson ?? 'กู้คืนข้อมูลจากไฟล์สำรอง (Restore Backup)'),
-                  subtitle: Text(l10n?.restoreFromJsonSubtitle ?? 'เลือกไฟล์สำรองข้อมูล (.json) จาก Google Drive หรือเครื่องเพื่อกู้คืน'),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: _handleRestoreHybridBackup,
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.upload_file_outlined),
-                  title: Text(l10n?.exportRawDb ?? 'ส่งออกไฟล์ฐานข้อมูลดิบ (.db)'),
-                  subtitle: Text(l10n?.exportRawDbSubtitle ?? 'สำรองไฟล์ SQLite เก็บไว้ในเครื่องหรือแชร์ออก (Windows/Android)'),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () => BackupService.exportDatabase(context),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.delete_outline, color: Colors.orange),
-                  title: Text(l10n?.trashBin ?? 'ถังขยะ (กู้คืนข้อมูล 30 วัน)'),
-                  subtitle: Text(l10n?.trashBinSubtitle ?? 'ดูบัญชีที่ถูกลบ กู้คืน หรือลบถาวร'),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const TrashBinScreen()),
-                    );
-                  },
-                ),
-              ],
+          // 5. Cloud Sync & Import
+          _buildSectionHeader(l10n?.cloudSyncTitle ?? 'คลาวด์และนำเข้าข้อมูล'),
+          _buildSectionCard([
+            _buildTile(
+              icon: Icons.table_view_rounded,
+              iconColor: Colors.teal,
+              title: l10n?.importWizard ?? 'นำเข้าข้อมูล (Notion CSV)',
+              subtitle: l10n?.importWizardSubtitle ?? 'ตัดลิงก์ relation, ตรวจจับรายการซ้ำ, พร้อม Rollback 1 คลิก',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ImportWizardScreen()),
+                );
+              },
             ),
-          ),
-          const SizedBox(height: 32),
+            _buildDivider(),
+            _buildTile(
+              icon: Icons.cloud_sync_rounded,
+              iconColor: Colors.blue,
+              title: l10n?.googleDriveSync ?? 'ซิงค์ข้อมูล Google Drive',
+              subtitle: l10n?.googleDriveSyncSubtitle ?? 'สำรองและซิงค์ข้อมูลผ่าน Google Drive ส่วนตัวของคุณ ปลอดภัย 100%',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const CloudSyncScreen()),
+                );
+              },
+            ),
+          ]),
+
+          const SizedBox(height: 18),
+
+          // 6. Backup & Restore
+          _buildSectionHeader(l10n?.personalCloudBackup ?? 'สำรองและกู้คืนข้อมูล'),
+          _buildSectionCard([
+            _buildTile(
+              icon: Icons.cloud_upload_rounded,
+              iconColor: Colors.blue,
+              title: l10n?.backupToJson ?? 'สำรองข้อมูล JSON',
+              subtitle: l10n?.backupToJsonSubtitle ?? 'สร้างไฟล์สำรองข้อมูลส่วนบุคคล นำไปเซฟลง Google Drive หรือเครื่อง',
+              onTap: _handleExportHybridBackup,
+            ),
+            _buildDivider(),
+            _buildTile(
+              icon: Icons.cloud_download_rounded,
+              iconColor: Colors.teal,
+              title: l10n?.restoreFromJson ?? 'กู้คืนข้อมูลสำรอง',
+              subtitle: l10n?.restoreFromJsonSubtitle ?? 'เลือกไฟล์สำรองข้อมูล (.json) เพื่อนำเข้าและกู้คืน',
+              onTap: _handleRestoreHybridBackup,
+            ),
+            _buildDivider(),
+            _buildTile(
+              icon: Icons.storage_rounded,
+              iconColor: Colors.blueGrey,
+              title: l10n?.exportRawDb ?? 'ส่งออกไฟล์ฐานข้อมูล (.db)',
+              subtitle: l10n?.exportRawDbSubtitle ?? 'สำรองไฟล์ SQLite เก็บไว้ในเครื่องหรือแชร์ออก',
+              onTap: () => BackupService.exportDatabase(context),
+            ),
+            _buildDivider(),
+            _buildTile(
+              icon: Icons.delete_outline_rounded,
+              iconColor: Colors.orange,
+              title: l10n?.trashBin ?? 'ถังขยะกู้คืนข้อมูล',
+              subtitle: l10n?.trashBinSubtitle ?? 'ดูรายการหรือบัญชีที่ถูกลบ กู้คืน หรือลบถาวร (30 วัน)',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const TrashBinScreen()),
+                );
+              },
+            ),
+          ]),
+
+          const SizedBox(height: 28),
 
           // App version info
           Center(
             child: Text(
-              l10n?.appVersionFooter ?? 'JP Money v1.0.0\nLocal-First Financial System',
-              style: TextStyle(fontSize: 12, color: VaultTheme.secondaryText(context)),
+              l10n?.appVersionFooter ?? 'OURS v1.0.0\nOur money, our journey.',
+              style: TextStyle(
+                fontFamily: VaultTheme.fontFamily,
+                fontSize: 12,
+                height: 1.5,
+                color: VaultTheme.secondaryText(context),
+              ),
               textAlign: TextAlign.center,
             ),
           ),
+          const SizedBox(height: 20),
         ],
       ),
     );
@@ -471,13 +433,219 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+      padding: const EdgeInsets.only(left: 6, bottom: 8, top: 4),
       child: Text(
         title,
         style: TextStyle(
-          fontWeight: FontWeight.bold,
+          fontFamily: VaultTheme.fontFamily,
+          fontWeight: FontWeight.w700,
           fontSize: 13,
+          letterSpacing: 0.3,
           color: VaultTheme.secondaryText(context),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionCard(List<Widget> children) {
+    return Container(
+      decoration: BoxDecoration(
+        color: VaultTheme.surface(context),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: VaultTheme.border(context), width: 0.8),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children,
+      ),
+    );
+  }
+
+  Widget _buildIconBadge(IconData icon, Color color) {
+    return Container(
+      width: 36,
+      height: 36,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Icon(icon, size: 20, color: color),
+    );
+  }
+
+  Widget _buildDivider() {
+    return Divider(
+      height: 1,
+      thickness: 0.6,
+      indent: 66,
+      endIndent: 16,
+      color: VaultTheme.border(context),
+    );
+  }
+
+  Widget _buildDropdownRow<T>({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required T value,
+    required List<DropdownMenuItem<T>> items,
+    required ValueChanged<T?> onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          _buildIconBadge(icon, iconColor),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontFamily: VaultTheme.fontFamily,
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                color: VaultTheme.primaryText(context),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+            decoration: BoxDecoration(
+              color: VaultTheme.background(context),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: VaultTheme.border(context), width: 0.6),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<T>(
+                value: value,
+                isDense: true,
+                style: TextStyle(
+                  fontFamily: VaultTheme.fontFamily,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: VaultTheme.primaryText(context),
+                ),
+                items: items,
+                onChanged: onChanged,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSwitchRow({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    String? subtitle,
+    required bool value,
+    required ValueChanged<bool>? onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          _buildIconBadge(icon, iconColor),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontFamily: VaultTheme.fontFamily,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: VaultTheme.primaryText(context),
+                  ),
+                ),
+                if (subtitle != null && subtitle.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: 12,
+                      color: VaultTheme.secondaryText(context),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Switch(
+            value: value,
+            activeThumbColor: VaultTheme.accent(context),
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTile({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    String? subtitle,
+    Widget? trailing,
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            _buildIconBadge(icon, iconColor),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      color: VaultTheme.primaryText(context),
+                    ),
+                  ),
+                  if (subtitle != null && subtitle.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontFamily: VaultTheme.fontFamily,
+                        fontSize: 12,
+                        color: VaultTheme.secondaryText(context),
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            trailing ?? Icon(
+              Icons.chevron_right_rounded,
+              size: 20,
+              color: VaultTheme.mutedText(context),
+            ),
+          ],
         ),
       ),
     );
@@ -574,4 +742,3 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 }
-

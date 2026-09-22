@@ -18,6 +18,7 @@ import '../../remittance/presentation/foreign_remittance_screen.dart';
 import '../../../core/theme/app_theme_style.dart';
 import '../../reports/presentation/reports_screen.dart';
 import '../../sync/presentation/cloud_sync_screen.dart';
+import '../../import/presentation/import_wizard_screen.dart';
 import 'trash_bin_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -399,6 +400,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   MaterialPageRoute(builder: (_) => const CloudSyncScreen()),
                 );
                 await _loadGoogleDriveStatus();
+              },
+            ),
+            _buildDivider(),
+            _buildTile(
+              icon: Icons.upload_file_rounded,
+              iconColor: const Color(0xFF2E7D32),
+              title: isThai ? 'นำเข้าข้อมูลจาก Notion CSV' : 'Import from Notion CSV',
+              subtitle: isThai
+                  ? 'นำเข้าไฟล์รายจ่าย, รายรับการแพทย์ และหุ้นสหรัฐฯ พร้อมตัด Relation ลิงก์'
+                  : 'Import expenses, healthcare incomes, and US stocks from Notion export',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ImportWizardScreen()),
+                );
               },
             ),
             _buildDivider(),

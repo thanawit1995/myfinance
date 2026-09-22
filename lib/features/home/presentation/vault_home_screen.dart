@@ -276,19 +276,6 @@ class VaultHomeScreen extends ConsumerWidget {
           children: [
             IconButton(
               icon: Icon(
-                Icons.assessment_outlined,
-                size: 22,
-                color: VaultTheme.secondaryText(context),
-              ),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const MonthlySummaryScreen()),
-                );
-              },
-              tooltip: isThai ? 'รายงานสรุปรายเดือน' : (l10n?.viewMonthlyReport ?? 'Monthly Report'),
-            ),
-            IconButton(
-              icon: Icon(
                 Icons.search_rounded,
                 size: 22,
                 color: VaultTheme.secondaryText(context),

@@ -25,7 +25,6 @@ class GoogleAuthService {
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: [
       'email',
-      'https://www.googleapis.com/auth/drive.file',
     ],
   );
 

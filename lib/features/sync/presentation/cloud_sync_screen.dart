@@ -1,10 +1,8 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:path/path.dart' as p;
 import '../../../core/services/cloud_sync_provider.dart';
 import '../../../core/services/google_auth_service.dart';
 import '../../../core/services/google_drive_sync_service.dart';
@@ -57,58 +55,12 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
     return rawPath;
   }
 
-  Future<String?> _promptGmailInput(BuildContext context) async {
-    final isThai = Localizations.localeOf(context).languageCode == 'th';
-    final emailController = TextEditingController();
-    return showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(isThai ? 'เข้าสู่ระบบ Gmail สำหรับ Google Drive' : 'Gmail Login for Google Drive'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(isThai
-                ? 'กรุณากรอกอีเมล Gmail ของคุณเพื่อใช้สำรองข้อมูลไปยัง Google Drive:'
-                : 'Enter your Gmail address to back up data to Google Drive:'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: emailController,
-              keyboardType: TextInputType.emailAddress,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'Gmail / Google Account',
-                prefixIcon: Icon(Icons.email_outlined),
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(isThai ? 'ยกเลิก' : 'Cancel')),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, emailController.text.trim()),
-            child: Text(isThai ? 'บันทึก' : 'Save'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _handleSignIn() async {
     final isThai = Localizations.localeOf(context).languageCode == 'th';
     final authService = ref.read(googleAuthServiceProvider);
     final syncService = ref.read(googleDriveSyncServiceProvider);
     try {
-      GoogleAuthUser? user;
-      if (authService.isSupportedPlatform) {
-        try {
-          user = await authService.signIn();
-        } catch (e) {
-          debugPrint('Native Google sign-in fallback: $e');
-        }
-      }
-
+      final user = await authService.signIn();
       if (user != null) {
         await syncService.detectOrGetDriveFolder();
         await _loadData();
@@ -120,29 +72,20 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
             ),
           );
         }
-      } else {
-        if (!mounted) return;
-        final entered = await _promptGmailInput(context);
-        if (entered != null && entered.isNotEmpty) {
-          await authService.saveManualEmail(entered);
-          await syncService.detectOrGetDriveFolder();
-          await _loadData();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(isThai ? 'เชื่อมต่อบัญชี $entered เรียบร้อยแล้ว' : 'Connected account $entered'),
-                backgroundColor: VaultTheme.positive(context),
-              ),
-            );
-          }
-        }
       }
     } catch (e) {
       if (mounted) {
+        final errText = e.toString();
+        final msg = errText.contains('10') || errText.contains('sign_in_failed')
+            ? (isThai
+                ? 'บริการ Google Play ปฏิเสธการเข้าสู่ระบบ (ต้องใช้ SHA-1 ในระบบ Google) คุณยังสามารถกดเลือกโฟลเดอร์ Google Drive บนเครื่องเพื่อซิงค์ข้อมูลได้ตามปกติ'
+                : 'Google Sign-In rejected (OAuth config required). You can still select your Google Drive folder directly below.')
+            : (isThai ? 'เข้าสู่ระบบไม่สำเร็จ: $errText' : 'Sign in failed: $errText');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isThai ? 'เกิดข้อผิดพลาด: $e' : 'Error: $e'),
+            content: Text(msg),
             backgroundColor: VaultTheme.negative(context),
+            duration: const Duration(seconds: 5),
           ),
         );
       }
@@ -181,76 +124,11 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
 
   Future<void> _pickDriveFolder() async {
     final isThai = Localizations.localeOf(context).languageCode == 'th';
-
-    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
-      final currentFolder = _status?.driveFolderPath != null
-          ? _status!.driveFolderPath!.split(Platform.pathSeparator).last
-          : 'MyFinance_Backup';
-      final folderController = TextEditingController(text: currentFolder.isEmpty ? 'MyFinance_Backup' : currentFolder);
-
-      final newFolder = await showDialog<String>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(isThai ? 'เลือกโฟลเดอร์ Google Drive' : 'Select Google Drive Folder'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                isThai
-                    ? 'ระบุชื่อโฟลเดอร์บน Google Drive ที่ต้องการใช้จัดเก็บไฟล์สำรอง:'
-                    : 'Enter the Google Drive folder name for storing backups:',
-                style: const TextStyle(fontSize: 13),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: folderController,
-                autofocus: true,
-                decoration: InputDecoration(
-                  labelText: isThai ? 'ชื่อโฟลเดอร์บน Drive' : 'Drive Folder Name',
-                  hintText: 'MyFinance_Backup',
-                  prefixIcon: const Icon(Icons.folder_outlined),
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, folderController.text.trim()),
-              child: Text(isThai ? 'บันทึก' : 'Save'),
-            ),
-          ],
-        ),
-      );
-
-      if (newFolder != null && newFolder.isNotEmpty) {
-        final syncService = ref.read(googleDriveSyncServiceProvider);
-        final docDir = await syncService.getDocumentsDirectory();
-        final targetDir = Directory(p.join(docDir.path, newFolder));
-        await syncService.setDriveFolder(targetDir.path);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(isThai ? 'ตั้งค่าโฟลเดอร์ Google Drive: /$newFolder สำเร็จ' : 'Set Google Drive folder to /$newFolder'),
-              backgroundColor: VaultTheme.positive(context),
-            ),
-          );
-        }
-        await _loadData();
-      }
-      return;
-    }
-
     try {
       final selectedDirectory = await FilePicker.platform.getDirectoryPath(
         dialogTitle: isThai
-            ? 'เลือกโฟลเดอร์ Google Drive (เช่น G:\\My Drive หรือโฟลเดอร์ที่คุณต้องการซิงค์)'
-            : 'Select Google Drive folder (e.g. G:\\My Drive\\VAULT)',
+            ? 'เลือกโฟลเดอร์ Google Drive สำหรับจัดเก็บไฟล์สำรอง'
+            : 'Select Google Drive folder for backup',
       );
 
       if (selectedDirectory != null && selectedDirectory.isNotEmpty) {
@@ -270,7 +148,7 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isThai ? 'ไม่สามารถเลือกโฟลเดอร์ได้: $e' : 'Could not select folder: $e'),
+            content: Text(isThai ? 'ไม่สามารถเปิดตัวเลือกโฟลเดอร์ได้: $e' : 'Could not open folder picker: $e'),
             backgroundColor: VaultTheme.negative(context),
           ),
         );

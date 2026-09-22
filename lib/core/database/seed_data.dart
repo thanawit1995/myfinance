@@ -269,6 +269,29 @@ class SeedData {
         updatedAt: now,
       ),
 
+      CategoriesCompanion.insert(
+        id: 'cat-exp-0000-4000-8000-000000000011',
+        nameTh: 'ของขวัญ / ของฝาก',
+        nameEn: 'Gifts',
+        categoryType: 'expense',
+        icon: const Value('card_giftcard'),
+        color: const Value('0xFFEC407A'),
+        isSystem: const Value(true),
+        createdAt: now,
+        updatedAt: now,
+      ),
+      CategoriesCompanion.insert(
+        id: 'cat-exp-0000-4000-8000-000000000012',
+        nameTh: 'ยูซุ',
+        nameEn: 'Yuzu',
+        categoryType: 'expense',
+        icon: const Value('pets'),
+        color: const Value('0xFFFF7043'),
+        isSystem: const Value(true),
+        createdAt: now,
+        updatedAt: now,
+      ),
+
       // Transfer
       CategoriesCompanion.insert(
         id: 'cat-trf-0000-4000-8000-000000000001',

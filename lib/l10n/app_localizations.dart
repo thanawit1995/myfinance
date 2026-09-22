@@ -1195,6 +1195,36 @@ abstract class AppLocalizations {
   /// In th, this message translates to:
   /// **'Our money, our journey.'**
   String get tagline;
+
+  /// No description provided for @importNotionInvestStocks.
+  ///
+  /// In th, this message translates to:
+  /// **'Notion ซื้อหุ้น US'**
+  String get importNotionInvestStocks;
+
+  /// No description provided for @importNotionInvestStocksSubtitle.
+  ///
+  /// In th, this message translates to:
+  /// **'Invest-Stocks (O, JEPQ, NVDA…)'**
+  String get importNotionInvestStocksSubtitle;
+
+  /// No description provided for @importInvestSuccessTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'นำเข้าหุ้นสำเร็จ!'**
+  String get importInvestSuccessTitle;
+
+  /// No description provided for @importInvestSuccessLot.
+  ///
+  /// In th, this message translates to:
+  /// **'นำเข้าสำเร็จ: {count} lot'**
+  String importInvestSuccessLot(int count);
+
+  /// No description provided for @importInvestDuplicateSkipped.
+  ///
+  /// In th, this message translates to:
+  /// **'ข้าม lot ซ้ำ: {count}'**
+  String importInvestDuplicateSkipped(int count);
 }
 
 class _AppLocalizationsDelegate

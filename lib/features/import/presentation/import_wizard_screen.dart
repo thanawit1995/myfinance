@@ -5,10 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/vault_theme.dart';
 import '../domain/csv_import_models.dart';
 import '../domain/csv_import_parser.dart';
+import '../domain/notion_invest_parser.dart';
 import '../import_provider.dart';
 import 'column_mapping_dialog.dart';
 import 'import_history_screen.dart';
 import 'import_preview_dialog.dart';
+import 'notion_invest_preview_dialog.dart';
+
 
 class ImportWizardScreen extends ConsumerStatefulWidget {
   const ImportWizardScreen({super.key});
@@ -18,7 +21,7 @@ class ImportWizardScreen extends ConsumerStatefulWidget {
 }
 
 class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
-  String _selectedTemplate = 'notion_expense'; // 'notion_expense', 'notion_income', 'custom'
+  String _selectedTemplate = 'notion_expense'; // 'notion_expense', 'notion_income', 'notion_invest_stocks', 'custom'
   String? _pickedFileName;
   List<List<dynamic>> _rawCsvRows = [];
   CsvColumnMapping? _currentMapping;
@@ -88,6 +91,13 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
   }
 
   Future<void> _proceedToPreview() async {
+    // ─── Invest-Stocks path ─────────────────────────────────────────────────
+    if (_selectedTemplate == 'notion_invest_stocks') {
+      await _proceedToInvestPreview();
+      return;
+    }
+
+    // ─── Standard expense / income / custom path ────────────────────────────
     if (_rawCsvRows.isEmpty || _currentMapping == null) return;
 
     setState(() => _isProcessing = true);
@@ -116,7 +126,6 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
       );
 
       if (result != null && mounted) {
-        // Show success summary
         _showSuccessDialog(result);
       }
     } catch (e) {
@@ -131,6 +140,97 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
       }
     }
   }
+
+  /// Handles the invest-stocks import preview flow.
+  Future<void> _proceedToInvestPreview() async {
+    if (_rawCsvRows.isEmpty) return;
+
+    setState(() => _isProcessing = true);
+    try {
+      final rows = NotionInvestParser.parseRows(_rawCsvRows);
+
+      if (!mounted) return;
+      setState(() => _isProcessing = false);
+
+      if (rows.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('ไม่พบข้อมูลหุ้นในไฟล์ CSV นี้'),
+            backgroundColor: VaultTheme.negative(context),
+          ),
+        );
+        return;
+      }
+
+      final result = await NotionInvestPreviewDialog.show(
+        context,
+        fileName: _pickedFileName ?? 'invest_stocks.csv',
+        rows: rows,
+      );
+
+      if (result != null && mounted) {
+        _showInvestSuccessDialog(result);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาดในการอ่านไฟล์หุ้น: $e'),
+            backgroundColor: VaultTheme.negative(context),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showInvestSuccessDialog(NotionInvestImportSummary result) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.check_circle, color: VaultTheme.positive(context)),
+            const SizedBox(width: 8),
+            const Text('นำเข้าหุ้นสำเร็จ!'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('• นำเข้าสำเร็จ: ${result.imported} lot'),
+            if (result.skippedDuplicates > 0)
+              Text('• ข้าม lot ซ้ำ: ${result.skippedDuplicates}',
+                  style: const TextStyle(color: Colors.orange)),
+            if (result.skippedDividends > 0)
+              Text('• ข้ามปันผล (ยังไม่รองรับ): ${result.skippedDividends}',
+                  style: const TextStyle(color: Colors.grey)),
+            if (result.errors.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              const Text('⚠️ มีข้อผิดพลาด:', style: TextStyle(color: Colors.red)),
+              ...result.errors.map((e) => Text('  • $e', style: const TextStyle(fontSize: 12))),
+            ],
+          ],
+        ),
+        actions: [
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: VaultTheme.accent(context)),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              setState(() {
+                _pickedFileName = null;
+                _rawCsvRows = [];
+                _currentMapping = null;
+              });
+            },
+            child: const Text('เสร็จสิ้น'),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   void _showSuccessDialog(CsvImportBatchResult result) {
     showDialog(
@@ -285,6 +385,19 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
                         icon: Icons.local_hospital_outlined,
                       ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildTemplateOption(
+                        id: 'notion_invest_stocks',
+                        title: 'Notion ซื้อหุ้น US',
+                        subtitle: 'Invest-Stocks (O, JEPQ, NVDA…)',
+                        icon: Icons.show_chart,
+                      ),
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: _buildTemplateOption(
@@ -353,7 +466,7 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
                 const SizedBox(height: 24),
 
                 // Step 3: Column Mapping Status & Preview Button
-                if (_pickedFileName != null && _currentMapping != null) ...[
+                if (_pickedFileName != null && (_currentMapping != null || _selectedTemplate == 'notion_invest_stocks')) ...[
                   const Text(
                     'ขั้นตอนที่ 3: ตรวจสอบและนำเข้า',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
@@ -367,23 +480,38 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.check, color: Colors.green, size: 20),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'จับคู่คอลัมน์สำเร็จ (Date: #${_currentMapping!.dateCol}, Name: #${_currentMapping!.nameCol}, Cat: #${_currentMapping!.categoryCol}, Amount: #${_currentMapping!.amountCol})',
-                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                          if (_selectedTemplate == 'notion_invest_stocks') ...[
+                            Row(
+                              children: [
+                                const Icon(Icons.check, color: Colors.green, size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'รูปแบบ Invest-Stocks (ตรวจจับคอลัมน์ Stock, Date, Shares, Invested อัตโนมัติ)',
+                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                                  ),
                                 ),
-                              ),
-                              TextButton.icon(
-                                icon: const Icon(Icons.tune, size: 16),
-                                label: const Text('ปรับแต่งคอลัมน์'),
-                                onPressed: _adjustMapping,
-                              ),
-                            ],
-                          ),
+                              ],
+                            ),
+                          ] else ...[
+                            Row(
+                              children: [
+                                const Icon(Icons.check, color: Colors.green, size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'จับคู่คอลัมน์สำเร็จ (Date: #${_currentMapping!.dateCol}, Name: #${_currentMapping!.nameCol}, Cat: #${_currentMapping!.categoryCol}, Amount: #${_currentMapping!.amountCol})',
+                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                                  ),
+                                ),
+                                TextButton.icon(
+                                  icon: const Icon(Icons.tune, size: 16),
+                                  label: const Text('ปรับแต่งคอลัมน์'),
+                                  onPressed: _adjustMapping,
+                                ),
+                              ],
+                            ),
+                          ],
                           const Divider(height: 20),
                           SizedBox(
                             width: double.infinity,
@@ -393,7 +521,7 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
                                 padding: const EdgeInsets.symmetric(vertical: 14),
                               ),
                               icon: const Icon(Icons.preview_outlined),
-                              label: const Text('ตรวจสอบข้อมูล 20 แถวแรก และยืนยันนำเข้า'),
+                              label: const Text('ตรวจสอบข้อมูลและยืนยันนำเข้า'),
                               onPressed: _proceedToPreview,
                             ),
                           ),

@@ -223,5 +223,20 @@
   "totalBudgetLabel": "Total Budget",
   "spentLabel": "Spent",
   "budgetLabel": "Budget",
-  "tagline": "Our money, our journey."
+  "tagline": "Our money, our journey.",
+  "importNotionInvestStocks": "Notion US Stocks",
+  "importNotionInvestStocksSubtitle": "Invest-Stocks (O, JEPQ, NVDA…)",
+  "importInvestSuccessTitle": "Import Stocks Completed!",
+  "importInvestSuccessLot": "Imported: {count} lots",
+  "@importInvestSuccessLot": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "importInvestDuplicateSkipped": "Skipped duplicates: {count}",
+  "@importInvestDuplicateSkipped": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  }
 }

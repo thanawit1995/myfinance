@@ -199,7 +199,7 @@ void main() {
       expect(parsed.length, 3);
       // Row 1
       expect(parsed[0].name, 'ร้านอาหารริมทาง');
-      expect(parsed[0].categoryName, 'Eating');
+      expect(parsed[0].categoryName, 'Food & Dining');
       expect(parsed[0].amountSatang, 25000);
       expect(parsed[0].isSummaryRow, isFalse);
       expect(parsed[0].isValid, isTrue);

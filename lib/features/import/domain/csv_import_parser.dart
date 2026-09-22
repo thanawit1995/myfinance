@@ -1,6 +1,7 @@
 import 'package:csv/csv.dart';
 import 'package:decimal/decimal.dart';
 import 'csv_import_models.dart';
+import 'notion_category_mapper.dart';
 
 class CsvImportParser {
   static const Map<String, int> monthNames = {
@@ -455,9 +456,16 @@ class CsvImportParser {
       }
 
       // Clean Notion relations (e.g. "Eating_OCT23 (https://...)" -> "Eating")
-      final cleanCategory = templateType.startsWith('notion')
+      // Then map Notion category names to app canonical nameEn
+      var cleanCategory = templateType.startsWith('notion')
           ? cleanNotionRelation(rawCategory)
           : rawCategory.trim();
+
+      if (templateType.startsWith('notion') && cleanCategory.isNotEmpty) {
+        final mapped = NotionCategoryMapper.toAppCategoryNameEn(cleanCategory);
+        if (mapped != null) cleanCategory = mapped;
+      }
+
 
       // Check for summary/total rows
       final isSummary = isSummaryRow(rawName, cleanCategory);

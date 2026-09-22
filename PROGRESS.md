@@ -577,6 +577,39 @@
 
 ---
 
+### Phase 3.3: ระบบนำเข้าข้อมูล Notion เต็มรูปแบบ (Notion Data Import: Expense, Income & US Stocks)
+- [x] **New Seed Categories**:
+  - เพิ่ม 2 หมวดหมู่รายจ่ายเริ่มต้นใหม่: "ของขวัญ / ของฝาก" (`Gifts`) และ "ยูซุ" (`Yuzu` - แมว)
+- [x] **Notion Category Mapper (`NotionCategoryMapper`)**:
+  - แปลงหมวดหมู่จาก Notion มาเป็นหมวดหมู่มาตรฐานของแอปอัตโนมัติ:
+    * `Eating` -> "อาหารและเครื่องดื่ม" (Food & Dining)
+    * `Transportation` -> "การเดินทาง" (Transportation)
+    * `Health & Fitness` -> "สุขภาพและรักษาพยาบาล" (Healthcare)
+    * `Home` -> "ที่อยู่อาศัย" (Housing)
+    * `Entertainment` -> "บันเทิงและการพักผ่อน" (Entertainment)
+    * `Lover` -> "ของขวัญ / ของฝาก" (Gifts)
+    * `Cat` -> "ยูซุ" (Yuzu)
+    * `Salary` -> "เงินเดือน" (Salary)
+    * `Top up` -> "รายรับอื่นๆ" (Other Income - non-taxable)
+    * `On duty` -> "รับจ้าง / ค่าอยู่เวร" (Freelance / Shift)
+- [x] **Notion Invest-Stocks Parser (`NotionInvestParser`)**:
+  - อ่านและวิเคราะห์ไฟล์ `Invest-Stocks *.csv` ของ Notion:
+    * แยก Ticker สัญลักษณ์หุ้น (เช่น O, JEPQ, NVDA, MSFT) โดยตัดลิงก์ URL อัตโนมัติ
+    * คำนวณวันที่ซื้อ, จำนวนหน่วย (ความแม่นยำ Decimal), ต้นทุน USD, ต้นทุน THB และอัตราแลกเปลี่ยน FX Rate
+    * แยกแยะวิธีการชำระเงินจากคอลัมน์ Text (`THB`, `USD`, `FCD`, `ปันผล`)
+- [x] **Investment Import Executor (`NotionInvestImportExecutor`)**:
+  - ตรวจสอบและสร้าง Asset ให้อัตโนมัติหากยังไม่มีในระบบ (ประเภท `foreign_stock`, สกุลเงิน `USD`)
+  - บันทึกการซื้อหุ้นลงสมุดบัญชีแยกประเภท (`transactions`) และตารางล็อตการลงทุน (`investment_lots`) พร้อม Audit Log แบบ Atomic Transaction ผ่าน `InvestmentsDao.recordBuyTrade`
+  - ตรวจจับและข้ามรายการซ้ำอัตโนมัติ (Duplicate Detection)
+- [x] **Import Wizard UI & Preview Dialog**:
+  - เพิ่มแท็บตัวเลือก "Notion ซื้อหุ้น US" ในหน้า Import Wizard
+  - สร้างหน้าจอตรวจสอบ `NotionInvestPreviewDialog` ให้ผู้ใช้เลือกติ๊กรายการที่ต้องการนำเข้า พร้อมแสดงรายละเอียด Ticker, จำนวนหุ้น, ต้นทุน USD, ต้นทุน THB
+- [x] **การรับประกันคุณภาพ (Quality Assurance)**:
+  - `flutter analyze`: **0 errors, 0 warnings, 0 issues**
+  - `flutter test`: **122/122 ผ่านฉลุย 100%** (รวมชุดทดสอบใหม่ของ Mapper และ Invest Parser)
+
+---
+
 ## 2. สิ่งที่ต้องทำในอนาคต (Future Enhancements)
 
 - [ ] การสร้าง Release Installer สำหรับ Windows (.msi / .exe)

@@ -223,5 +223,20 @@
   "totalBudgetLabel": "งบรวม",
   "spentLabel": "ใช้ไป",
   "budgetLabel": "งบ",
-  "tagline": "Our money, our journey."
+  "tagline": "Our money, our journey.",
+  "importNotionInvestStocks": "Notion ซื้อหุ้น US",
+  "importNotionInvestStocksSubtitle": "Invest-Stocks (O, JEPQ, NVDA…)",
+  "importInvestSuccessTitle": "นำเข้าหุ้นสำเร็จ!",
+  "importInvestSuccessLot": "นำเข้าสำเร็จ: {count} lot",
+  "@importInvestSuccessLot": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "importInvestDuplicateSkipped": "ข้าม lot ซ้ำ: {count}",
+  "@importInvestDuplicateSkipped": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  }
 }

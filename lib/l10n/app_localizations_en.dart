@@ -592,4 +592,24 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tagline => 'Our money, our journey.';
+
+  @override
+  String get importNotionInvestStocks => 'Notion US Stocks';
+
+  @override
+  String get importNotionInvestStocksSubtitle =>
+      'Invest-Stocks (O, JEPQ, NVDA…)';
+
+  @override
+  String get importInvestSuccessTitle => 'Import Stocks Completed!';
+
+  @override
+  String importInvestSuccessLot(int count) {
+    return 'Imported: $count lots';
+  }
+
+  @override
+  String importInvestDuplicateSkipped(int count) {
+    return 'Skipped duplicates: $count';
+  }
 }

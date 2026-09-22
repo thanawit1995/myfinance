@@ -554,6 +554,29 @@
 
 ---
 
+### Phase 3.2: การปรับปรุง UI, การแปลภาษา และระบบคลาวด์ Google Drive (UI Polish, Localization & Cloud Streamlining)
+- [x] **Google Drive Sync UI Streamlining**:
+  - ปรับการแสดงผลชื่อโฟลเดอร์ Google Drive ให้สะอาดตา ไม่แสดงเส้นทางภายในเครื่อง (`/data/user/0/...`) โดยแสดงเป็น `Google Drive: /MyFinance_Backup` บนมือถือ หรือตำแหน่ง Drive บน Desktop
+  - ลดทอนการ์ดที่ไม่จำเป็น ทำให้หน้าจอกระชับ คงไว้เฉพาะปุ่มหลัก: บัญชี Google, การตั้งค่าโฟลเดอร์, สวิตช์ Auto-Sync, สวิตช์ Sync over Wi-Fi only และปุ่ม Backup/Restore
+  - ปรับระยะขอบและ padding ของปุ่ม "เข้าสู่ระบบ" เพื่อไม่ให้อักษรและสระภาษาไทยถูกตัดขอบ
+  - ยุบส่วนประวัติ Safety Backups ให้เป็น ExpansionTile เพื่อไม่ให้เกะกะสายตา
+- [x] **Trash Bin Localization (หน้าถังขยะรองรับสองภาษา 100%)**:
+  - แปลข้อความทั้งหมดในหน้าถังขยะ (`trash_bin_screen.dart`) ทั้งชื่อหน้าจอ, แท็บบัญชี/สินทรัพย์, สถานะว่าง, จำนวนวันที่เหลือ, และกล่องยืนยันการกู้คืน/ลบถาวร
+- [x] **Tax Planning Text Overflow Fix (แก้ไขตัวอักษรล้นกรอบ)**:
+  - แก้ไข `_buildRemittanceStat`, การ์ดเปรียบเทียบกลยุทธ์เงินปันผล และแถบเลือกปีภาษี ให้ใช้ `Expanded` และกำหนดการตัดบรรทัดป้องกันข้อความล้นขอบจอ
+- [x] **VAULT Mode Monthly Report (เพิ่มทางเข้ารายงานรายเดือน)**:
+  - เพิ่มไอคอนรายงาน `Icons.assessment_outlined` บน AppBar ด้านบนของหน้าหลักในโหมด VAULT
+  - เพิ่มแถบกดดูรายงานรายเดือน `ดูรายงานสรุปรายเดือน ›` ในการ์ด FINANCIAL POSITION สไตล์ Quiet Luxury
+- [x] **Lumi Budget Mascot Layout Fix (แก้รูปทับซ้อนตัวอักษร)**:
+  - จัดโครงสร้าง `budget_hero_card.dart` ใหม่เป็น `Row` ควบคู่กับ `Expanded` เพื่อแยกพื้นที่ข้อความตัวเลขงบประมาณกับรูปภาพน้อง Lumi อย่างชัดเจน หมดปัญหาการทับซ้อนกัน 100%
+  - เพิ่ม `FittedBox` ป้องกันตัวเลขงบประมาณล้นในทุกขนาดหน้าจอ
+- [x] **การรับประกันคุณภาพ (Quality Assurance)**:
+  - `flutter analyze`: **0 errors, 0 warnings, 0 issues**
+  - `flutter test`: **116/116 ผ่านฉลุย 100%**
+  - คอมไพล์ APK รุ่นล่าสุด: `build\app\outputs\flutter-apk\app-release.apk` และคัดลอกมาไว้ที่ `c:\Projects\myfinance\app-release.apk` (40.2 MB)
+
+---
+
 ## 2. สิ่งที่ต้องทำในอนาคต (Future Enhancements)
 
 - [ ] การสร้าง Release Installer สำหรับ Windows (.msi / .exe)

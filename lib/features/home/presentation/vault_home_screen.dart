@@ -276,6 +276,19 @@ class VaultHomeScreen extends ConsumerWidget {
           children: [
             IconButton(
               icon: Icon(
+                Icons.assessment_outlined,
+                size: 22,
+                color: VaultTheme.secondaryText(context),
+              ),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const MonthlySummaryScreen()),
+                );
+              },
+              tooltip: isThai ? 'รายงานสรุปรายเดือน' : (l10n?.viewMonthlyReport ?? 'Monthly Report'),
+            ),
+            IconButton(
+              icon: Icon(
                 Icons.search_rounded,
                 size: 22,
                 color: VaultTheme.secondaryText(context),
@@ -435,13 +448,17 @@ class VaultHomeScreen extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          Money(remainingSatang).format(symbol: '฿'),
-                          style: VaultTheme.tabular(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w800,
-                            color: const Color(0xFF2B2338),
-                            letterSpacing: -0.5,
+                        FittedBox(
+                          alignment: Alignment.centerLeft,
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            Money(remainingSatang).format(symbol: '฿'),
+                            style: VaultTheme.tabular(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFF2B2338),
+                              letterSpacing: -0.5,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 6),
@@ -463,8 +480,8 @@ class VaultHomeScreen extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(16),
                     child: Image.asset(
                       'assets/images/lumi_budget_character.png',
-                      width: 120,
-                      height: 105,
+                      width: 95,
+                      height: 100,
                       fit: BoxFit.contain,
                       errorBuilder: (_, _, _) => const SizedBox.shrink(),
                     ),
@@ -796,6 +813,42 @@ class VaultHomeScreen extends ConsumerWidget {
               ),
             ],
           ),
+          if (!isLumi) ...[
+            const SizedBox(height: 10),
+            Divider(color: VaultTheme.border(context), height: 1),
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const MonthlySummaryScreen()),
+                );
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.assessment_outlined,
+                      size: 15,
+                      color: VaultTheme.accent(context),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      isThai ? 'ดูรายงานสรุปรายเดือน ›' : 'View Monthly Report ›',
+                      style: TextStyle(
+                        fontFamily: VaultTheme.fontFamily,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: VaultTheme.accent(context),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

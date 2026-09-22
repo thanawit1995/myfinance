@@ -142,11 +142,12 @@ class _TaxScreenState extends ConsumerState<TaxScreen> {
                           children: [
                             Icon(Icons.calendar_month_outlined, size: 22, color: Theme.of(context).colorScheme.primary),
                             const SizedBox(width: 10),
-                            Text(
-                              isThai ? 'ปีภาษี' : 'Tax Year',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            Expanded(
+                              child: Text(
+                                isThai ? 'ปีภาษี' : 'Tax Year',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              ),
                             ),
-                            const Spacer(),
                             DropdownButtonHideUnderline(
                               child: DropdownButton<int>(
                                 value: _selectedTaxYear,
@@ -282,9 +283,11 @@ class _TaxScreenState extends ConsumerState<TaxScreen> {
                               children: [
                                 const Icon(Icons.analytics_outlined, color: Colors.blue),
                                 const SizedBox(width: 8),
-                                Text(
-                                  isThai ? 'เปรียบเทียบกลยุทธ์เงินปันผลหุ้นไทย' : 'Thai Stock Dividend Strategy Comparison',
-                                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                                Expanded(
+                                  child: Text(
+                                    isThai ? 'เปรียบเทียบกลยุทธ์เงินปันผลหุ้นไทย' : 'Thai Stock Dividend Strategy Comparison',
+                                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                                  ),
                                 ),
                               ],
                             ),
@@ -662,7 +665,10 @@ class _TaxScreenState extends ConsumerState<TaxScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12)),
+        Expanded(
+          child: Text(label, style: const TextStyle(fontSize: 12)),
+        ),
+        const SizedBox(width: 8),
         Text(
           value,
           style: TextStyle(

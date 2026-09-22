@@ -1,7 +1,10 @@
+import 'dart:io';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:path/path.dart' as p;
 import '../../../core/services/cloud_sync_provider.dart';
 import '../../../core/services/google_auth_service.dart';
 import '../../../core/services/google_drive_sync_service.dart';
@@ -39,6 +42,19 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
         _googleUser = user;
       });
     }
+  }
+
+  String _formatDriveFolderDisplay(String? rawPath, bool isThai) {
+    if (rawPath == null || rawPath.isEmpty) {
+      return isThai ? 'ยังไม่ได้เชื่อมต่อโฟลเดอร์ Google Drive' : 'No Google Drive folder connected';
+    }
+    // Check if on mobile or contains default backup path
+    if (rawPath.contains('GoogleDrive_Backup') || rawPath.startsWith('/data/user/') || rawPath.startsWith('/data/data/')) {
+      final segments = rawPath.split(Platform.pathSeparator);
+      final folderName = segments.isNotEmpty && segments.last.isNotEmpty ? segments.last : 'MyFinance_Backup';
+      return 'Google Drive: /$folderName';
+    }
+    return rawPath;
   }
 
   Future<String?> _promptGmailInput(BuildContext context) async {
@@ -164,9 +180,77 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
   }
 
   Future<void> _pickDriveFolder() async {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+
+    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+      final currentFolder = _status?.driveFolderPath != null
+          ? _status!.driveFolderPath!.split(Platform.pathSeparator).last
+          : 'MyFinance_Backup';
+      final folderController = TextEditingController(text: currentFolder.isEmpty ? 'MyFinance_Backup' : currentFolder);
+
+      final newFolder = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(isThai ? 'เลือกโฟลเดอร์ Google Drive' : 'Select Google Drive Folder'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isThai
+                    ? 'ระบุชื่อโฟลเดอร์บน Google Drive ที่ต้องการใช้จัดเก็บไฟล์สำรอง:'
+                    : 'Enter the Google Drive folder name for storing backups:',
+                style: const TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: folderController,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: isThai ? 'ชื่อโฟลเดอร์บน Drive' : 'Drive Folder Name',
+                  hintText: 'MyFinance_Backup',
+                  prefixIcon: const Icon(Icons.folder_outlined),
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, folderController.text.trim()),
+              child: Text(isThai ? 'บันทึก' : 'Save'),
+            ),
+          ],
+        ),
+      );
+
+      if (newFolder != null && newFolder.isNotEmpty) {
+        final syncService = ref.read(googleDriveSyncServiceProvider);
+        final docDir = await syncService.getDocumentsDirectory();
+        final targetDir = Directory(p.join(docDir.path, newFolder));
+        await syncService.setDriveFolder(targetDir.path);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(isThai ? 'ตั้งค่าโฟลเดอร์ Google Drive: /$newFolder สำเร็จ' : 'Set Google Drive folder to /$newFolder'),
+              backgroundColor: VaultTheme.positive(context),
+            ),
+          );
+        }
+        await _loadData();
+      }
+      return;
+    }
+
     try {
       final selectedDirectory = await FilePicker.platform.getDirectoryPath(
-        dialogTitle: 'เลือกโฟลเดอร์ Google Drive (เช่น G:\\My Drive หรือโฟลเดอร์ที่คุณต้องการซิงค์)',
+        dialogTitle: isThai
+            ? 'เลือกโฟลเดอร์ Google Drive (เช่น G:\\My Drive หรือโฟลเดอร์ที่คุณต้องการซิงค์)'
+            : 'Select Google Drive folder (e.g. G:\\My Drive\\VAULT)',
       );
 
       if (selectedDirectory != null && selectedDirectory.isNotEmpty) {
@@ -175,7 +259,7 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('เชื่อมต่อโฟลเดอร์: $selectedDirectory สำเร็จ'),
+              content: Text(isThai ? 'เชื่อมต่อโฟลเดอร์: $selectedDirectory สำเร็จ' : 'Connected to folder: $selectedDirectory'),
               backgroundColor: VaultTheme.positive(context),
             ),
           );
@@ -186,7 +270,7 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('ไม่สามารถเลือกโฟลเดอร์ได้: $e'),
+            content: Text(isThai ? 'ไม่สามารถเลือกโฟลเดอร์ได้: $e' : 'Could not select folder: $e'),
             backgroundColor: VaultTheme.negative(context),
           ),
         );
@@ -231,9 +315,9 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
         content: Text(
           isThai
               ? 'ข้อมูลจาก Google Drive จะถูกนำมาแทนที่ฐานข้อมูลปัจจุบันในเครื่อง\n\n'
-                '🛡️ เพื่อความปลอดภัยสูงสุด ระบบจะสร้างไฟล์สำรองฉุกเฉิน (Safety Backup) ของข้อมูลปัจจุบันไว้ให้คุณโดยอัตโนมัติก่อนเขียนทับเสมอ'
+                '🛡️ เพื่อความปลอดภัย ระบบจะสร้างไฟล์สำรองฉุกเฉิน (Safety Backup) ให้คุณโดยอัตโนมัติก่อนเขียนทับเสมอ'
               : 'Data from Google Drive will replace the current local database.\n\n'
-                '🛡️ For maximum safety, an automatic Safety Backup will be created before restoring.',
+                '🛡️ For safety, an automatic Safety Backup will be created before restoring.',
           style: const TextStyle(fontSize: 14),
         ),
         actions: [
@@ -356,7 +440,7 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
           : ListView(
               padding: const EdgeInsets.all(20),
               children: [
-                // 0. Google Account Card
+                // 1. Google Account Card
                 Card(
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   color: VaultTheme.surface(context),
@@ -404,7 +488,7 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                               Text(
                                 _googleUser != null
                                     ? _googleUser!.email
-                                    : (isThai ? 'เชื่อมต่อบัญชี Google เพื่อสำรองข้อมูลไปยังไดรฟ์' : 'Connect Google account to back up data to Drive'),
+                                    : (isThai ? 'เชื่อมต่อ Google Drive เพื่อสำรองข้อมูล' : 'Connect Google Drive for cloud backup'),
                                 style: const TextStyle(fontSize: 12, color: Colors.grey),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -412,20 +496,35 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                             ],
                           ),
                         ),
+                        const SizedBox(width: 8),
                         if (_googleUser != null)
                           TextButton(
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            ),
                             onPressed: _handleSignOut,
-                            child: Text(isThai ? 'ออกจากระบบ' : 'Sign Out', style: const TextStyle(color: Colors.red, fontSize: 12)),
+                            child: Text(
+                              isThai ? 'ออกจากระบบ' : 'Sign Out',
+                              style: const TextStyle(color: Colors.red, fontSize: 12.5, fontWeight: FontWeight.w600),
+                            ),
                           )
                         else
-                          FilledButton.tonalIcon(
+                          FilledButton.tonal(
                             style: FilledButton.styleFrom(
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                             ),
-                            icon: const Icon(Icons.login, size: 16),
-                            label: Text(isThai ? 'เข้าสู่ระบบ' : 'Sign In'),
                             onPressed: _handleSignIn,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.login, size: 16),
+                                const SizedBox(width: 6),
+                                Text(
+                                  isThai ? 'เข้าสู่ระบบ' : 'Sign In',
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
                           ),
                       ],
                     ),
@@ -434,7 +533,7 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
 
                 const SizedBox(height: 16),
 
-                // 1. Main Status Card
+                // 2. Main Status Card with Action Buttons
                 Card(
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   color: VaultTheme.surface(context),
@@ -456,7 +555,7 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                               ),
                               child: Icon(
                                 _status!.isConnected ? Icons.cloud_done : Icons.cloud_off,
-                                size: 30,
+                                size: 28,
                                 color: _status!.isConnected ? Colors.teal : Colors.orange,
                               ),
                             ),
@@ -471,22 +570,22 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                                         : (isThai ? 'ยังไม่ได้เชื่อมต่อ Google Drive' : 'Google Drive Disconnected'),
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      fontSize: 17,
+                                      fontSize: 16,
                                       color: VaultTheme.primaryText(context),
                                     ),
                                   ),
                                   const SizedBox(height: 3),
                                   Text(
                                     _status!.isConnected
-                                        ? (_status!.driveFolderPath ?? '')
+                                        ? _formatDriveFolderDisplay(_status!.driveFolderPath, isThai)
                                         : (isThai
-                                            ? 'ตรวจไม่พบโฟลเดอร์ Google Drive for Desktop ในตำแหน่งมาตรฐาน'
-                                            : 'No standard Google Drive folder detected'),
+                                            ? 'แตะเลือกโฟลเดอร์ หรือเข้าสู่ระบบ Google เพื่อเริ่มซิงค์'
+                                            : 'Sign in or select a folder to start syncing'),
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: _status!.isConnected ? Colors.grey : Colors.orange,
                                     ),
-                                    maxLines: 2,
+                                    maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
@@ -497,7 +596,7 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
 
                         // Remote update alert badge
                         if (_status!.hasRemoteUpdate) ...[
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 14),
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
@@ -507,13 +606,13 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.info_outline, color: Colors.amber, size: 22),
+                                const Icon(Icons.info_outline, color: Colors.amber, size: 20),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
                                     isThai
-                                        ? 'มีข้อมูลเวอร์ชันใหม่กว่าบน Google Drive (บันทึกล่าสุดเมื่อ ${_status!.remoteLastModified != null ? dateFormat.format(_status!.remoteLastModified!) : ""}) แนะนำให้กดดึงข้อมูลล่าสุด'
-                                        : 'A newer version is available on Google Drive (last modified ${_status!.remoteLastModified != null ? dateFormat.format(_status!.remoteLastModified!) : ""}). Restoring is recommended.',
+                                        ? 'มีข้อมูลใหม่กว่าบน Google Drive แนะนำให้กดดึงข้อมูลล่าสุด'
+                                        : 'A newer backup is available on Drive. Restore is recommended.',
                                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                                   ),
                                 ),
@@ -522,7 +621,7 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                           ),
                         ],
 
-                        const Divider(height: 28),
+                        const Divider(height: 24),
 
                         // Sync stats
                         Row(
@@ -536,7 +635,7 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                                 Text(
                                   _status!.lastSyncTime != null
                                       ? dateFormat.format(_status!.lastSyncTime!)
-                                      : (isThai ? 'ยังไม่เคยซิงค์ข้อมูล' : 'Never synced'),
+                                      : (isThai ? 'ยังไม่เคยซิงค์' : 'Never'),
                                   style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                                 ),
                               ],
@@ -544,7 +643,7 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
-                                Text(isThai ? 'รายการใหม่ในเครื่อง' : 'Pending Changes', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                Text(isThai ? 'รายการรอซิงค์' : 'Pending', style: const TextStyle(fontSize: 12, color: Colors.grey)),
                                 const SizedBox(height: 4),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
@@ -568,43 +667,43 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                           ],
                         ),
 
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 18),
 
-                        // Action Buttons: Upload & Download
+                        // Action Buttons: Backup & Restore
                         Row(
                           children: [
                             Expanded(
                               child: FilledButton.icon(
                                 style: FilledButton.styleFrom(
                                   backgroundColor: VaultTheme.accent(context),
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 8),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                 ),
                                 icon: _isLoading
                                     ? const SizedBox(
-                                        width: 18,
-                                        height: 18,
+                                        width: 16,
+                                        height: 16,
                                         child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                                       )
-                                    : const Icon(Icons.cloud_upload_outlined, size: 20),
+                                    : const Icon(Icons.cloud_upload_outlined, size: 18),
                                 label: Text(
-                                  isThai ? 'ส่งข้อมูลขึ้น Drive' : 'Backup to Drive',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                  isThai ? 'ส่งขึ้น Drive' : 'Backup to Drive',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                                 ),
                                 onPressed: (_isLoading || !_status!.isConnected) ? null : _uploadToGoogleDrive,
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: OutlinedButton.icon(
                                 style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 8),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                 ),
-                                icon: const Icon(Icons.cloud_download_outlined, size: 20),
+                                icon: const Icon(Icons.cloud_download_outlined, size: 18),
                                 label: Text(
-                                  isThai ? 'ดึงข้อมูลจาก Drive' : 'Restore from Drive',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                  isThai ? 'ดึงจาก Drive' : 'Restore from Drive',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                                 ),
                                 onPressed: (_isLoading || !_status!.isConnected) ? null : _confirmAndDownloadFromDrive,
                               ),
@@ -615,11 +714,10 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
 
-                // 2. Settings Section
-                Text(isThai ? 'การตั้งค่า Google Drive' : 'Google Drive Settings', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                const SizedBox(height: 10),
+                const SizedBox(height: 16),
+
+                // 3. Settings Section Card
                 Card(
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   color: VaultTheme.surface(context),
@@ -629,21 +727,28 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                         leading: const Icon(Icons.folder_outlined, color: Colors.blueAccent),
                         title: Text(isThai ? 'โฟลเดอร์ Google Drive' : 'Google Drive Folder'),
                         subtitle: Text(
-                          _status!.isConnected
-                              ? (_status!.driveFolderPath ?? (isThai ? 'ระบุแล้ว' : 'Specified'))
-                              : (isThai ? 'ยังไม่ได้เลือกโฟลเดอร์ (แตะเพื่อเลือกโฟลเดอร์ไดรฟ์ G: หรือ Google Drive)' : 'No folder selected'),
+                          _formatDriveFolderDisplay(_status!.driveFolderPath, isThai),
                           style: const TextStyle(fontSize: 12),
                         ),
                         trailing: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
                           onPressed: _pickDriveFolder,
-                          child: Text(_status!.isConnected ? (isThai ? 'เปลี่ยน' : 'Change') : (isThai ? 'เลือกโฟลเดอร์' : 'Select')),
+                          child: Text(
+                            _status!.isConnected ? (isThai ? 'เปลี่ยน' : 'Change') : (isThai ? 'เลือก' : 'Select'),
+                            style: const TextStyle(fontSize: 12.5),
+                          ),
                         ),
                       ),
                       const Divider(height: 1),
                       SwitchListTile(
                         secondary: const Icon(Icons.sync),
                         title: Text(isThai ? 'ซิงค์อัตโนมัติ (Auto-Sync)' : 'Auto-Sync'),
-                        subtitle: Text(isThai ? 'ตรวจสอบและซิงค์ข้อมูลกับ Google Drive ทุกครั้งที่เปิดแอป' : 'Check and sync with Google Drive on startup'),
+                        subtitle: Text(
+                          isThai ? 'ตรวจสอบและซิงค์กับ Google Drive เมื่อเปิดแอป' : 'Sync with Google Drive on startup',
+                          style: const TextStyle(fontSize: 11.5),
+                        ),
                         value: _status!.isAutoSync,
                         onChanged: (val) async {
                           await ref.read(googleDriveSyncServiceProvider).setAutoSyncEnabled(val);
@@ -654,7 +759,10 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                       SwitchListTile(
                         secondary: const Icon(Icons.wifi),
                         title: Text(isThai ? 'ซิงค์ผ่าน Wi-Fi เท่านั้น' : 'Sync over Wi-Fi only'),
-                        subtitle: Text(isThai ? 'ประหยัดเน็ตมือถือ ไม่ซิงค์เมื่อใช้เครือข่าย Cellular' : 'Save mobile data, do not sync over cellular'),
+                        subtitle: Text(
+                          isThai ? 'ประหยัดเน็ต ไม่ซิงค์ผ่านเน็ตมือถือ' : 'Save mobile data, Wi-Fi only',
+                          style: const TextStyle(fontSize: 11.5),
+                        ),
                         value: _status!.isWifiOnly,
                         onChanged: (val) async {
                           await ref.read(googleDriveSyncServiceProvider).setWifiOnly(val);
@@ -665,14 +773,17 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                         const Divider(height: 1),
                         ListTile(
                           leading: const Icon(Icons.link_off, color: Colors.redAccent),
-                          title: Text(isThai ? 'ยกเลิกการเชื่อมต่อโฟลเดอร์' : 'Disconnect Folder', style: const TextStyle(color: Colors.redAccent)),
+                          title: Text(
+                            isThai ? 'ยกเลิกการเชื่อมต่อโฟลเดอร์' : 'Disconnect Folder',
+                            style: const TextStyle(color: Colors.redAccent, fontSize: 13.5),
+                          ),
                           onTap: () async {
                             final confirm = await showDialog<bool>(
                               context: context,
                               builder: (ctx) => AlertDialog(
                                 title: Text(isThai ? 'ยกเลิกการเชื่อมต่อ?' : 'Disconnect Folder?'),
                                 content: Text(isThai
-                                    ? 'การยกเลิกจะไม่ลบข้อมูลในเครื่องหรือใน Google Drive แต่จะหยุดการซิงค์ไว้ชั่วคราว'
+                                    ? 'การยกเลิกจะไม่ลบข้อมูลในเครื่องหรือใน Google Drive แต่จะหยุดการซิงค์ชั่วคราว'
                                     : 'Disconnecting will not delete any files, but sync will be paused.'),
                                 actions: [
                                   TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(isThai ? 'ยกเลิก' : 'Cancel')),
@@ -694,77 +805,75 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
 
-                // 3. Safety Pre-Sync Backups Section
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(isThai ? 'ไฟล์สำรองฉุกเฉินก่อนซิงค์ (Safety Backups)' : 'Safety Pre-Sync Backups', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                    Text(
-                      '${_backups.length} ${isThai ? "ไฟล์" : "files"}',
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  isThai
-                      ? 'ทุกครั้งก่อนการดึงข้อมูลทับ ระบบจะสำรองข้อมูลในเครื่องไว้ที่นี่เสมอเพื่อให้คุณย้อนกลับได้ 100%'
-                      : 'An automatic backup is created before every restore so you can always roll back.',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-                const SizedBox(height: 10),
-
-                if (_backups.isEmpty)
+                // 4. Collapsible Safety Backups Section (Clean & non-intrusive)
+                if (_backups.isNotEmpty) ...[
+                  const SizedBox(height: 14),
                   Card(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     color: VaultTheme.surface(context),
-                    child: Padding(
-                      padding: const EdgeInsets.all(18),
-                      child: Center(
-                        child: Text(
-                          isThai
-                              ? 'ยังไม่มีไฟล์สำรองฉุกเฉิน (จะสร้างอัตโนมัติเมื่อมีการดึงข้อมูลจาก Drive)'
-                              : 'No safety backups yet (created automatically when restoring from Drive)',
-                          style: const TextStyle(color: Colors.grey, fontSize: 13),
+                    child: Theme(
+                      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                      child: ExpansionTile(
+                        leading: const Icon(Icons.shield_outlined, color: Colors.teal),
+                        title: Text(
+                          isThai ? 'ไฟล์สำรองฉุกเฉิน (Safety Backups)' : 'Safety Backups',
+                          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
                         ),
+                        subtitle: Text(
+                          '${_backups.length} ${isThai ? "ไฟล์ที่เก็บไว้ก่อนซิงค์" : "pre-sync backups available"}',
+                          style: const TextStyle(fontSize: 11.5, color: Colors.grey),
+                        ),
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            child: Column(
+                              children: _backups.map((b) {
+                                final sizeKb = (b.sizeBytes / 1024).toStringAsFixed(1);
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              dateFormat.format(b.createdAt),
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                                            ),
+                                            Text(
+                                              '${b.fileName} ($sizeKb KB)',
+                                              style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      OutlinedButton(
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: Colors.orange,
+                                          side: const BorderSide(color: Colors.orange),
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        ),
+                                        onPressed: () => _confirmRollbackBackup(b),
+                                        child: Text(isThai ? 'กู้คืน' : 'Rollback', style: const TextStyle(fontSize: 11)),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  )
-                else
-                  ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _backups.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 8),
-                    itemBuilder: (context, idx) {
-                      final b = _backups[idx];
-                      final sizeKb = (b.sizeBytes / 1024).toStringAsFixed(1);
-                      return Card(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        color: VaultTheme.surface(context),
-                        child: ListTile(
-                          dense: true,
-                          leading: const Icon(Icons.shield_outlined, color: Colors.teal),
-                          title: Text(
-                            dateFormat.format(b.createdAt),
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                          ),
-                          subtitle: Text('${b.fileName} ($sizeKb KB)', style: const TextStyle(fontSize: 11)),
-                          trailing: OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.orange,
-                              side: const BorderSide(color: Colors.orange),
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            ),
-                            onPressed: () => _confirmRollbackBackup(b),
-                            child: Text(isThai ? 'กู้คืนจุดนี้' : 'Rollback', style: const TextStyle(fontSize: 11)),
-                          ),
-                        ),
-                      );
-                    },
                   ),
+                ],
+
+                const SizedBox(height: 24),
               ],
             ),
     );

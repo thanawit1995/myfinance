@@ -104,6 +104,8 @@ class GoogleDriveSyncService {
     return getApplicationDocumentsDirectory();
   }
 
+  Future<Directory> getDocumentsDirectory() => _getDocumentsDir();
+
   /// ค้นหาและตรวจสอบโฟลเดอร์ Google Drive for Desktop ในเครื่อง Windows 11 อัตโนมัติ
   Future<String?> detectOrGetDriveFolder() async {
     // 1. ถ้าผู้ใช้กดตัดการเชื่อมต่อไว้ ไม่ต้อง auto-detect อัตโนมัติ

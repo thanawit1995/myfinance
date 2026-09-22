@@ -35,13 +35,14 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
 
   @override
   Widget build(BuildContext context) {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     final remittancesDao = ref.watch(remittancesDaoProvider);
     final taxDao = ref.watch(taxDaoProvider);
     final accountsDao = ref.watch(accountsDaoProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('ติดตามเงินได้ต่างประเทศ (Remittance)'),
+        title: Text(isThai ? 'ติดตามเงินได้ต่างประเทศ (Remittance)' : 'Foreign Remittance Tracking'),
         actions: [
           DropdownButton<int>(
             value: _selectedRemittedYear,
@@ -55,7 +56,10 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
             ),
             items: _availableRemittedYears().map((y) {
               final beYear = y + 543;
-              return DropdownMenuItem(value: y, child: Text('ปีที่นำเข้า $y (พ.ศ. $beYear)'));
+              return DropdownMenuItem(
+                value: y,
+                child: Text(isThai ? 'ปีที่นำเข้า $y (พ.ศ. $beYear)' : 'Remitted Year $y'),
+              );
             }).toList(),
             onChanged: (y) {
               if (y != null) setState(() => _selectedRemittedYear = y);
@@ -63,14 +67,14 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
           ),
           IconButton(
             icon: const Icon(Icons.calendar_month),
-            tooltip: 'ระบุจำนวนวันที่อยู่ในไทย (เกณฑ์ 180 วัน)',
+            tooltip: isThai ? 'ระบุจำนวนวันที่อยู่ในไทย (เกณฑ์ 180 วัน)' : 'Days in Thailand (180-day rule)',
             onPressed: () => _showDaysInThailandDialog(),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         icon: const Icon(Icons.add),
-        label: const Text('บันทึกนำเงินเข้าไทย'),
+        label: Text(isThai ? 'บันทึกนำเงินเข้าไทย' : 'Add Remittance'),
         onPressed: () => _showAddRemittanceDialog(),
       ),
       body: StreamBuilder<TaxResidencyRecord?>(
@@ -120,7 +124,9 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'สถานะผู้มีถิ่นที่อยู่ในไทย ปี $_selectedRemittedYear: $residencyDays วัน',
+                                    isThai
+                                        ? 'สถานะผู้มีถิ่นที่อยู่ในไทย ปี $_selectedRemittedYear: $residencyDays วัน'
+                                        : 'Tax Residency Status in $_selectedRemittedYear: $residencyDays days',
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 13.5,
@@ -129,9 +135,13 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    residencyDays >= 180
-                                        ? 'อยู่ในไทย >= 180 วัน เข้าเกณฑ์ Tax Resident ตาม ป.161/2566'
-                                        : 'อยู่ในไทย < 180 วัน ได้รับยกเว้นตาม ป.รัษฎากร ม.41 วรรคสาม',
+                                    isThai
+                                        ? (residencyDays >= 180
+                                            ? 'อยู่ในไทย >= 180 วัน เข้าเกณฑ์ Tax Resident ตาม ป.161/2566'
+                                            : 'อยู่ในไทย < 180 วัน ได้รับยกเว้นตาม ป.รัษฎากร ม.41 วรรคสาม')
+                                        : (residencyDays >= 180
+                                            ? 'Stayed in Thailand >= 180 days (Tax Resident under P.161/2566)'
+                                            : 'Stayed in Thailand < 180 days (Non-resident, Tax Exempt)'),
                                     style: TextStyle(fontSize: 11.5, color: VaultTheme.secondaryText(context)),
                                   ),
                                 ],
@@ -142,7 +152,7 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
                                 foregroundColor: VaultTheme.accent(context),
                               ),
                               onPressed: () => _showDaysInThailandDialog(initialDays: residencyDays),
-                              child: const Text('แก้ไขวัน'),
+                              child: Text(isThai ? 'แก้ไขวัน' : 'Edit Days'),
                             ),
                           ],
                         ),
@@ -154,7 +164,9 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'รายการนำเงินเข้าไทย (${remittances.length} รายการ)',
+                            isThai
+                                ? 'รายการนำเงินเข้าไทย (${remittances.length} รายการ)'
+                                : 'Remittance Records (${remittances.length})',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 15,
@@ -174,7 +186,9 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
                               Icon(Icons.payments_outlined, size: 48, color: VaultTheme.mutedText(context)),
                               const SizedBox(height: 12),
                               Text(
-                                'ไม่มีรายการนำเงินเข้าไทยในปี $_selectedRemittedYear',
+                                isThai
+                                    ? 'ไม่มีรายการนำเงินเข้าไทยในปี $_selectedRemittedYear'
+                                    : 'No remittances recorded in $_selectedRemittedYear',
                                 style: TextStyle(color: VaultTheme.secondaryText(context)),
                               ),
                             ],
@@ -189,8 +203,8 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
                             daysInThailandYearRemitted: residencyDays,
                           );
 
-                          final srcAcc = accMap[r.sourceAccountId]?.name ?? 'บัญชีต่างประเทศ';
-                          final dstAcc = accMap[r.destinationAccountId]?.name ?? 'บัญชีไทย';
+                          final srcAcc = accMap[r.sourceAccountId]?.name ?? (isThai ? 'บัญชีต่างประเทศ' : 'Offshore Account');
+                          final dstAcc = accMap[r.destinationAccountId]?.name ?? (isThai ? 'บัญชีไทย' : 'Domestic Account');
 
                           return Card(
                             margin: const EdgeInsets.only(bottom: 12),
@@ -220,7 +234,7 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
                                         ),
                                         Row(
                                           children: [
-                                            _buildStatusBadge(assess),
+                                            _buildStatusBadge(assess, isThai),
                                             const SizedBox(width: 6),
                                             Icon(Icons.edit_outlined, size: 16, color: VaultTheme.mutedText(context)),
                                           ],
@@ -248,7 +262,7 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      'เงินต่างประเทศ: ${_currencyFormat.format(r.amountOriginalSatang / 100.0)} ${r.currencyCode} (เรต: ${r.fxRate})',
+                                      '${isThai ? "เงินต่างประเทศ" : "Foreign Amount"}: ${_currencyFormat.format(r.amountOriginalSatang / 100.0)} ${r.currencyCode} (${isThai ? "เรต" : "Rate"}: ${r.fxRate})',
                                       style: TextStyle(fontSize: 12, color: VaultTheme.mutedText(context)),
                                     ),
                                     const SizedBox(height: 8),
@@ -261,7 +275,7 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
                                         border: Border.all(color: VaultTheme.border(context), width: 0.75),
                                       ),
                                       child: Text(
-                                        'เกิดปีภาษี: ${r.taxYearEarned ?? '-'} | ประเภท: ${r.incomeSourceType} | ${r.isPrincipal ? "เงินต้นเดิม" : "กำไร/ผลตอบแทน"}\nเหตุผล: ${assess.reasonTh}',
+                                        '${isThai ? "เกิดปีภาษี" : "Tax Year Earned"}: ${r.taxYearEarned ?? "-"} | ${isThai ? "ประเภท" : "Type"}: ${r.incomeSourceType} | ${r.isPrincipal ? (isThai ? "เงินต้นเดิม" : "Principal") : (isThai ? "กำไร/ผลตอบแทน" : "Income/Gain")}\n${isThai ? "เหตุผล" : "Reason"}: ${assess.getLocalizedReason(isThai)}',
                                         style: TextStyle(
                                           fontSize: 11.5,
                                           color: VaultTheme.primaryText(context),
@@ -287,6 +301,7 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
   }
 
   Future<void> _showEditRemittanceDialog(ForeignRemittance r) async {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     bool isPrincipal = r.isPrincipal;
     int taxYearEarned = r.taxYearEarned ?? (_selectedRemittedYear - 1);
     String incomeType = r.incomeSourceType;
@@ -297,7 +312,7 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
-            title: const Text('แก้ไขข้อมูลภาษีนำเงินเข้าไทย'),
+            title: Text(isThai ? 'แก้ไขข้อมูลภาษีนำเงินเข้าไทย' : 'Edit Remittance Tax Details'),
             content: SizedBox(
               width: 440,
               child: SingleChildScrollView(
@@ -306,61 +321,68 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'ยอดเงิน: ${_currencyFormat.format(r.amountThbSatang / 100.0)} THB (${_currencyFormat.format(r.amountOriginalSatang / 100.0)} ${r.currencyCode})',
+                      '${isThai ? "ยอดเงิน" : "Amount"}: ${_currencyFormat.format(r.amountThbSatang / 100.0)} THB (${_currencyFormat.format(r.amountOriginalSatang / 100.0)} ${r.currencyCode})',
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                     ),
                     const SizedBox(height: 12),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('เป็นเงินต้นเดิมที่เคยส่งออกไป (ยกเว้นภาษี)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                      subtitle: const Text('ไม่ใช่ผลตอบแทนหรือกำไร จึงไม่เข้าเกณฑ์เสียภาษีตามกฎหมาย'),
+                      title: Text(
+                        isThai ? 'เป็นเงินต้นเดิมที่เคยส่งออกไป (ยกเว้นภาษี)' : 'Original Capital / Principal (Tax Exempt)',
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Text(isThai
+                          ? 'ไม่ใช่ผลตอบแทนหรือกำไร จึงไม่เข้าเกณฑ์เสียภาษีตามกฎหมาย'
+                          : 'Not profit or earnings; exempt from tax under revenue code'),
                       value: isPrincipal,
                       onChanged: (v) => setDialogState(() => isPrincipal = v),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<int>(
                       initialValue: taxYearEarned,
-                      decoration: const InputDecoration(
-                        labelText: 'ปีที่เกิดเงินได้ (Tax Year Earned)',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: isThai ? 'ปีที่เกิดเงินได้ (Tax Year Earned)' : 'Tax Year Earned',
+                        border: const OutlineInputBorder(),
                         isDense: true,
                       ),
                       items: _availableRemittedYears(includePast: true).map((yr) => DropdownMenuItem(
                         value: yr,
-                        child: Text('ปี $yr (พ.ศ. ${yr + 543})'),
+                        child: Text(isThai ? 'ปี $yr (พ.ศ. ${yr + 543})' : 'Year $yr'),
                       )).toList(),
                       onChanged: (v) => setDialogState(() => taxYearEarned = v ?? taxYearEarned),
                     ),
                     if (taxYearEarned < 2024) ...[
                       const SizedBox(height: 6),
                       Text(
-                        '✓ ได้รับยกเว้นภาษีตามคำสั่ง ป.162/2566 (เกิดก่อน 1 ม.ค. 2024)',
+                        isThai
+                            ? '✓ ได้รับยกเว้นภาษีตามคำสั่ง ป.162/2566 (เกิดก่อน 1 ม.ค. 2024)'
+                            : '✓ Tax exempt under Order Paw 162/2566 (earned before Jan 1, 2024)',
                         style: TextStyle(fontSize: 12, color: VaultTheme.positive(context), fontWeight: FontWeight.bold),
                       ),
                     ],
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       initialValue: incomeType,
-                      decoration: const InputDecoration(
-                        labelText: 'ประเภทของเงินได้',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: isThai ? 'ประเภทของเงินได้' : 'Income Source Type',
+                        border: const OutlineInputBorder(),
                         isDense: true,
                       ),
-                      items: const [
-                        DropdownMenuItem(value: 'capital_gain', child: Text('กำไรจากการลงทุน (Capital Gain)')),
-                        DropdownMenuItem(value: 'dividend', child: Text('เงินปันผล/ดอกเบี้ย (Dividend/Interest)')),
-                        DropdownMenuItem(value: 'salary', child: Text('เงินเดือน/ค่าจ้าง (Salary/Offshore Income)')),
-                        DropdownMenuItem(value: 'savings_principal', child: Text('เงินออมสะสม/เงินต้น')),
-                        DropdownMenuItem(value: 'other', child: Text('อื่นๆ (Other)')),
+                      items: [
+                        DropdownMenuItem(value: 'capital_gain', child: Text(isThai ? 'กำไรจากการลงทุน (Capital Gain)' : 'Capital Gain')),
+                        DropdownMenuItem(value: 'dividend', child: Text(isThai ? 'เงินปันผล/ดอกเบี้ย (Dividend/Interest)' : 'Dividend / Interest')),
+                        DropdownMenuItem(value: 'salary', child: Text(isThai ? 'เงินเดือน/ค่าจ้าง (Salary/Offshore Income)' : 'Salary / Offshore Income')),
+                        DropdownMenuItem(value: 'savings_principal', child: Text(isThai ? 'เงินออมสะสม/เงินต้น' : 'Savings / Principal')),
+                        DropdownMenuItem(value: 'other', child: Text(isThai ? 'อื่นๆ (Other)' : 'Other')),
                       ],
                       onChanged: (v) => setDialogState(() => incomeType = v!),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: noteCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'หมายเหตุ',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: isThai ? 'หมายเหตุ' : 'Note',
+                        border: const OutlineInputBorder(),
                         isDense: true,
                       ),
                     ),
@@ -375,11 +397,11 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
                   await ref.read(remittancesDaoProvider).deleteRemittance(r.id);
                   if (ctx.mounted) Navigator.of(ctx).pop();
                 },
-                child: const Text('ลบรายการติดตามนี้'),
+                child: Text(isThai ? 'ลบรายการติดตามนี้' : 'Delete Record'),
               ),
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('ยกเลิก'),
+                child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
               ),
               ElevatedButton(
                 onPressed: () async {
@@ -395,7 +417,7 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
                   );
                   if (ctx.mounted) Navigator.of(ctx).pop();
                 },
-                child: const Text('บันทึก'),
+                child: Text(isThai ? 'บันทึก' : 'Save'),
               ),
             ],
           );
@@ -404,7 +426,7 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
     );
   }
 
-  Widget _buildStatusBadge(RemittanceAssessmentResult assess) {
+  Widget _buildStatusBadge(RemittanceAssessmentResult assess, bool isThai) {
     final isTax = assess.isTaxable;
     final color = isTax ? VaultTheme.negative(context) : VaultTheme.positive(context);
 
@@ -416,18 +438,19 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
         border: Border.all(color: color.withValues(alpha: 0.3), width: 0.75),
       ),
       child: Text(
-        assess.statusLabel,
+        assess.getLocalizedStatus(isThai),
         style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
       ),
     );
   }
 
   Future<void> _showDaysInThailandDialog({int initialDays = 365}) async {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     final ctrl = TextEditingController(text: initialDays.toString());
     final result = await showDialog<int>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('จำนวนวันที่อยู่ในไทย ปี $_selectedRemittedYear'),
+        title: Text(isThai ? 'จำนวนวันที่อยู่ในไทย ปี $_selectedRemittedYear' : 'Days in Thailand in $_selectedRemittedYear'),
         content: TextField(
           controller: ctrl,
           keyboardType: TextInputType.number,
@@ -435,14 +458,16 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
             FilteringTextInputFormatter.digitsOnly,
             LengthLimitingTextInputFormatter(3),
           ],
-          decoration: const InputDecoration(
-            labelText: 'จำนวนวัน (1 - 366 วัน)',
-            helperText: 'หากอยู่รวมตั้งแต่ 180 วันขึ้นไป จะถือเป็นผู้มีถิ่นที่อยู่ในไทย',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: isThai ? 'จำนวนวัน (1 - 366 วัน)' : 'Days (1 - 366)',
+            helperText: isThai
+                ? 'หากอยู่รวมตั้งแต่ 180 วันขึ้นไป จะถือเป็นผู้มีถิ่นที่อยู่ในไทย'
+                : 'Staying >= 180 days qualifies as Thai Tax Resident',
+            border: const OutlineInputBorder(),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('ยกเลิก')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(isThai ? 'ยกเลิก' : 'Cancel')),
           ElevatedButton(
             onPressed: () {
               final val = int.tryParse(ctrl.text);
@@ -450,7 +475,7 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
                 Navigator.of(ctx).pop(val);
               }
             },
-            child: const Text('บันทึก'),
+            child: Text(isThai ? 'บันทึก' : 'Save'),
           ),
         ],
       ),
@@ -462,6 +487,7 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
   }
 
   Future<void> _showAddRemittanceDialog() async {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     final accounts = await ref.read(accountsDaoProvider).getActiveAccounts();
     if (!mounted) return;
     final foreignAccs = accounts.where((a) => !a.isDomestic || a.currencyCode != 'THB').toList();
@@ -469,7 +495,11 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
 
     if (foreignAccs.isEmpty || domesticAccs.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ต้องมีบัญชีต่างประเทศ (Offshore) และบัญชีไทย (Domestic) ก่อนบันทึก')),
+        SnackBar(
+          content: Text(isThai
+              ? 'ต้องมีบัญชีต่างประเทศ (Offshore) และบัญชีไทย (Domestic) ก่อนบันทึก'
+              : 'You need both an Offshore account and a Domestic THB account to record a remittance'),
+        ),
       );
       return;
     }
@@ -488,7 +518,7 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
-            title: const Text('บันทึกการนำเงินเข้าไทย (Remittance)'),
+            title: Text(isThai ? 'บันทึกการนำเงินเข้าไทย (Remittance)' : 'Record Foreign Remittance'),
             content: SizedBox(
               width: 480,
               child: SingleChildScrollView(
@@ -498,14 +528,18 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
                   children: [
                     DropdownButtonFormField<String>(
                       initialValue: srcAccId,
-                      decoration: const InputDecoration(labelText: 'บัญชีต้นทาง (ต่างประเทศ)'),
+                      decoration: InputDecoration(
+                        labelText: isThai ? 'บัญชีต้นทาง (ต่างประเทศ)' : 'Source Account (Offshore)',
+                      ),
                       items: foreignAccs.map((a) => DropdownMenuItem(value: a.id, child: Text('${a.name} (${a.currencyCode})'))).toList(),
                       onChanged: (v) => setDialogState(() => srcAccId = v!),
                     ),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
                       initialValue: dstAccId,
-                      decoration: const InputDecoration(labelText: 'บัญชีปลายทาง (ในประเทศ)'),
+                      decoration: InputDecoration(
+                        labelText: isThai ? 'บัญชีปลายทาง (ในประเทศ)' : 'Destination Account (Domestic)',
+                      ),
                       items: domesticAccs.map((a) => DropdownMenuItem(value: a.id, child: Text(a.name))).toList(),
                       onChanged: (v) => setDialogState(() => dstAccId = v!),
                     ),
@@ -517,7 +551,10 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
                             controller: amountCtrl,
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
                             inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
-                            decoration: const InputDecoration(labelText: 'จำนวนเงินต่างประเทศ', border: OutlineInputBorder()),
+                            decoration: InputDecoration(
+                              labelText: isThai ? 'จำนวนเงินต่างประเทศ' : 'Foreign Amount',
+                              border: const OutlineInputBorder(),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -526,7 +563,10 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
                             controller: fxRateCtrl,
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
                             inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
-                            decoration: const InputDecoration(labelText: 'อัตราแลกเปลี่ยน (FX)', border: OutlineInputBorder()),
+                            decoration: InputDecoration(
+                              labelText: isThai ? 'อัตราแลกเปลี่ยน (FX)' : 'Exchange Rate (FX)',
+                              border: const OutlineInputBorder(),
+                            ),
                           ),
                         ),
                       ],
@@ -539,22 +579,26 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
                         FilteringTextInputFormatter.digitsOnly,
                         LengthLimitingTextInputFormatter(4),
                       ],
-                      decoration: const InputDecoration(
-                        labelText: 'ปีภาษีที่เกิดเงินได้ (Tax Year Earned)',
-                        helperText: 'เช่น หากเป็นกำไรปี 2023 ที่นำเข้าปี 2025 ให้ระบุ 2023',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: isThai ? 'ปีภาษีที่เกิดเงินได้ (Tax Year Earned)' : 'Tax Year Earned',
+                        helperText: isThai
+                            ? 'เช่น หากเป็นกำไรปี 2023 ที่นำเข้าปี 2025 ให้ระบุ 2023'
+                            : 'e.g. For 2023 gains remitted in 2025, enter 2023',
+                        border: const OutlineInputBorder(),
                       ),
                     ),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
                       initialValue: incomeType,
-                      decoration: const InputDecoration(labelText: 'ประเภทเงินได้ต้นทาง'),
-                      items: const [
-                        DropdownMenuItem(value: 'dividend', child: Text('เงินปันผล (Dividend)')),
-                        DropdownMenuItem(value: 'capital_gain', child: Text('กำไรจากการขายสินทรัพย์ (Capital Gain)')),
-                        DropdownMenuItem(value: 'salary_freelance', child: Text('เงินเดือน / รับจ้างต่างประเทศ')),
-                        DropdownMenuItem(value: 'interest', child: Text('ดอกเบี้ยเงินฝากต่างประเทศ')),
-                        DropdownMenuItem(value: 'principal_return', child: Text('เงินต้นเดิมที่ส่งไปลงทุน')),
+                      decoration: InputDecoration(
+                        labelText: isThai ? 'ประเภทเงินได้ต้นทาง' : 'Income Source Type',
+                      ),
+                      items: [
+                        DropdownMenuItem(value: 'dividend', child: Text(isThai ? 'เงินปันผล (Dividend)' : 'Dividend')),
+                        DropdownMenuItem(value: 'capital_gain', child: Text(isThai ? 'กำไรจากการขายสินทรัพย์ (Capital Gain)' : 'Capital Gain')),
+                        DropdownMenuItem(value: 'salary_freelance', child: Text(isThai ? 'เงินเดือน / รับจ้างต่างประเทศ' : 'Salary / Offshore Income')),
+                        DropdownMenuItem(value: 'interest', child: Text(isThai ? 'ดอกเบี้ยเงินฝากต่างประเทศ' : 'Interest')),
+                        DropdownMenuItem(value: 'principal_return', child: Text(isThai ? 'เงินต้นเดิมที่ส่งไปลงทุน' : 'Principal Return')),
                       ],
                       onChanged: (v) {
                         setDialogState(() {
@@ -568,8 +612,8 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
                     const SizedBox(height: 8),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('เป็นเงินต้นเดิม (ไม่ใช่กำไร)'),
-                      subtitle: const Text('เงินต้นเดิมที่เคยส่งออกไป ไม่ต้องเสียภาษี'),
+                      title: Text(isThai ? 'เป็นเงินต้นเดิม (ไม่ใช่กำไร)' : 'Original Principal (Not Gains)'),
+                      subtitle: Text(isThai ? 'เงินต้นเดิมที่เคยส่งออกไป ไม่ต้องเสียภาษี' : 'Original capital previously sent abroad is tax-exempt'),
                       value: isPrincipal,
                       onChanged: (v) => setDialogState(() => isPrincipal = v),
                     ),
@@ -578,7 +622,7 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('ยกเลิก')),
+              TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(isThai ? 'ยกเลิก' : 'Cancel')),
               ElevatedButton(
                 onPressed: () async {
                   final amt = double.tryParse(amountCtrl.text) ?? 0.0;
@@ -633,7 +677,7 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
 
                   if (ctx.mounted) Navigator.of(ctx).pop();
                 },
-                child: const Text('บันทึก'),
+                child: Text(isThai ? 'บันทึก' : 'Save'),
               ),
             ],
           );

@@ -41,56 +41,72 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
     }
   }
 
+  Future<String?> _promptGmailInput(BuildContext context) async {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+    final emailController = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(isThai ? 'เข้าสู่ระบบ Gmail สำหรับ Google Drive' : 'Gmail Login for Google Drive'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(isThai
+                ? 'กรุณากรอกอีเมล Gmail ของคุณเพื่อใช้สำรองข้อมูลไปยัง Google Drive:'
+                : 'Enter your Gmail address to back up data to Google Drive:'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: emailController,
+              keyboardType: TextInputType.emailAddress,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Gmail / Google Account',
+                prefixIcon: Icon(Icons.email_outlined),
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(isThai ? 'ยกเลิก' : 'Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, emailController.text.trim()),
+            child: Text(isThai ? 'บันทึก' : 'Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _handleSignIn() async {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     final authService = ref.read(googleAuthServiceProvider);
     final syncService = ref.read(googleDriveSyncServiceProvider);
     try {
+      GoogleAuthUser? user;
       if (authService.isSupportedPlatform) {
-        final user = await authService.signIn();
-        if (user != null) {
-          await _loadData();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('เข้าสู่ระบบด้วย ${user.email} สำเร็จ'),
-                backgroundColor: VaultTheme.positive(context),
-              ),
-            );
-          }
+        try {
+          user = await authService.signIn();
+        } catch (e) {
+          debugPrint('Native Google sign-in fallback: $e');
+        }
+      }
+
+      if (user != null) {
+        await syncService.detectOrGetDriveFolder();
+        await _loadData();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(isThai ? 'เข้าสู่ระบบด้วย ${user.email} สำเร็จ' : 'Signed in as ${user.email}'),
+              backgroundColor: VaultTheme.positive(context),
+            ),
+          );
         }
       } else {
-        final emailController = TextEditingController();
-        final entered = await showDialog<String>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('เข้าสู่ระบบ Gmail สำหรับ Google Drive'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('กรุณากรอกอีเมล Gmail ของคุณเพื่อใช้สำรองข้อมูลไปยัง Google Drive:'),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Gmail / Google Account',
-                    prefixIcon: Icon(Icons.email_outlined),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('ยกเลิก')),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, emailController.text.trim()),
-                child: const Text('บันทึก'),
-              ),
-            ],
-          ),
-        );
+        if (!mounted) return;
+        final entered = await _promptGmailInput(context);
         if (entered != null && entered.isNotEmpty) {
           await authService.saveManualEmail(entered);
           await syncService.detectOrGetDriveFolder();
@@ -98,7 +114,7 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('บันทึกบัญชี $entered เรียบร้อยแล้ว'),
+                content: Text(isThai ? 'เชื่อมต่อบัญชี $entered เรียบร้อยแล้ว' : 'Connected account $entered'),
                 backgroundColor: VaultTheme.positive(context),
               ),
             );
@@ -109,7 +125,7 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('ไม่สามารถเข้าสู่ระบบได้: $e'),
+            content: Text(isThai ? 'เกิดข้อผิดพลาด: $e' : 'Error: $e'),
             backgroundColor: VaultTheme.negative(context),
           ),
         );
@@ -118,17 +134,20 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
   }
 
   Future<void> _handleSignOut() async {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('ออกจากระบบ Google'),
-        content: Text('คุณต้องการออกจากระบบบัญชี ${_googleUser?.email ?? ""} ใช่หรือไม่?'),
+        title: Text(isThai ? 'ออกจากระบบ Google' : 'Sign Out of Google'),
+        content: Text(isThai
+            ? 'คุณต้องการออกจากระบบบัญชี ${_googleUser?.email ?? ""} ใช่หรือไม่?'
+            : 'Sign out of account ${_googleUser?.email ?? ""}?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('ยกเลิก')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(isThai ? 'ยกเลิก' : 'Cancel')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('ออกจากระบบ'),
+            child: Text(isThai ? 'ออกจากระบบ' : 'Sign Out'),
           ),
         ],
       ),
@@ -138,7 +157,7 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
       await _loadData();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ออกจากระบบเรียบร้อยแล้ว')),
+          SnackBar(content: Text(isThai ? 'ออกจากระบบเรียบร้อยแล้ว' : 'Signed out successfully')),
         );
       }
     }
@@ -198,30 +217,34 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
   }
 
   Future<void> _confirmAndDownloadFromDrive() async {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.cloud_download, color: Colors.blueAccent),
-            SizedBox(width: 8),
-            Text('ดึงข้อมูลจาก Google Drive?'),
+            const Icon(Icons.cloud_download, color: Colors.blueAccent),
+            const SizedBox(width: 8),
+            Text(isThai ? 'ดึงข้อมูลจาก Google Drive?' : 'Restore from Google Drive?'),
           ],
         ),
-        content: const Text(
-          'ข้อมูลจาก Google Drive จะถูกนำมาแทนที่ฐานข้อมูลปัจจุบันในเครื่อง\n\n'
-          '🛡️ เพื่อความปลอดภัยสูงสุด ระบบจะสร้างไฟล์สำรองฉุกเฉิน (Safety Backup) ของข้อมูลปัจจุบันไว้ให้คุณโดยอัตโนมัติก่อนเขียนทับเสมอ',
-          style: TextStyle(fontSize: 14),
+        content: Text(
+          isThai
+              ? 'ข้อมูลจาก Google Drive จะถูกนำมาแทนที่ฐานข้อมูลปัจจุบันในเครื่อง\n\n'
+                '🛡️ เพื่อความปลอดภัยสูงสุด ระบบจะสร้างไฟล์สำรองฉุกเฉิน (Safety Backup) ของข้อมูลปัจจุบันไว้ให้คุณโดยอัตโนมัติก่อนเขียนทับเสมอ'
+              : 'Data from Google Drive will replace the current local database.\n\n'
+                '🛡️ For maximum safety, an automatic Safety Backup will be created before restoring.',
+          style: const TextStyle(fontSize: 14),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('ยกเลิก'),
+            child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: VaultTheme.accent(context)),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('ยืนยันดึงข้อมูล'),
+            child: Text(isThai ? 'ยืนยันดึงข้อมูล' : 'Confirm Restore'),
           ),
         ],
       ),
@@ -251,30 +274,35 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
   }
 
   Future<void> _confirmRollbackBackup(PreSyncBackupInfo backup) async {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+    final dateFormat = DateFormat('dd MMM yyyy, HH:mm:ss', isThai ? 'th' : 'en_US');
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.history, color: Colors.orangeAccent),
-            SizedBox(width: 8),
-            Text('กู้คืนไฟล์สำรองฉุกเฉิน?'),
+            const Icon(Icons.history, color: Colors.orangeAccent),
+            const SizedBox(width: 8),
+            Text(isThai ? 'กู้คืนไฟล์สำรองฉุกเฉิน?' : 'Restore Safety Backup?'),
           ],
         ),
         content: Text(
-          'คุณต้องการย้อนกลับไปใช้ข้อมูล ณ วันที่:\n${DateFormat('dd MMM yyyy, HH:mm:ss', 'th').format(backup.createdAt)} หรือไม่?\n\n'
-          'ข้อมูลปัจจุบันจะถูกแทนที่ด้วยข้อมูลจากไฟล์สำรองนี้',
+          isThai
+              ? 'คุณต้องการย้อนกลับไปใช้ข้อมูล ณ วันที่:\n${dateFormat.format(backup.createdAt)} หรือไม่?\n\n'
+                'ข้อมูลปัจจุบันจะถูกแทนที่ด้วยข้อมูลจากไฟล์สำรองนี้'
+              : 'Roll back database to point in time:\n${dateFormat.format(backup.createdAt)}?\n\n'
+                'Current data will be replaced with this backup.',
           style: const TextStyle(fontSize: 14),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('ยกเลิก'),
+            child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.orangeAccent),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('ยืนยันกู้คืน'),
+            child: Text(isThai ? 'ยืนยันกู้คืน' : 'Confirm Restore'),
           ),
         ],
       ),
@@ -296,7 +324,9 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(ok ? 'ย้อนกลับข้อมูลจากไฟล์สำรองสำเร็จเรียบร้อย' : 'เกิดข้อผิดพลาดในการกู้คืน'),
+        content: Text(ok
+            ? (isThai ? 'ย้อนกลับข้อมูลจากไฟล์สำรองสำเร็จเรียบร้อย' : 'Rolled back data successfully')
+            : (isThai ? 'เกิดข้อผิดพลาดในการกู้คืน' : 'Failed to restore backup')),
         backgroundColor: ok ? posColor : negColor,
       ),
     );
@@ -304,7 +334,8 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final dateFormat = DateFormat('dd MMM yyyy, HH:mm', 'th');
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+    final dateFormat = DateFormat('dd MMM yyyy, HH:mm', isThai ? 'th' : 'en_US');
 
     return Scaffold(
       backgroundColor: VaultTheme.background(context),
@@ -360,7 +391,7 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                               Text(
                                 _googleUser != null
                                     ? (_googleUser!.displayName ?? _googleUser!.email)
-                                    : 'เข้าสู่ระบบด้วย Gmail',
+                                    : (isThai ? 'เข้าสู่ระบบด้วย Gmail' : 'Sign in with Gmail'),
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 15,
@@ -373,7 +404,7 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                               Text(
                                 _googleUser != null
                                     ? _googleUser!.email
-                                    : 'เชื่อมต่อบัญชี Google เพื่อสำรองข้อมูลไปยังไดรฟ์',
+                                    : (isThai ? 'เชื่อมต่อบัญชี Google เพื่อสำรองข้อมูลไปยังไดรฟ์' : 'Connect Google account to back up data to Drive'),
                                 style: const TextStyle(fontSize: 12, color: Colors.grey),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -384,7 +415,7 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                         if (_googleUser != null)
                           TextButton(
                             onPressed: _handleSignOut,
-                            child: const Text('ออกจากระบบ', style: TextStyle(color: Colors.red, fontSize: 12)),
+                            child: Text(isThai ? 'ออกจากระบบ' : 'Sign Out', style: const TextStyle(color: Colors.red, fontSize: 12)),
                           )
                         else
                           FilledButton.tonalIcon(
@@ -393,7 +424,7 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             ),
                             icon: const Icon(Icons.login, size: 16),
-                            label: const Text('เข้าสู่ระบบ'),
+                            label: Text(isThai ? 'เข้าสู่ระบบ' : 'Sign In'),
                             onPressed: _handleSignIn,
                           ),
                       ],
@@ -436,8 +467,8 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                                 children: [
                                   Text(
                                     _status!.isConnected
-                                        ? 'เชื่อมต่อ Google Drive เรียบร้อย'
-                                        : 'ยังไม่ได้เชื่อมต่อ Google Drive',
+                                        ? (isThai ? 'เชื่อมต่อ Google Drive เรียบร้อย' : 'Google Drive Connected')
+                                        : (isThai ? 'ยังไม่ได้เชื่อมต่อ Google Drive' : 'Google Drive Disconnected'),
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 17,
@@ -448,7 +479,9 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                                   Text(
                                     _status!.isConnected
                                         ? (_status!.driveFolderPath ?? '')
-                                        : 'ตรวจไม่พบโฟลเดอร์ Google Drive for Desktop ในตำแหน่งมาตรฐาน',
+                                        : (isThai
+                                            ? 'ตรวจไม่พบโฟลเดอร์ Google Drive for Desktop ในตำแหน่งมาตรฐาน'
+                                            : 'No standard Google Drive folder detected'),
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: _status!.isConnected ? Colors.grey : Colors.orange,
@@ -478,7 +511,9 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
-                                    'มีข้อมูลเวอร์ชันใหม่กว่าบน Google Drive (บันทึกล่าสุดเมื่อ ${_status!.remoteLastModified != null ? dateFormat.format(_status!.remoteLastModified!) : ""}) แนะนำให้กดดึงข้อมูลล่าสุด',
+                                    isThai
+                                        ? 'มีข้อมูลเวอร์ชันใหม่กว่าบน Google Drive (บันทึกล่าสุดเมื่อ ${_status!.remoteLastModified != null ? dateFormat.format(_status!.remoteLastModified!) : ""}) แนะนำให้กดดึงข้อมูลล่าสุด'
+                                        : 'A newer version is available on Google Drive (last modified ${_status!.remoteLastModified != null ? dateFormat.format(_status!.remoteLastModified!) : ""}). Restoring is recommended.',
                                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                                   ),
                                 ),
@@ -496,12 +531,12 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('ซิงค์ล่าสุดเมื่อ', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                Text(isThai ? 'ซิงค์ล่าสุดเมื่อ' : 'Last Synced', style: const TextStyle(fontSize: 12, color: Colors.grey)),
                                 const SizedBox(height: 4),
                                 Text(
                                   _status!.lastSyncTime != null
                                       ? dateFormat.format(_status!.lastSyncTime!)
-                                      : 'ยังไม่เคยซิงค์ข้อมูล',
+                                      : (isThai ? 'ยังไม่เคยซิงค์ข้อมูล' : 'Never synced'),
                                   style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                                 ),
                               ],
@@ -509,7 +544,7 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
-                                const Text('รายการใหม่ในเครื่อง', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                Text(isThai ? 'รายการใหม่ในเครื่อง' : 'Pending Changes', style: const TextStyle(fontSize: 12, color: Colors.grey)),
                                 const SizedBox(height: 4),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
@@ -520,7 +555,7 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Text(
-                                    '${_status!.pendingCount} รายการ',
+                                    '${_status!.pendingCount} ${isThai ? "รายการ" : "items"}',
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 12,
@@ -552,9 +587,9 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                                         child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                                       )
                                     : const Icon(Icons.cloud_upload_outlined, size: 20),
-                                label: const Text(
-                                  'ส่งข้อมูลขึ้น Drive',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                label: Text(
+                                  isThai ? 'ส่งข้อมูลขึ้น Drive' : 'Backup to Drive',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                                 ),
                                 onPressed: (_isLoading || !_status!.isConnected) ? null : _uploadToGoogleDrive,
                               ),
@@ -567,9 +602,9 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                 ),
                                 icon: const Icon(Icons.cloud_download_outlined, size: 20),
-                                label: const Text(
-                                  'ดึงข้อมูลจาก Drive',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                label: Text(
+                                  isThai ? 'ดึงข้อมูลจาก Drive' : 'Restore from Drive',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                                 ),
                                 onPressed: (_isLoading || !_status!.isConnected) ? null : _confirmAndDownloadFromDrive,
                               ),
@@ -583,7 +618,7 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                 const SizedBox(height: 20),
 
                 // 2. Settings Section
-                const Text('การตั้งค่า Google Drive', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                Text(isThai ? 'การตั้งค่า Google Drive' : 'Google Drive Settings', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                 const SizedBox(height: 10),
                 Card(
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -592,23 +627,23 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                     children: [
                       ListTile(
                         leading: const Icon(Icons.folder_outlined, color: Colors.blueAccent),
-                        title: const Text('โฟลเดอร์ Google Drive'),
+                        title: Text(isThai ? 'โฟลเดอร์ Google Drive' : 'Google Drive Folder'),
                         subtitle: Text(
                           _status!.isConnected
-                              ? (_status!.driveFolderPath ?? 'ระบุแล้ว')
-                              : 'ยังไม่ได้เลือกโฟลเดอร์ (แตะเพื่อเลือกโฟลเดอร์ไดรฟ์ G: หรือ Google Drive)',
+                              ? (_status!.driveFolderPath ?? (isThai ? 'ระบุแล้ว' : 'Specified'))
+                              : (isThai ? 'ยังไม่ได้เลือกโฟลเดอร์ (แตะเพื่อเลือกโฟลเดอร์ไดรฟ์ G: หรือ Google Drive)' : 'No folder selected'),
                           style: const TextStyle(fontSize: 12),
                         ),
                         trailing: OutlinedButton(
                           onPressed: _pickDriveFolder,
-                          child: Text(_status!.isConnected ? 'เปลี่ยน' : 'เลือกโฟลเดอร์'),
+                          child: Text(_status!.isConnected ? (isThai ? 'เปลี่ยน' : 'Change') : (isThai ? 'เลือกโฟลเดอร์' : 'Select')),
                         ),
                       ),
                       const Divider(height: 1),
                       SwitchListTile(
                         secondary: const Icon(Icons.sync),
-                        title: const Text('ซิงค์อัตโนมัติ (Auto-Sync)'),
-                        subtitle: const Text('ตรวจสอบและซิงค์ข้อมูลกับ Google Drive ทุกครั้งที่เปิดแอป'),
+                        title: Text(isThai ? 'ซิงค์อัตโนมัติ (Auto-Sync)' : 'Auto-Sync'),
+                        subtitle: Text(isThai ? 'ตรวจสอบและซิงค์ข้อมูลกับ Google Drive ทุกครั้งที่เปิดแอป' : 'Check and sync with Google Drive on startup'),
                         value: _status!.isAutoSync,
                         onChanged: (val) async {
                           await ref.read(googleDriveSyncServiceProvider).setAutoSyncEnabled(val);
@@ -618,8 +653,8 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                       const Divider(height: 1),
                       SwitchListTile(
                         secondary: const Icon(Icons.wifi),
-                        title: const Text('ซิงค์ผ่าน Wi-Fi เท่านั้น'),
-                        subtitle: const Text('ประหยัดเน็ตมือถือ ไม่ซิงค์เมื่อใช้เครือข่าย Cellular'),
+                        title: Text(isThai ? 'ซิงค์ผ่าน Wi-Fi เท่านั้น' : 'Sync over Wi-Fi only'),
+                        subtitle: Text(isThai ? 'ประหยัดเน็ตมือถือ ไม่ซิงค์เมื่อใช้เครือข่าย Cellular' : 'Save mobile data, do not sync over cellular'),
                         value: _status!.isWifiOnly,
                         onChanged: (val) async {
                           await ref.read(googleDriveSyncServiceProvider).setWifiOnly(val);
@@ -630,19 +665,21 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                         const Divider(height: 1),
                         ListTile(
                           leading: const Icon(Icons.link_off, color: Colors.redAccent),
-                          title: const Text('ยกเลิกการเชื่อมต่อโฟลเดอร์', style: TextStyle(color: Colors.redAccent)),
+                          title: Text(isThai ? 'ยกเลิกการเชื่อมต่อโฟลเดอร์' : 'Disconnect Folder', style: const TextStyle(color: Colors.redAccent)),
                           onTap: () async {
                             final confirm = await showDialog<bool>(
                               context: context,
                               builder: (ctx) => AlertDialog(
-                                title: const Text('ยกเลิกการเชื่อมต่อ?'),
-                                content: const Text('การยกเลิกจะไม่ลบข้อมูลในเครื่องหรือใน Google Drive แต่จะหยุดการซิงค์ไว้ชั่วคราว'),
+                                title: Text(isThai ? 'ยกเลิกการเชื่อมต่อ?' : 'Disconnect Folder?'),
+                                content: Text(isThai
+                                    ? 'การยกเลิกจะไม่ลบข้อมูลในเครื่องหรือใน Google Drive แต่จะหยุดการซิงค์ไว้ชั่วคราว'
+                                    : 'Disconnecting will not delete any files, but sync will be paused.'),
                                 actions: [
-                                  TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('ยกเลิก')),
+                                  TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(isThai ? 'ยกเลิก' : 'Cancel')),
                                   FilledButton(
                                     style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
                                     onPressed: () => Navigator.of(ctx).pop(true),
-                                    child: const Text('ยืนยันยกเลิก'),
+                                    child: Text(isThai ? 'ยืนยันยกเลิก' : 'Confirm'),
                                   ),
                                 ],
                               ),
@@ -663,17 +700,19 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('ไฟล์สำรองฉุกเฉินก่อนซิงค์ (Safety Backups)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    Text(isThai ? 'ไฟล์สำรองฉุกเฉินก่อนซิงค์ (Safety Backups)' : 'Safety Pre-Sync Backups', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                     Text(
-                      '${_backups.length} ไฟล์',
+                      '${_backups.length} ${isThai ? "ไฟล์" : "files"}',
                       style: const TextStyle(fontSize: 12, color: Colors.grey),
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  'ทุกครั้งก่อนการดึงข้อมูลทับ ระบบจะสำรองข้อมูลในเครื่องไว้ที่นี่เสมอเพื่อให้คุณย้อนกลับได้ 100%',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                Text(
+                  isThai
+                      ? 'ทุกครั้งก่อนการดึงข้อมูลทับ ระบบจะสำรองข้อมูลในเครื่องไว้ที่นี่เสมอเพื่อให้คุณย้อนกลับได้ 100%'
+                      : 'An automatic backup is created before every restore so you can always roll back.',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
                 const SizedBox(height: 10),
 
@@ -681,12 +720,14 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                   Card(
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     color: VaultTheme.surface(context),
-                    child: const Padding(
-                      padding: EdgeInsets.all(18),
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
                       child: Center(
                         child: Text(
-                          'ยังไม่มีไฟล์สำรองฉุกเฉิน (จะสร้างอัตโนมัติเมื่อมีการดึงข้อมูลจาก Drive)',
-                          style: TextStyle(color: Colors.grey, fontSize: 13),
+                          isThai
+                              ? 'ยังไม่มีไฟล์สำรองฉุกเฉิน (จะสร้างอัตโนมัติเมื่อมีการดึงข้อมูลจาก Drive)'
+                              : 'No safety backups yet (created automatically when restoring from Drive)',
+                          style: const TextStyle(color: Colors.grey, fontSize: 13),
                         ),
                       ),
                     ),
@@ -718,7 +759,7 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             ),
                             onPressed: () => _confirmRollbackBackup(b),
-                            child: const Text('กู้คืนจุดนี้', style: TextStyle(fontSize: 11)),
+                            child: Text(isThai ? 'กู้คืนจุดนี้' : 'Rollback', style: const TextStyle(fontSize: 11)),
                           ),
                         ),
                       );

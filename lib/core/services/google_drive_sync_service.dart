@@ -158,6 +158,19 @@ class GoogleDriveSyncService {
       }
     }
 
+    // 4. บน Android, iOS หรือ Desktop ที่ไม่มี G:\ ให้สร้างโฟลเดอร์ GoogleDrive_Backup ใน Documents ของแอป
+    if (!kIsWeb) {
+      final docDir = await _getDocumentsDir();
+      final backupDir = Directory(p.join(docDir.path, 'GoogleDrive_Backup'));
+      if (!await backupDir.exists()) {
+        try {
+          await backupDir.create(recursive: true);
+        } catch (_) {}
+      }
+      await setDriveFolder(backupDir.path);
+      return backupDir.path;
+    }
+
     return null;
   }
 

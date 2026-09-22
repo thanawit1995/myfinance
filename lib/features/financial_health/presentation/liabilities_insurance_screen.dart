@@ -108,11 +108,17 @@ class _LiabilitiesTab extends ConsumerWidget {
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              // Summary Card
+              // Summary Card with High-Contrast Adaptive Theme
               Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                color: theme.colorScheme.errorContainer.withValues(alpha: 0.2),
+                elevation: 1,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(
+                    color: VaultTheme.negative(context).withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                ),
+                color: VaultTheme.surface(context),
                 child: Padding(
                   padding: const EdgeInsets.all(18),
                   child: Column(
@@ -123,13 +129,16 @@ class _LiabilitiesTab extends ConsumerWidget {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(isThai ? 'ยอดหนี้รวมทั้งหมด' : 'Total Debt Balance', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                              Text(
+                                isThai ? 'ยอดหนี้รวมทั้งหมด' : 'Total Debt Balance',
+                                style: TextStyle(fontSize: 12, color: VaultTheme.secondaryText(context)),
+                              ),
                               const SizedBox(height: 4),
                               Text(
                                 Money(totalDebtsSatang).format(symbol: '฿'),
                                 style: theme.textTheme.titleLarge?.copyWith(
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.red.shade800,
+                                  color: VaultTheme.negative(context),
                                 ),
                               ),
                             ],
@@ -137,7 +146,10 @@ class _LiabilitiesTab extends ConsumerWidget {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              Text(isThai ? 'ภาระผ่อนต่อเดือน' : 'Monthly Payment', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                              Text(
+                                isThai ? 'ภาระผ่อนต่อเดือน' : 'Monthly Payment',
+                                style: TextStyle(fontSize: 12, color: VaultTheme.secondaryText(context)),
+                              ),
                               const SizedBox(height: 4),
                               Text(
                                 Money(monthlyPaymentSatang).format(symbol: '฿'),
@@ -180,12 +192,15 @@ class _LiabilitiesTab extends ConsumerWidget {
                     children: [
                       Icon(Icons.check_circle_outline, size: 64, color: Colors.green.shade400),
                       const SizedBox(height: 12),
-                      const Text(
-                        'ไม่มีภาระหนี้สินคงค้าง',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      Text(
+                        isThai ? 'ไม่มีภาระหนี้สินคงค้าง' : 'No Outstanding Debts',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 4),
-                      Text('คุณไม่มีหนี้สินที่บันทึกไว้ในระบบ', style: TextStyle(color: Colors.grey.shade600)),
+                      Text(
+                        isThai ? 'คุณไม่มีหนี้สินที่บันทึกไว้ในระบบ' : 'You have no debts recorded in the system.',
+                        style: TextStyle(color: VaultTheme.secondaryText(context)),
+                      ),
                     ],
                   ),
                 )
@@ -195,7 +210,11 @@ class _LiabilitiesTab extends ConsumerWidget {
 
                   return Card(
                     margin: const EdgeInsets.only(bottom: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      side: BorderSide(color: VaultTheme.border(context), width: 0.8),
+                    ),
+                    color: VaultTheme.surface(context),
                     child: Padding(
                       padding: const EdgeInsets.all(14),
                       child: Column(
@@ -206,13 +225,17 @@ class _LiabilitiesTab extends ConsumerWidget {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: Colors.deepOrange.shade50,
+                                  color: theme.colorScheme.errorContainer.withValues(alpha: 0.25),
                                   borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: Colors.deepOrange.shade200),
+                                  border: Border.all(color: theme.colorScheme.error.withValues(alpha: 0.4)),
                                 ),
                                 child: Text(
-                                  _getTypeLabel(item.liabilityType),
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.deepOrange.shade800),
+                                  _getTypeLabel(item.liabilityType, isThai),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: VaultTheme.negative(context),
+                                  ),
                                 ),
                               ),
                               if (item.isShortTerm) ...[
@@ -220,10 +243,17 @@ class _LiabilitiesTab extends ConsumerWidget {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: Colors.amber.shade50,
+                                    color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.3),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
-                                  child: const Text('ระยะสั้น', style: TextStyle(fontSize: 10.5, color: Colors.brown)),
+                                  child: Text(
+                                    isThai ? 'ระยะสั้น' : 'Short-term',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: theme.colorScheme.onTertiaryContainer,
+                                    ),
+                                  ),
                                 ),
                               ],
                               const Spacer(),
@@ -235,19 +265,26 @@ class _LiabilitiesTab extends ConsumerWidget {
                                 },
                               ),
                               IconButton(
-                                icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                                icon: Icon(Icons.delete_outline, size: 18, color: VaultTheme.negative(context)),
                                 onPressed: () async {
                                   final confirm = await showDialog<bool>(
                                     context: context,
                                     builder: (ctx) => AlertDialog(
-                                      title: const Text('ยืนยันลบหนี้สิน'),
-                                      content: Text('คุณต้องการลบ "${item.name}" หรือไม่?'),
+                                      title: Text(isThai ? 'ยืนยันลบหนี้สิน' : 'Confirm Delete Debt'),
+                                      content: Text(
+                                        isThai
+                                            ? 'คุณต้องการลบ "${item.name}" หรือไม่?'
+                                            : 'Are you sure you want to delete "${item.name}"?',
+                                      ),
                                       actions: [
-                                        TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('ยกเลิก')),
+                                        TextButton(
+                                          onPressed: () => Navigator.of(ctx).pop(false),
+                                          child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+                                        ),
                                         FilledButton(
                                           style: FilledButton.styleFrom(backgroundColor: Colors.red),
                                           onPressed: () => Navigator.of(ctx).pop(true),
-                                          child: const Text('ลบ'),
+                                          child: Text(isThai ? 'ลบ' : 'Delete'),
                                         ),
                                       ],
                                     ),
@@ -273,7 +310,9 @@ class _LiabilitiesTab extends ConsumerWidget {
                                 const Icon(Icons.link, size: 14, color: Colors.blue),
                                 const SizedBox(width: 4),
                                 Text(
-                                  'เชื่อมกับบัญชี: ${linkedAccount.name} (ดึงยอดสด)',
+                                  isThai
+                                      ? 'เชื่อมกับบัญชี: ${linkedAccount.name} (ดึงยอดสด)'
+                                      : 'Linked account: ${linkedAccount.name} (Live balance)',
                                   style: const TextStyle(fontSize: 12, color: Colors.blue),
                                 ),
                               ],
@@ -286,7 +325,10 @@ class _LiabilitiesTab extends ConsumerWidget {
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text('ยอดหนี้คงเหลือ', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                  Text(
+                                    isThai ? 'ยอดหนี้คงเหลือ' : 'Remaining Balance',
+                                    style: TextStyle(fontSize: 11, color: VaultTheme.secondaryText(context)),
+                                  ),
                                   Text(
                                     Money(item.remainingPrincipalSatang).format(symbol: '฿'),
                                     style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
@@ -296,7 +338,10 @@ class _LiabilitiesTab extends ConsumerWidget {
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text('ผ่อนเดือนละ', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                  Text(
+                                    isThai ? 'ผ่อนเดือนละ' : 'Monthly Payment',
+                                    style: TextStyle(fontSize: 11, color: VaultTheme.secondaryText(context)),
+                                  ),
                                   Text(
                                     Money(item.monthlyPaymentSatang).format(symbol: '฿'),
                                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
@@ -306,7 +351,10 @@ class _LiabilitiesTab extends ConsumerWidget {
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  const Text('ดอกเบี้ยต่อปี', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                  Text(
+                                    isThai ? 'ดอกเบี้ยต่อปี' : 'Interest Rate',
+                                    style: TextStyle(fontSize: 11, color: VaultTheme.secondaryText(context)),
+                                  ),
                                   Text(
                                     '${item.interestRatePercent}%',
                                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
@@ -317,7 +365,10 @@ class _LiabilitiesTab extends ConsumerWidget {
                           ),
                           if (item.note != null && item.note!.isNotEmpty) ...[
                             const SizedBox(height: 8),
-                            Text('หมายเหตุ: ${item.note!}', style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600)),
+                            Text(
+                              '${isThai ? "หมายเหตุ" : "Note"}: ${item.note!}',
+                              style: TextStyle(fontSize: 11.5, color: VaultTheme.secondaryText(context)),
+                            ),
                           ],
                         ],
                       ),
@@ -332,20 +383,21 @@ class _LiabilitiesTab extends ConsumerWidget {
     );
   }
 
-  String _getTypeLabel(String type) {
+  String _getTypeLabel(String type, bool isThai) {
     switch (type) {
       case 'credit_card':
-        return 'บัตรเครดิต';
+        return isThai ? 'บัตรเครดิต' : 'Credit Card';
       case 'personal_loan':
-        return 'สินเชื่อบุคคล';
+        return isThai ? 'สินเชื่อบุคคล' : 'Personal Loan';
       case 'mortgage':
-        return 'สินเชื่อบ้าน';
+        return isThai ? 'สินเชื่อบ้าน' : 'Mortgage';
       case 'car_loan':
-        return 'สินเชื่อรถยนต์';
+      case 'auto_loan':
+        return isThai ? 'สินเชื่อรถยนต์' : 'Auto Loan';
       case 'student_loan':
-        return 'กยศ.';
+        return isThai ? 'กยศ.' : 'Student Loan';
       default:
-        return 'หนี้สินอื่นๆ';
+        return isThai ? 'หนี้สินอื่นๆ' : 'Other Debt';
     }
   }
 }
@@ -359,6 +411,7 @@ class _InsuranceTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final dao = ref.watch(insuranceDaoProvider);
     final theme = Theme.of(context);
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
 
     return FutureBuilder(
       future: Future.wait([
@@ -373,15 +426,13 @@ class _InsuranceTab extends ConsumerWidget {
         }
 
         if (snapshot.hasError) {
-          return Center(child: Text('เกิดข้อผิดพลาด: ${snapshot.error}'));
+          return Center(child: Text(isThai ? 'เกิดข้อผิดพลาด: ${snapshot.error}' : 'Error: ${snapshot.error}'));
         }
 
         final items = snapshot.data![0] as List<InsurancePolicy>;
         final sumInsuredSatang = snapshot.data![1] as int;
         final medicalSatang = snapshot.data![2] as int;
         final premiumSatang = snapshot.data![3] as int;
-
-        final isThai = Localizations.localeOf(context).languageCode == 'th';
 
         return Scaffold(
           floatingActionButton: FloatingActionButton.extended(
@@ -413,7 +464,10 @@ class _InsuranceTab extends ConsumerWidget {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(isThai ? 'ทุนประกันชีวิตรวม' : 'Total Life Sum Insured', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                              Text(
+                                isThai ? 'ทุนประกันชีวิตรวม' : 'Total Life Sum Insured',
+                                style: TextStyle(fontSize: 12, color: VaultTheme.secondaryText(context)),
+                              ),
                               const SizedBox(height: 4),
                               Text(
                                 Money(sumInsuredSatang).format(symbol: '฿'),
@@ -427,7 +481,10 @@ class _InsuranceTab extends ConsumerWidget {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              Text(isThai ? 'เบี้ยประกันรวมต่อปี' : 'Annual Premium', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                              Text(
+                                isThai ? 'เบี้ยประกันรวมต่อปี' : 'Annual Premium',
+                                style: TextStyle(fontSize: 12, color: VaultTheme.secondaryText(context)),
+                              ),
                               const SizedBox(height: 4),
                               Text(
                                 Money(premiumSatang).format(symbol: '฿'),
@@ -470,12 +527,15 @@ class _InsuranceTab extends ConsumerWidget {
                     children: [
                       Icon(Icons.shield_outlined, size: 64, color: Colors.blue.shade300),
                       const SizedBox(height: 12),
-                      const Text(
-                        'ยังไม่มีข้อมูลกรมธรรม์ประกันภัย',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      Text(
+                        isThai ? 'ยังไม่มีข้อมูลกรมธรรม์ประกันภัย' : 'No Insurance Policies Recorded',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 4),
-                      Text('บันทึกกรมธรรม์เพื่อประเมินความคุ้มครองชีวิตและค่ารักษา', style: TextStyle(color: Colors.grey.shade600)),
+                      Text(
+                        isThai ? 'บันทึกกรมธรรม์เพื่อประเมินความคุ้มครองชีวิตและค่ารักษา' : 'Record policies to evaluate life and health protection.',
+                        style: TextStyle(color: VaultTheme.secondaryText(context)),
+                      ),
                     ],
                   ),
                 )
@@ -483,7 +543,11 @@ class _InsuranceTab extends ConsumerWidget {
                 ...items.map((item) {
                   return Card(
                     margin: const EdgeInsets.only(bottom: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      side: BorderSide(color: VaultTheme.border(context), width: 0.8),
+                    ),
+                    color: VaultTheme.surface(context),
                     child: Padding(
                       padding: const EdgeInsets.all(14),
                       child: Column(
@@ -494,13 +558,17 @@ class _InsuranceTab extends ConsumerWidget {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: Colors.blue.shade50,
+                                  color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
                                   borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: Colors.blue.shade200),
+                                  border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.4)),
                                 ),
                                 child: Text(
-                                  _getTypeLabel(item.insuranceType),
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.blue.shade800),
+                                  _getInsuranceTypeLabel(item.insuranceType, isThai),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: theme.colorScheme.primary,
+                                  ),
                                 ),
                               ),
                               const Spacer(),
@@ -512,19 +580,26 @@ class _InsuranceTab extends ConsumerWidget {
                                 },
                               ),
                               IconButton(
-                                icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                                icon: Icon(Icons.delete_outline, size: 18, color: VaultTheme.negative(context)),
                                 onPressed: () async {
                                   final confirm = await showDialog<bool>(
                                     context: context,
                                     builder: (ctx) => AlertDialog(
-                                      title: const Text('ยืนยันลบกรมธรรม์'),
-                                      content: Text('คุณต้องการลบ "${item.policyName}" หรือไม่?'),
+                                      title: Text(isThai ? 'ยืนยันลบกรมธรรม์' : 'Confirm Delete Policy'),
+                                      content: Text(
+                                        isThai
+                                            ? 'คุณต้องการลบ "${item.policyName}" หรือไม่?'
+                                            : 'Are you sure you want to delete "${item.policyName}"?',
+                                      ),
                                       actions: [
-                                        TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('ยกเลิก')),
+                                        TextButton(
+                                          onPressed: () => Navigator.of(ctx).pop(false),
+                                          child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+                                        ),
                                         FilledButton(
                                           style: FilledButton.styleFrom(backgroundColor: Colors.red),
                                           onPressed: () => Navigator.of(ctx).pop(true),
-                                          child: const Text('ลบ'),
+                                          child: Text(isThai ? 'ลบ' : 'Delete'),
                                         ),
                                       ],
                                     ),
@@ -547,7 +622,7 @@ class _InsuranceTab extends ConsumerWidget {
                             const SizedBox(height: 2),
                             Text(
                               item.note!,
-                              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                              style: TextStyle(fontSize: 12, color: VaultTheme.secondaryText(context)),
                             ),
                           ],
                           const SizedBox(height: 10),
@@ -557,7 +632,10 @@ class _InsuranceTab extends ConsumerWidget {
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text('ทุนชีวิต', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                  Text(
+                                    isThai ? 'ทุนชีวิต' : 'Life Coverage',
+                                    style: TextStyle(fontSize: 11, color: VaultTheme.secondaryText(context)),
+                                  ),
                                   Text(
                                     Money(item.sumInsuredSatang).format(symbol: '฿'),
                                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
@@ -567,7 +645,10 @@ class _InsuranceTab extends ConsumerWidget {
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text('คุ้มครองรักษา/โรคร้าย', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                  Text(
+                                    isThai ? 'คุ้มครองรักษา/โรคร้าย' : 'Medical / CI',
+                                    style: TextStyle(fontSize: 11, color: VaultTheme.secondaryText(context)),
+                                  ),
                                   Text(
                                     Money(item.medicalCoverageSatang).format(symbol: '฿'),
                                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
@@ -577,10 +658,17 @@ class _InsuranceTab extends ConsumerWidget {
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  const Text('เบี้ยต่อปี', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                  Text(
+                                    isThai ? 'เบี้ยต่อปี' : 'Annual Premium',
+                                    style: TextStyle(fontSize: 11, color: VaultTheme.secondaryText(context)),
+                                  ),
                                   Text(
                                     Money(item.annualPremiumSatang).format(symbol: '฿'),
-                                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.green.shade700),
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: VaultTheme.positive(context),
+                                    ),
                                   ),
                                 ],
                               ),
@@ -590,11 +678,11 @@ class _InsuranceTab extends ConsumerWidget {
                             const SizedBox(height: 8),
                             Row(
                               children: [
-                                const Icon(Icons.event, size: 14, color: Colors.grey),
+                                Icon(Icons.event, size: 14, color: VaultTheme.secondaryText(context)),
                                 const SizedBox(width: 4),
                                 Text(
-                                  'ครบกำหนดชำระ: ${DateFormat('dd/MM/yyyy').format(item.dueDate!)}',
-                                  style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+                                  '${isThai ? "ครบกำหนดชำระ" : "Due Date"}: ${DateFormat('dd/MM/yyyy').format(item.dueDate!)}',
+                                  style: TextStyle(fontSize: 11.5, color: VaultTheme.secondaryText(context)),
                                 ),
                               ],
                             ),
@@ -612,22 +700,22 @@ class _InsuranceTab extends ConsumerWidget {
     );
   }
 
-  String _getTypeLabel(String type) {
+  String _getInsuranceTypeLabel(String type, bool isThai) {
     switch (type) {
       case 'life':
-        return 'ประกันชีวิต';
+        return isThai ? 'ประกันชีวิต' : 'Life Insurance';
       case 'health':
-        return 'ประกันสุขภาพ';
+        return isThai ? 'ประกันสุขภาพ' : 'Health Insurance';
       case 'accident':
-        return 'ประกันอุบัติเหตุ';
+        return isThai ? 'ประกันอุบัติเหตุ' : 'Accident';
       case 'critical_illness':
-        return 'โรคร้ายแรง';
+        return isThai ? 'โรคร้ายแรง' : 'Critical Illness';
       case 'savings':
-        return 'ออมทรัพย์';
+        return isThai ? 'ออมทรัพย์' : 'Endowment / Savings';
       case 'unit_linked':
-        return 'ยูนิตลิงค์';
+        return isThai ? 'ยูนิตลิงค์' : 'Unit-Linked';
       default:
-        return 'อื่นๆ';
+        return isThai ? 'อื่นๆ' : 'Other';
     }
   }
 }

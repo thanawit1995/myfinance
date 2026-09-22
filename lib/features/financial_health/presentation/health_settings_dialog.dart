@@ -150,12 +150,14 @@ class _HealthSettingsDialogState extends ConsumerState<HealthSettingsDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+
     return AlertDialog(
-      title: const Row(
+      title: Row(
         children: [
-          Icon(Icons.tune, color: Colors.blueGrey),
-          SizedBox(width: 8),
-          Text('ตั้งค่าเกณฑ์สุขภาพการเงิน'),
+          const Icon(Icons.tune, color: Colors.blueGrey),
+          const SizedBox(width: 8),
+          Text(isThai ? 'ตั้งค่าเกณฑ์สุขภาพการเงิน' : 'Health Metric Settings'),
         ],
       ),
       content: _isLoading
@@ -172,73 +174,83 @@ class _HealthSettingsDialogState extends ConsumerState<HealthSettingsDialog> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'ปรับแต่งเป้าหมายทางการเงินส่วนบุคคลและพารามิเตอร์ครอบครัว:',
-                        style: TextStyle(fontSize: 12.5, color: Colors.grey),
+                      Text(
+                        isThai
+                            ? 'ปรับแต่งเป้าหมายทางการเงินส่วนบุคคลและพารามิเตอร์ครอบครัว:'
+                            : 'Customize personal financial targets and family parameters:',
+                        style: const TextStyle(fontSize: 12.5, color: Colors.grey),
                       ),
                       const SizedBox(height: 16),
 
-                      _buildSectionLabel('1. ด้านสภาพคล่อง'),
+                      _buildSectionLabel(isThai ? '1. ด้านสภาพคล่อง' : '1. Liquidity Pillar'),
                       _buildNumberField(
                         controller: _basicLiqController,
-                        label: 'เป้าหมายสภาพคล่องพื้นฐาน (เท่า)',
+                        label: isThai ? 'เป้าหมายสภาพคล่องพื้นฐาน (เท่า)' : 'Target Basic Liquidity (x)',
                         hint: '1.0',
-                        suffix: 'เท่า',
+                        suffix: isThai ? 'เท่า' : 'x',
+                        isThai: isThai,
                       ),
                       const SizedBox(height: 10),
                       _buildNumberField(
                         controller: _emergMonthsController,
-                        label: 'เป้าหมายเงินสำรองฉุกเฉิน (เดือน)',
+                        label: isThai ? 'เป้าหมายเงินสำรองฉุกเฉิน (เดือน)' : 'Target Emergency Fund (Months)',
                         hint: '6.0',
-                        suffix: 'เดือน',
+                        suffix: isThai ? 'เดือน' : 'mo',
+                        isThai: isThai,
                       ),
                       const SizedBox(height: 16),
 
-                      _buildSectionLabel('2. ด้านหนี้สิน'),
+                      _buildSectionLabel(isThai ? '2. ด้านหนี้สิน' : '2. Debt Pillar'),
                       _buildNumberField(
                         controller: _dtaController,
-                        label: 'เพดานหนี้สินต่อสินทรัพย์ (%)',
+                        label: isThai ? 'เพดานหนี้สินต่อสินทรัพย์ (%)' : 'Debt-to-Asset Ceiling (%)',
                         hint: '50.0',
                         suffix: '%',
+                        isThai: isThai,
                       ),
                       const SizedBox(height: 10),
                       _buildNumberField(
                         controller: _dtiController,
-                        label: 'เพดานภาระหนี้ต่อรายได้ DTI (%)',
+                        label: isThai ? 'เพดานภาระหนี้ต่อรายได้ DTI (%)' : 'DTI Debt Service Ceiling (%)',
                         hint: '40.0',
                         suffix: '%',
+                        isThai: isThai,
                       ),
                       const SizedBox(height: 16),
 
-                      _buildSectionLabel('3. ด้านการออมและการลงทุน'),
+                      _buildSectionLabel(isThai ? '3. ด้านการออมและการลงทุน' : '3. Savings & Investment Pillar'),
                       _buildNumberField(
                         controller: _savingsController,
-                        label: 'เป้าหมายอัตราการออมต่อเดือน (%)',
+                        label: isThai ? 'เป้าหมายอัตราการออมต่อเดือน (%)' : 'Target Savings Rate (%)',
                         hint: '10.0',
                         suffix: '%',
+                        isThai: isThai,
                       ),
                       const SizedBox(height: 10),
                       _buildNumberField(
                         controller: _invRatioController,
-                        label: 'เป้าหมายสัดส่วนสินทรัพย์ลงทุน (%)',
+                        label: isThai ? 'เป้าหมายสัดส่วนสินทรัพย์ลงทุน (%)' : 'Target Investment Ratio (%)',
                         hint: '50.0',
                         suffix: '%',
+                        isThai: isThai,
                       ),
                       const SizedBox(height: 16),
 
-                      _buildSectionLabel('4. ด้านความคุ้มครองและครอบครัว'),
+                      _buildSectionLabel(isThai ? '4. ด้านความคุ้มครองและครอบครัว' : '4. Protection & Family Pillar'),
                       _buildNumberField(
                         controller: _familyReserveController,
-                        label: 'เงินสำรองเผื่อครอบครัว/ผู้อยู่ในอุปการะ (บาท)',
+                        label: isThai ? 'เงินสำรองเผื่อครอบครัว/ผู้อยู่ในอุปการะ (บาท)' : 'Family Dependent Reserve (THB)',
                         hint: '0',
-                        suffix: 'บาท',
+                        suffix: isThai ? 'บาท' : 'THB',
+                        isThai: isThai,
                       ),
                       const SizedBox(height: 10),
                       _buildNumberField(
                         controller: _medicalCostController,
-                        label: 'ประมาณการค่ารักษาพยาบาลโรคร้ายแรง (บาท)',
+                        label: isThai ? 'ประมาณการค่ารักษาพยาบาลโรคร้ายแรง (บาท)' : 'Estimated Medical / CI Cost (THB)',
                         hint: '500,000',
-                        suffix: 'บาท',
+                        suffix: isThai ? 'บาท' : 'THB',
+                        isThai: isThai,
                       ),
                     ],
                   ),
@@ -248,11 +260,11 @@ class _HealthSettingsDialogState extends ConsumerState<HealthSettingsDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('ยกเลิก'),
+          child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
         ),
         FilledButton(
           onPressed: _isLoading ? null : _saveSettings,
-          child: const Text('บันทึกการตั้งค่า'),
+          child: Text(isThai ? 'บันทึกการตั้งค่า' : 'Save Settings'),
         ),
       ],
     );
@@ -273,6 +285,7 @@ class _HealthSettingsDialogState extends ConsumerState<HealthSettingsDialog> {
     required String label,
     required String hint,
     required String suffix,
+    required bool isThai,
   }) {
     return TextFormField(
       controller: controller,
@@ -286,8 +299,8 @@ class _HealthSettingsDialogState extends ConsumerState<HealthSettingsDialog> {
         border: const OutlineInputBorder(),
       ),
       validator: (val) {
-        if (val == null || val.trim().isEmpty) return 'กรุณาระบุตัวเลข';
-        if (double.tryParse(val.trim()) == null) return 'ตัวเลขไม่ถูกต้อง';
+        if (val == null || val.trim().isEmpty) return isThai ? 'กรุณาระบุตัวเลข' : 'Please enter number';
+        if (double.tryParse(val.trim()) == null) return isThai ? 'ตัวเลขไม่ถูกต้อง' : 'Invalid number';
         return null;
       },
     );

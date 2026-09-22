@@ -357,157 +357,43 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           const SizedBox(height: 18),
 
-          // 5. Cloud Backup & Sync (Google Drive Only)
-          _buildSectionHeader(isThai ? 'สำรองข้อมูลบนคลาวด์ (Google Drive)' : 'Cloud Backup (Google Drive)'),
+          // 5. Cloud Backup & Sync (Google Drive Only) - Single Unified Entry Point
+          _buildSectionHeader(isThai ? 'ข้อมูลและการสำรองข้อมูล' : 'Data & Cloud Backup'),
           _buildSectionCard([
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            _buildTile(
+              icon: Icons.cloud_sync_rounded,
+              iconColor: Colors.blueAccent,
+              title: isThai ? 'สำรองและกู้คืนข้อมูล Google Drive' : 'Google Drive Backup & Sync',
+              subtitle: _googleUser != null
+                  ? (isThai
+                      ? 'เชื่อมต่อแล้ว: ${_googleUser!.email}${_gdriveStatus?.lastSyncTime != null ? " • ล่าสุด: ${DateFormat('d MMM, HH:mm', 'th_TH').format(_gdriveStatus!.lastSyncTime!)}" : ""}'
+                      : 'Connected: ${_googleUser!.email}${_gdriveStatus?.lastSyncTime != null ? " • Last: ${DateFormat('d MMM, HH:mm', 'en_US').format(_gdriveStatus!.lastSyncTime!)}" : ""}')
+                  : (isThai
+                      ? 'เชื่อมต่อ Gmail เพื่อสำรองข้อมูลขึ้น Google Drive อย่างปลอดภัย'
+                      : 'Connect Gmail to back up securely to Google Drive'),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: _googleUser != null
-                              ? Colors.teal.withValues(alpha: 0.15)
-                              : Colors.blue.withValues(alpha: 0.15),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(
-                          child: _googleUser != null
-                              ? Text(
-                                  _googleUser!.email.substring(0, 1).toUpperCase(),
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.teal),
-                                )
-                              : const Icon(Icons.cloud_sync_rounded, color: Colors.blue, size: 24),
+                  if (_googleUser != null)
+                    Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: VaultTheme.positive(context).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        isThai ? 'เชื่อมต่อแล้ว' : 'Connected',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: VaultTheme.positive(context),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _googleUser != null
-                                  ? (_googleUser!.displayName ?? _googleUser!.email)
-                                  : (isThai ? 'ยังไม่ได้เข้าสู่ระบบ Google' : 'Not signed in to Google'),
-                              style: TextStyle(
-                                fontFamily: VaultTheme.fontFamily,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                                color: VaultTheme.primaryText(context),
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              _googleUser != null
-                                  ? _googleUser!.email
-                                  : (isThai ? 'เข้าสู่ระบบด้วย Gmail เพื่อสำรองข้อมูล' : 'Sign in with Gmail to back up'),
-                              style: TextStyle(
-                                fontFamily: VaultTheme.fontFamily,
-                                fontSize: 12,
-                                color: VaultTheme.secondaryText(context),
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (_googleUser != null)
-                        TextButton(
-                          onPressed: _handleGoogleSignOut,
-                          style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
-                          child: Text(
-                            isThai ? 'ออกจากระบบ' : 'Sign Out',
-                            style: const TextStyle(color: Colors.red, fontSize: 12),
-                          ),
-                        )
-                      else
-                        FilledButton.tonalIcon(
-                          style: FilledButton.styleFrom(
-                            visualDensity: VisualDensity.compact,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          ),
-                          icon: const Icon(Icons.login, size: 16),
-                          label: Text(isThai ? 'เข้าสู่ระบบ Gmail' : 'Sign In'),
-                          onPressed: _handleGoogleSignIn,
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  const Divider(height: 1),
-                  const SizedBox(height: 12),
-                  // Sync & Restore Quick Action Buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton.icon(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: VaultTheme.accent(context),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          icon: const Icon(Icons.cloud_upload_outlined, size: 18),
-                          label: Text(
-                            isThai ? 'สำรองข้อมูลเดี๋ยวนี้' : 'Backup Now',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                          ),
-                          onPressed: _handleSyncNow,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          icon: const Icon(Icons.cloud_download_outlined, size: 18),
-                          label: Text(
-                            isThai ? 'ดึงข้อมูลจากไดรฟ์' : 'Restore from Drive',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                          ),
-                          onPressed: _handleRestoreFromDrive,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (_gdriveStatus?.lastSyncTime != null) ...[
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(Icons.check_circle_outline, size: 14, color: VaultTheme.positive(context)),
-                        const SizedBox(width: 6),
-                        Text(
-                          isThai
-                              ? 'สำรองข้อมูลล่าสุด: ${DateFormat('d MMM yyyy, HH:mm', 'th_TH').format(_gdriveStatus!.lastSyncTime!)}'
-                              : 'Last backup: ${DateFormat('d MMM yyyy, HH:mm', 'en_US').format(_gdriveStatus!.lastSyncTime!)}',
-                          style: TextStyle(
-                            fontFamily: VaultTheme.fontFamily,
-                            fontSize: 11,
-                            color: VaultTheme.secondaryText(context),
-                          ),
-                        ),
-                      ],
                     ),
-                  ],
+                  Icon(Icons.chevron_right_rounded, color: VaultTheme.secondaryText(context)),
                 ],
               ),
-            ),
-            _buildDivider(),
-            _buildTile(
-              icon: Icons.tune_rounded,
-              iconColor: Colors.blueAccent,
-              title: isThai ? 'จัดการและตั้งค่า Google Drive เพิ่มเติม' : 'Google Drive Settings & Backups',
-              subtitle: isThai
-                  ? 'ดูประวัติไฟล์สำรองฉุกเฉิน, เลือกระบบเครือข่าย Wi-Fi, จัดการตำแหน่งโฟลเดอร์'
-                  : 'Manage safety backups, Wi-Fi only mode, folder location',
               onTap: () async {
                 await Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const CloudSyncScreen()),
@@ -785,170 +671,5 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       );
     }
-  }
-
-  Future<void> _handleGoogleSignIn() async {
-    final isThai = widget.currentLocale.languageCode == 'th';
-    final authService = ref.read(googleAuthServiceProvider);
-    final syncService = ref.read(googleDriveSyncServiceProvider);
-    try {
-      if (authService.isSupportedPlatform) {
-        final user = await authService.signIn();
-        if (user != null) {
-          await _loadGoogleDriveStatus();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(isThai ? 'เข้าสู่ระบบด้วย ${user.email} สำเร็จ' : 'Signed in as ${user.email}'),
-                backgroundColor: VaultTheme.positive(context),
-              ),
-            );
-          }
-        }
-      } else {
-        // Windows Desktop: Prompt for Gmail account or link local Google Drive folder
-        final emailController = TextEditingController();
-        final entered = await showDialog<String>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: Text(isThai ? 'เข้าสู่ระบบ Gmail สำหรับ Google Drive' : 'Gmail Login for Google Drive'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(isThai
-                    ? 'กรุณากรอกอีเมล Gmail ของคุณเพื่อใช้สำรองข้อมูลไปยัง Google Drive:'
-                    : 'Enter your Gmail address to back up data to Google Drive:'),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Gmail / Google Account',
-                    prefixIcon: Icon(Icons.email_outlined),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: Text(isThai ? 'ยกเลิก' : 'Cancel')),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, emailController.text.trim()),
-                child: Text(isThai ? 'บันทึก' : 'Save'),
-              ),
-            ],
-          ),
-        );
-        if (entered != null && entered.isNotEmpty) {
-          await authService.saveManualEmail(entered);
-          await syncService.detectOrGetDriveFolder();
-          await _loadGoogleDriveStatus();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(isThai ? 'บันทึกบัญชี $entered เรียบร้อยแล้ว' : 'Saved account $entered'),
-                backgroundColor: VaultTheme.positive(context),
-              ),
-            );
-          }
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(isThai ? 'ไม่สามารถเข้าสู่ระบบได้: $e' : 'Sign in failed: $e'),
-            backgroundColor: VaultTheme.negative(context),
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _handleGoogleSignOut() async {
-    final isThai = widget.currentLocale.languageCode == 'th';
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(isThai ? 'ออกจากระบบ Google' : 'Sign Out of Google'),
-        content: Text(isThai
-            ? 'คุณต้องการออกจากระบบบัญชี ${_googleUser?.email ?? ""} ใช่หรือไม่?'
-            : 'Sign out of account ${_googleUser?.email ?? ""}?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(isThai ? 'ยกเลิก' : 'Cancel')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(isThai ? 'ออกจากระบบ' : 'Sign Out'),
-          ),
-        ],
-      ),
-    );
-    if (confirm == true) {
-      await ref.read(googleAuthServiceProvider).signOut();
-      await _loadGoogleDriveStatus();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(isThai ? 'ออกจากระบบเรียบร้อยแล้ว' : 'Signed out successfully')),
-        );
-      }
-    }
-  }
-
-  Future<void> _handleSyncNow() async {
-    final isThai = widget.currentLocale.languageCode == 'th';
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(
-      SnackBar(content: Text(isThai ? 'กำลังสำรองข้อมูลขึ้น Google Drive...' : 'Syncing data to Google Drive...')),
-    );
-    final result = await ref.read(googleDriveSyncServiceProvider).uploadToGoogleDrive();
-    await _loadGoogleDriveStatus();
-    if (!mounted) return;
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(result.message),
-        backgroundColor: result.success ? VaultTheme.positive(context) : VaultTheme.negative(context),
-        duration: const Duration(seconds: 4),
-      ),
-    );
-  }
-
-  Future<void> _handleRestoreFromDrive() async {
-    final isThai = widget.currentLocale.languageCode == 'th';
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(isThai ? 'ดึงข้อมูลจาก Google Drive?' : 'Restore from Google Drive?'),
-        content: Text(isThai
-            ? 'ข้อมูลจาก Google Drive จะถูกนำมาแทนที่ฐานข้อมูลในเครื่อง\n\n🛡️ ระบบจะสร้างไฟล์สำรองฉุกเฉิน (Safety Backup) ไว้ให้อัตโนมัติก่อนเขียนทับเสมอ'
-            : 'Data from Google Drive will replace local database.\n\n🛡️ An automatic safety backup will be created before restoring.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(isThai ? 'ยกเลิก' : 'Cancel')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: VaultTheme.accent(context)),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(isThai ? 'ยืนยันดึงข้อมูล' : 'Confirm Restore'),
-          ),
-        ],
-      ),
-    );
-    if (confirm != true || !mounted) return;
-
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(
-      SnackBar(content: Text(isThai ? 'กำลังดึงข้อมูลจาก Google Drive...' : 'Restoring from Google Drive...')),
-    );
-    final result = await ref.read(googleDriveSyncServiceProvider).downloadAndRestoreFromGoogleDrive();
-    await _loadGoogleDriveStatus();
-    if (!mounted) return;
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(result.message),
-        backgroundColor: result.success ? VaultTheme.positive(context) : VaultTheme.negative(context),
-        duration: const Duration(seconds: 5),
-      ),
-    );
   }
 }

@@ -360,13 +360,22 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
     _updateWidget();
 
     if (mounted) {
-      final recurringMsg = _isRecurring ? ' และตั้งรายการประจำแล้ว' : '';
+      final isThai = Localizations.localeOf(context).languageCode == 'th';
+      final srcAcc = _currentSourceAccount;
+      final srcCurrency = srcAcc?.currencyCode ?? 'THB';
+      final srcSymbol = srcCurrency == 'USD' ? '\$' : (srcCurrency == 'THB' ? '฿' : '$srcCurrency ');
+      final recurringMsg = _isRecurring ? (isThai ? ' และตั้งรายการประจำแล้ว' : ' and recurring schedule set') : '';
+      final typeText = _formatType(_transactionType, isThai);
+      final successMsg = isThai
+          ? 'บันทึกรายการ $typeText $srcSymbol$_amountString สำเร็จ$recurringMsg'
+          : 'Successfully saved $typeText $srcSymbol$_amountString$recurringMsg';
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('บันทึกรายการ ${_formatType(_transactionType)} ฿$_amountString สำเร็จ$recurringMsg'),
+          content: Text(successMsg),
           backgroundColor: VaultTheme.positive(context),
           action: SnackBarAction(
-            label: 'บันทึกรายการเดิมอีกครั้ง',
+            label: isThai ? 'บันทึกรายการเดิมอีกครั้ง' : 'Duplicate Last',
             textColor: Colors.white,
             onPressed: _duplicateLastTransaction,
           ),
@@ -413,14 +422,14 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
     );
   }
 
-  String _formatType(String type) {
+  String _formatType(String type, [bool isThai = true]) {
     switch (type) {
       case 'expense':
-        return 'รายจ่าย';
+        return isThai ? 'รายจ่าย' : 'Expense';
       case 'income':
-        return 'รายรับ';
+        return isThai ? 'รายรับ' : 'Income';
       case 'transfer':
-        return 'โอนเงิน';
+        return isThai ? 'โอนเงิน' : 'Transfer';
       default:
         return type;
     }
@@ -432,6 +441,7 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
 
     final l10n = AppLocalizations.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
 
     final amountBgColor = isDark
         ? const Color(0xFF1E293B)
@@ -459,11 +469,11 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
                 onPressed: () => Navigator.of(context).pop(),
               )
             : null,
-        title: Text(l10n?.quickAddKeypad ?? 'บันทึกด่วน (3 แตะ)'),
+        title: Text(l10n?.quickAddKeypad ?? (isThai ? 'บันทึกด่วน (3 แตะ)' : 'Quick Add (3 Taps)')),
         actions: [
           TextButton.icon(
             icon: const Icon(Icons.history, size: 18),
-            label: Text(l10n?.duplicateLast ?? 'ทำซ้ำล่าสุด'),
+            label: Text(l10n?.duplicateLast ?? (isThai ? 'ทำซ้ำล่าสุด' : 'Repeat Last')),
             onPressed: _duplicateLastTransaction,
           ),
         ],
@@ -475,9 +485,9 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
             // 1. Transaction Type Segmented Buttons
             SegmentedButton<String>(
               segments: [
-                ButtonSegment(value: 'expense', label: Text(l10n?.expense ?? 'รายจ่าย'), icon: const Icon(Icons.remove_circle_outline)),
-                ButtonSegment(value: 'income', label: Text(l10n?.income ?? 'รายรับ'), icon: const Icon(Icons.add_circle_outline)),
-                ButtonSegment(value: 'transfer', label: Text(l10n?.transfer ?? 'โอนเงิน'), icon: const Icon(Icons.swap_horiz)),
+                ButtonSegment(value: 'expense', label: Text(l10n?.expense ?? (isThai ? 'รายจ่าย' : 'Expense')), icon: const Icon(Icons.remove_circle_outline)),
+                ButtonSegment(value: 'income', label: Text(l10n?.income ?? (isThai ? 'รายรับ' : 'Income')), icon: const Icon(Icons.add_circle_outline)),
+                ButtonSegment(value: 'transfer', label: Text(l10n?.transfer ?? (isThai ? 'โอนเงิน' : 'Transfer')), icon: const Icon(Icons.swap_horiz)),
               ],
               selected: {_transactionType},
               onSelectionChanged: (newVal) async {
@@ -511,7 +521,7 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Text(
-                        'จำนวนเงินที่โอนออก ($srcCurrency)',
+                        isThai ? 'จำนวนเงินที่โอนออก ($srcCurrency)' : 'Transfer Out Amount ($srcCurrency)',
                         style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w600,
@@ -523,7 +533,7 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Text(
-                        'สกุลเงิน $srcCurrency',
+                        isThai ? 'สกุลเงิน $srcCurrency' : 'Currency: $srcCurrency',
                         style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w600,
@@ -549,7 +559,7 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
             if (_transactionType != 'transfer') ...[
               Align(
                 alignment: Alignment.centerLeft,
-                child: Text(l10n?.category != null ? '${l10n!.category}:' : 'เลือกหมวดหมู่:', style: theme.textTheme.labelLarge),
+                child: Text(l10n?.category != null ? '${l10n!.category}:' : (isThai ? 'เลือกหมวดหมู่:' : 'Select Category:'), style: theme.textTheme.labelLarge),
               ),
               const SizedBox(height: 6),
               _buildCategoryChips(),
@@ -592,7 +602,10 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 icon: const Icon(Icons.check, size: 24),
-                label: const Text('บันทึกรายการ', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                label: Text(
+                  isThai ? 'บันทึกรายการ' : 'Save Transaction',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
                 onPressed: _submitTransaction,
               ),
             ),
@@ -604,6 +617,8 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
   }
 
   Widget _buildCategoryChips() {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+
     return FutureBuilder<List<Category>>(
       future: ref.read(categoriesDaoProvider).getActiveCategories(_transactionType),
       builder: (context, snapshot) {
@@ -618,6 +633,9 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
                 final isLumi = VaultTheme.isLumi(context);
                 final isDark = VaultTheme.isDark(context);
                 final accentColor = isLumi ? const Color(0xFFFF5C9D) : VaultTheme.accent(context);
+                final displayName = isThai
+                    ? cat.nameTh
+                    : (cat.nameEn.trim().isNotEmpty ? cat.nameEn : cat.nameTh);
 
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
@@ -629,7 +647,7 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
                           ? (isDark && !isLumi ? Colors.black : Colors.white)
                           : (isLumi ? const Color(0xFFFF5C9D) : VaultTheme.secondaryText(context)),
                     ),
-                    label: Text(cat.nameTh),
+                    label: Text(displayName),
                     selected: isSelected,
                     selectedColor: accentColor,
                     labelStyle: TextStyle(
@@ -652,7 +670,7 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
               }),
               ActionChip(
                 avatar: const Icon(Icons.add, size: 16),
-                label: const Text('เพิ่มหมวดหมู่'),
+                label: Text(isThai ? 'เพิ่มหมวดหมู่' : 'Add Category'),
                 onPressed: () async {
                   final newCat = await CategoryFormDialog.show(
                     context,
@@ -673,6 +691,8 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
   }
 
   Widget _buildAdditionalOptions(ThemeData theme) {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+
     return Card(
       elevation: 0,
       color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
@@ -689,14 +709,14 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
               : null,
         ),
         title: Text(
-          'ตัวเลือกเพิ่มเติม (โน้ต, โครงการ, รายการประจำ)',
+          isThai ? 'ตัวเลือกเพิ่มเติม (โน้ต, โครงการ, รายการประจำ)' : 'Additional Options (Note, Project, Recurring)',
           style: theme.textTheme.bodyMedium?.copyWith(
             fontWeight: (_isRecurring || _selectedProjectId != null) ? FontWeight.bold : FontWeight.normal,
           ),
         ),
         subtitle: (_isRecurring || _selectedProjectId != null)
             ? Text(
-                '${_selectedProjectId != null ? "มีโครงการ " : ""}${_isRecurring ? "(รายการประจำ)" : ""}',
+                '${_selectedProjectId != null ? (isThai ? "มีโครงการ " : "Project linked ") : ""}${_isRecurring ? (isThai ? "(รายการประจำ)" : "(Recurring)") : ""}',
                 style: TextStyle(fontSize: 12, color: theme.colorScheme.primary),
               )
             : null,
@@ -705,10 +725,10 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
           // 1. Note TextField
           TextField(
             controller: _noteController,
-            decoration: const InputDecoration(
-              labelText: 'บันทึกช่วยจำ (Note)',
-              prefixIcon: Icon(Icons.note_alt_outlined),
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: isThai ? 'บันทึกช่วยจำ (Note)' : 'Note',
+              prefixIcon: const Icon(Icons.note_alt_outlined),
+              border: const OutlineInputBorder(),
               isDense: true,
             ),
           ),
@@ -720,15 +740,15 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
             builder: (context, snapshot) {
               final projects = snapshot.data ?? [];
               return DropdownButtonFormField<String?>(
-                decoration: const InputDecoration(
-                  labelText: 'ผูกกับโครงการพิเศษ (Special Project)',
-                  prefixIcon: Icon(Icons.folder_special_outlined),
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: isThai ? 'ผูกกับโครงการพิเศษ (Special Project)' : 'Special Project',
+                  prefixIcon: const Icon(Icons.folder_special_outlined),
+                  border: const OutlineInputBorder(),
                   isDense: true,
                 ),
                 initialValue: _selectedProjectId,
                 items: [
-                  const DropdownMenuItem(value: null, child: Text('ไม่ระบุโครงการ')),
+                  DropdownMenuItem(value: null, child: Text(isThai ? 'ไม่ระบุโครงการ' : 'No Project')),
                   ...projects.map((p) => DropdownMenuItem(
                         value: p.id,
                         child: Text(p.name),
@@ -751,8 +771,8 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
               children: [
                 CheckboxListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                  title: const Text('ตั้งเป็นรายการประจำ (Recurring)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  subtitle: const Text('บันทึกซ้ำอัตโนมัติตามรอบที่กำหนด', style: TextStyle(fontSize: 12)),
+                  title: Text(isThai ? 'ตั้งเป็นรายการประจำ (Recurring)' : 'Recurring Transaction', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  subtitle: Text(isThai ? 'บันทึกซ้ำอัตโนมัติตามรอบที่กำหนด' : 'Repeat transaction on schedule', style: const TextStyle(fontSize: 12)),
                   value: _isRecurring,
                   onChanged: (val) => setState(() => _isRecurring = val ?? false),
                 ),
@@ -764,57 +784,57 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
                         const Divider(height: 1),
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String>(
-                          decoration: const InputDecoration(
-                            labelText: 'ความถี่ (Frequency)',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: isThai ? 'ความถี่ (Frequency)' : 'Frequency',
+                            border: const OutlineInputBorder(),
                             isDense: true,
                           ),
                           initialValue: _recurringFrequency,
-                          items: const [
-                            DropdownMenuItem(value: 'daily', child: Text('ทุกวัน (Daily)')),
-                            DropdownMenuItem(value: 'weekly', child: Text('ทุกสัปดาห์ (Weekly)')),
-                            DropdownMenuItem(value: 'monthly', child: Text('ทุกเดือน (Monthly)')),
+                          items: [
+                            DropdownMenuItem(value: 'daily', child: Text(isThai ? 'ทุกวัน (Daily)' : 'Daily')),
+                            DropdownMenuItem(value: 'weekly', child: Text(isThai ? 'ทุกสัปดาห์ (Weekly)' : 'Weekly')),
+                            DropdownMenuItem(value: 'monthly', child: Text(isThai ? 'ทุกเดือน (Monthly)' : 'Monthly')),
                           ],
                           onChanged: (val) => setState(() => _recurringFrequency = val ?? 'monthly'),
                         ),
                         const SizedBox(height: 10),
                         if (_recurringFrequency == 'monthly')
                           DropdownButtonFormField<int>(
-                            decoration: const InputDecoration(
-                              labelText: 'ทุกวันที่ของเดือน (Day of month)',
-                              border: OutlineInputBorder(),
+                            decoration: InputDecoration(
+                              labelText: isThai ? 'ทุกวันที่ของเดือน (Day of month)' : 'Day of Month',
+                              border: const OutlineInputBorder(),
                               isDense: true,
                             ),
                             initialValue: _recurringDayOfMonth,
                             items: List.generate(31, (i) => i + 1)
-                                .map((day) => DropdownMenuItem(value: day, child: Text('วันที่ $day ของทุกเดือน')))
+                                .map((day) => DropdownMenuItem(value: day, child: Text(isThai ? 'วันที่ $day ของทุกเดือน' : 'Day $day of month')))
                                 .toList(),
                             onChanged: (val) => setState(() => _recurringDayOfMonth = val ?? 1),
                           ),
                         if (_recurringFrequency == 'weekly')
                           DropdownButtonFormField<int>(
-                            decoration: const InputDecoration(
-                              labelText: 'ทุกวันในสัปดาห์ (Day of week)',
-                              border: OutlineInputBorder(),
+                            decoration: InputDecoration(
+                              labelText: isThai ? 'ทุกวันในสัปดาห์ (Day of week)' : 'Day of Week',
+                              border: const OutlineInputBorder(),
                               isDense: true,
                             ),
                             initialValue: _recurringDayOfWeek,
-                            items: const [
-                              DropdownMenuItem(value: 1, child: Text('วันจันทร์')),
-                              DropdownMenuItem(value: 2, child: Text('วันอังคาร')),
-                              DropdownMenuItem(value: 3, child: Text('วันพุธ')),
-                              DropdownMenuItem(value: 4, child: Text('วันพฤหัสบดี')),
-                              DropdownMenuItem(value: 5, child: Text('วันศุกร์')),
-                              DropdownMenuItem(value: 6, child: Text('วันเสาร์')),
-                              DropdownMenuItem(value: 7, child: Text('วันอาทิตย์')),
+                            items: [
+                              DropdownMenuItem(value: 1, child: Text(isThai ? 'วันจันทร์' : 'Monday')),
+                              DropdownMenuItem(value: 2, child: Text(isThai ? 'วันอังคาร' : 'Tuesday')),
+                              DropdownMenuItem(value: 3, child: Text(isThai ? 'วันพุธ' : 'Wednesday')),
+                              DropdownMenuItem(value: 4, child: Text(isThai ? 'วันพฤหัสบดี' : 'Thursday')),
+                              DropdownMenuItem(value: 5, child: Text(isThai ? 'วันศุกร์' : 'Friday')),
+                              DropdownMenuItem(value: 6, child: Text(isThai ? 'วันเสาร์' : 'Saturday')),
+                              DropdownMenuItem(value: 7, child: Text(isThai ? 'วันอาทิตย์' : 'Sunday')),
                             ],
                             onChanged: (val) => setState(() => _recurringDayOfWeek = val ?? 1),
                           ),
                         const SizedBox(height: 8),
                         SwitchListTile(
                           contentPadding: EdgeInsets.zero,
-                          title: const Text('บันทึกรายการอัตโนมัติ (Auto-post)', style: TextStyle(fontSize: 13)),
-                          subtitle: const Text('บันทึกเข้าบัญชีทันทีเมื่อถึงกำหนด', style: TextStyle(fontSize: 11)),
+                          title: Text(isThai ? 'บันทึกรายการอัตโนมัติ (Auto-post)' : 'Auto-post Transaction', style: const TextStyle(fontSize: 13)),
+                          subtitle: Text(isThai ? 'บันทึกเข้าบัญชีทันทีเมื่อถึงกำหนด' : 'Post automatically on due date', style: const TextStyle(fontSize: 11)),
                           value: _recurringAutoPost,
                           onChanged: (val) => setState(() => _recurringAutoPost = val),
                         ),
@@ -831,6 +851,8 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
   }
 
   Widget _buildAccountSelector() {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+
     return FutureBuilder<List<Account>>(
       future: ref.read(accountsDaoProvider).getActiveAccounts(),
       builder: (context, snapshot) {
@@ -849,7 +871,7 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
             children: [
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(labelText: 'จากบัญชี', border: OutlineInputBorder()),
+                  decoration: InputDecoration(labelText: isThai ? 'จากบัญชี' : 'From Account', border: const OutlineInputBorder()),
                   initialValue: _selectedAccountId,
                   items: accounts.map((a) => DropdownMenuItem(value: a.id, child: Text('${a.name} (${a.currencyCode})'))).toList(),
                   onChanged: (val) {
@@ -870,7 +892,7 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
               Expanded(
                 child: DropdownButtonFormField<String>(
                   key: ValueKey('dest_$effectiveDestId'),
-                  decoration: const InputDecoration(labelText: 'ไปยังบัญชี', border: OutlineInputBorder()),
+                  decoration: InputDecoration(labelText: isThai ? 'ไปยังบัญชี' : 'To Account', border: const OutlineInputBorder()),
                   initialValue: effectiveDestId,
                   items: destAccounts.map((a) => DropdownMenuItem(value: a.id, child: Text('${a.name} (${a.currencyCode})'))).toList(),
                   onChanged: (val) => setState(() => _selectedDestinationAccountId = val),
@@ -880,7 +902,7 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
           );
         } else {
           return DropdownButtonFormField<String>(
-            decoration: const InputDecoration(labelText: 'เลือกบัญชี', border: OutlineInputBorder()),
+            decoration: InputDecoration(labelText: isThai ? 'เลือกบัญชี' : 'Select Account', border: const OutlineInputBorder()),
             initialValue: _selectedAccountId,
             items: accounts.map((a) => DropdownMenuItem(value: a.id, child: Text('${a.name} (${a.currencyCode})'))).toList(),
             onChanged: (val) => setState(() => _selectedAccountId = val),
@@ -908,6 +930,7 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
           return const SizedBox.shrink();
         }
 
+        final isThai = Localizations.localeOf(context).languageCode == 'th';
         final isDark = theme.brightness == Brightness.dark;
         final parsedSrc = double.tryParse(_amountString) ?? 0.0;
         final parsedDst = double.tryParse(_usdAmountString) ?? 0.0;
@@ -915,19 +938,19 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
         if (parsedSrc > 0 && parsedDst > 0) {
           if (srcCurrency == 'THB' && dstCurrency == 'USD') {
             final rate = parsedSrc / parsedDst; // THB / USD
-            fxHint = 'อัตราแลกเปลี่ยนโดยประมาณ: 1 USD ≈ ${rate.toStringAsFixed(2)} THB';
+            fxHint = isThai ? 'อัตราแลกเปลี่ยนโดยประมาณ: 1 USD ≈ ${rate.toStringAsFixed(2)} THB' : 'Approx. Exchange Rate: 1 USD ≈ ${rate.toStringAsFixed(2)} THB';
           } else if (srcCurrency == 'USD' && dstCurrency == 'THB') {
             final rate = parsedDst / parsedSrc; // THB / USD
-            fxHint = 'อัตราแลกเปลี่ยนโดยประมาณ: 1 USD ≈ ${rate.toStringAsFixed(2)} THB';
+            fxHint = isThai ? 'อัตราแลกเปลี่ยนโดยประมาณ: 1 USD ≈ ${rate.toStringAsFixed(2)} THB' : 'Approx. Exchange Rate: 1 USD ≈ ${rate.toStringAsFixed(2)} THB';
           } else {
             final rate = parsedSrc / parsedDst;
-            fxHint = 'อัตราแลกเปลี่ยนโดยประมาณ: 1 $dstCurrency ≈ ${rate.toStringAsFixed(2)} $srcCurrency';
+            fxHint = isThai ? 'อัตราแลกเปลี่ยนโดยประมาณ: 1 $dstCurrency ≈ ${rate.toStringAsFixed(2)} $srcCurrency' : 'Approx. Exchange Rate: 1 $dstCurrency ≈ ${rate.toStringAsFixed(2)} $srcCurrency';
           }
         }
 
         final cardTitle = dstCurrency == 'THB'
-            ? 'ยอดเงินบาทปลายทางที่ได้รับ (THB)'
-            : 'ยอดเงินปลายทาง ($dstCurrency)';
+            ? (isThai ? 'ยอดเงินบาทปลายทางที่ได้รับ (THB)' : 'Destination Amount Received (THB)')
+            : (isThai ? 'ยอดเงินปลายทาง ($dstCurrency)' : 'Destination Amount ($dstCurrency)');
         final prefixSymbol = dstCurrency == 'USD' ? '\$ ' : (dstCurrency == 'THB' ? '฿ ' : '$dstCurrency ');
 
         return Container(
@@ -1086,6 +1109,7 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
           return const SizedBox.shrink();
         }
 
+        final isThai = Localizations.localeOf(context).languageCode == 'th';
         final currentAmount = double.tryParse(_amountString) ?? 0.0;
         final secondaryAmount = double.tryParse(_usdAmountString) ?? 0.0;
         final currentAmountThbSatang = src.currencyCode != 'THB'
@@ -1113,7 +1137,7 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'ตรวจพบ: นำเงินต่างประเทศเข้าไทย (Foreign Remittance)',
+                      isThai ? 'ตรวจพบ: นำเงินต่างประเทศเข้าไทย (Foreign Remittance)' : 'Detected: Foreign Remittance into Thailand',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: isDark ? const Color(0xFFF8FAFC) : Colors.blue.shade900,
@@ -1139,7 +1163,7 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'เงินต้นลงทุนต่างประเทศคงเหลือ:',
+                          isThai ? 'เงินต้นลงทุนต่างประเทศคงเหลือ:' : 'Remaining Foreign Principal:',
                           style: TextStyle(
                             fontSize: 12,
                             color: isDark ? const Color(0xFF94A3B8) : Colors.black87,
@@ -1158,8 +1182,12 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
                     const SizedBox(height: 4),
                     Text(
                       isWithinPrincipal
-                          ? '✓ อยู่ในวงเงินต้น — ตัดเงินต้นเดิมตาม FIFO อัตโนมัติ (ได้รับยกเว้นภาษี)'
-                          : '⚠️ ยอดโอนเกินเงินต้นคงเหลือ — ส่วนเกินจะถือเป็นกำไรตามเกณฑ์ FIFO',
+                          ? (isThai
+                              ? '✓ อยู่ในวงเงินต้น — ตัดเงินต้นเดิมตาม FIFO อัตโนมัติ (ได้รับยกเว้นภาษี)'
+                              : '✓ Within principal limit — deducts original principal via FIFO (Tax Exempt)')
+                          : (isThai
+                              ? '⚠️ ยอดโอนเกินเงินต้นคงเหลือ — ส่วนเกินจะถือเป็นกำไรตามเกณฑ์ FIFO'
+                              : '⚠️ Transfer exceeds remaining principal — excess is treated as assessable gain via FIFO'),
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
@@ -1176,15 +1204,15 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
                 children: [
                   Expanded(
                     child: DropdownButtonFormField<int>(
-                      decoration: const InputDecoration(
-                        labelText: 'ปีที่เกิดเงินได้ (กรณีเป็นกำไร)',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: isThai ? 'ปีที่เกิดเงินได้ (กรณีเป็นกำไร)' : 'Tax Year Earned (if gain)',
+                        border: const OutlineInputBorder(),
                         isDense: true,
                       ),
                       initialValue: _remittanceTaxYearEarned > currentYear ? currentYear : _remittanceTaxYearEarned,
                       items: yearList.map((yr) => DropdownMenuItem(
                         value: yr,
-                        child: Text('ปี $yr (พ.ศ. ${yr + 543})'),
+                        child: Text(isThai ? 'ปี $yr (พ.ศ. ${yr + 543})' : 'Year $yr (B.E. ${yr + 543})'),
                       )).toList(),
                       onChanged: (val) {
                         if (val != null) setState(() => _remittanceTaxYearEarned = val);
@@ -1194,18 +1222,18 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: DropdownButtonFormField<String>(
-                      decoration: const InputDecoration(
-                        labelText: 'ประเภทเงินได้',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: isThai ? 'ประเภทเงินได้' : 'Income Type',
+                        border: const OutlineInputBorder(),
                         isDense: true,
                       ),
                       initialValue: _remittanceIncomeSourceType,
-                      items: const [
-                        DropdownMenuItem(value: 'capital_gain', child: Text('กำไรลงทุน')),
-                        DropdownMenuItem(value: 'dividend', child: Text('เงินปันผล')),
-                        DropdownMenuItem(value: 'salary', child: Text('เงินเดือน')),
-                        DropdownMenuItem(value: 'savings_principal', child: Text('เงินเก็บ')),
-                        DropdownMenuItem(value: 'other', child: Text('อื่นๆ')),
+                      items: [
+                        DropdownMenuItem(value: 'capital_gain', child: Text(isThai ? 'กำไรลงทุน' : 'Capital Gain')),
+                        DropdownMenuItem(value: 'dividend', child: Text(isThai ? 'เงินปันผล' : 'Dividend')),
+                        DropdownMenuItem(value: 'salary', child: Text(isThai ? 'เงินเดือน' : 'Salary')),
+                        DropdownMenuItem(value: 'savings_principal', child: Text(isThai ? 'เงินเก็บ' : 'Savings Principal')),
+                        DropdownMenuItem(value: 'other', child: Text(isThai ? 'อื่นๆ' : 'Other')),
                       ],
                       onChanged: (val) {
                         if (val != null) setState(() => _remittanceIncomeSourceType = val);
@@ -1218,7 +1246,9 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
-                    '✓ ได้รับยกเว้นภาษีตามคำสั่ง ป.162/2566 (เงินได้เกิดก่อน 1 ม.ค. 2024)',
+                    isThai
+                        ? '✓ ได้รับยกเว้นภาษีตามคำสั่ง ป.162/2566 (เงินได้เกิดก่อน 1 ม.ค. 2024)'
+                        : '✓ Tax exempt per Paw.162/2566 (earned before Jan 1, 2024)',
                     style: TextStyle(fontSize: 11, color: Colors.green.shade800, fontWeight: FontWeight.bold),
                   ),
                 ),

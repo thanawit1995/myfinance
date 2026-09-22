@@ -180,7 +180,7 @@ class FinancialHealthDao extends DatabaseAccessor<AppDatabase> with _$FinancialH
   // 3. FULL FINANCIAL HEALTH CALCULATION
   // -------------------------------------------------------------
 
-  Future<FinancialHealthSummary> getFinancialHealthSummary() async {
+  Future<FinancialHealthSummary> getFinancialHealthSummary({bool isThai = true}) async {
     // 1. Gather Assets
     final liquidAssets = await getLiquidAssetsSatang();
     final totalAssets = await getTotalAssetsSatang();
@@ -239,7 +239,7 @@ class FinancialHealthDao extends DatabaseAccessor<AppDatabase> with _$FinancialH
       targetInvestmentRatioPercent: double.tryParse(invSetting?.targetValue ?? '50.0') ?? 50.0,
     );
 
-    return FinancialHealthCalculator.calculate(input);
+    return FinancialHealthCalculator.calculate(input, isThai: isThai);
   }
 
   // -------------------------------------------------------------

@@ -38,12 +38,12 @@ class _LiabilityFormDialogState extends ConsumerState<LiabilityFormDialog> {
   List<Account> _availableAccounts = [];
   bool _isLoading = true;
 
-  final Map<String, String> _typeLabels = {
-    'credit_card': 'บัตรเครดิต',
-    'personal_loan': 'สินเชื่อส่วนบุคคล',
-    'mortgage': 'สินเชื่อบ้าน/ที่อยู่อาศัย',
-    'auto_loan': 'สินเชื่อรถยนต์',
-    'other': 'หนี้สินอื่นๆ',
+  Map<String, String> _getTypeLabels(bool isThai) => {
+    'credit_card': isThai ? 'บัตรเครดิต' : 'Credit Card',
+    'personal_loan': isThai ? 'สินเชื่อส่วนบุคคล' : 'Personal Loan',
+    'mortgage': isThai ? 'สินเชื่อบ้าน/ที่อยู่อาศัย' : 'Mortgage / Housing Loan',
+    'auto_loan': isThai ? 'สินเชื่อรถยนต์' : 'Auto / Car Loan',
+    'other': isThai ? 'หนี้สินอื่นๆ' : 'Other Debt',
   };
 
   @override
@@ -142,10 +142,14 @@ class _LiabilityFormDialogState extends ConsumerState<LiabilityFormDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     final isEditing = widget.liabilityToEdit != null;
+    final typeLabels = _getTypeLabels(isThai);
 
     return AlertDialog(
-      title: Text(isEditing ? 'แก้ไขรายการหนี้สิน' : 'เพิ่มรายการหนี้สินใหม่'),
+      title: Text(isEditing
+          ? (isThai ? 'แก้ไขรายการหนี้สิน' : 'Edit Debt')
+          : (isThai ? 'เพิ่มรายการหนี้สินใหม่' : 'Add New Debt')),
       content: _isLoading
           ? const SizedBox(height: 120, child: Center(child: CircularProgressIndicator()))
           : SizedBox(
@@ -159,23 +163,25 @@ class _LiabilityFormDialogState extends ConsumerState<LiabilityFormDialog> {
                     children: [
                       TextFormField(
                         controller: _nameController,
-                        decoration: const InputDecoration(
-                          labelText: 'ชื่อหนี้สิน / สถาบันการเงิน *',
-                          hintText: 'เช่น สินเชื่อบ้าน ธอส, บัตรเครดิต KBank',
+                        decoration: InputDecoration(
+                          labelText: isThai ? 'ชื่อหนี้สิน / สถาบันการเงิน *' : 'Debt Name / Institution *',
+                          hintText: isThai ? 'เช่น สินเชื่อบ้าน ธอส, บัตรเครดิต KBank' : 'e.g. Home Loan, Credit Card',
                           isDense: true,
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
                         ),
-                        validator: (v) => (v == null || v.trim().isEmpty) ? 'กรุณาระบุชื่อ' : null,
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? (isThai ? 'กรุณาระบุชื่อ' : 'Please enter name')
+                            : null,
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
                         initialValue: _liabilityType,
-                        decoration: const InputDecoration(
-                          labelText: 'ประเภทหนี้สิน',
+                        decoration: InputDecoration(
+                          labelText: isThai ? 'ประเภทหนี้สิน' : 'Debt Type',
                           isDense: true,
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
                         ),
-                        items: _typeLabels.entries
+                        items: typeLabels.entries
                             .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
                             .toList(),
                         onChanged: (val) {
@@ -192,16 +198,16 @@ class _LiabilityFormDialogState extends ConsumerState<LiabilityFormDialog> {
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String?>(
                         initialValue: _linkedAccountId,
-                        decoration: const InputDecoration(
-                          labelText: 'เชื่อมโยงกับบัญชีในแอป (ทางเลือก)',
-                          hintText: 'เลือกเพื่อดึงยอดคงค้างอัตโนมัติ',
+                        decoration: InputDecoration(
+                          labelText: isThai ? 'เชื่อมโยงกับบัญชีในแอป (ทางเลือก)' : 'Link with App Account (Optional)',
+                          hintText: isThai ? 'เลือกเพื่อดึงยอดคงค้างอัตโนมัติ' : 'Select to pull live balance automatically',
                           isDense: true,
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
                         ),
                         items: [
-                          const DropdownMenuItem<String?>(
+                          DropdownMenuItem<String?>(
                             value: null,
-                            child: Text('-- ไม่เชื่อมโยง (กรอกยอดเอง) --'),
+                            child: Text(isThai ? '-- ไม่เชื่อมโยง (กรอกยอดเอง) --' : '-- Not Linked (Manual) --'),
                           ),
                           ..._availableAccounts.map(
                             (a) => DropdownMenuItem<String?>(
@@ -231,7 +237,9 @@ class _LiabilityFormDialogState extends ConsumerState<LiabilityFormDialog> {
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
-                                  'ระบบจะดึงยอดหนี้คงค้างจริงจากบัญชีนี้อัตโนมัติ เพื่อป้องกันการนับหนี้ซ้อน',
+                                  isThai
+                                      ? 'ระบบจะดึงยอดหนี้คงค้างจริงจากบัญชีนี้อัตโนมัติ เพื่อป้องกันการนับหนี้ซ้อน'
+                                      : 'The system pulls live debt balance from this account to avoid double counting.',
                                   style: TextStyle(fontSize: 11.5, color: Colors.blue.shade800),
                                 ),
                               ),
@@ -245,15 +253,21 @@ class _LiabilityFormDialogState extends ConsumerState<LiabilityFormDialog> {
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
                         decoration: InputDecoration(
-                          labelText: _linkedAccountId != null ? 'เงินต้นเริ่มต้น (บาท)' : 'ยอดหนี้คงเหลือ (บาท) *',
+                          labelText: _linkedAccountId != null
+                              ? (isThai ? 'เงินต้นเริ่มต้น (บาท)' : 'Initial Principal (THB)')
+                              : (isThai ? 'ยอดหนี้คงเหลือ (บาท) *' : 'Remaining Principal (THB) *'),
                           hintText: '0.00',
-                          suffixText: 'บาท',
+                          suffixText: isThai ? 'บาท' : 'THB',
                           isDense: true,
                           border: const OutlineInputBorder(),
                         ),
                         validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'กรุณาระบุจำนวนเงิน';
-                          if (double.tryParse(v.trim()) == null) return 'ตัวเลขไม่ถูกต้อง';
+                          if (v == null || v.trim().isEmpty) {
+                            return isThai ? 'กรุณาระบุจำนวนเงิน' : 'Please specify amount';
+                          }
+                          if (double.tryParse(v.trim()) == null) {
+                            return isThai ? 'ตัวเลขไม่ถูกต้อง' : 'Invalid number';
+                          }
                           return null;
                         },
                       ),
@@ -265,16 +279,20 @@ class _LiabilityFormDialogState extends ConsumerState<LiabilityFormDialog> {
                               controller: _monthlyPaymentController,
                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
                               inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
-                              decoration: const InputDecoration(
-                                labelText: 'ค่างวดต่อเดือน (บาท) *',
+                              decoration: InputDecoration(
+                                labelText: isThai ? 'ค่างวดต่อเดือน (บาท) *' : 'Monthly Payment (THB) *',
                                 hintText: '0.00',
-                                suffixText: 'บาท',
+                                suffixText: isThai ? 'บาท' : 'THB',
                                 isDense: true,
-                                border: OutlineInputBorder(),
+                                border: const OutlineInputBorder(),
                               ),
                               validator: (v) {
-                                if (v == null || v.trim().isEmpty) return 'กรุณาระบุ';
-                                if (double.tryParse(v.trim()) == null) return 'ตัวเลขไม่ถูกต้อง';
+                                if (v == null || v.trim().isEmpty) {
+                                  return isThai ? 'กรุณาระบุ' : 'Required';
+                                }
+                                if (double.tryParse(v.trim()) == null) {
+                                  return isThai ? 'ตัวเลขไม่ถูกต้อง' : 'Invalid number';
+                                }
                                 return null;
                               },
                             ),
@@ -285,12 +303,12 @@ class _LiabilityFormDialogState extends ConsumerState<LiabilityFormDialog> {
                               controller: _interestRateController,
                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
                               inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
-                              decoration: const InputDecoration(
-                                labelText: 'อัตราดอกเบี้ย (%)',
+                              decoration: InputDecoration(
+                                labelText: isThai ? 'อัตราดอกเบี้ย (%)' : 'Interest Rate (%)',
                                 hintText: 'เช่น 5.5',
-                                suffixText: '% ต่อปี',
+                                suffixText: isThai ? '% ต่อปี' : '% p.a.',
                                 isDense: true,
-                                border: OutlineInputBorder(),
+                                border: const OutlineInputBorder(),
                               ),
                             ),
                           ),
@@ -299,18 +317,18 @@ class _LiabilityFormDialogState extends ConsumerState<LiabilityFormDialog> {
                       const SizedBox(height: 12),
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: const Text('หนี้สินระยะสั้น (ไม่เกิน 1 ปี)'),
-                        subtitle: const Text('ใช้ในการคำนวณอัตราส่วนสภาพคล่องพื้นฐาน'),
+                        title: Text(isThai ? 'หนี้สินระยะสั้น (ไม่เกิน 1 ปี)' : 'Short-term Debt (<= 1 year)'),
+                        subtitle: Text(isThai ? 'ใช้ในการคำนวณอัตราส่วนสภาพคล่องพื้นฐาน' : 'Used for basic liquidity ratio calculation'),
                         value: _isShortTerm,
                         onChanged: (val) => setState(() => _isShortTerm = val),
                       ),
                       const SizedBox(height: 6),
                       TextFormField(
                         controller: _noteController,
-                        decoration: const InputDecoration(
-                          labelText: 'บันทึกเพิ่มเติม (ถ้ามี)',
+                        decoration: InputDecoration(
+                          labelText: isThai ? 'บันทึกเพิ่มเติม (ถ้ามี)' : 'Notes (optional)',
                           isDense: true,
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
                         ),
                       ),
                     ],
@@ -321,11 +339,13 @@ class _LiabilityFormDialogState extends ConsumerState<LiabilityFormDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('ยกเลิก'),
+          child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
         ),
         FilledButton(
           onPressed: _isLoading ? null : _save,
-          child: Text(isEditing ? 'บันทึกการแก้ไข' : 'เพิ่มหนี้สิน'),
+          child: Text(isEditing
+              ? (isThai ? 'บันทึกการแก้ไข' : 'Save Changes')
+              : (isThai ? 'เพิ่มหนี้สิน' : 'Add Debt')),
         ),
       ],
     );

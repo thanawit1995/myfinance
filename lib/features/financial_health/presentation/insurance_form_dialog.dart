@@ -35,13 +35,13 @@ class _InsuranceFormDialogState extends ConsumerState<InsuranceFormDialog> {
   String _insuranceType = 'life';
   DateTime? _dueDate;
 
-  final Map<String, String> _typeLabels = {
-    'life': 'ประกันชีวิต (Life)',
-    'health': 'ประกันสุขภาพ (Health)',
-    'accident': 'ประกันอุบัติเหตุ (Accident)',
-    'critical_illness': 'ประกันโรคร้ายแรง (CI)',
-    'savings': 'ประกันออมทรัพย์ (Endowment)',
-    'other': 'อื่นๆ',
+  Map<String, String> _getTypeLabels(bool isThai) => {
+    'life': isThai ? 'ประกันชีวิต (Life)' : 'Life Insurance',
+    'health': isThai ? 'ประกันสุขภาพ (Health)' : 'Health Insurance',
+    'accident': isThai ? 'ประกันอุบัติเหตุ (Accident)' : 'Accident Insurance',
+    'critical_illness': isThai ? 'ประกันโรคร้ายแรง (CI)' : 'Critical Illness (CI)',
+    'savings': isThai ? 'ประกันออมทรัพย์ (Endowment)' : 'Savings / Endowment',
+    'other': isThai ? 'อื่นๆ' : 'Other',
   };
 
   @override
@@ -138,10 +138,14 @@ class _InsuranceFormDialogState extends ConsumerState<InsuranceFormDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     final isEditing = widget.policyToEdit != null;
+    final typeLabels = _getTypeLabels(isThai);
 
     return AlertDialog(
-      title: Text(isEditing ? 'แก้ไขกรมธรรม์ประกัน' : 'เพิ่มกรมธรรม์ประกันใหม่'),
+      title: Text(isEditing
+          ? (isThai ? 'แก้ไขกรมธรรม์ประกัน' : 'Edit Insurance Policy')
+          : (isThai ? 'เพิ่มกรมธรรม์ประกันใหม่' : 'Add New Insurance Policy')),
       content: SizedBox(
         width: 480,
         child: Form(
@@ -153,23 +157,25 @@ class _InsuranceFormDialogState extends ConsumerState<InsuranceFormDialog> {
               children: [
                 TextFormField(
                   controller: _nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'ชื่อแผนประกัน / กรมธรรม์ / บริษัท *',
-                    hintText: 'เช่น AIA สุขภาพเหมาจ่าย, เมืองไทยประกันชีวิต 10/1',
+                  decoration: InputDecoration(
+                    labelText: isThai ? 'ชื่อแผนประกัน / กรมธรรม์ / บริษัท *' : 'Policy Name / Insurer *',
+                    hintText: isThai ? 'เช่น AIA สุขภาพเหมาจ่าย, เมืองไทยประกันชีวิต 10/1' : 'e.g. AIA Health, Muang Thai Life',
                     isDense: true,
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                   ),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'กรุณาระบุชื่อ' : null,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? (isThai ? 'กรุณาระบุชื่อ' : 'Please specify policy name')
+                      : null,
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   initialValue: _insuranceType,
-                  decoration: const InputDecoration(
-                    labelText: 'ประเภทประกัน',
+                  decoration: InputDecoration(
+                    labelText: isThai ? 'ประเภทประกัน' : 'Insurance Type',
                     isDense: true,
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                   ),
-                  items: _typeLabels.entries
+                  items: typeLabels.entries
                       .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
                       .toList(),
                   onChanged: (val) {
@@ -184,12 +190,12 @@ class _InsuranceFormDialogState extends ConsumerState<InsuranceFormDialog> {
                         controller: _sumInsuredController,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
-                        decoration: const InputDecoration(
-                          labelText: 'ทุนประกันชีวิต (บาท)',
+                        decoration: InputDecoration(
+                          labelText: isThai ? 'ทุนประกันชีวิต (บาท)' : 'Life Sum Insured (THB)',
                           hintText: '0.00',
-                          suffixText: 'บาท',
+                          suffixText: isThai ? 'บาท' : 'THB',
                           isDense: true,
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
                         ),
                       ),
                     ),
@@ -199,12 +205,12 @@ class _InsuranceFormDialogState extends ConsumerState<InsuranceFormDialog> {
                         controller: _medicalCoverageController,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
-                        decoration: const InputDecoration(
-                          labelText: 'วงเงินคุ้มครองสุขภาพ/โรคร้าย',
+                        decoration: InputDecoration(
+                          labelText: isThai ? 'วงเงินคุ้มครองสุขภาพ/โรคร้าย' : 'Medical / CI Coverage',
                           hintText: '0.00',
-                          suffixText: 'บาท',
+                          suffixText: isThai ? 'บาท' : 'THB',
                           isDense: true,
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
                         ),
                       ),
                     ),
@@ -218,16 +224,20 @@ class _InsuranceFormDialogState extends ConsumerState<InsuranceFormDialog> {
                         controller: _annualPremiumController,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
-                        decoration: const InputDecoration(
-                          labelText: 'เบี้ยประกันต่อปี (บาท) *',
+                        decoration: InputDecoration(
+                          labelText: isThai ? 'เบี้ยประกันต่อปี (บาท) *' : 'Annual Premium (THB) *',
                           hintText: '0.00',
-                          suffixText: 'บาท',
+                          suffixText: isThai ? 'บาท' : 'THB',
                           isDense: true,
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
                         ),
                         validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'กรุณาระบุ';
-                          if (double.tryParse(v.trim()) == null) return 'ตัวเลขไม่ถูกต้อง';
+                          if (v == null || v.trim().isEmpty) {
+                            return isThai ? 'กรุณาระบุ' : 'Required';
+                          }
+                          if (double.tryParse(v.trim()) == null) {
+                            return isThai ? 'ตัวเลขไม่ถูกต้อง' : 'Invalid number';
+                          }
                           return null;
                         },
                       ),
@@ -242,7 +252,9 @@ class _InsuranceFormDialogState extends ConsumerState<InsuranceFormDialog> {
                         onPressed: _pickDueDate,
                         icon: const Icon(Icons.calendar_today, size: 18),
                         label: Text(
-                          _dueDate != null ? DateFormat('dd/MM/yyyy').format(_dueDate!) : 'วันครบกำหนดชำระ',
+                          _dueDate != null
+                              ? DateFormat('dd/MM/yyyy').format(_dueDate!)
+                              : (isThai ? 'วันครบกำหนดชำระ' : 'Due Date'),
                           style: const TextStyle(fontSize: 12),
                         ),
                       ),
@@ -252,10 +264,12 @@ class _InsuranceFormDialogState extends ConsumerState<InsuranceFormDialog> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _noteController,
-                  decoration: const InputDecoration(
-                    labelText: 'บันทึกเพิ่มเติม (เช่น เลขกรมธรรม์, ผู้รับผลประโยชน์)',
+                  decoration: InputDecoration(
+                    labelText: isThai
+                        ? 'บันทึกเพิ่มเติม (เช่น เลขกรมธรรม์, ผู้รับผลประโยชน์)'
+                        : 'Notes (e.g. policy no., beneficiary)',
                     isDense: true,
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                   ),
                 ),
               ],
@@ -266,11 +280,13 @@ class _InsuranceFormDialogState extends ConsumerState<InsuranceFormDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('ยกเลิก'),
+          child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
         ),
         FilledButton(
           onPressed: _save,
-          child: Text(isEditing ? 'บันทึกการแก้ไข' : 'เพิ่มกรมธรรม์'),
+          child: Text(isEditing
+              ? (isThai ? 'บันทึกการแก้ไข' : 'Save Changes')
+              : (isThai ? 'เพิ่มกรมธรรม์' : 'Add Policy')),
         ),
       ],
     );

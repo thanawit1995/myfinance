@@ -532,8 +532,25 @@
     * รักษาเมนูถังขยะกู้คืนข้อมูล 30 วัน (Trash Bin) ไว้ในหน้าตั้งค่าเพื่อให้ผู้ใช้กู้คืนข้อมูลที่เผลอลบได้ตลอดเวลา
   - **การรับประกันคุณภาพ (Quality Assurance)**:
     * `flutter analyze`: **0 errors, 0 warnings, 0 issues**
+- [x] **5.17 ปรับปรุงความคมชัด Dark Mode, แปลภาษาอังกฤษครบทุกหน้าจอ (Foreign Remittance, Financial Health, Debts & Insurance, Quick Add, Trade Dialog), ฟอนต์แท้ Noto Sans Thai, และรวมศูนย์ Google Drive Sync**:
+  - **แก้ไขฟอนต์ Noto Sans Thai แท้ 100% บน Android**:
+    * ดาวน์โหลดไฟล์ฟอนต์ TrueType (`.ttf`) ตัวจริงจาก Google Fonts ทั้ง 4 น้ำหนัก (Regular, Medium, SemiBold, Bold) แทนที่ไฟล์เดิมที่มีปัญหา
+    * ตัวอักษรแสดงผลสวยงาม คมชัด และสอดคล้องกับบน Web Desktop
+  - **รวมศูนย์เมนู Google Drive Sync ในหน้าตั้งค่า**:
+    * ยุบรวมการตั้งค่า Google Drive ให้เหลือเพียงเมนูเดียวในหน้าตั้งค่า เข้าถึงหน้า `CloudSyncScreen` โดยตรง
+    * เพิ่มระบบสำรองด้วยการกรอก Gmail เมื่ออุปกรณ์ Android ไม่พบ Google Sign-In Client ID (หลีกเลี่ยงข้อผิดพลาด `ApiException 10`)
+  - **ปรับปรุงคอนทราสต์และความคมชัดหน้า Debts & Insurance**:
+    * ปรับสีการ์ดสรุปหนี้สินและกรมธรรม์ประกันภัยให้ใช้ `VaultTheme.surface(context)` และข้อความคมชัดสูง ไม่มืดกลืนใน Dark Mode
+  - **แปลภาษาอังกฤษครบถ้วน 100% (Bilingual Support)**:
+    * **ภาษีนำเงินเข้าประเทศ (Foreign Remittance)**: รองรับทั้งหน้าจอ การประเมินกฎหมาย ป.161/ป.162 และการคำนวณเงินได้
+    * **สุขภาพการเงิน (Financial Health)**: แปลเกณฑ์ประเมินทั้ง 8 มิติ, การ์ดแนะนำ, Breakdown, แผ่นลากดูรายละเอียด (Metric Detail Sheet), และหน้าต่างตั้งค่าเกณฑ์ (Health Settings Dialog)
+    * **หนี้สินและประกันภัย (Debts & Insurance)**: แปลรายการหนี้สิน, กรมธรรม์, ฟอร์มเพิ่ม/แก้ไขหนี้สิน, และฟอร์มเพิ่ม/แก้ไขกรมธรรม์
+    * **บันทึกรายการด่วน (Quick Add)**: แปลชิปหมวดหมู่, ตัวเลือกเพิ่มเติม (บันทึกช่วยจำ, ผูกโครงการ, รายการประจำ), การ์ดโอนเงินข้ามสกุลเงิน, ส่วนแจ้งเตือนนำเงินเข้าประเทศ และข้อความบันทึกสำเร็จ
+    * **บันทึกซื้อ/ขายสินทรัพย์ (Buy/Sell Trade Dialog)**: แปลกล่องสลับซื้อ/ขาย, ช่องกรอกจำนวน/ราคา/เรต FX/ค่าธรรมเนียม, การคำนวณยอดเงินสุทธิ, และกล่องเตือนทำรายการข้ามปีภาษี
+  - **การรับประกันคุณภาพ (Quality Assurance)**:
+    * `flutter analyze`: **0 errors, 0 warnings, 0 issues**
     * `flutter test`: **116/116 ผ่านฉลุย 100%**
-    * ประกอบไฟล์ติดตั้ง **`OURS.apk`** (40.2 MB) และติดตั้งลงมือถือ **Oppo Find X9** ผ่าน ADB Streamed Install สำเร็จสมบูรณ์
+    * คอมไพล์ APK รุ่นล่าสุด: `build\app\outputs\flutter-apk\app-release.apk` และคัดลอกมาไว้ที่ `c:\Projects\myfinance\app-release.apk` (40.2 MB)
 
 ---
 

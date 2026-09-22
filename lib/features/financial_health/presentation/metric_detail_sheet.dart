@@ -18,6 +18,7 @@ class MetricDetailSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     final statusColor = _getStatusColor(metric.status);
 
     return Container(
@@ -61,7 +62,7 @@ class MetricDetailSheet extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'ตัวชี้วัดที่ ${metric.metricIndex}: ${metric.code.toUpperCase()}',
+                        '${isThai ? "ตัวชี้วัดที่" : "Metric #"} ${metric.metricIndex}: ${metric.code.toUpperCase()}',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -99,7 +100,7 @@ class MetricDetailSheet extends StatelessWidget {
                       Icon(_getStatusIcon(metric.status), size: 16, color: statusColor),
                       const SizedBox(width: 4),
                       Text(
-                        _getStatusLabel(metric.status),
+                        _getStatusLabel(metric.status, isThai),
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -123,11 +124,11 @@ class MetricDetailSheet extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildStatColumn('คะแนนที่ได้', '${metric.score} / ${metric.maxScore}', statusColor),
+                    _buildStatColumn(isThai ? 'คะแนนที่ได้' : 'Score', '${metric.score} / ${metric.maxScore}', statusColor),
                     Container(height: 36, width: 1, color: Colors.grey.shade300),
-                    _buildStatColumn('ค่าปัจจุบัน', metric.formattedValue, theme.colorScheme.onSurface),
+                    _buildStatColumn(isThai ? 'ค่าปัจจุบัน' : 'Current', metric.formattedValue, theme.colorScheme.onSurface),
                     Container(height: 36, width: 1, color: Colors.grey.shade300),
-                    _buildStatColumn('เกณฑ์เป้าหมาย', metric.targetThreshold, Colors.blueGrey.shade700),
+                    _buildStatColumn(isThai ? 'เกณฑ์เป้าหมาย' : 'Target', metric.targetThreshold, Colors.blueGrey.shade700),
                   ],
                 ),
               ),
@@ -136,7 +137,7 @@ class MetricDetailSheet extends StatelessWidget {
 
             // Formula Box
             Text(
-              'สูตรการคำนวณ',
+              isThai ? 'สูตรการคำนวณ' : 'Calculation Formula',
               style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 6),
@@ -161,14 +162,14 @@ class MetricDetailSheet extends StatelessWidget {
 
             // Source of Numbers (Transparent Breakdown)
             Text(
-              'ที่มาของตัวเลข (Source of Numbers)',
+              isThai ? 'ที่มาของตัวเลข (Source of Numbers)' : 'Source of Numbers (Breakdown)',
               style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             if (metric.breakdownItems.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text('ไม่มีตัวเลขแยกย่อย', style: TextStyle(color: Colors.grey.shade600)),
+                child: Text(isThai ? 'ไม่มีตัวเลขแยกย่อย' : 'No breakdown data', style: TextStyle(color: Colors.grey.shade600)),
               )
             else
               ...metric.breakdownItems.map((item) => _buildBreakdownRow(context, item)),
@@ -176,7 +177,7 @@ class MetricDetailSheet extends StatelessWidget {
 
             // Recommendation Card
             Text(
-              'คำแนะนำและการปรับปรุง',
+              isThai ? 'คำแนะนำและการปรับปรุง' : 'Recommendation & Next Steps',
               style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
@@ -213,7 +214,7 @@ class MetricDetailSheet extends StatelessWidget {
               width: double.infinity,
               child: FilledButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('ปิดหน้าต่างนี้'),
+                child: Text(isThai ? 'ปิดหน้าต่างนี้' : 'Close'),
               ),
             ),
           ],
@@ -225,26 +226,35 @@ class MetricDetailSheet extends StatelessWidget {
   Widget _buildStatColumn(String label, String value, Color valueColor) {
     return Column(
       children: [
-        Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11.5, color: Colors.grey),
+        ),
         const SizedBox(height: 4),
         Text(
           value,
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: valueColor),
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: valueColor,
+          ),
         ),
       ],
     );
   }
 
   Widget _buildBreakdownRow(BuildContext context, MetricBreakdownItem item) {
+    final theme = Theme.of(context);
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.25),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Expanded(
             child: Column(
@@ -252,7 +262,7 @@ class MetricDetailSheet extends StatelessWidget {
               children: [
                 Text(
                   item.label,
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  style: const TextStyle(fontSize: 12.5),
                 ),
                 if (item.note != null && item.note!.isNotEmpty) ...[
                   const SizedBox(height: 2),
@@ -299,14 +309,14 @@ class MetricDetailSheet extends StatelessWidget {
     }
   }
 
-  String _getStatusLabel(HealthStatus status) {
+  String _getStatusLabel(HealthStatus status, bool isThai) {
     switch (status) {
       case HealthStatus.pass:
-        return 'ผ่านเกณฑ์ดี';
+        return isThai ? 'ผ่านเกณฑ์ดี' : 'Pass';
       case HealthStatus.warning:
-        return 'เฝ้าระวัง';
+        return isThai ? 'เฝ้าระวัง' : 'Warning';
       case HealthStatus.fail:
-        return 'ต้องปรับปรุง';
+        return isThai ? 'ต้องปรับปรุง' : 'Action Needed';
     }
   }
 }

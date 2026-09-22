@@ -80,10 +80,11 @@ class _BuySellTradeDialogState extends ConsumerState<BuySellTradeDialog> {
   }
 
   Future<void> _submit() async {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     if (!_formKey.currentState!.validate()) return;
     if (_selectedAssetId == null || _selectedAccountId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณาเลือกสินทรัพย์และบัญชีทำรายการ')),
+        SnackBar(content: Text(isThai ? 'กรุณาเลือกสินทรัพย์และบัญชีทำรายการ' : 'Please select an asset and an account')),
       );
       return;
     }
@@ -95,18 +96,25 @@ class _BuySellTradeDialogState extends ConsumerState<BuySellTradeDialog> {
       final proceed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('⚠️ คำเตือนปีภาษีที่ผ่านมาแล้ว'),
+          title: Text(isThai ? '⚠️ คำเตือนปีภาษีที่ผ่านมาแล้ว' : '⚠️ Past Tax Year Warning'),
           content: Text(
-            'รายการนี้เกิดขึ้นในปี ค.ศ. ${_tradeDate.year} ซึ่งเป็นปีภาษีที่ผ่านมาแล้ว '
-            'การ${_isBuy ? "ซื้อ" : "ขาย"}ย้อนหลังจะกระทบต่อการจัดสรร Lot และกำไรที่รับรู้ (Realized Gain) '
-            'ที่คุณอาจยื่นภาษีไปแล้ว คุณต้องการดำเนินการต่อหรือไม่?',
+            isThai
+                ? 'รายการนี้เกิดขึ้นในปี ค.ศ. ${_tradeDate.year} ซึ่งเป็นปีภาษีที่ผ่านมาแล้ว '
+                    'การ${_isBuy ? "ซื้อ" : "ขาย"}ย้อนหลังจะกระทบต่อการจัดสรร Lot และกำไรที่รับรู้ (Realized Gain) '
+                    'ที่คุณอาจยื่นภาษีไปแล้ว คุณต้องการดำเนินการต่อหรือไม่?'
+                : 'This transaction occurred in ${_tradeDate.year}, which is a past tax year. '
+                    'Recording past ${_isBuy ? "purchases" : "sales"} retroactively affects lot allocation and Realized P&L '
+                    'that may have already been filed. Do you wish to continue?',
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('ยกเลิก')),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+            ),
             FilledButton(
               style: FilledButton.styleFrom(backgroundColor: Colors.orange.shade800),
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('ยืนยันดำเนินการ'),
+              child: Text(isThai ? 'ยืนยันดำเนินการ' : 'Proceed'),
             ),
           ],
         ),
@@ -160,7 +168,7 @@ class _BuySellTradeDialogState extends ConsumerState<BuySellTradeDialog> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e is InsufficientQuantityException ? e.message : 'เกิดข้อผิดพลาด: $e'),
+            content: Text(e is InsufficientQuantityException ? e.message : (isThai ? 'เกิดข้อผิดพลาด: $e' : 'Error: $e')),
             backgroundColor: Colors.red.shade700,
           ),
         );
@@ -175,9 +183,14 @@ class _BuySellTradeDialogState extends ConsumerState<BuySellTradeDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
 
     return AlertDialog(
-      title: Text(_isBuy ? 'บันทึกการซื้อสินทรัพย์ (Buy)' : 'บันทึกการขายสินทรัพย์ (Sell)'),
+      title: Text(
+        _isBuy
+            ? (isThai ? 'บันทึกการซื้อสินทรัพย์ (Buy)' : 'Record Asset Purchase (Buy)')
+            : (isThai ? 'บันทึกการขายสินทรัพย์ (Sell)' : 'Record Asset Sale (Sell)'),
+      ),
       content: SizedBox(
         width: 480,
         child: SingleChildScrollView(
@@ -188,9 +201,17 @@ class _BuySellTradeDialogState extends ConsumerState<BuySellTradeDialog> {
               children: [
                 // 1. Toggle Buy / Sell
                 SegmentedButton<bool>(
-                  segments: const [
-                    ButtonSegment(value: true, label: Text('ซื้อ (Buy)'), icon: Icon(Icons.add_shopping_cart)),
-                    ButtonSegment(value: false, label: Text('ขาย (Sell)'), icon: Icon(Icons.sell)),
+                  segments: [
+                    ButtonSegment(
+                      value: true,
+                      label: Text(isThai ? 'ซื้อ (Buy)' : 'Buy'),
+                      icon: const Icon(Icons.add_shopping_cart),
+                    ),
+                    ButtonSegment(
+                      value: false,
+                      label: Text(isThai ? 'ขาย (Sell)' : 'Sell'),
+                      icon: const Icon(Icons.sell),
+                    ),
                   ],
                   selected: {_isBuy},
                   onSelectionChanged: (set) => setState(() => _isBuy = set.first),
@@ -208,7 +229,10 @@ class _BuySellTradeDialogState extends ConsumerState<BuySellTradeDialog> {
                       _selectedAccountId = assets.first.defaultAccountId;
                     }
                     return DropdownButtonFormField<String>(
-                      decoration: const InputDecoration(labelText: 'สินทรัพย์ *', border: OutlineInputBorder()),
+                      decoration: InputDecoration(
+                        labelText: isThai ? 'สินทรัพย์ *' : 'Asset *',
+                        border: const OutlineInputBorder(),
+                      ),
                       initialValue: _selectedAssetId,
                       items: assets.map((a) {
                         return DropdownMenuItem(
@@ -240,9 +264,12 @@ class _BuySellTradeDialogState extends ConsumerState<BuySellTradeDialog> {
                     if (_selectedAccountId == null && accounts.isNotEmpty) {
                       _selectedAccountId = accounts.first.id;
                     }
+                    final accLabel = _isBuy
+                        ? (isThai ? 'หักเงินจากบัญชี *' : 'Deduct from Account *')
+                        : (isThai ? 'รับเงินเข้าบัญชี *' : 'Deposit to Account *');
                     return DropdownButtonFormField<String>(
                       decoration: InputDecoration(
-                        labelText: _isBuy ? 'หักเงินจากบัญชี *' : 'รับเงินเข้าบัญชี *',
+                        labelText: accLabel,
                         border: const OutlineInputBorder(),
                       ),
                       initialValue: _selectedAccountId,
@@ -269,18 +296,18 @@ class _BuySellTradeDialogState extends ConsumerState<BuySellTradeDialog> {
                         inputFormatters: [
                           FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                         ],
-                        decoration: const InputDecoration(
-                          labelText: 'จำนวนหน่วย *',
-                          hintText: 'เช่น 100 หรือ 0.05',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: isThai ? 'จำนวนหน่วย *' : 'Quantity *',
+                          hintText: isThai ? 'เช่น 100 หรือ 0.05' : 'e.g. 100 or 0.05',
+                          border: const OutlineInputBorder(),
                         ),
                         validator: (val) {
-                          if (val == null || val.trim().isEmpty) return 'กรุณาระบุจำนวน';
+                          if (val == null || val.trim().isEmpty) return isThai ? 'กรุณาระบุจำนวน' : 'Please specify quantity';
                           try {
                             final d = Decimal.parse(val.trim());
                             if (d <= Decimal.zero) return '> 0';
                           } catch (_) {
-                            return 'ตัวเลขไม่ถูกต้อง';
+                            return isThai ? 'ตัวเลขไม่ถูกต้อง' : 'Invalid number';
                           }
                           return null;
                         },
@@ -297,12 +324,12 @@ class _BuySellTradeDialogState extends ConsumerState<BuySellTradeDialog> {
                           FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                         ],
                         decoration: InputDecoration(
-                          labelText: 'ราคา/หน่วย ($_currency) *',
-                          hintText: 'เช่น 65.50',
+                          labelText: isThai ? 'ราคา/หน่วย ($_currency) *' : 'Price/Unit ($_currency) *',
+                          hintText: isThai ? 'เช่น 65.50' : 'e.g. 65.50',
                           border: const OutlineInputBorder(),
                         ),
                         validator: (val) {
-                          if (val == null || val.trim().isEmpty) return 'กรุณาระบุราคา';
+                          if (val == null || val.trim().isEmpty) return isThai ? 'กรุณาระบุราคา' : 'Please specify price';
                           final num = double.tryParse(val.trim());
                           if (num == null || num <= 0) return '> 0';
                           return null;
@@ -323,18 +350,22 @@ class _BuySellTradeDialogState extends ConsumerState<BuySellTradeDialog> {
                       FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                     ],
                     decoration: InputDecoration(
-                      labelText: 'อัตราแลกเปลี่ยน (THB ต่อ 1 $_currency) *',
+                      labelText: isThai
+                          ? 'อัตราแลกเปลี่ยน (THB ต่อ 1 $_currency) *'
+                          : 'Exchange Rate (THB per 1 $_currency) *',
                       hintText: 'เช่น 35.500000',
                       border: const OutlineInputBorder(),
-                      helperText: 'ระบบจะล็อกเรตนี้ไว้ในธุรกรรม และบันทึกลงประวัติ FX',
+                      helperText: isThai
+                          ? 'ระบบจะล็อกเรตนี้ไว้ในธุรกรรม และบันทึกลงประวัติ FX'
+                          : 'Rate is locked for this transaction and logged in FX history',
                     ),
                     validator: (val) {
-                      if (val == null || val.trim().isEmpty) return 'กรุณาระบุเรต FX';
+                      if (val == null || val.trim().isEmpty) return isThai ? 'กรุณาระบุเรต FX' : 'Please specify FX rate';
                       try {
                         final fx = Decimal.parse(val.trim());
                         if (fx <= Decimal.zero) return '> 0';
                       } catch (_) {
-                        return 'เรตไม่ถูกต้อง';
+                        return isThai ? 'เรตไม่ถูกต้อง' : 'Invalid rate';
                       }
                       return null;
                     },
@@ -353,10 +384,10 @@ class _BuySellTradeDialogState extends ConsumerState<BuySellTradeDialog> {
                         inputFormatters: [
                           FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                         ],
-                        decoration: const InputDecoration(
-                          labelText: 'ค่าธรรมเนียม (บาท)',
-                          hintText: 'เช่น 15.00',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: isThai ? 'ค่าธรรมเนียม (บาท)' : 'Fee (THB)',
+                          hintText: isThai ? 'เช่น 15.00' : 'e.g. 15.00',
+                          border: const OutlineInputBorder(),
                         ),
                         onChanged: (_) => setState(() {}),
                       ),
@@ -368,7 +399,7 @@ class _BuySellTradeDialogState extends ConsumerState<BuySellTradeDialog> {
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.calendar_today),
-                  title: Text(DateFormat('d MMMM yyyy', 'th').format(_tradeDate)),
+                  title: Text(DateFormat('d MMMM yyyy', isThai ? 'th' : 'en').format(_tradeDate)),
                   trailing: const Icon(Icons.edit_calendar),
                   onTap: () async {
                     final picked = await showDatePicker(
@@ -394,6 +425,9 @@ class _BuySellTradeDialogState extends ConsumerState<BuySellTradeDialog> {
                         (_isBuy ? (fee * 100).round() : -(fee * 100).round());
 
                     final moneyPreview = Money(thbTotalSatang > 0 ? thbTotalSatang : 0);
+                    final summaryLabel = _isBuy
+                        ? (isThai ? 'ยอดเงินจ่ายสุทธิ (THB):' : 'Net Amount Paid (THB):')
+                        : (isThai ? 'ยอดเงินรับสุทธิ (THB):' : 'Net Amount Received (THB):');
 
                     return Container(
                       padding: const EdgeInsets.all(12),
@@ -404,8 +438,7 @@ class _BuySellTradeDialogState extends ConsumerState<BuySellTradeDialog> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(_isBuy ? 'ยอดเงินจ่ายสุทธิ (THB):' : 'ยอดเงินรับสุทธิ (THB):',
-                              style: const TextStyle(fontWeight: FontWeight.bold)),
+                          Text(summaryLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
                           Text(
                             moneyPreview.format(symbol: '฿'),
                             style: TextStyle(
@@ -424,10 +457,10 @@ class _BuySellTradeDialogState extends ConsumerState<BuySellTradeDialog> {
                 // 8. Note
                 TextFormField(
                   controller: _noteController,
-                  decoration: const InputDecoration(
-                    labelText: 'บันทึกช่วยจำ (Note)',
-                    hintText: 'เช่น DCA ประจำเดือน',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: isThai ? 'บันทึกช่วยจำ (Note)' : 'Note',
+                    hintText: isThai ? 'เช่น DCA ประจำเดือน' : 'e.g. Monthly DCA',
+                    border: const OutlineInputBorder(),
                   ),
                 ),
               ],
@@ -436,12 +469,15 @@ class _BuySellTradeDialogState extends ConsumerState<BuySellTradeDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('ยกเลิก')),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+        ),
         FilledButton(
           onPressed: _isLoading ? null : _submit,
           child: _isLoading
               ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-              : Text(_isBuy ? 'ยืนยันการซื้อ' : 'ยืนยันการขาย'),
+              : Text(_isBuy ? (isThai ? 'ยืนยันการซื้อ' : 'Confirm Buy') : (isThai ? 'ยืนยันการขาย' : 'Confirm Sell')),
         ),
       ],
     );

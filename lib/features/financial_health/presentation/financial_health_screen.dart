@@ -53,7 +53,7 @@ class _FinancialHealthScreenState extends ConsumerState<FinancialHealthScreen> {
         onRefresh: () async => _refresh(),
         child: FutureBuilder(
           future: Future.wait([
-            dao.getFinancialHealthSummary(),
+            dao.getFinancialHealthSummary(isThai: isThai),
             dao.getRunRateForecast(),
           ]),
           builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {

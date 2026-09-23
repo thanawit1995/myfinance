@@ -24,8 +24,11 @@ class GoogleAuthService {
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
   static const String driveScope = 'https://www.googleapis.com/auth/drive.file';
+  static const String webClientId = '25761984668-bisj0948pdlu6k6s1hvlpvbmqi9bb2r3.apps.googleusercontent.com';
 
   final GoogleSignIn _googleSignIn = GoogleSignIn(
+    clientId: kIsWeb ? webClientId : null,
+    serverClientId: webClientId,
     scopes: [
       'email',
       driveScope,

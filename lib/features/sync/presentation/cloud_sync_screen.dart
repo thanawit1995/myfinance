@@ -31,9 +31,21 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
     try {
       final syncService = ref.read(googleDriveSyncServiceProvider);
       final authService = ref.read(googleAuthServiceProvider);
-      final status = await syncService.getStatus();
+      final status = await syncService.getStatus().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => const GoogleDriveSyncStatus(
+          isConnected: false,
+          isAutoSync: false,
+          isWifiOnly: false,
+          lastSyncTime: null,
+          pendingCount: 0,
+        ),
+      );
       final backups = kIsWeb ? <PreSyncBackupInfo>[] : await syncService.getPreSyncBackups();
-      final user = await authService.getCurrentUser();
+      final user = await authService.getCurrentUser().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => null,
+      );
       if (mounted) {
         setState(() {
           _status = status;

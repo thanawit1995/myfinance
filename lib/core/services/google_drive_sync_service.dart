@@ -13,6 +13,7 @@ import '../database/daos/sync_dao.dart';
 import '../database/daos/transactions_dao.dart';
 import 'google_auth_service.dart';
 import 'google_drive_api_client.dart';
+import 'web_db_helper/web_db_helper.dart';
 
 class GoogleDriveSyncStatus {
   final bool isConnected;
@@ -280,8 +281,8 @@ class GoogleDriveSyncService {
     final lastSync = await getLastSyncTime();
     final pending = await syncDao.countPendingSync(lastSync);
 
-    // 1. ตรวจสอบว่าล็อกอิน Google Cloud หรือไม่
-    final authClient = await googleAuthService?.getAuthenticatedClient();
+    // 1. ตรวจสอบว่าล็อกอิน Google Cloud หรือไม่ (ห้ามขอ scopes ระหว่าง getStatus เพราะจะทำให้ค้าง)
+    final authClient = await googleAuthService?.getAuthenticatedClient(requestScopesIfNeeded: false);
     if (authClient != null) {
       DateTime? remoteModified;
       int? remoteTxCount;
@@ -373,8 +374,8 @@ class GoogleDriveSyncService {
   /// อัปโหลดฐานข้อมูลขึ้น Google Drive (Cloud REST API หรือ Local Folder)
   Future<GoogleDriveSyncResult> uploadToGoogleDrive() async {
     final now = DateTime.now();
-    // 1. ตรวจสอบว่าเชื่อมต่อ Cloud หรือเลือกโฟลเดอร์ไว้หรือไม่
-    final authClient = await googleAuthService?.getAuthenticatedClient();
+    // 1. ตรวจสอบว่าเชื่อมต่อ Cloud หรือเลือกโฟลเดอร์ไว้หรือไม่ (user gesture: ขอสิทธิ์ driveScope หากยังไม่ได้อนุญาต)
+    final authClient = await googleAuthService?.getAuthenticatedClient(requestScopesIfNeeded: true);
     final folderPath = authClient == null ? await detectOrGetDriveFolder() : null;
     if (authClient == null && folderPath == null) {
       return GoogleDriveSyncResult(
@@ -389,15 +390,6 @@ class GoogleDriveSyncService {
       await db.customSelect('SELECT 1;').get();
       await db.customStatement('PRAGMA wal_checkpoint(TRUNCATE);');
     } catch (_) {}
-
-    final localDb = await getLocalDatabaseFile();
-    if (localDb == null || !await localDb.exists()) {
-      return GoogleDriveSyncResult(
-        success: false,
-        message: 'ไม่พบไฟล์ฐานข้อมูลในเครื่อง',
-        timestamp: now,
-      );
-    }
 
     // ตรวจสอบเงื่อนไข Wi-Fi
     if (await isWifiOnly()) {
@@ -423,8 +415,31 @@ class GoogleDriveSyncService {
         await db.customStatement('PRAGMA wal_checkpoint(TRUNCATE);');
       } catch (_) {}
 
-      // 3. คำนวณ SHA-256 Checksum ของฐานข้อมูล
-      final dbBytes = await localDb.readAsBytes();
+      // 3. ดึงข้อมูลไบนารีของฐานข้อมูล (Web: IndexedDB/OPFS, Native: SQLite File)
+      final Uint8List dbBytes;
+      if (kIsWeb) {
+        final webBytes = await exportWebDatabase();
+        if (webBytes == null || webBytes.isEmpty) {
+          return GoogleDriveSyncResult(
+            success: false,
+            message: 'ไม่พบไฟล์ฐานข้อมูลในเบราว์เซอร์',
+            timestamp: now,
+          );
+        }
+        dbBytes = webBytes;
+      } else {
+        final localDb = await getLocalDatabaseFile();
+        if (localDb == null || !await localDb.exists()) {
+          return GoogleDriveSyncResult(
+            success: false,
+            message: 'ไม่พบไฟล์ฐานข้อมูลในเครื่อง',
+            timestamp: now,
+          );
+        }
+        dbBytes = await localDb.readAsBytes();
+      }
+
+      // 4. คำนวณ SHA-256 Checksum ของฐานข้อมูล
       final sha256Hash = sha256.convert(dbBytes).toString();
 
       final metaData = {
@@ -438,8 +453,7 @@ class GoogleDriveSyncService {
         'fileSizeBytes': dbBytes.length,
       };
 
-      // 4. กรณีเชื่อมต่อ Google Cloud สำเร็จ ➔ อัปโหลดผ่าน Google Drive REST API
-      final authClient = await googleAuthService?.getAuthenticatedClient();
+      // 5. กรณีเชื่อมต่อ Google Cloud สำเร็จ ➔ อัปโหลดผ่าน Google Drive REST API
       if (authClient != null) {
         final apiClient = GoogleDriveApiClient(authClient);
         await apiClient.uploadDatabaseAndMeta(
@@ -457,8 +471,7 @@ class GoogleDriveSyncService {
         );
       }
 
-      // 5. กรณีไม่ได้ล็อกอิน Cloud ➔ ทำงานแบบ Local Folder เดิม
-      final folderPath = await detectOrGetDriveFolder();
+      // 6. กรณีไม่ได้ล็อกอิน Cloud ➔ ทำงานแบบ Local Folder เดิม (Desktop)
       if (folderPath == null) {
         return GoogleDriveSyncResult(
           success: false,
@@ -493,9 +506,13 @@ class GoogleDriveSyncService {
         timestamp: now,
       );
     } catch (e) {
+      final errStr = e.toString();
+      final msg = errStr.contains('401')
+          ? 'การยืนยันตัวตน Google Drive หมดอายุ กรุณาออกจากระบบแล้วเข้าสู่ระบบ Google ใหม่อีกครั้ง'
+          : 'เกิดข้อผิดพลาดในการอัปโหลด: $e';
       return GoogleDriveSyncResult(
         success: false,
-        message: 'เกิดข้อผิดพลาดในการอัปโหลด: $e',
+        message: msg,
         timestamp: now,
       );
     }
@@ -506,7 +523,7 @@ class GoogleDriveSyncService {
     final now = DateTime.now();
 
     try {
-      final authClient = await googleAuthService?.getAuthenticatedClient();
+      final authClient = await googleAuthService?.getAuthenticatedClient(requestScopesIfNeeded: true);
 
       // ─── กู้คืนผ่าน Google Drive Cloud REST API ──────────────────────────
       if (authClient != null) {
@@ -547,7 +564,32 @@ class GoogleDriveSyncService {
           }
         }
 
-        // Safety Backup ไฟล์เดิมในเครื่อง
+        // กรณีรันบน Web: บันทึกลง IndexedDB / OPFS แล้วสั่งรีโหลดหน้าเว็บอัตโนมัติ
+        if (kIsWeb) {
+          final restored = await restoreWebDatabase(remoteBytes);
+          if (!restored) {
+            return GoogleDriveSyncResult(
+              success: false,
+              message: 'ไม่สามารถบันทึกข้อมูลลงฐานข้อมูลเบราว์เซอร์ได้',
+              timestamp: now,
+            );
+          }
+          await _setLastSyncTime(remoteTime ?? now);
+
+          Future.delayed(const Duration(milliseconds: 1200), () {
+            reloadWebPage();
+          });
+
+          return GoogleDriveSyncResult(
+            success: true,
+            message: 'กู้คืนข้อมูลสำเร็จ ($remoteAcc บัญชี, $remoteTx รายการ) กำลังรีเฟรชหน้าเว็บ...',
+            totalAccounts: remoteAcc,
+            totalTransactions: remoteTx,
+            timestamp: now,
+          );
+        }
+
+        // Native (Android / Windows): Safety Backup ไฟล์เดิมในเครื่อง
         var localDb = await getLocalDatabaseFile();
         String? backupPath;
         if (localDb != null && await localDb.exists()) {
@@ -588,7 +630,7 @@ class GoogleDriveSyncService {
         );
       }
 
-      // ─── กู้คืนผ่าน Local Folder ───────────────────────────────────────
+      // ─── กู้คืนผ่าน Local Folder (สำหรับ Desktop ที่เลือกโฟลเดอร์ไว้) ────────
       final folderPath = await detectOrGetDriveFolder();
       if (folderPath == null) {
         return GoogleDriveSyncResult(
@@ -676,9 +718,13 @@ class GoogleDriveSyncService {
         backupFilePath: backupPath,
       );
     } catch (e) {
+      final errStr = e.toString();
+      final msg = errStr.contains('401')
+          ? 'การยืนยันตัวตน Google Drive หมดอายุ กรุณาออกจากระบบแล้วเข้าสู่ระบบ Google ใหม่อีกครั้ง'
+          : 'เกิดข้อผิดพลาดในการกู้คืนข้อมูล: $e';
       return GoogleDriveSyncResult(
         success: false,
-        message: 'เกิดข้อผิดพลาดในการกู้คืนข้อมูล: $e',
+        message: msg,
         timestamp: now,
       );
     }

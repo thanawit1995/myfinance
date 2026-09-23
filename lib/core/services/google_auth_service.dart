@@ -74,6 +74,13 @@ class GoogleAuthService {
       try {
         _account = await _googleSignIn.signIn();
         if (_account != null) {
+          if (kIsWeb) {
+            try {
+              await _googleSignIn.requestScopes([driveScope]);
+            } catch (e) {
+              debugPrint('requestScopes error on signIn: $e');
+            }
+          }
           await _saveUser(_account!.email, _account!.displayName, _account!.photoUrl);
           return GoogleAuthUser(
             email: _account!.email,
@@ -93,8 +100,19 @@ class GoogleAuthService {
     await _saveUser(email, displayName, null);
   }
 
+  /// ขอสิทธิ์ Drive scope เพิ่มเติมบน Web
+  Future<bool> requestDriveScopeOnWeb() async {
+    if (!kIsWeb) return true;
+    try {
+      return await _googleSignIn.requestScopes([driveScope]);
+    } catch (e) {
+      debugPrint('requestDriveScopeOnWeb error: $e');
+      return false;
+    }
+  }
+
   /// สร้าง http.Client ที่มี Access Token ของ Google สำหรับคุยกับ Google APIs
-  Future<http.Client?> getAuthenticatedClient() async {
+  Future<http.Client?> getAuthenticatedClient({bool requestScopesIfNeeded = false}) async {
     if (!isSupportedPlatform) return null;
 
     if (_account == null) {
@@ -104,6 +122,35 @@ class GoogleAuthService {
     }
 
     if (_account == null) return null;
+
+    if (kIsWeb) {
+      try {
+        final canAccess = await _googleSignIn.canAccessScopes([driveScope]);
+        if (!canAccess) {
+          if (requestScopesIfNeeded) {
+            final granted = await _googleSignIn.requestScopes([driveScope]);
+            if (!granted) {
+              debugPrint('Drive scope was not granted by user');
+              return null;
+            }
+          } else {
+            return null;
+          }
+        }
+      } catch (e) {
+        debugPrint('canAccessScopes check error: $e');
+        if (requestScopesIfNeeded) {
+          try {
+            final granted = await _googleSignIn.requestScopes([driveScope]);
+            if (!granted) return null;
+          } catch (_) {
+            return null;
+          }
+        } else {
+          return null;
+        }
+      }
+    }
 
     final authHeaders = await _account!.authHeaders;
     return _GoogleAuthClient(authHeaders);

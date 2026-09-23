@@ -3,12 +3,12 @@ chcp 65001 > nul
 cd /d "%~dp0"
 cls
 echo ====================================================================
-echo   เปิดแอป JP Money บนหน้าจอคอมพิวเตอร์ Windows ทันที
+echo   เปิดแอป OURS บนหน้าจอคอมพิวเตอร์ Windows ทันที
 echo ====================================================================
 echo.
 
 if exist "build\windows\x64\runner\Release\myfinance.exe" (
-    echo กำลังเปิดโปรแกรม JP Money...
+    echo กำลังเปิดโปรแกรม OURS...
     start "" "build\windows\x64\runner\Release\myfinance.exe"
     exit /b 0
 )

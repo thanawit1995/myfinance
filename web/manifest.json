@@ -1,11 +1,11 @@
 {
-    "name": "JP Money — สมุดบันทึกการเงินส่วนบุคคล",
-    "short_name": "JP Money",
+    "name": "OURS — Our money, our journey.",
+    "short_name": "OURS",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#FFF9F5",
     "theme_color": "#FFF9F5",
-    "description": "สมุดบันทึกการเงินส่วนบุคคลที่อบอุ่น ใช้งานง่าย พร้อมการวางแผนงบประมาณและพอร์ตการลงทุน",
+    "description": "OURS — สมุดบันทึกการเงินส่วนบุคคลและพอร์ตการลงทุน สำหรับคุณและคนที่คุณรัก",
     "orientation": "any",
     "prefer_related_applications": false,
     "icons": [

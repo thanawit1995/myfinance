@@ -1,4 +1,4 @@
-﻿[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 
 Set-Location $PSScriptRoot
@@ -27,14 +27,14 @@ try {
     # Ensure git config has name & email so commit won't fail
     $userName = git config user.name
     if (-not $userName) {
-        git config user.name "JP Money User"
-        git config user.email "user@jpmoney.local"
+        git config user.name "OURS User"
+        git config user.email "user@ours.local"
     }
 
     # 3. Add and commit files
     Write-Host "[*] กำลังบันทึกไฟล์โปรเจกต์ทั้งหมดเข้า Git..." -ForegroundColor Yellow
     git add .
-    git commit -m "Update JP Money with Hybrid Backup and PWA Web App" 2>$null
+    git commit -m "Update OURS with Hybrid Backup and PWA Web App" 2>$null
 
     # 4. Check remote URL
     $remoteUrl = git remote get-url origin 2>$null

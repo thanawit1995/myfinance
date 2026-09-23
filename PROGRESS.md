@@ -633,6 +633,10 @@
   4. เพิ่มการดักจับข้อผิดพลาดทั่วทั้งระบบด้วย `PlatformDispatcher.instance.onError` และ `try/catch` ในจุดอ่าน Secure Storage และ Recurring Rules เมื่อเปิดแอป เพื่อป้องกันการแครชแบบฉับพลัน
   5. ระบบย่อโค้ด R8 บดบังคลาส WorkDatabase (`androidx.work.impl.WorkDatabase`): ในโหมด Release ระบบ Gradle ทำการย่อโค้ดและเปลี่ยนชื่อคลาสของ Room/WorkManager ทำให้ `InitializationProvider` ตอนเริ่มแอปพลิเคชันพังทันทีก่อนหน้าต่างแรกจะแสดง แก้ไขโดยสร้างไฟล์ `proguard-rules.pro` เพื่อรักษากลุ่มคลาสของ WorkManager และ Room พร้อมปิด `isMinifyEnabled = false` ทดสอบบนเครื่องจริง Oppo Find X9 (ColorOS 16 / Android 16) เปิดใช้งานได้สำเร็จสมบูรณ์ 100%
 - **GitHub Actions Build Web ล้มเหลวเนื่องจาก `dart:ffi` ใน `sqlite3_flutter_libs`**: บนเว็บไม่มีโมดูล `dart:ffi` การเรียกใช้แพ็กเกจ SQLite โดยตรงใน `main.dart` ทำให้การคอมไพล์ Web บน GitHub Actions พัง แก้ไขโดยสร้างชั้นสวิตช์แบบข้ามแพลตฟอร์ม (Conditional Export) ทำให้ระบบเว็บคอมไพล์ผ่านฉลุย 100% ส่วน Android/Windows ยังคงทำงานร่วมกับ SQLite ได้เต็มประสิทธิภาพ
+- **Google Drive Sync บน WebApp ค้างหน้า Loading และกู้คืน (Restore) ไม่สำเร็จ**:
+  1. *ปัญหาหน้าโหลดค้าง*: ใน WebApp เมื่อเปิดหน้า Sync ตัวแอปเรียก `getStatus()` ซึ่งพยายามเรียก `requestScopes` ใน `initState` โดยไม่ได้เกิดจากการคลิกของผู้ใช้ เบราว์เซอร์จึงบล็อกหน้าต่าง OAuth Popup ทำให้การทำงานค้าง แก้ไขโดยตั้งค่า `requestScopesIfNeeded: false` ในการตรวจสอบสถานะ และเพิ่ม Timeout 5 วินาที พร้อมขอสิทธิ์เฉพาะเมื่อผู้ใช้กดปุ่มสำรอง/กู้คืนข้อมูลโดยตรง
+  2. *ปัญหากู้คืนข้อมูลไม่สำเร็จ*: เดิมฟังก์ชันกู้คืนเรียกใช้ `dart:io` `File` และโฟลเดอร์เครื่องซึ่งไม่มีอยู่บน Web (`UnsupportedError`) แก้ไขโดยเพิ่ม `web_db_helper_web.dart` เพื่อเขียนข้อมูลฐานข้อมูลสำรองลงสู่ IndexedDB (`IndexedDbFileSystem`) และ Origin Private File System (OPFS) ของเบราว์เซอร์โดยตรง พร้อมสั่งรีเฟรชหน้าเว็บอัตโนมัติเพื่อให้แอปโหลดฐานข้อมูลกู้คืนขึ้นมาใช้งานได้ทันที
+
 
 
 

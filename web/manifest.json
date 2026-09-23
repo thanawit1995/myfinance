@@ -6,7 +6,7 @@
     "background_color": "#FFF9F5",
     "theme_color": "#FFF9F5",
     "description": "OURS — สมุดบันทึกการเงินส่วนบุคคลและพอร์ตการลงทุน สำหรับคุณและคนที่คุณรัก",
-    "orientation": "any",
+    "orientation": "portrait",
     "prefer_related_applications": false,
     "icons": [
         {

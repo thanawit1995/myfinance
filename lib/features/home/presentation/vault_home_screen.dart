@@ -98,7 +98,10 @@ class VaultHomeScreen extends ConsumerWidget {
                     );
                   },
                   onAddTransaction: () {
-                    VaultAddSheet.show(context);
+                    VaultAddSheet.show(
+                      context,
+                      onNavigateToTransactions: onNavigateToMoney,
+                    );
                   },
                 );
               }

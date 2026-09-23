@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -16,22 +17,87 @@ class TransactionListScreen extends ConsumerStatefulWidget {
   ConsumerState<TransactionListScreen> createState() => _TransactionListScreenState();
 }
 
-class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
+class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   final _searchController = TextEditingController();
   String? _selectedAccountId;
   String? _selectedCategoryId;
   DateTimeRange? _selectedDateRange;
   String? _selectedType; // null = ทั้งหมด, 'income', 'expense', 'transfer'
 
+  List<Transaction>? _transactions;
+  bool _isLoading = false;
+  StreamSubscription? _dbSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTransactions();
+    // Silent background sync with database updates
+    _dbSubscription = ref.read(transactionsDaoProvider).watchRecentTransactions(limit: 1).listen((_) {
+      _silentReloadTransactions();
+    });
+  }
+
   @override
   void dispose() {
+    _dbSubscription?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
+  Future<void> _loadTransactions() async {
+    if (_transactions == null) {
+      setState(() => _isLoading = true);
+    }
+    try {
+      final list = await ref.read(transactionsDaoProvider).searchTransactions(
+        query: _searchController.text.trim().isEmpty ? null : _searchController.text.trim(),
+        startDate: _selectedDateRange?.start,
+        endDate: _selectedDateRange?.end.add(const Duration(days: 1)),
+        accountId: _selectedAccountId,
+        categoryId: _selectedCategoryId,
+        transactionType: _selectedType,
+        excludeInvestments: false,
+      );
+      if (mounted) {
+        setState(() {
+          _transactions = list;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _silentReloadTransactions() async {
+    try {
+      final list = await ref.read(transactionsDaoProvider).searchTransactions(
+        query: _searchController.text.trim().isEmpty ? null : _searchController.text.trim(),
+        startDate: _selectedDateRange?.start,
+        endDate: _selectedDateRange?.end.add(const Duration(days: 1)),
+        accountId: _selectedAccountId,
+        categoryId: _selectedCategoryId,
+        transactionType: _selectedType,
+        excludeInvestments: false,
+      );
+      if (mounted) {
+        setState(() {
+          _transactions = list;
+        });
+      }
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
-    final txDao = ref.watch(transactionsDaoProvider);
+    super.build(context);
     final isThai = Localizations.localeOf(context).languageCode == 'th';
 
     return Scaffold(
@@ -70,14 +136,14 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
                         icon: const Icon(Icons.clear),
                         onPressed: () {
                           _searchController.clear();
-                          setState(() {});
+                          _loadTransactions();
                         },
                       )
                     : null,
                 isDense: true,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              onChanged: (_) => setState(() {}),
+              onChanged: (_) => _loadTransactions(),
             ),
           ),
 
@@ -110,17 +176,26 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
                   if (_selectedDateRange != null)
                     Chip(
                       label: Text('${DateFormat('d/M').format(_selectedDateRange!.start)} - ${DateFormat('d/M').format(_selectedDateRange!.end)}'),
-                      onDeleted: () => setState(() => _selectedDateRange = null),
+                      onDeleted: () {
+                        setState(() => _selectedDateRange = null);
+                        _loadTransactions();
+                      },
                     ),
                   if (_selectedAccountId != null)
                     Chip(
                       label: Text(isThai ? 'บัญชีที่เลือก' : 'Selected Account'),
-                      onDeleted: () => setState(() => _selectedAccountId = null),
+                      onDeleted: () {
+                        setState(() => _selectedAccountId = null);
+                        _loadTransactions();
+                      },
                     ),
                   if (_selectedCategoryId != null)
                     Chip(
                       label: Text(isThai ? 'หมวดหมู่ที่เลือก' : 'Selected Category'),
-                      onDeleted: () => setState(() => _selectedCategoryId = null),
+                      onDeleted: () {
+                        setState(() => _selectedCategoryId = null);
+                        _loadTransactions();
+                      },
                     ),
                 ],
               ),
@@ -128,26 +203,13 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
 
           // Transaction list
           Expanded(
-            child: FutureBuilder<List<Transaction>>(
-              future: txDao.searchTransactions(
-                query: _searchController.text.trim().isEmpty ? null : _searchController.text.trim(),
-                startDate: _selectedDateRange?.start,
-                endDate: _selectedDateRange?.end.add(const Duration(days: 1)),
-                accountId: _selectedAccountId,
-                categoryId: _selectedCategoryId,
-                transactionType: _selectedType,
-                excludeInvestments: false,
-              ),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
+            child: Builder(
+              builder: (context) {
+                if (_isLoading && _transactions == null) {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                if (snapshot.hasError) {
-                  return Center(child: Text('เกิดข้อผิดพลาด: ${snapshot.error}'));
-                }
-
-                final transactions = snapshot.data ?? [];
+                final transactions = _transactions ?? [];
                 if (transactions.isEmpty) {
                   return Center(
                     child: Column(
@@ -173,6 +235,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
                 final sortedDates = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
 
                 return ListView.builder(
+                  key: const PageStorageKey('transaction_list_scroll_key'),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   itemCount: sortedDates.length,
                   itemBuilder: (context, dateIndex) {
@@ -273,7 +336,10 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
         ],
       ),
       selected: isSelected,
-      onSelected: (_) => setState(() => _selectedType = value),
+      onSelected: (_) {
+        setState(() => _selectedType = value);
+        _loadTransactions();
+      },
       showCheckmark: false,
       selectedColor: chipColor,
       backgroundColor: chipColor.withValues(alpha: 0.1),
@@ -371,7 +437,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
       onTap: () async {
         final changed = await EditTransactionDialog.show(context, tx);
         if (changed == true && mounted) {
-          setState(() {});
+          _loadTransactions();
         }
       },
       onLongPress: () => _confirmDelete(tx, isThai),
@@ -401,12 +467,15 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
     );
 
     if (confirm == true) {
+      // Optimistic in-place removal: immediate visual update, no spinner, scroll preserved
+      setState(() {
+        _transactions?.removeWhere((t) => t.id == tx.id);
+      });
       await ref.read(transactionsDaoProvider).softDeleteTransaction(tx.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(isThai ? 'ลบรายการเรียบร้อยแล้ว' : 'Transaction deleted')),
         );
-        setState(() {});
       }
     }
   }
@@ -497,6 +566,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
                               _selectedCategoryId = null;
                             });
                             setState(() => _selectedType = null);
+                            _loadTransactions();
                           },
                           child: Text(isThai ? 'ล้างตัวกรองทั้งหมด' : 'Clear Filters'),
                         ),
@@ -506,7 +576,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
                         child: FilledButton(
                           onPressed: () {
                             Navigator.of(ctx).pop();
-                            setState(() {});
+                            _loadTransactions();
                           },
                           child: const Text('นำไปใช้'),
                         ),

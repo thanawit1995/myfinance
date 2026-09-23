@@ -8,6 +8,7 @@ import '../../../../core/database/app_database.dart';
 import '../../../../core/database/database_provider.dart';
 import '../../../../core/money/money.dart';
 import '../../../../core/theme/vault_theme.dart';
+import '../../import/domain/csv_import_parser.dart';
 
 class AccruedIncomeScreen extends ConsumerStatefulWidget {
   const AccruedIncomeScreen({super.key});
@@ -431,20 +432,6 @@ class _AccruedIncomeScreenState extends ConsumerState<AccruedIncomeScreen> {
                         color: VaultTheme.secondaryText(context),
                       ),
                     ),
-                    if (tx.taxCategory != null) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          tx.taxCategory!,
-                          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ],
@@ -465,18 +452,32 @@ class _AccruedIncomeScreenState extends ConsumerState<AccruedIncomeScreen> {
                 ),
               ),
               const SizedBox(height: 4),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.check_circle_outline, size: 14),
-                label: Text(isThai ? 'รับเงินแล้ว' : 'Mark Received', style: const TextStyle(fontSize: 11)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: VaultTheme.positive(context),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  minimumSize: const Size(60, 26),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              InkWell(
+                onTap: () => _showMarkReceivedDialog(context, tx, isThai),
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: VaultTheme.positive(context).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: VaultTheme.positive(context).withValues(alpha: 0.35)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle_rounded, size: 13, color: VaultTheme.positive(context)),
+                      const SizedBox(width: 4),
+                      Text(
+                        isThai ? 'รับแล้ว' : 'Received',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: VaultTheme.positive(context),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                onPressed: () => _showMarkReceivedDialog(context, tx, isThai),
               ),
             ],
           ),
@@ -863,6 +864,27 @@ class _AccruedIncomeScreenState extends ConsumerState<AccruedIncomeScreen> {
     String? selectedCategoryId = categories.isNotEmpty ? categories.first.id : null;
     String? selectedAccountId = accounts.isNotEmpty ? accounts.first.id : null;
     String selectedTaxType = '40(1)';
+    bool isRecurring = false;
+    int recurringDayOfMonth = 25;
+
+    void updateInferredTax(String inputName, String? catId, void Function(void Function()) setDialogState) {
+      final cat = categories.where((c) => c.id == catId).firstOrNull;
+      final combined = '$inputName ${cat?.nameTh ?? ""} ${cat?.nameEn ?? ""}';
+      final inferred = CsvImportParser.classifyIncomeTax(
+        name: combined,
+        date: now,
+        amountSatang: 100000,
+      );
+      setDialogState(() {
+        if (inferred.taxCategory == '40_1') {
+          selectedTaxType = '40(1)';
+        } else if (inferred.taxCategory == '40_2') {
+          selectedTaxType = '40(2)';
+        } else if (inferred.taxCategory == 'non_taxable') {
+          selectedTaxType = 'non_taxable';
+        }
+      });
+    }
 
     await showDialog(
       context: context,
@@ -889,6 +911,7 @@ class _AccruedIncomeScreenState extends ConsumerState<AccruedIncomeScreen> {
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   ),
+                  onChanged: (val) => updateInferredTax(val, selectedCategoryId, setDialogState),
                 ),
                 const SizedBox(height: 12),
 
@@ -949,10 +972,17 @@ class _AccruedIncomeScreenState extends ConsumerState<AccruedIncomeScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Tax Category
-                Text(isThai ? 'ประเภทเงินได้พึงประเมิน' : 'Tax Category', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                // Tax Category (Auto inferred + editable)
+                Row(
+                  children: [
+                    Text(isThai ? 'ประเภทเงินได้พึงประเมิน' : 'Tax Category', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                    const SizedBox(width: 6),
+                    Text(isThai ? '(ระบบเลือกให้อัตโนมัติ เปลี่ยนได้)' : '(Auto-selected)', style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+                  ],
+                ),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
+                  key: ValueKey('tax_$selectedTaxType'),
                   initialValue: selectedTaxType,
                   decoration: InputDecoration(
                     isDense: true,
@@ -960,9 +990,10 @@ class _AccruedIncomeScreenState extends ConsumerState<AccruedIncomeScreen> {
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   items: const [
-                    DropdownMenuItem(value: '40(1)', child: Text('40(1) เงินเดือน/พตส./ไม่ทำเวชฯ')),
-                    DropdownMenuItem(value: '40(2)', child: Text('40(2) ค่าเวรเหมา/เบี้ยเลี้ยง')),
+                    DropdownMenuItem(value: '40(1)', child: Text('40(1) เงินเดือน / พตส. / ไม่ทำเวชฯ')),
+                    DropdownMenuItem(value: '40(2)', child: Text('40(2) ค่าเวรเหมา / รายชั่วโมง / เบี้ยเลี้ยง')),
                     DropdownMenuItem(value: '40(6)', child: Text('40(6) ค่าแพทย์อิสระ / DF')),
+                    DropdownMenuItem(value: 'non_taxable', child: Text('ยกเว้นภาษี (Non-taxable / Top up)')),
                   ],
                   onChanged: (val) {
                     if (val != null) setDialogState(() => selectedTaxType = val);
@@ -988,11 +1019,47 @@ class _AccruedIncomeScreenState extends ConsumerState<AccruedIncomeScreen> {
                       );
                     }).toList(),
                     onChanged: (val) {
-                      if (val != null) setDialogState(() => selectedCategoryId = val);
+                      if (val != null) {
+                        selectedCategoryId = val;
+                        updateInferredTax(nameController.text, val, setDialogState);
+                      }
                     },
                   ),
                   const SizedBox(height: 12),
                 ],
+
+                // Recurring Checkbox & Day of Month
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: Text(
+                    isThai ? 'ตั้งเป็นรายการเกิดซ้ำประจำเดือน (Recurring)' : 'Repeat monthly (Recurring)',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    isThai ? 'สร้างรายการค้างรับอัตโนมัติในทุกๆ เดือน' : 'Automatically create accrued item monthly',
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                  ),
+                  value: isRecurring,
+                  onChanged: (val) => setDialogState(() => isRecurring = val ?? false),
+                ),
+                if (isRecurring)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      children: [
+                        Text(isThai ? 'รอบวันที่เงินมักจะออก:' : 'Target day of month:', style: const TextStyle(fontSize: 12)),
+                        const SizedBox(width: 8),
+                        DropdownButton<int>(
+                          value: recurringDayOfMonth,
+                          items: List.generate(31, (i) => i + 1).map((d) => DropdownMenuItem(value: d, child: Text('วันที่ $d'))).toList(),
+                          onChanged: (d) {
+                            if (d != null) setDialogState(() => recurringDayOfMonth = d);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
 
                 // Tag
                 Text(isThai ? 'แท็ก / ป้ายกำกับ' : 'Tag', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
@@ -1058,11 +1125,40 @@ class _AccruedIncomeScreenState extends ConsumerState<AccruedIncomeScreen> {
                   ),
                 );
 
+                // If recurring is enabled, register Recurring Rule
+                if (isRecurring) {
+                  final recurDao = ref.read(recurringTransactionsDaoProvider);
+                  final nextRun = DateTime(nowTime.year, nowTime.month + 1, recurringDayOfMonth);
+                  await recurDao.createRule(
+                    RecurringRulesCompanion.insert(
+                      id: const Uuid().v4(),
+                      title: name,
+                      transactionType: 'income',
+                      sourceAccountId: defaultAccId,
+                      categoryId: drift.Value(selectedCategoryId),
+                      amountSatang: moneyParsed.satang,
+                      currencyCode: 'THB',
+                      frequency: 'monthly',
+                      dayOfMonth: drift.Value(recurringDayOfMonth),
+                      nextRunDate: nextRun,
+                      isActive: const drift.Value(true),
+                      autoPost: const drift.Value(false),
+                      note: drift.Value(tagController.text.trim().isEmpty ? null : tagController.text.trim()),
+                      createdAt: nowTime,
+                      updatedAt: nowTime,
+                    ),
+                  );
+                }
+
                 if (ctx.mounted) Navigator.pop(ctx);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(isThai ? 'บันทึกรายการค้างรับเรียบร้อย' : 'Accrued income added!'),
+                      content: Text(
+                        isThai
+                            ? (isRecurring ? 'บันทึกรายการค้างรับและตั้งรายการประจำแล้ว' : 'บันทึกรายการค้างรับเรียบร้อย')
+                            : 'Accrued income added!',
+                      ),
                       backgroundColor: VaultTheme.positive(context),
                     ),
                   );

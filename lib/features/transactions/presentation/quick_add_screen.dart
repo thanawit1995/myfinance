@@ -14,15 +14,18 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../../core/widgets/category_icon_helper.dart';
 import '../../categories/presentation/category_form_dialog.dart';
 import '../../recurring/domain/recurring_engine.dart';
+import '../../import/domain/csv_import_parser.dart';
 
 class QuickAddScreen extends ConsumerStatefulWidget {
   final String? initialType;
   final bool isModal;
+  final VoidCallback? onTransactionSaved;
 
   const QuickAddScreen({
     super.key,
     this.initialType,
     this.isModal = false,
+    this.onTransactionSaved,
   });
 
   @override
@@ -44,6 +47,13 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
   DateTime _transactionDate = DateTime.now();
 
   List<Account> _accounts = [];
+  List<Category> _currentCategories = [];
+
+  // Accrued income & Tax classification options
+  bool _isAccruedIncome = false;
+  String _accruedWorkPeriod = '';
+  String _selectedTaxCategory = '40_1';
+  bool _userManuallyChangedTax = false;
 
   Account? get _currentSourceAccount =>
       _accounts.where((a) => a.id == _selectedAccountId).firstOrNull;
@@ -74,6 +84,8 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    _accruedWorkPeriod = '${now.year}-${now.month.toString().padLeft(2, '0')}';
     if (widget.initialType != null) {
       _transactionType = widget.initialType!.toLowerCase();
     }
@@ -82,11 +94,12 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
 
   Future<void> _loadInitialData() async {
     final accounts = await ref.read(accountsDaoProvider).getActiveAccounts();
-    final categories = await ref.read(categoriesDaoProvider).getActiveCategories('expense');
+    final categories = await ref.read(categoriesDaoProvider).getActiveCategories(_transactionType);
 
     if (mounted) {
       setState(() {
         _accounts = accounts;
+        _currentCategories = categories;
         if (accounts.isNotEmpty) {
           _selectedAccountId = accounts.first.id;
           if (accounts.length > 1) {
@@ -96,8 +109,55 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
         if (categories.isNotEmpty) {
           _selectedCategoryId = categories.first.id;
         }
+        _inferTaxCategory();
       });
     }
+  }
+
+  void _inferTaxCategory([String? newNote, String? newCatId]) {
+    if (_transactionType != 'income' || _userManuallyChangedTax) return;
+    final noteText = (newNote ?? _noteController.text).trim();
+    final catId = newCatId ?? _selectedCategoryId;
+    final cat = _currentCategories.where((c) => c.id == catId).firstOrNull;
+    final combined = '$noteText ${cat?.nameTh ?? ""} ${cat?.nameEn ?? ""}';
+    final inferred = CsvImportParser.classifyIncomeTax(
+      name: combined,
+      date: _transactionDate,
+      amountSatang: 100000,
+    );
+    if (inferred.taxCategory == '40_1' ||
+        inferred.taxCategory == '40_2' ||
+        inferred.taxCategory == '40_6' ||
+        inferred.taxCategory == '40_8' ||
+        inferred.taxCategory == 'non_taxable') {
+      _selectedTaxCategory = inferred.taxCategory;
+    } else if (cat?.taxIncomeType != null && cat!.taxIncomeType!.isNotEmpty) {
+      _selectedTaxCategory = cat.taxIncomeType!;
+    } else {
+      _selectedTaxCategory = '40_1';
+    }
+  }
+
+  String _formatWorkPeriodDisplay(String period, bool isThai) {
+    final parts = period.split('-');
+    if (parts.length == 2) {
+      final year = int.tryParse(parts[0]);
+      final month = int.tryParse(parts[1]);
+      if (year != null && month != null && month >= 1 && month <= 12) {
+        const thaiMonths = [
+          'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+          'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+        ];
+        const enMonths = [
+          'January', 'February', 'March', 'April', 'May', 'June',
+          'July', 'August', 'September', 'October', 'November', 'December'
+        ];
+        return isThai
+            ? '${thaiMonths[month - 1]} $year (${year + 543})'
+            : '${enMonths[month - 1]} $year';
+      }
+    }
+    return period;
   }
 
   Future<void> _duplicateLastTransaction() async {
@@ -265,26 +325,27 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
     String? taxCat;
     int whtSatang = 0;
     if (_transactionType == 'income') {
-      final cat = _selectedCategoryId != null
-          ? await ref.read(categoriesDaoProvider).getCategoryById(_selectedCategoryId!)
-          : null;
-      taxCat = cat?.taxIncomeType ?? '40_8';
-
-      final catName = '${cat?.nameTh ?? ""} ${cat?.nameEn ?? ""}'.toLowerCase();
-      final noteLower = _note.toLowerCase();
-      final isJuly2026OrLater = _transactionDate.year > 2026 ||
-          (_transactionDate.year == 2026 && _transactionDate.month >= 7);
-
-      if (catName.contains('top up') || catName.contains('topup') || noteLower.contains('top up')) {
-        taxCat = 'non_taxable';
+      taxCat = _selectedTaxCategory;
+      if (taxCat == 'non_taxable') {
         whtSatang = 0;
-      } else if ((catName.contains('p4p') || catName.contains('พ.ต.ส.') || catName.contains('พตส') ||
-                  noteLower.contains('p4p') || noteLower.contains('พ.ต.ส.') || noteLower.contains('พตส')) &&
-                 isJuly2026OrLater) {
-        taxCat = '40_1';
-        whtSatang = (amountThbSatang * 5) ~/ 100;
+      } else if (taxCat == '40_1') {
+        final cat = _selectedCategoryId != null
+            ? _currentCategories.where((c) => c.id == _selectedCategoryId).firstOrNull
+            : null;
+        final catName = '${cat?.nameTh ?? ""} ${cat?.nameEn ?? ""}'.toLowerCase();
+        final noteLower = _note.toLowerCase();
+        final isJuly2026OrLater = _transactionDate.year > 2026 ||
+            (_transactionDate.year == 2026 && _transactionDate.month >= 7);
+
+        if ((catName.contains('p4p') || catName.contains('พ.ต.ส.') || catName.contains('พตส') ||
+             noteLower.contains('p4p') || noteLower.contains('พ.ต.ส.') || noteLower.contains('พตส')) &&
+            isJuly2026OrLater) {
+          whtSatang = (amountThbSatang * 5) ~/ 100;
+        }
       }
     }
+
+    final isAccrued = _transactionType == 'income' && _isAccruedIncome;
 
     final newTx = TransactionsCompanion.insert(
       id: _uuid.v4(),
@@ -301,6 +362,9 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
       withholdingTaxSatang: Value(whtSatang),
       tag: Value(effectiveTag),
       transactionDate: _transactionDate,
+      workPeriod: Value(isAccrued ? _accruedWorkPeriod : null),
+      expectedAmountSatang: Value(isAccrued ? amountThbSatang : null),
+      isCleared: Value(!isAccrued),
       note: Value(_note.isEmpty ? null : _note),
       createdAt: now,
       updatedAt: now,
@@ -365,10 +429,11 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
       final srcCurrency = srcAcc?.currencyCode ?? 'THB';
       final srcSymbol = srcCurrency == 'USD' ? '\$' : (srcCurrency == 'THB' ? '฿' : '$srcCurrency ');
       final recurringMsg = _isRecurring ? (isThai ? ' และตั้งรายการประจำแล้ว' : ' and recurring schedule set') : '';
+      final accruedMsg = isAccrued ? (isThai ? ' (บันทึกเป็นรายได้ค้างรับรอบ ${_formatWorkPeriodDisplay(_accruedWorkPeriod, isThai)})' : ' (Accrued income for $_accruedWorkPeriod)') : '';
       final typeText = _formatType(_transactionType, isThai);
       final successMsg = isThai
-          ? 'บันทึกรายการ $typeText $srcSymbol$_amountString สำเร็จ$recurringMsg'
-          : 'Successfully saved $typeText $srcSymbol$_amountString$recurringMsg';
+          ? 'บันทึกรายการ $typeText $srcSymbol$_amountString สำเร็จ$recurringMsg$accruedMsg'
+          : 'Successfully saved $typeText $srcSymbol$_amountString$recurringMsg$accruedMsg';
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -382,17 +447,24 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
         ),
       );
 
-      // Reset amount and additional options
-      setState(() {
-        _amountString = '0';
-        _usdAmountString = '0';
-        _note = '';
-        _noteController.clear();
-        _tag = null;
-        _feeThbSatang = 0;
-        _selectedProjectId = null;
-        _isRecurring = false;
-      });
+      widget.onTransactionSaved?.call();
+      if (widget.isModal && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(true);
+      } else {
+        // Reset amount and additional options
+        setState(() {
+          _amountString = '0';
+          _usdAmountString = '0';
+          _note = '';
+          _noteController.clear();
+          _tag = null;
+          _feeThbSatang = 0;
+          _selectedProjectId = null;
+          _isRecurring = false;
+          _isAccruedIncome = false;
+          _userManuallyChangedTax = false;
+        });
+      }
     }
   }
 
@@ -491,16 +563,16 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
               ],
               selected: {_transactionType},
               onSelectionChanged: (newVal) async {
-                setState(() {
-                  _transactionType = newVal.first;
-                });
-                if (_transactionType != 'transfer') {
-                  final cats = await ref.read(categoriesDaoProvider).getActiveCategories(_transactionType);
-                  if (cats.isNotEmpty && mounted) {
-                    setState(() {
-                      _selectedCategoryId = cats.first.id;
-                    });
-                  }
+                final newType = newVal.first;
+                final cats = await ref.read(categoriesDaoProvider).getActiveCategories(newType);
+                if (mounted) {
+                  setState(() {
+                    _transactionType = newType;
+                    _currentCategories = cats;
+                    _selectedCategoryId = cats.isNotEmpty ? cats.first.id : null;
+                    _userManuallyChangedTax = false;
+                    _inferTaxCategory();
+                  });
                 }
               },
             ),
@@ -555,14 +627,35 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
             ),
             const SizedBox(height: 12),
 
-            // 3. Category Chips (Quick 2nd Tap)
-            if (_transactionType != 'transfer') ...[
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(l10n?.category != null ? '${l10n!.category}:' : (isThai ? 'เลือกหมวดหมู่:' : 'Select Category:'), style: theme.textTheme.labelLarge),
+            // 2.1 Note / Transaction Title Field (Item 6 - เด่น ชัดเจน เข้าถึงง่าย)
+            TextField(
+              controller: _noteController,
+              decoration: InputDecoration(
+                labelText: isThai ? 'ชื่อรายการ / บันทึกย่อ' : 'Title / Note',
+                hintText: isThai ? 'เช่น เงินเดือน, ค่าเวร, ค่าอาหาร, กาแฟ' : 'e.g. Salary, Shift, Coffee',
+                prefixIcon: const Icon(Icons.edit_note_outlined),
+                border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+                isDense: true,
               ),
-              const SizedBox(height: 6),
-              _buildCategoryChips(),
+              onChanged: (val) {
+                if (_transactionType == 'income') {
+                  setState(() {
+                    _inferTaxCategory(val, _selectedCategoryId);
+                  });
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+
+            // 3. Category Dropdown (Item 6 - Dropdown เลือกง่าย พร้อมปุ่มเพิ่มหมวดหมู่)
+            if (_transactionType != 'transfer') ...[
+              _buildCategoryDropdown(theme, isThai),
+              const SizedBox(height: 12),
+            ],
+
+            // 3.1 Income Tax & Accrued Income Settings (Item 3 & Item 5)
+            if (_transactionType == 'income') ...[
+              _buildIncomeTaxAndAccruedCard(theme, isThai),
               const SizedBox(height: 12),
             ],
 
@@ -582,7 +675,7 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
               const SizedBox(height: 12),
             ],
 
-            // 5. Additional Options (Note, Project, Recurring)
+            // 5. Additional Options (Project, Recurring)
             _buildAdditionalOptions(theme),
             const SizedBox(height: 12),
 
@@ -616,77 +709,222 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
     );
   }
 
-  Widget _buildCategoryChips() {
-    final isThai = Localizations.localeOf(context).languageCode == 'th';
+  Widget _buildCategoryDropdown(ThemeData theme, bool isThai) {
+    final validSelectedId = _currentCategories.any((c) => c.id == _selectedCategoryId)
+        ? _selectedCategoryId
+        : (_currentCategories.isNotEmpty ? _currentCategories.first.id : null);
 
-    return FutureBuilder<List<Category>>(
-      future: ref.read(categoriesDaoProvider).getActiveCategories(_transactionType),
-      builder: (context, snapshot) {
-        final categories = snapshot.data ?? [];
-        return SizedBox(
-          height: 46,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
+    return Row(
+      children: [
+        Expanded(
+          child: DropdownButtonFormField<String>(
+            key: ValueKey('cat_dropdown_${_transactionType}_$validSelectedId'),
+            decoration: InputDecoration(
+              labelText: isThai ? 'หมวดหมู่ (Category)' : 'Category',
+              prefixIcon: const Icon(Icons.category_outlined),
+              border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+              isDense: true,
+            ),
+            initialValue: validSelectedId,
+            items: _currentCategories.map((cat) {
+              final displayName = isThai
+                  ? cat.nameTh
+                  : (cat.nameEn.trim().isNotEmpty ? cat.nameEn : cat.nameTh);
+              return DropdownMenuItem(
+                value: cat.id,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(CategoryIconHelper.getIcon(cat.icon), size: 18),
+                    const SizedBox(width: 8),
+                    Text(displayName, overflow: TextOverflow.ellipsis),
+                  ],
+                ),
+              );
+            }).toList(),
+            onChanged: (val) {
+              setState(() {
+                _selectedCategoryId = val;
+                if (_transactionType == 'income') {
+                  _inferTaxCategory(_noteController.text, val);
+                }
+              });
+            },
+          ),
+        ),
+        const SizedBox(width: 8),
+        IconButton.filledTonal(
+          tooltip: isThai ? 'เพิ่มหมวดหมู่ใหม่' : 'Add Category',
+          icon: const Icon(Icons.add),
+          onPressed: () async {
+            final newCat = await CategoryFormDialog.show(
+              context,
+              initialType: _transactionType,
+            );
+            if (newCat != null && mounted) {
+              final updatedCats = await ref.read(categoriesDaoProvider).getActiveCategories(_transactionType);
+              setState(() {
+                _currentCategories = updatedCats;
+                _selectedCategoryId = newCat.id;
+                if (_transactionType == 'income') {
+                  _inferTaxCategory(_noteController.text, newCat.id);
+                }
+              });
+            }
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildIncomeTaxAndAccruedCard(ThemeData theme, bool isThai) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Tax Category Header & Dropdown (Item 5)
+          Row(
             children: [
-              ...categories.map((cat) {
-                final isSelected = cat.id == _selectedCategoryId;
-                final isLumi = VaultTheme.isLumi(context);
-                final isDark = VaultTheme.isDark(context);
-                final accentColor = isLumi ? const Color(0xFFFF5C9D) : VaultTheme.accent(context);
-                final displayName = isThai
-                    ? cat.nameTh
-                    : (cat.nameEn.trim().isNotEmpty ? cat.nameEn : cat.nameTh);
-
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    avatar: Icon(
-                      CategoryIconHelper.getIcon(cat.icon),
-                      size: 16,
-                      color: isSelected
-                          ? (isDark && !isLumi ? Colors.black : Colors.white)
-                          : (isLumi ? const Color(0xFFFF5C9D) : VaultTheme.secondaryText(context)),
-                    ),
-                    label: Text(displayName),
-                    selected: isSelected,
-                    selectedColor: accentColor,
-                    labelStyle: TextStyle(
-                      fontFamily: VaultTheme.fontFamily,
-                      fontSize: 13,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      color: isSelected
-                          ? (isDark && !isLumi ? Colors.black : Colors.white)
-                          : VaultTheme.primaryText(context),
-                    ),
-                    onSelected: (selected) {
-                      if (selected) {
-                        setState(() {
-                          _selectedCategoryId = cat.id;
-                        });
-                      }
-                    },
-                  ),
-                );
-              }),
-              ActionChip(
-                avatar: const Icon(Icons.add, size: 16),
-                label: Text(isThai ? 'เพิ่มหมวดหมู่' : 'Add Category'),
-                onPressed: () async {
-                  final newCat = await CategoryFormDialog.show(
-                    context,
-                    initialType: _transactionType,
-                  );
-                  if (newCat != null && mounted) {
-                    setState(() {
-                      _selectedCategoryId = newCat.id;
-                    });
-                  }
-                },
+              const Icon(Icons.receipt_long_outlined, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                isThai ? 'ประเภทภาษีเงินได้' : 'Income Tax Category',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              const Spacer(),
+              Text(
+                _userManuallyChangedTax
+                    ? (isThai ? '(ผู้ใช้เลือกเอง)' : '(Custom)')
+                    : (isThai ? '(ประเมินอัตโนมัติ)' : '(Auto-inferred)'),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: _userManuallyChangedTax ? theme.colorScheme.primary : Colors.grey,
+                  fontWeight: _userManuallyChangedTax ? FontWeight.bold : FontWeight.normal,
+                ),
               ),
             ],
           ),
-        );
-      },
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            key: ValueKey('tax_cat_$_selectedTaxCategory'),
+            initialValue: _selectedTaxCategory,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+            ),
+            items: [
+              DropdownMenuItem(
+                value: '40_1',
+                child: Text(isThai ? '40(1) เงินเดือน / P4P / พ.ต.ส.' : '40(1) Salary / P4P / PTS', style: const TextStyle(fontSize: 13)),
+              ),
+              DropdownMenuItem(
+                value: '40_2',
+                child: Text(isThai ? '40(2) ค่าเวรเหมา / เบี้ยเลี้ยง / DF' : '40(2) Shift / Allowance / DF', style: const TextStyle(fontSize: 13)),
+              ),
+              DropdownMenuItem(
+                value: '40_6',
+                child: Text(isThai ? '40(6) วิชาชีพอิสระ (การแพทย์)' : '40(6) Medical Practice', style: const TextStyle(fontSize: 13)),
+              ),
+              DropdownMenuItem(
+                value: '40_8',
+                child: Text(isThai ? '40(8) รายได้อื่นๆ' : '40(8) Other Income', style: const TextStyle(fontSize: 13)),
+              ),
+              DropdownMenuItem(
+                value: 'non_taxable',
+                child: Text(isThai ? 'ยกเว้นภาษี (Non-taxable / Top up)' : 'Non-taxable / Top up', style: const TextStyle(fontSize: 13)),
+              ),
+            ],
+            onChanged: (val) {
+              if (val != null) {
+                setState(() {
+                  _selectedTaxCategory = val;
+                  _userManuallyChangedTax = true;
+                });
+              }
+            },
+          ),
+          const SizedBox(height: 10),
+          const Divider(height: 1),
+          const SizedBox(height: 4),
+
+          // 2. Accrued Income Switch & Work Period Picker (Item 3)
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              isThai ? 'รายได้ค้างรับ / เงินตกเบิก (Accrued Income)' : 'Accrued Income / Arrears',
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text(
+              isThai ? 'เงินยังไม่เข้าบัญชีจริง ระบุรอบเดือนทำงาน' : 'Income not yet received, specify work period',
+              style: const TextStyle(fontSize: 11),
+            ),
+            value: _isAccruedIncome,
+            onChanged: (val) {
+              setState(() {
+                _isAccruedIncome = val;
+              });
+            },
+          ),
+          if (_isAccruedIncome) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: theme.colorScheme.outlineVariant),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isThai ? 'รอบเดือนทำงาน (Work Period):' : 'Work Period:',
+                          style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
+                        ),
+                        Text(
+                          _formatWorkPeriodDisplay(_accruedWorkPeriod, isThai),
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filledTonal(
+                  icon: const Icon(Icons.edit_calendar, size: 20),
+                  tooltip: isThai ? 'เลือกรอบเดือนทำงาน' : 'Select Work Period',
+                  onPressed: () async {
+                    final parts = _accruedWorkPeriod.split('-');
+                    final curYear = parts.length == 2 ? int.tryParse(parts[0]) ?? DateTime.now().year : DateTime.now().year;
+                    final curMonth = parts.length == 2 ? int.tryParse(parts[1]) ?? DateTime.now().month : DateTime.now().month;
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime(curYear, curMonth),
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                    );
+                    if (picked != null) {
+                      setState(() {
+                        _accruedWorkPeriod = '${picked.year}-${picked.month.toString().padLeft(2, '0')}';
+                      });
+                    }
+                  },
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -704,12 +942,12 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
         tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
         leading: Icon(
           Icons.tune,
-          color: (_isRecurring || _selectedProjectId != null || _noteController.text.isNotEmpty)
+          color: (_isRecurring || _selectedProjectId != null)
               ? theme.colorScheme.primary
               : null,
         ),
         title: Text(
-          isThai ? 'ตัวเลือกเพิ่มเติม (โน้ต, โครงการ, รายการประจำ)' : 'Additional Options (Note, Project, Recurring)',
+          isThai ? 'ตัวเลือกเพิ่มเติม (โครงการ, รายการประจำ)' : 'Additional Options (Project, Recurring)',
           style: theme.textTheme.bodyMedium?.copyWith(
             fontWeight: (_isRecurring || _selectedProjectId != null) ? FontWeight.bold : FontWeight.normal,
           ),
@@ -722,17 +960,6 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
             : null,
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         children: [
-          // 1. Note TextField
-          TextField(
-            controller: _noteController,
-            decoration: InputDecoration(
-              labelText: isThai ? 'บันทึกช่วยจำ (Note)' : 'Note',
-              prefixIcon: const Icon(Icons.note_alt_outlined),
-              border: const OutlineInputBorder(),
-              isDense: true,
-            ),
-          ),
-          const SizedBox(height: 12),
 
           // 2. Project Selector Dropdown
           FutureBuilder<List<Project>>(

@@ -19,9 +19,25 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="screen-orientation" content="portrait">
+  <meta name="x5-orientation" content="portrait">
+
   <title>OURS — Our money, our journey.</title>
   <link rel="manifest" href="manifest.json">
   <meta name="google-signin-client_id" content="25761984668-bisj0948pdlu6k6s1hvlpvbmqi9bb2r3.apps.googleusercontent.com">
+  <script>
+    function lockPortrait() {
+      try {
+        if (screen.orientation && screen.orientation.lock) {
+          screen.orientation.lock('portrait').catch(function() {});
+        }
+      } catch (e) {}
+    }
+    window.addEventListener('load', lockPortrait);
+    window.addEventListener('resize', lockPortrait);
+    document.addEventListener('fullscreenchange', lockPortrait);
+  </script>
 </head>
 <body style="margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #FAF8F5;">
   <script src="flutter_bootstrap.js" async></script>

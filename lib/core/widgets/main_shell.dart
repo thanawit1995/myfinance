@@ -126,7 +126,10 @@ class _MainShellState extends ConsumerState<MainShell> {
 
     final fab = showFab
         ? FloatingActionButton.extended(
-            onPressed: () => VaultAddSheet.show(context),
+            onPressed: () => VaultAddSheet.show(
+              context,
+              onNavigateToTransactions: () => _onTabSelected(1, moneyTabIndex: 0),
+            ),
             backgroundColor: isLumi ? const Color(0xFFFF5B9A) : accentCol,
             foregroundColor: isLumi ? Colors.white : (isDark ? const Color(0xFF111315) : Colors.white),
             elevation: isLumi ? 3 : 2,

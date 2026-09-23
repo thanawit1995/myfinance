@@ -11,9 +11,11 @@ import '../../features/investments/presentation/buy_sell_trade_dialog.dart';
 /// 3. Transfer
 /// 4. Trade
 class VaultAddSheet extends StatelessWidget {
-  const VaultAddSheet({super.key});
+  final VoidCallback? onNavigateToTransactions;
 
-  static Future<void> show(BuildContext context) {
+  const VaultAddSheet({super.key, this.onNavigateToTransactions});
+
+  static Future<void> show(BuildContext context, {VoidCallback? onNavigateToTransactions}) {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -21,7 +23,7 @@ class VaultAddSheet extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => const VaultAddSheet(),
+      builder: (_) => VaultAddSheet(onNavigateToTransactions: onNavigateToTransactions),
     );
   }
 
@@ -75,14 +77,21 @@ class VaultAddSheet extends StatelessWidget {
               iconColor: VaultTheme.negative(context),
               title: l10n?.expense ?? 'Expense',
               subtitle: isThai ? 'บันทึกค่าใช้จ่ายประจำวัน' : 'Record daily expense',
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context);
-                Navigator.push(
+                final saved = await Navigator.push<bool>(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const QuickAddScreen(initialType: 'expense', isModal: true),
+                    builder: (_) => QuickAddScreen(
+                      initialType: 'expense',
+                      isModal: true,
+                      onTransactionSaved: onNavigateToTransactions,
+                    ),
                   ),
                 );
+                if (saved == true) {
+                  onNavigateToTransactions?.call();
+                }
               },
             ),
 
@@ -93,14 +102,21 @@ class VaultAddSheet extends StatelessWidget {
               iconColor: VaultTheme.positive(context),
               title: l10n?.income ?? 'Income',
               subtitle: isThai ? 'บันทึกเงินเดือน หรือรายรับอื่น' : 'Record salary or other income',
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context);
-                Navigator.push(
+                final saved = await Navigator.push<bool>(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const QuickAddScreen(initialType: 'income', isModal: true),
+                    builder: (_) => QuickAddScreen(
+                      initialType: 'income',
+                      isModal: true,
+                      onTransactionSaved: onNavigateToTransactions,
+                    ),
                   ),
                 );
+                if (saved == true) {
+                  onNavigateToTransactions?.call();
+                }
               },
             ),
 
@@ -111,14 +127,21 @@ class VaultAddSheet extends StatelessWidget {
               iconColor: accentCol,
               title: l10n?.transfer ?? 'Transfer',
               subtitle: isThai ? 'โอนเงินระหว่างบัญชี หรือแลกเปลี่ยน USD' : 'Transfer between accounts or USD FX',
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context);
-                Navigator.push(
+                final saved = await Navigator.push<bool>(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const QuickAddScreen(initialType: 'transfer', isModal: true),
+                    builder: (_) => QuickAddScreen(
+                      initialType: 'transfer',
+                      isModal: true,
+                      onTransactionSaved: onNavigateToTransactions,
+                    ),
                   ),
                 );
+                if (saved == true) {
+                  onNavigateToTransactions?.call();
+                }
               },
             ),
 

@@ -7,6 +7,9 @@ class CsvColumnMapping {
   final int? noteCol;
   final int? taxTypeCol;
   final int? whtCol;
+  final int? budgetCol;
+  final int? propertyCol;
+  final int? periodCol;
 
   const CsvColumnMapping({
     required this.dateCol,
@@ -17,6 +20,9 @@ class CsvColumnMapping {
     this.noteCol,
     this.taxTypeCol,
     this.whtCol,
+    this.budgetCol,
+    this.propertyCol,
+    this.periodCol,
   });
 
   CsvColumnMapping copyWith({
@@ -28,6 +34,9 @@ class CsvColumnMapping {
     int? noteCol,
     int? taxTypeCol,
     int? whtCol,
+    int? budgetCol,
+    int? propertyCol,
+    int? periodCol,
   }) {
     return CsvColumnMapping(
       dateCol: dateCol ?? this.dateCol,
@@ -38,6 +47,9 @@ class CsvColumnMapping {
       noteCol: noteCol ?? this.noteCol,
       taxTypeCol: taxTypeCol ?? this.taxTypeCol,
       whtCol: whtCol ?? this.whtCol,
+      budgetCol: budgetCol ?? this.budgetCol,
+      propertyCol: propertyCol ?? this.propertyCol,
+      periodCol: periodCol ?? this.periodCol,
     );
   }
 }
@@ -58,6 +70,9 @@ class ParsedCsvRow {
   final bool isDuplicate;
   final String? validationError;
   final List<dynamic> rawRow;
+  final String? workPeriod; // รอบเดือนผลงาน เช่น '2026-07'
+  final int? expectedAmountSatang; // ยอดประมาณการ/Budget
+  final bool isCleared; // ได้รับเงินแล้ว (true) หรือ ค้างรับ/ตกเบิก (false)
 
   const ParsedCsvRow({
     required this.rowIndex,
@@ -75,6 +90,9 @@ class ParsedCsvRow {
     this.isDuplicate = false,
     this.validationError,
     required this.rawRow,
+    this.workPeriod,
+    this.expectedAmountSatang,
+    this.isCleared = true,
   });
 
   bool get isValid => validationError == null && !isSummaryRow && date != null;
@@ -95,6 +113,9 @@ class ParsedCsvRow {
     bool? isDuplicate,
     String? validationError,
     List<dynamic>? rawRow,
+    String? workPeriod,
+    int? expectedAmountSatang,
+    bool? isCleared,
   }) {
     return ParsedCsvRow(
       rowIndex: rowIndex ?? this.rowIndex,
@@ -112,6 +133,9 @@ class ParsedCsvRow {
       isDuplicate: isDuplicate ?? this.isDuplicate,
       validationError: validationError ?? this.validationError,
       rawRow: rawRow ?? this.rawRow,
+      workPeriod: workPeriod ?? this.workPeriod,
+      expectedAmountSatang: expectedAmountSatang ?? this.expectedAmountSatang,
+      isCleared: isCleared ?? this.isCleared,
     );
   }
 }

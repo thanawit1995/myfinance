@@ -220,8 +220,11 @@ class AccountsDao extends DatabaseAccessor<AppDatabase> with _$AccountsDaoMixin 
 
         if (t.sourceAccountId == accountId) {
           if (t.transactionType == 'income') {
-            final netIncome = amount - (isForeign ? 0 : t.withholdingTaxSatang);
-            balance += netIncome;
+            // Only cleared income transactions are included in real-time cash balance
+            if (t.isCleared) {
+              final netIncome = amount - (isForeign ? 0 : t.withholdingTaxSatang);
+              balance += netIncome;
+            }
           } else if (t.transactionType == 'expense') {
             balance -= (amount + fee);
           } else if (t.transactionType == 'transfer') {

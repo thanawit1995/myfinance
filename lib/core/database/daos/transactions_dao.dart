@@ -382,4 +382,85 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
 
     return result;
   }
+
+  /// ดึงรายการรายได้ค้างรับ/เงินตกเบิกที่ยังไม่ได้รับเงินจริง (isCleared == false)
+  Stream<List<Transaction>> watchAccruedIncomes() {
+    return (select(transactions)
+          ..where((t) =>
+              t.deletedAt.isNull() &
+              t.transactionType.equals('income') &
+              t.isCleared.equals(false))
+          ..orderBy([
+            (t) => OrderingTerm.desc(t.workPeriod),
+            (t) => OrderingTerm.desc(t.transactionDate),
+          ]))
+        .watch();
+  }
+
+  Future<List<Transaction>> getAccruedIncomes() {
+    return (select(transactions)
+          ..where((t) =>
+              t.deletedAt.isNull() &
+              t.transactionType.equals('income') &
+              t.isCleared.equals(false))
+          ..orderBy([
+            (t) => OrderingTerm.desc(t.workPeriod),
+            (t) => OrderingTerm.desc(t.transactionDate),
+          ]))
+        .get();
+  }
+
+  /// บันทึกรับเงินเข้าบัญชีจริง (Mark as Received)
+  Future<bool> markIncomeAsReceived(
+    String transactionId, {
+    required String accountId,
+    required DateTime receivedDate,
+    int? actualAmountSatang,
+  }) async {
+    final existing = await getTransactionById(transactionId);
+    if (existing == null) return false;
+
+    final now = DateTime.now();
+    final updatedAmount = actualAmountSatang ?? existing.amountThbSatang;
+
+    final updated = await (update(transactions)..where((t) => t.id.equals(transactionId))).write(
+      TransactionsCompanion(
+        isCleared: const Value(true),
+        sourceAccountId: Value(accountId),
+        transactionDate: Value(receivedDate),
+        amountThbSatang: Value(updatedAmount),
+        amountOriginalSatang: Value(updatedAmount),
+        updatedAt: Value(now),
+      ),
+    );
+
+    if (updated > 0) {
+      await into(auditLogs).insert(
+        AuditLogsCompanion.insert(
+          id: _uuid.v4(),
+          entityTable: 'transactions',
+          entityId: transactionId,
+          action: 'UPDATE',
+          beforeDataJson: Value(jsonEncode({
+            'is_cleared': existing.isCleared,
+            'source_account_id': existing.sourceAccountId,
+            'transaction_date': existing.transactionDate.toIso8601String(),
+            'amount_thb_satang': existing.amountThbSatang,
+          })),
+          afterDataJson: Value(jsonEncode({
+            'is_cleared': true,
+            'source_account_id': accountId,
+            'transaction_date': receivedDate.toIso8601String(),
+            'amount_thb_satang': updatedAmount,
+          })),
+          changeTimestamp: now,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+      return true;
+    }
+    return false;
+  }
 }
+

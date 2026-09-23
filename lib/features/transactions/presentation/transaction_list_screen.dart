@@ -6,6 +6,7 @@ import '../../../../core/database/database_provider.dart';
 import '../../../../core/money/money.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/category_name_helper.dart';
+import '../../income_tracker/presentation/accrued_income_screen.dart';
 import 'edit_transaction_dialog.dart';
 
 class TransactionListScreen extends ConsumerStatefulWidget {
@@ -37,6 +38,16 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
       appBar: AppBar(
         title: Text(isThai ? 'ประวัติรายการ' : 'Transactions'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.pending_actions_outlined),
+            tooltip: isThai ? 'ติดตามรายได้ค้างรับ & เงินตกเบิก' : 'Accrued Income',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AccruedIncomeScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.filter_list),
             onPressed: _showFilterDialog,
@@ -169,7 +180,10 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
                     final dayTxs = grouped[date]!;
 
                     int dailyNetSatang = dayTxs.fold(0, (sum, tx) {
-                      if (tx.transactionType == 'income') return sum + tx.amountThbSatang;
+                      if (tx.transactionType == 'income') {
+                        if (!tx.isCleared) return sum;
+                        return sum + tx.amountThbSatang;
+                      }
                       if (tx.transactionType == 'expense') return sum - tx.amountThbSatang;
                       return sum;
                     });
@@ -313,9 +327,31 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
         tx.note?.isNotEmpty == true ? tx.note! : defaultNote,
         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
       ),
-      subtitle: Text(
-        timeStr,
-        style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+      subtitle: Row(
+        children: [
+          Text(
+            timeStr,
+            style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+          ),
+          if (!tx.isCleared) ...[
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                tx.workPeriod != null ? 'ค้างรับ (${tx.workPeriod})' : 'ค้างรับ/ตกเบิก',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.amber.shade900,
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
       trailing: Column(
         mainAxisAlignment: MainAxisAlignment.center,

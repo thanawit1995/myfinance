@@ -6,15 +6,12 @@ part of 'financial_health_dao.dart';
 mixin _$FinancialHealthDaoMixin on DatabaseAccessor<AppDatabase> {
   $FinancialHealthSettingsTable get financialHealthSettings =>
       attachedDatabase.financialHealthSettings;
-  $CurrenciesTable get currencies => attachedDatabase.currencies;
   $AccountsTable get accounts => attachedDatabase.accounts;
-  $CategoriesTable get categories => attachedDatabase.categories;
-  $AssetsTable get assets => attachedDatabase.assets;
-  $ImportBatchesTable get importBatches => attachedDatabase.importBatches;
   $TransactionsTable get transactions => attachedDatabase.transactions;
   $LiabilitiesTable get liabilities => attachedDatabase.liabilities;
   $InsurancePoliciesTable get insurancePolicies =>
       attachedDatabase.insurancePolicies;
+  $AssetsTable get assets => attachedDatabase.assets;
   $BudgetsTable get budgets => attachedDatabase.budgets;
   $AuditLogsTable get auditLogs => attachedDatabase.auditLogs;
   FinancialHealthDaoManager get managers => FinancialHealthDaoManager(this);
@@ -28,16 +25,8 @@ class FinancialHealthDaoManager {
         _db.attachedDatabase,
         _db.financialHealthSettings,
       );
-  $$CurrenciesTableTableManager get currencies =>
-      $$CurrenciesTableTableManager(_db.attachedDatabase, _db.currencies);
   $$AccountsTableTableManager get accounts =>
       $$AccountsTableTableManager(_db.attachedDatabase, _db.accounts);
-  $$CategoriesTableTableManager get categories =>
-      $$CategoriesTableTableManager(_db.attachedDatabase, _db.categories);
-  $$AssetsTableTableManager get assets =>
-      $$AssetsTableTableManager(_db.attachedDatabase, _db.assets);
-  $$ImportBatchesTableTableManager get importBatches =>
-      $$ImportBatchesTableTableManager(_db.attachedDatabase, _db.importBatches);
   $$TransactionsTableTableManager get transactions =>
       $$TransactionsTableTableManager(_db.attachedDatabase, _db.transactions);
   $$LiabilitiesTableTableManager get liabilities =>
@@ -47,6 +36,8 @@ class FinancialHealthDaoManager {
         _db.attachedDatabase,
         _db.insurancePolicies,
       );
+  $$AssetsTableTableManager get assets =>
+      $$AssetsTableTableManager(_db.attachedDatabase, _db.assets);
   $$BudgetsTableTableManager get budgets =>
       $$BudgetsTableTableManager(_db.attachedDatabase, _db.budgets);
   $$AuditLogsTableTableManager get auditLogs =>

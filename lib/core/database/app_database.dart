@@ -72,7 +72,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.connection);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration {
@@ -130,6 +130,10 @@ class AppDatabase extends _$AppDatabase {
           await m.addColumn(transactions, transactions.syncVersion);
           await m.addColumn(accounts, accounts.syncVersion);
           await m.addColumn(categories, categories.syncVersion);
+        }
+        if (from < 8) {
+          await m.addColumn(transactions, transactions.workPeriod);
+          await m.addColumn(transactions, transactions.expectedAmountSatang);
         }
       },
       beforeOpen: (details) async {

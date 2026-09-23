@@ -1184,6 +1184,7 @@ class VaultHomeScreen extends ConsumerWidget {
     int totalExpense = 0;
     for (final t in monthTx) {
       if (t.transactionType == 'income') {
+        if (!t.isCleared) continue;
         totalIncome += t.amountThbSatang;
       } else if (t.transactionType == 'expense') {
         totalExpense += (t.amountThbSatang + t.feeThbSatang);

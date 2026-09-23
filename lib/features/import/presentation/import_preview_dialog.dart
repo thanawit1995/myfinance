@@ -130,6 +130,11 @@ class _ImportPreviewDialogState extends ConsumerState<ImportPreviewDialog> {
                     runSpacing: 8,
                     children: [
                       _buildBadge('พร้อมนำเข้า: $validCount', VaultTheme.positive(context)),
+                      if (widget.rows.any((r) => !r.isCleared))
+                        _buildBadge(
+                          'ค้างรับ/ตกเบิก: ${widget.rows.where((r) => !r.isCleared && r.isValid && !r.isSummaryRow).length}',
+                          Colors.amber.shade800,
+                        ),
                       if (dupCount > 0) _buildBadge('พบซ้ำในระบบ: $dupCount', Colors.orange),
                       if (summaryCount > 0) _buildBadge('แถวสรุปยอด (ข้าม): $summaryCount', Colors.grey),
                       if (errorCount > 0) _buildBadge('ข้อมูลผิดพลาด: $errorCount', Colors.redAccent),
@@ -223,14 +228,16 @@ class _ImportPreviewDialogState extends ConsumerState<ImportPreviewDialog> {
                             headingRowHeight: 38,
                             dataRowMinHeight: 36,
                             dataRowMaxHeight: 44,
-                            columns: const [
-                              DataColumn(label: Text('สถานะ', style: TextStyle(fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('วันที่', style: TextStyle(fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('รายการ', style: TextStyle(fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('หมวดหมู่', style: TextStyle(fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('บัญชี', style: TextStyle(fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('จำนวนเงิน', style: TextStyle(fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('ภาษี/WHT', style: TextStyle(fontWeight: FontWeight.bold))),
+                            columns: [
+                              const DataColumn(label: Text('สถานะ', style: TextStyle(fontWeight: FontWeight.bold))),
+                              const DataColumn(label: Text('วันที่', style: TextStyle(fontWeight: FontWeight.bold))),
+                              if (widget.rows.any((r) => r.workPeriod != null && r.workPeriod!.isNotEmpty))
+                                const DataColumn(label: Text('รอบเดือน', style: TextStyle(fontWeight: FontWeight.bold))),
+                              const DataColumn(label: Text('รายการ', style: TextStyle(fontWeight: FontWeight.bold))),
+                              const DataColumn(label: Text('หมวดหมู่', style: TextStyle(fontWeight: FontWeight.bold))),
+                              const DataColumn(label: Text('บัญชี', style: TextStyle(fontWeight: FontWeight.bold))),
+                              const DataColumn(label: Text('จำนวนเงิน', style: TextStyle(fontWeight: FontWeight.bold))),
+                              const DataColumn(label: Text('ภาษี/WHT', style: TextStyle(fontWeight: FontWeight.bold))),
                             ],
                             rows: widget.rows.take(20).map((row) {
                               Widget statusBadge;
@@ -238,6 +245,8 @@ class _ImportPreviewDialogState extends ConsumerState<ImportPreviewDialog> {
                                 statusBadge = _buildSmallBadge('สรุปยอด (ข้าม)', Colors.grey);
                               } else if (!row.isValid) {
                                 statusBadge = _buildSmallBadge(row.validationError ?? 'ผิดพลาด', Colors.redAccent);
+                              } else if (!row.isCleared) {
+                                statusBadge = _buildSmallBadge('ค้างรับ/ตกเบิก', Colors.amber.shade800);
                               } else if (row.isDuplicate) {
                                 statusBadge = _buildSmallBadge('ซ้ำในระบบ', Colors.orange);
                               } else {
@@ -245,18 +254,24 @@ class _ImportPreviewDialogState extends ConsumerState<ImportPreviewDialog> {
                               }
 
                               final dateText = row.date != null ? dateFormat.format(row.date!) : row.rawDateString;
-                              final amountText = '฿${currencyFormat.format(row.amountSatang / 100.0)}';
+                              final displaySatang = (!row.isCleared && row.expectedAmountSatang != null && row.expectedAmountSatang! > 0)
+                                  ? row.expectedAmountSatang!
+                                  : row.amountSatang;
+                              final amountText = '฿${currencyFormat.format(displaySatang / 100.0)}';
 
                               return DataRow(
                                 color: WidgetStateProperty.resolveWith<Color?>((states) {
                                   if (row.isSummaryRow) return Colors.grey.withValues(alpha: 0.08);
                                   if (row.isDuplicate) return Colors.orange.withValues(alpha: 0.08);
                                   if (!row.isValid) return Colors.red.withValues(alpha: 0.08);
+                                  if (!row.isCleared) return Colors.amber.withValues(alpha: 0.08);
                                   return null;
                                 }),
                                 cells: [
                                   DataCell(statusBadge),
                                   DataCell(Text(dateText, style: const TextStyle(fontSize: 12))),
+                                  if (widget.rows.any((r) => r.workPeriod != null && r.workPeriod!.isNotEmpty))
+                                    DataCell(Text(row.workPeriod ?? '-', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500))),
                                   DataCell(
                                     Text(
                                       row.name,
@@ -269,13 +284,15 @@ class _ImportPreviewDialogState extends ConsumerState<ImportPreviewDialog> {
                                   DataCell(Text(row.accountName ?? '-', style: const TextStyle(fontSize: 12))),
                                   DataCell(
                                     Text(
-                                      amountText,
+                                      !row.isCleared ? '$amountText (รอรับ)' : amountText,
                                       style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.bold,
-                                        color: row.transactionType == 'income'
-                                            ? VaultTheme.positive(context)
-                                            : VaultTheme.primaryText(context),
+                                        color: !row.isCleared
+                                            ? Colors.amber.shade900
+                                            : (row.transactionType == 'income'
+                                                ? VaultTheme.positive(context)
+                                                : VaultTheme.primaryText(context)),
                                       ),
                                     ),
                                   ),

@@ -51,31 +51,60 @@ class CsvImportParser {
     int? noteCol;
     int? taxTypeCol;
     int? whtCol;
+    int? budgetCol;
+    int? propertyCol;
+    int? periodCol;
 
     for (int i = 0; i < headers.length; i++) {
       final h = headers[i].trim().toLowerCase();
       if (h.contains('date') || h.contains('วันที่') || h.contains('time') || h == 'd') {
         if (dateCol == -1) dateCol = i;
-      } else if (h.contains('name') || h.contains('รายการ') || h.contains('description') || h.contains('title') || h == 'item') {
+      } else if (h.contains('name') || h.contains('รายการ') || h.contains('description') || h.contains('title') || h == 'item' || h == 'income' || h == 'expense') {
         if (nameCol == -1) nameCol = i;
       } else if (h.contains('category') || h.contains('หมวดหมู่') || h.contains('cat') || h.contains('ประเภท')) {
         if (categoryCol == -1) categoryCol = i;
-      } else if (h.contains('amount') || h.contains('จำนวนเงิน') || h.contains('ยอด') || h.contains('price') || h.contains('thb')) {
-        if (amountCol == -1) amountCol = i;
+      } else if (h == 'amount' || h == 'จำนวนเงิน' || h == 'ยอด' || h == 'price' || h == 'thb' || h.contains('actual')) {
+        amountCol = i;
+      } else if (h.contains('budget') || h.contains('ประมาณการ') || h.contains('คาดการณ์')) {
+        budgetCol = i;
+      } else if (h.contains('property') || h.contains('สถานะ') || h.contains('status') || h == 'paid') {
+        propertyCol = i;
+      } else if (h.contains('monthly overview') || h.contains('overview') || h.contains('period') || h.contains('รอบเดือน') || h.contains('cycle')) {
+        periodCol = i;
       } else if (h.contains('wallet') || h.contains('account') || h.contains('บัญชี') || h.contains('กระเป๋า')) {
         accountCol = i;
-      } else if (h.contains('note') || h.contains('หมายเหตุ') || h.contains('memo') || h.contains('remark')) {
+      } else if (h.contains('note') || h.contains('หมายเหตุ') || h.contains('memo') || h.contains('remark') || h == 'type') {
         noteCol = i;
       } else if (h.contains('tax') || h.contains('ภาษี') || h.contains('มาตรา')) {
         taxTypeCol = i;
       } else if (h.contains('wht') || h.contains('หัก ณ ที่จ่าย') || h.contains('withholding')) {
         whtCol = i;
+      } else if (amountCol == -1 && (h.contains('amount') || h.contains('ยอดเงิน'))) {
+        amountCol = i;
+      }
+    }
+
+    // Specific template override for Notion Income
+    if (template == 'notion_income') {
+      for (int i = 0; i < headers.length; i++) {
+        final h = headers[i].trim().toLowerCase();
+        if (h == 'date') dateCol = i;
+        if (h == 'income') nameCol = i;
+        if (h == 'category') categoryCol = i;
+        if (h == 'budget') budgetCol = i;
+        if (h == 'amount') amountCol = i;
+        if (h == 'property') propertyCol = i;
+        if (h.contains('monthly overview')) periodCol = i;
+        if (h == 'type') noteCol = i;
       }
     }
 
     // Fallbacks if not cleanly matched
     if (dateCol == -1 && headers.isNotEmpty) dateCol = 0;
     if (nameCol == -1 && headers.length > 1) nameCol = 1;
+    if (amountCol == -1 && budgetCol != null) {
+      amountCol = budgetCol;
+    }
     if (amountCol == -1) {
       for (int i = headers.length - 1; i >= 0; i--) {
         if (i != dateCol && i != nameCol && i != categoryCol) {
@@ -103,6 +132,9 @@ class CsvImportParser {
         noteCol: noteCol,
         taxTypeCol: taxTypeCol,
         whtCol: whtCol,
+        budgetCol: budgetCol,
+        propertyCol: propertyCol,
+        periodCol: periodCol,
       );
     }
     return null;
@@ -131,6 +163,40 @@ class CsvImportParser {
     s = s.replaceFirst(cleanRegex, '').trim();
 
     return s;
+  }
+
+  /// Parses Notion work period like "December 25 (https://...)" or "July 26" into "2025-12" or "2026-07"
+  static String? parseNotionWorkPeriod(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return null;
+    var s = raw.trim();
+    final parenIndex = s.indexOf('(');
+    if (parenIndex != -1) {
+      s = s.substring(0, parenIndex).trim();
+    }
+
+    // Pattern 1: ISO like '2026-07' or '2026/07'
+    final isoMatch = RegExp(r'^(\d{4})[-/](\d{1,2})$').firstMatch(s);
+    if (isoMatch != null) {
+      final y = isoMatch.group(1)!;
+      final m = int.parse(isoMatch.group(2)!).toString().padLeft(2, '0');
+      return '$y-$m';
+    }
+
+    // Pattern 2: Month Name + Year e.g. "December 25" or "July 26" or "ธันวาคม 25"
+    final match = RegExp(r'([A-Za-zก-๙\.]+)\s*(\d{2,4})').firstMatch(s);
+    if (match != null) {
+      final rawMonth = match.group(1)!;
+      var rawYear = int.tryParse(match.group(2)!) ?? 2026;
+      if (rawYear < 100) {
+        rawYear += 2000;
+      } else if (rawYear > 2500) {
+        rawYear -= 543; // พ.ศ. -> ค.ศ.
+      }
+      final month = _resolveMonth(rawMonth);
+      return '${rawYear.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}';
+    }
+
+    return null;
   }
 
   /// Detects whether this row is a total/summary row (e.g. "รวมทั้งเดือน ก.ย.", "Total")
@@ -403,6 +469,60 @@ class CsvImportParser {
       );
     }
 
+    // 10. เงินหมื่น ไม่ทำเวชฯ = 40(2) (WHT 0)
+    if (cleanName.contains('ไม่ทำเวช') || cleanName.contains('เงินหมื่น')) {
+      return IncomeTaxClassification(
+        taxCategory: '40_2',
+        withholdingTaxSatang: explicitWhtSatang ?? 0,
+        ruleReason: 'เงินหมื่นไม่ทำเวชปฏิบัติส่วนตัว มาตรา 40(2) ไม่หักภาษี ณ ที่จ่าย',
+      );
+    }
+
+    // 11. เงินส่งเสริมพิเศษ / เบี้ยกันดาร = 40(2) (WHT 0)
+    if (cleanName.contains('ส่งเสริมพิเศษ') || cleanName.contains('เบี้ยกันดาร')) {
+      return IncomeTaxClassification(
+        taxCategory: '40_2',
+        withholdingTaxSatang: explicitWhtSatang ?? 0,
+        ruleReason: 'เงินส่งเสริมพิเศษ มาตรา 40(2) ไม่หักภาษี ณ ที่จ่าย',
+      );
+    }
+
+    // 12. P4P = 40(2)
+    if (cleanName.contains('p4p')) {
+      return IncomeTaxClassification(
+        taxCategory: '40_2',
+        withholdingTaxSatang: explicitWhtSatang ?? 0,
+        ruleReason: 'P4P (Pay for Performance) มาตรา 40(2) มีหักภาษี ณ ที่จ่ายตามระเบียบ',
+      );
+    }
+
+    // 13. สมุดตรวจสุขภาพ = 40(2)
+    if (cleanName.contains('สมุดตรวจสุขภาพ') || cleanName.contains('ตรวจสุขภาพ')) {
+      return IncomeTaxClassification(
+        taxCategory: '40_2',
+        withholdingTaxSatang: explicitWhtSatang ?? 0,
+        ruleReason: 'ค่าตรวจสุขภาพ มาตรา 40(2) ไม่หักภาษี ณ ที่จ่าย',
+      );
+    }
+
+    // 14. ค่าเวร / เวรนอก / ซื้อเวร = 40(2)
+    if (cleanName.contains('เวร') || cleanName.contains('on duty')) {
+      return IncomeTaxClassification(
+        taxCategory: '40_2',
+        withholdingTaxSatang: explicitWhtSatang ?? 0,
+        ruleReason: 'ค่าเวรปฏิบัติการ มาตรา 40(2) ไม่หักภาษี ณ ที่จ่าย',
+      );
+    }
+
+    // 15. Credit เงินคืน / Cashback = Non-taxable
+    if (cleanName.contains('เงินคืน') || cleanName.contains('cashback') || cleanName.contains('credit')) {
+      return const IncomeTaxClassification(
+        taxCategory: 'non_taxable',
+        withholdingTaxSatang: 0,
+        ruleReason: 'เงินคืน/Cashback ไม่อยู่ในเกณฑ์ประเมินภาษี',
+      );
+    }
+
     // Default fallback
     return IncomeTaxClassification(
       taxCategory: '40_2',
@@ -441,9 +561,20 @@ class CsvImportParser {
           ? parseAmountSatang(row[mapping.whtCol!])
           : null;
 
+      final rawBudget = mapping.budgetCol != null && mapping.budgetCol! < row.length
+          ? row[mapping.budgetCol!]
+          : null;
+      final rawProperty = mapping.propertyCol != null && mapping.propertyCol! < row.length
+          ? row[mapping.propertyCol!]
+          : null;
+      final rawPeriod = mapping.periodCol != null && mapping.periodCol! < row.length
+          ? row[mapping.periodCol!]
+          : null;
+
       // 1. Skip completely blank rows (e.g. abandoned empty rows from Notion)
       final isDateEmpty = rawDate == null || rawDate.toString().trim().isEmpty;
-      final isAmountEmpty = rawAmount == null || rawAmount.toString().trim().isEmpty;
+      final isAmountEmpty = (rawAmount == null || rawAmount.toString().trim().isEmpty) &&
+          (rawBudget == null || rawBudget.toString().trim().isEmpty);
       if (rawName.isEmpty && isDateEmpty && isAmountEmpty) {
         continue;
       }
@@ -451,12 +582,12 @@ class CsvImportParser {
       // 2. Skip repeated header rows (e.g. if files were concatenated)
       final lowerName = rawName.toLowerCase();
       final lowerDate = (rawDate?.toString() ?? '').toLowerCase().trim();
-      if ((lowerName == 'expense' || lowerName == 'name' || lowerName == 'รายการ' || lowerName == 'item') &&
+      if ((lowerName == 'expense' || lowerName == 'name' || lowerName == 'รายการ' || lowerName == 'item' || lowerName == 'income') &&
           (lowerDate == 'date' || lowerDate == 'วันที่' || lowerDate == 'time')) {
         continue;
       }
       if ((lowerName == 'date' || lowerName == 'วันที่') &&
-          (lowerDate == 'expense' || lowerDate == 'name' || lowerDate == 'รายการ')) {
+          (lowerDate == 'expense' || lowerDate == 'name' || lowerDate == 'รายการ' || lowerDate == 'income')) {
         continue;
       }
 
@@ -471,13 +602,38 @@ class CsvImportParser {
         if (mapped != null) cleanCategory = mapped;
       }
 
+      // Parse work period if provided (e.g. "July 26" -> "2026-07")
+      final workPeriod = parseNotionWorkPeriod(rawPeriod?.toString());
+
+      // Parse clearance status (isCleared): Property == 'Yes' -> true, 'No' -> false
+      bool isCleared = true;
+      if (rawProperty != null) {
+        final propStr = rawProperty.toString().trim().toLowerCase();
+        if (propStr == 'no' || propStr == 'false') {
+          isCleared = false;
+        } else if (propStr == 'yes' || propStr == 'true') {
+          isCleared = true;
+        }
+      }
 
       // Check for summary/total rows
       final isSummary = isSummaryRow(rawName, cleanCategory);
 
       // Parse date and amount
       final date = parseDate(rawDate);
-      var amountSatang = parseAmountSatang(rawAmount);
+      final actualSatang = parseAmountSatang(rawAmount).abs();
+      final budgetSatang = rawBudget != null ? parseAmountSatang(rawBudget).abs() : 0;
+
+      int amountSatang = actualSatang;
+      // If Amount is 0 (or empty because Property was No), use Budget amount as expected amount
+      if (amountSatang == 0 && budgetSatang > 0) {
+        amountSatang = budgetSatang;
+      }
+      if (rawProperty != null && rawProperty.toString().trim().toLowerCase() == 'no') {
+        isCleared = false;
+      }
+
+      final expectedAmountSatang = budgetSatang > 0 ? budgetSatang : amountSatang;
 
       // Determine transaction type
       String txType = 'expense';
@@ -531,6 +687,9 @@ class CsvImportParser {
         isSummaryRow: isSummary,
         validationError: valError,
         rawRow: row,
+        workPeriod: workPeriod,
+        expectedAmountSatang: expectedAmountSatang,
+        isCleared: isCleared,
       ));
     }
 

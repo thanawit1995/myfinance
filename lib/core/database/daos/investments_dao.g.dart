@@ -4,18 +4,16 @@ part of 'investments_dao.dart';
 
 // ignore_for_file: type=lint
 mixin _$InvestmentsDaoMixin on DatabaseAccessor<AppDatabase> {
-  $CurrenciesTable get currencies => attachedDatabase.currencies;
-  $AccountsTable get accounts => attachedDatabase.accounts;
   $AssetsTable get assets => attachedDatabase.assets;
-  $CategoriesTable get categories => attachedDatabase.categories;
-  $ImportBatchesTable get importBatches => attachedDatabase.importBatches;
-  $TransactionsTable get transactions => attachedDatabase.transactions;
   $InvestmentLotsTable get investmentLots => attachedDatabase.investmentLots;
   $InvestmentSalesTable get investmentSales => attachedDatabase.investmentSales;
   $AssetPricesTable get assetPrices => attachedDatabase.assetPrices;
   $InvestmentIncomesTable get investmentIncomes =>
       attachedDatabase.investmentIncomes;
+  $TransactionsTable get transactions => attachedDatabase.transactions;
   $FxRatesTable get fxRates => attachedDatabase.fxRates;
+  $CurrenciesTable get currencies => attachedDatabase.currencies;
+  $AccountsTable get accounts => attachedDatabase.accounts;
   $AuditLogsTable get auditLogs => attachedDatabase.auditLogs;
   InvestmentsDaoManager get managers => InvestmentsDaoManager(this);
 }
@@ -23,18 +21,8 @@ mixin _$InvestmentsDaoMixin on DatabaseAccessor<AppDatabase> {
 class InvestmentsDaoManager {
   final _$InvestmentsDaoMixin _db;
   InvestmentsDaoManager(this._db);
-  $$CurrenciesTableTableManager get currencies =>
-      $$CurrenciesTableTableManager(_db.attachedDatabase, _db.currencies);
-  $$AccountsTableTableManager get accounts =>
-      $$AccountsTableTableManager(_db.attachedDatabase, _db.accounts);
   $$AssetsTableTableManager get assets =>
       $$AssetsTableTableManager(_db.attachedDatabase, _db.assets);
-  $$CategoriesTableTableManager get categories =>
-      $$CategoriesTableTableManager(_db.attachedDatabase, _db.categories);
-  $$ImportBatchesTableTableManager get importBatches =>
-      $$ImportBatchesTableTableManager(_db.attachedDatabase, _db.importBatches);
-  $$TransactionsTableTableManager get transactions =>
-      $$TransactionsTableTableManager(_db.attachedDatabase, _db.transactions);
   $$InvestmentLotsTableTableManager get investmentLots =>
       $$InvestmentLotsTableTableManager(
         _db.attachedDatabase,
@@ -52,8 +40,14 @@ class InvestmentsDaoManager {
         _db.attachedDatabase,
         _db.investmentIncomes,
       );
+  $$TransactionsTableTableManager get transactions =>
+      $$TransactionsTableTableManager(_db.attachedDatabase, _db.transactions);
   $$FxRatesTableTableManager get fxRates =>
       $$FxRatesTableTableManager(_db.attachedDatabase, _db.fxRates);
+  $$CurrenciesTableTableManager get currencies =>
+      $$CurrenciesTableTableManager(_db.attachedDatabase, _db.currencies);
+  $$AccountsTableTableManager get accounts =>
+      $$AccountsTableTableManager(_db.attachedDatabase, _db.accounts);
   $$AuditLogsTableTableManager get auditLogs =>
       $$AuditLogsTableTableManager(_db.attachedDatabase, _db.auditLogs);
 }

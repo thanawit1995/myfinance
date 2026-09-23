@@ -606,7 +606,36 @@
   - สร้างหน้าจอตรวจสอบ `NotionInvestPreviewDialog` ให้ผู้ใช้เลือกติ๊กรายการที่ต้องการนำเข้า พร้อมแสดงรายละเอียด Ticker, จำนวนหุ้น, ต้นทุน USD, ต้นทุน THB
 - [x] **การรับประกันคุณภาพ (Quality Assurance)**:
   - `flutter analyze`: **0 errors, 0 warnings, 0 issues**
-  - `flutter test`: **122/122 ผ่านฉลุย 100%** (รวมชุดทดสอบใหม่ของ Mapper และ Invest Parser)
+  - `flutter test`: **128/128 ผ่านฉลุย 100%**
+
+---
+
+### Phase 4.3: ระบบนำเข้า Notion Income & ระบบติดตามรายได้ค้างรับ/เงินตกเบิกแพทย์ (Medical Accrued Income & Arrears Tracker)
+- [x] **Schema Migration v7 -> v8**:
+  - เพิ่มคอลัมน์ในตาราง `transactions`:
+    * `work_period` (TEXT nullable): บันทึกรอบเดือนของการทำงาน (เช่น `'2025-12'`, `'2026-07'`)
+    * `expected_amount_satang` (INT nullable): ยอดเงินที่คาดว่าจะได้รับ (จากคอลัมน์ `Budget`)
+    * `is_cleared` (BOOL default true): สถานะเงินเข้าบัญชีแล้ว (`true`) หรือเป็นรายได้ค้างรับ/เงินตกเบิก (`false`)
+- [x] **Ledger Invariant Isolation**:
+  - อัปเดต `AccountsDao.getAccountBalanceSatang()` และการคำนวณเงินสดในหน้าต่างต่าง ๆ ให้ **ไม่นำ** รายได้ที่ `is_cleared == false` มารวมในยอดเงินสดคงเหลือของบัญชีธนาคาร (ป้องกันยอดเงินในแอปไม่ตรงกับ Mobile Banking ของจริง)
+- [x] **Notion Income CSV Parser**:
+  - ตรวจจับคอลัมน์ `Date`, `Income`, `Category`, `Budget`, `Amount`, `Property`, `Monthly Overview`, `Type` อัตโนมัติ
+  - แปลง `Monthly Overview` เช่น `"December 25 (url)"` -> `'2025-12'`, `"July 26"` -> `'2026-07'`
+  - กำหนด `is_cleared = false` เมื่อ `Property == 'No'`
+  - จัดหมวดภาษีเงินได้แพทย์ไทยอัตโนมัติ: เงินเดือน, พ.ต.ส., เงินประจำตำแหน่ง = 40(1); ค่าเวรเหมา, เงินรายชั่วโมง, DF, เงินหมื่นไม่ทำเวชฯ = 40(2); Top up = ยกเว้นภาษี
+- [x] **Accrued Income & Arrears Screen (`AccruedIncomeScreen`)**:
+  - แสดงการ์ดยอดรวมเงินค้างรับทั้งหมด, จำนวนรายการ, และจำนวนรอบเดือนที่ค้าง
+  - จัดกลุ่มรายการตามรอบเดือนที่ทำงาน (`workPeriod`) เรียงจากเดือนล่าสุด
+  - ปุ่มบันทึกรับเงินเข้าบัญชีจริง (**Mark Received**): ให้ผู้ใช้เลือกบัญชีปลายทาง (เช่น KTB, SCB) ระบุวันที่เงินเข้าจริง และปรับยอดเงินที่ได้รับจริง (หากมีการหักภาษี) พร้อมอัปเดตเป็น `is_cleared = true` ยอดเงินสดจะเข้าบัญชีทันที และบันทึก Audit Log
+  - ปุ่มรับเงินทั้งรอบเดือน (**Receive All in Period**) ช่วยให้กดเคลียร์เงินเข้าทั้งงวดได้ในคลิกเดียว
+  - ปุ่ม "+ บันทึกค้างรับใหม่" สำหรับลงรายการค่าเวรหรือเงินพิเศษที่ทำไปแล้วแต่ยังรอเงินออก
+- [x] **การเชื่อมต่อ Navigation & UI Enhancements**:
+  - เพิ่มไอคอนทางลัดติดตามเงินตกเบิก (`Icons.pending_actions_outlined`) บน AppBar ของหน้า Money และหน้าประวัติรายการ
+  - หน้าประวัติรายการแสดงป้ายกำกับสีส้ม `[ค้างรับ (YYYY-MM)]` สำหรับรายการที่ยังไม่ได้รับเงิน
+  - ปรับปรุง `ImportPreviewDialog` แสดงแถบสรุปและสถานะแถวค้างรับ/ตกเบิกอย่างชัดเจนก่อนกดยืนยันนำเข้า
+- [x] **การรับประกันคุณภาพ (Quality Assurance)**:
+  - `flutter test`: **128/128 ผ่าน 100%** (เพิ่มชุดทดสอบ `notion_income_import_test.dart`)
+  - `flutter analyze`: **0 errors, 0 warnings, 0 issues**
 
 ---
 

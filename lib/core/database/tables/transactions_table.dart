@@ -30,8 +30,10 @@ class Transactions extends Table {
   TextColumn get taxCategory => text().nullable()(); // 40_1, 40_2, 40_4_interest, 40_4_dividend_th, 40_4_dividend_foreign, 40_4_crypto, 40_4_foreign_stock_gain, 40_6_medical, 40_8, non_taxable
   IntColumn get withholdingTaxSatang => integer().withDefault(const Constant(0))();
   DateTimeColumn get transactionDate => dateTime()();
+  TextColumn get workPeriod => text().nullable()(); // รอบเดือนผลงาน เช่น '2025-12', '2026-07'
+  IntColumn get expectedAmountSatang => integer().nullable()(); // ยอดประมาณการ/Budget ใน Notion
   TextColumn get note => text().nullable()();
-  BoolColumn get isCleared => boolean().withDefault(const Constant(false))();
+  BoolColumn get isCleared => boolean().withDefault(const Constant(true))();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
   DateTimeColumn get deletedAt => dateTime().nullable()();

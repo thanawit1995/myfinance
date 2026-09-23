@@ -5,15 +5,10 @@ part of 'tax_dao.dart';
 // ignore_for_file: type=lint
 mixin _$TaxDaoMixin on DatabaseAccessor<AppDatabase> {
   $TaxRulesTable get taxRules => attachedDatabase.taxRules;
-  $CurrenciesTable get currencies => attachedDatabase.currencies;
-  $AccountsTable get accounts => attachedDatabase.accounts;
-  $CategoriesTable get categories => attachedDatabase.categories;
-  $AssetsTable get assets => attachedDatabase.assets;
-  $ImportBatchesTable get importBatches => attachedDatabase.importBatches;
-  $TransactionsTable get transactions => attachedDatabase.transactions;
   $TaxDeductionsTable get taxDeductions => attachedDatabase.taxDeductions;
   $TaxResidencyRecordsTable get taxResidencyRecords =>
       attachedDatabase.taxResidencyRecords;
+  $TransactionsTable get transactions => attachedDatabase.transactions;
   $InvestmentIncomesTable get investmentIncomes =>
       attachedDatabase.investmentIncomes;
   $ForeignRemittancesTable get foreignRemittances =>
@@ -27,18 +22,6 @@ class TaxDaoManager {
   TaxDaoManager(this._db);
   $$TaxRulesTableTableManager get taxRules =>
       $$TaxRulesTableTableManager(_db.attachedDatabase, _db.taxRules);
-  $$CurrenciesTableTableManager get currencies =>
-      $$CurrenciesTableTableManager(_db.attachedDatabase, _db.currencies);
-  $$AccountsTableTableManager get accounts =>
-      $$AccountsTableTableManager(_db.attachedDatabase, _db.accounts);
-  $$CategoriesTableTableManager get categories =>
-      $$CategoriesTableTableManager(_db.attachedDatabase, _db.categories);
-  $$AssetsTableTableManager get assets =>
-      $$AssetsTableTableManager(_db.attachedDatabase, _db.assets);
-  $$ImportBatchesTableTableManager get importBatches =>
-      $$ImportBatchesTableTableManager(_db.attachedDatabase, _db.importBatches);
-  $$TransactionsTableTableManager get transactions =>
-      $$TransactionsTableTableManager(_db.attachedDatabase, _db.transactions);
   $$TaxDeductionsTableTableManager get taxDeductions =>
       $$TaxDeductionsTableTableManager(_db.attachedDatabase, _db.taxDeductions);
   $$TaxResidencyRecordsTableTableManager get taxResidencyRecords =>
@@ -46,6 +29,8 @@ class TaxDaoManager {
         _db.attachedDatabase,
         _db.taxResidencyRecords,
       );
+  $$TransactionsTableTableManager get transactions =>
+      $$TransactionsTableTableManager(_db.attachedDatabase, _db.transactions);
   $$InvestmentIncomesTableTableManager get investmentIncomes =>
       $$InvestmentIncomesTableTableManager(
         _db.attachedDatabase,

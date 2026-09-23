@@ -227,11 +227,45 @@ class GoogleDriveSyncService {
   /// ดึงไฟล์ฐานข้อมูล SQLite ปัจจุบันของแอป
   Future<File?> getLocalDatabaseFile() async {
     if (customDbFile != null) return customDbFile;
-    final docDir = await _getDocumentsDir();
-    final dbFile = File(p.join(docDir.path, 'myfinance.sqlite'));
-    if (await dbFile.exists()) {
-      return dbFile;
+
+    final candidateNames = [
+      'myfinance_vault.sqlite',
+      'myfinance.sqlite',
+      'myfinance_vault.db',
+      'myfinance.db',
+    ];
+
+    final searchDirs = <Directory>[];
+    try {
+      searchDirs.add(await _getDocumentsDir());
+    } catch (_) {}
+
+    if (customDocDir == null) {
+      try {
+        searchDirs.add(await getApplicationSupportDirectory());
+      } catch (_) {}
+
+      final extraDirs = <Directory>[];
+      for (final d in searchDirs) {
+        try {
+          final parent = d.parent;
+          extraDirs.add(Directory(p.join(parent.path, 'databases')));
+          extraDirs.add(Directory(p.join(parent.path, 'app_flutter')));
+          extraDirs.add(Directory(p.join(parent.path, 'files')));
+        } catch (_) {}
+      }
+      searchDirs.addAll(extraDirs);
     }
+
+    for (final dir in searchDirs) {
+      for (final name in candidateNames) {
+        final f = File(p.join(dir.path, name));
+        if (await f.exists()) {
+          return f;
+        }
+      }
+    }
+
     return null;
   }
 
@@ -345,6 +379,12 @@ class GoogleDriveSyncService {
         timestamp: now,
       );
     }
+
+    // บังคับให้ฐานข้อมูลเขียนข้อมูลลงไฟล์ดิสก์อย่างสมบูรณ์
+    try {
+      await db.customSelect('SELECT 1;').get();
+      await db.customStatement('PRAGMA wal_checkpoint(TRUNCATE);');
+    } catch (_) {}
 
     final localDb = await getLocalDatabaseFile();
     if (localDb == null || !await localDb.exists()) {
@@ -504,7 +544,7 @@ class GoogleDriveSyncService {
         }
 
         // Safety Backup ไฟล์เดิมในเครื่อง
-        final localDb = await getLocalDatabaseFile();
+        var localDb = await getLocalDatabaseFile();
         String? backupPath;
         if (localDb != null && await localDb.exists()) {
           final docDir = await _getDocumentsDir();
@@ -520,14 +560,17 @@ class GoogleDriveSyncService {
           try {
             await db.customStatement('PRAGMA wal_checkpoint(TRUNCATE);');
           } catch (_) {}
-
-          await localDb.writeAsBytes(remoteBytes, flush: true);
-
-          final walFile = File('${localDb.path}-wal');
-          final shmFile = File('${localDb.path}-shm');
-          if (await walFile.exists()) await walFile.delete();
-          if (await shmFile.exists()) await shmFile.delete();
+        } else {
+          final docDir = await _getDocumentsDir();
+          localDb = File(p.join(docDir.path, 'myfinance_vault.sqlite'));
         }
+
+        await localDb.writeAsBytes(remoteBytes, flush: true);
+
+        final walFile = File('${localDb.path}-wal');
+        final shmFile = File('${localDb.path}-shm');
+        if (await walFile.exists()) await walFile.delete();
+        if (await shmFile.exists()) await shmFile.delete();
 
         await _setLastSyncTime(remoteTime ?? now);
 
@@ -589,7 +632,7 @@ class GoogleDriveSyncService {
         }
       }
 
-      final localDb = await getLocalDatabaseFile();
+      var localDb = await getLocalDatabaseFile();
       String? backupPath;
       if (localDb != null && await localDb.exists()) {
         final docDir = await _getDocumentsDir();
@@ -602,20 +645,21 @@ class GoogleDriveSyncService {
         final safetyBackup = File(p.join(backupDir.path, 'backup_before_sync_$timeStr.db'));
         await localDb.copy(safetyBackup.path);
         backupPath = safetyBackup.path;
-      }
 
-      if (localDb != null) {
         try {
           await db.customStatement('PRAGMA wal_checkpoint(TRUNCATE);');
         } catch (_) {}
-
-        await remoteDbFile.copy(localDb.path);
-
-        final walFile = File('${localDb.path}-wal');
-        final shmFile = File('${localDb.path}-shm');
-        if (await walFile.exists()) await walFile.delete();
-        if (await shmFile.exists()) await shmFile.delete();
+      } else {
+        final docDir = await _getDocumentsDir();
+        localDb = File(p.join(docDir.path, 'myfinance_vault.sqlite'));
       }
+
+      await remoteDbFile.copy(localDb.path);
+
+      final walFile = File('${localDb.path}-wal');
+      final shmFile = File('${localDb.path}-shm');
+      if (await walFile.exists()) await walFile.delete();
+      if (await shmFile.exists()) await shmFile.delete();
 
       await _setLastSyncTime(remoteTime ?? now);
 

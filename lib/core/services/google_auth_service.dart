@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:http/http.dart' as http;
 
 class GoogleAuthUser {
   final String email;
@@ -22,9 +23,12 @@ class GoogleAuthService {
 
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
+  static const String driveScope = 'https://www.googleapis.com/auth/drive.file';
+
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: [
       'email',
+      driveScope,
     ],
   );
 
@@ -86,6 +90,22 @@ class GoogleAuthService {
     await _saveUser(email, displayName, null);
   }
 
+  /// สร้าง http.Client ที่มี Access Token ของ Google สำหรับคุยกับ Google APIs
+  Future<http.Client?> getAuthenticatedClient() async {
+    if (!isSupportedPlatform) return null;
+
+    if (_account == null) {
+      try {
+        _account = await _googleSignIn.signInSilently();
+      } catch (_) {}
+    }
+
+    if (_account == null) return null;
+
+    final authHeaders = await _account!.authHeaders;
+    return _GoogleAuthClient(authHeaders);
+  }
+
   Future<void> signOut() async {
     if (isSupportedPlatform) {
       try {
@@ -102,5 +122,23 @@ class GoogleAuthService {
     await _storage.write(key: _keyEmail, value: email);
     if (name != null) await _storage.write(key: _keyName, value: name);
     if (photo != null) await _storage.write(key: _keyPhoto, value: photo);
+  }
+}
+
+class _GoogleAuthClient extends http.BaseClient {
+  final Map<String, String> _headers;
+  final http.Client _client = http.Client();
+
+  _GoogleAuthClient(this._headers);
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) {
+    return _client.send(request..headers.addAll(_headers));
+  }
+
+  @override
+  void close() {
+    _client.close();
+    super.close();
   }
 }

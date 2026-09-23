@@ -291,6 +291,17 @@ class SeedData {
         createdAt: now,
         updatedAt: now,
       ),
+      CategoriesCompanion.insert(
+        id: 'cat-exp-0000-4000-8000-000000000013',
+        nameTh: 'ท่องเที่ยว',
+        nameEn: 'Travel',
+        categoryType: 'expense',
+        icon: const Value('flight_takeoff'),
+        color: const Value('0xFF00ACC1'),
+        isSystem: const Value(true),
+        createdAt: now,
+        updatedAt: now,
+      ),
 
       // Transfer
       CategoriesCompanion.insert(

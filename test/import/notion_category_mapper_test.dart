@@ -12,11 +12,15 @@ void main() {
       expect(NotionCategoryMapper.toAppCategoryNameEn('Entertainment'), 'Entertainment');
     });
 
-    test('maps custom confirmed categories: Lover -> Gifts and Cat -> Yuzu', () {
+    test('maps confirmed custom categories: Lover -> Gifts, Cat -> Yuzu, Car -> Transportation, Travel -> Travel', () {
       expect(NotionCategoryMapper.toAppCategoryNameEn('Lover'), 'Gifts');
       expect(NotionCategoryMapper.toAppCategoryNameEn('lover'), 'Gifts');
       expect(NotionCategoryMapper.toAppCategoryNameEn('Cat'), 'Yuzu');
       expect(NotionCategoryMapper.toAppCategoryNameEn('cat'), 'Yuzu');
+      expect(NotionCategoryMapper.toAppCategoryNameEn('Car'), 'Transportation');
+      expect(NotionCategoryMapper.toAppCategoryNameEn('car'), 'Transportation');
+      expect(NotionCategoryMapper.toAppCategoryNameEn('Travel'), 'Travel');
+      expect(NotionCategoryMapper.toAppCategoryNameEn('travel'), 'Travel');
     });
 
     test('maps Notion income categories correctly', () {
@@ -24,6 +28,8 @@ void main() {
       expect(NotionCategoryMapper.toAppCategoryNameEn('Top up'), 'Other Income');
       expect(NotionCategoryMapper.toAppCategoryNameEn('topup'), 'Other Income');
       expect(NotionCategoryMapper.toAppCategoryNameEn('On duty'), 'Freelance / Shift');
+      expect(NotionCategoryMapper.toAppCategoryNameEn('Extra'), 'Other Income');
+      expect(NotionCategoryMapper.toAppCategoryNameEn('extra'), 'Other Income');
     });
 
     test('returns null for unknown categories', () {

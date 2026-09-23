@@ -91,6 +91,18 @@ void main() {
         CsvImportParser.cleanNotionRelation('ค่ารักษาพยาบาล'),
         'ค่ารักษาพยาบาล',
       );
+      expect(
+        CsvImportParser.cleanNotionRelation('🍴Eating_OCT23 (https://notion.so)'),
+        'Eating',
+      );
+      expect(
+        CsvImportParser.cleanNotionRelation('❤️Lover_OCT23 (https://notion.so)'),
+        'Lover',
+      );
+      expect(
+        CsvImportParser.cleanNotionRelation('✈️Travel_MAY24 (https://notion.so)'),
+        'Travel',
+      );
     });
 
     test('Summary and total row detection', () {

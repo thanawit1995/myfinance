@@ -125,6 +125,11 @@ class CsvImportParser {
       s = s.substring(0, underscoreIdx).trim();
     }
 
+    // Strip leading emojis and symbols (e.g. "🍴Eating" -> "Eating", "❤️Lover" -> "Lover")
+    // Keep Thai, English letters, digits, spaces, &, -, /
+    final cleanRegex = RegExp(r'^[^a-zA-Z0-9\u0E00-\u0E7F]+');
+    s = s.replaceFirst(cleanRegex, '').trim();
+
     return s;
   }
 

@@ -29,6 +29,8 @@ class NotionCategoryMapper {
     'utilities': 'Utilities',
     'education': 'Education',
     'financial fees': 'Financial Fees',
+    'car': 'Transportation',
+    'travel': 'Travel',
     'other expense': 'Other Expense',
 
     // ─── Income ────────────────────────────────────────────────────────────
@@ -40,6 +42,7 @@ class NotionCategoryMapper {
     'interest & dividends': 'Interest & Dividends',
     'dividends': 'Interest & Dividends',
     'business': 'Business / Sales',
+    'extra': 'Other Income',
     'other income': 'Other Income',
   };
 }

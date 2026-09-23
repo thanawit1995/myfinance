@@ -13,6 +13,7 @@ final googleDriveSyncServiceProvider = Provider<GoogleDriveSyncService>((ref) {
     transactionsDao: ref.watch(transactionsDaoProvider),
     accountsDao: ref.watch(accountsDaoProvider),
     syncDao: ref.watch(syncDaoProvider),
+    googleAuthService: ref.watch(googleAuthServiceProvider),
   );
 });
 

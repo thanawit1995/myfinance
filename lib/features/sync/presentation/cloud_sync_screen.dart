@@ -1,5 +1,5 @@
-import 'dart:io';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -28,17 +28,33 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
   }
 
   Future<void> _loadData() async {
-    final syncService = ref.read(googleDriveSyncServiceProvider);
-    final authService = ref.read(googleAuthServiceProvider);
-    final status = await syncService.getStatus();
-    final backups = await syncService.getPreSyncBackups();
-    final user = await authService.getCurrentUser();
-    if (mounted) {
-      setState(() {
-        _status = status;
-        _backups = backups;
-        _googleUser = user;
-      });
+    try {
+      final syncService = ref.read(googleDriveSyncServiceProvider);
+      final authService = ref.read(googleAuthServiceProvider);
+      final status = await syncService.getStatus();
+      final backups = kIsWeb ? <PreSyncBackupInfo>[] : await syncService.getPreSyncBackups();
+      final user = await authService.getCurrentUser();
+      if (mounted) {
+        setState(() {
+          _status = status;
+          _backups = backups;
+          _googleUser = user;
+        });
+      }
+    } catch (e, stack) {
+      debugPrint('CloudSyncScreen _loadData error: $e\n$stack');
+      if (mounted) {
+        setState(() {
+          _status = const GoogleDriveSyncStatus(
+            isConnected: false,
+            isAutoSync: false,
+            isWifiOnly: false,
+            lastSyncTime: null,
+            pendingCount: 0,
+            lastError: 'พร้อมใช้งาน',
+          );
+        });
+      }
     }
   }
 
@@ -46,9 +62,12 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
     if (rawPath == null || rawPath.isEmpty) {
       return isThai ? 'ยังไม่ได้เชื่อมต่อโฟลเดอร์ Google Drive' : 'No Google Drive folder connected';
     }
+    if (kIsWeb || rawPath.contains('Google Drive Cloud')) {
+      return 'Google Drive Cloud (MyFinance_Backup)';
+    }
     // Check if on mobile or contains default backup path
     if (rawPath.contains('GoogleDrive_Backup') || rawPath.startsWith('/data/user/') || rawPath.startsWith('/data/data/')) {
-      final segments = rawPath.split(Platform.pathSeparator);
+      final segments = rawPath.split(RegExp(r'[/\\]'));
       final folderName = segments.isNotEmpty && segments.last.isNotEmpty ? segments.last : 'MyFinance_Backup';
       return 'Google Drive: /$folderName';
     }
@@ -608,16 +627,18 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                           _formatDriveFolderDisplay(_status!.driveFolderPath, isThai),
                           style: const TextStyle(fontSize: 12),
                         ),
-                        trailing: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          ),
-                          onPressed: _pickDriveFolder,
-                          child: Text(
-                            _status!.isConnected ? (isThai ? 'เปลี่ยน' : 'Change') : (isThai ? 'เลือก' : 'Select'),
-                            style: const TextStyle(fontSize: 12.5),
-                          ),
-                        ),
+                        trailing: kIsWeb
+                            ? null
+                            : OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                ),
+                                onPressed: _pickDriveFolder,
+                                child: Text(
+                                  _status!.isConnected ? (isThai ? 'เปลี่ยน' : 'Change') : (isThai ? 'เลือก' : 'Select'),
+                                  style: const TextStyle(fontSize: 12.5),
+                                ),
+                              ),
                       ),
                       const Divider(height: 1),
                       SwitchListTile(

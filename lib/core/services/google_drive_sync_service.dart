@@ -105,6 +105,7 @@ class GoogleDriveSyncService {
 
   Future<Directory> _getDocumentsDir() async {
     if (customDocDir != null) return customDocDir!;
+    if (kIsWeb) throw UnsupportedError('Documents directory is not supported on web');
     return getApplicationDocumentsDirectory();
   }
 
@@ -112,6 +113,8 @@ class GoogleDriveSyncService {
 
   /// ค้นหาและตรวจสอบโฟลเดอร์ Google Drive for Desktop ในเครื่อง Windows 11 อัตโนมัติ
   Future<String?> detectOrGetDriveFolder() async {
+    if (kIsWeb) return null;
+
     // 1. ถ้าผู้ใช้กดตัดการเชื่อมต่อไว้ ไม่ต้อง auto-detect อัตโนมัติ
     final isDisconnected = await _secureStorage.read(key: _keyDisconnected);
     if (isDisconnected == 'true') {
@@ -226,6 +229,7 @@ class GoogleDriveSyncService {
 
   /// ดึงไฟล์ฐานข้อมูล SQLite ปัจจุบันของแอป
   Future<File?> getLocalDatabaseFile() async {
+    if (kIsWeb) return null;
     if (customDbFile != null) return customDbFile;
 
     final candidateNames = [
@@ -682,6 +686,7 @@ class GoogleDriveSyncService {
 
   /// เรียกดูรายการไฟล์สำรองฉุกเฉินก่อนซิงค์ (Safety Pre-Sync Backups)
   Future<List<PreSyncBackupInfo>> getPreSyncBackups() async {
+    if (kIsWeb) return [];
     final docDir = await _getDocumentsDir();
     final backupDir = Directory(p.join(docDir.path, 'backups'));
     if (!await backupDir.exists()) {

@@ -118,5 +118,107 @@ void main() {
       expect(logs.any((l) => l.action == 'CREATE'), isTrue);
       expect(logs.any((l) => l.action == 'DELETE'), isTrue);
     });
+
+    test('Recurring income with prev_month and accrued generates un-cleared transaction with N-1 workPeriod', () async {
+      final now = DateTime(2026, 9, 25);
+      final ruleId = uuid.v4();
+
+      await db.recurringTransactionsDao.createRule(
+        RecurringRulesCompanion.insert(
+          id: ruleId,
+          title: 'เงินค่าตอบแทนพิเศษ รพ.',
+          transactionType: 'income',
+          sourceAccountId: 'acc_main',
+          amountSatang: 2500000, // 25,000 THB
+          currencyCode: 'THB',
+          frequency: 'monthly',
+          dayOfMonth: const Value(25),
+          nextRunDate: DateTime(2026, 9, 25),
+          autoPost: const Value(true),
+          note: const Value('เงินค่าตอบแทนพิเศษ [work_period:prev_month] [tax_cat:40_2] [accrued]'),
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      final postedCount = await db.recurringTransactionsDao.processDueRules(nowOverride: now);
+      expect(postedCount, 1);
+
+      final txs = await db.transactionsDao.getRecentTransactions(limit: 5);
+      final tx = txs.firstWhere((t) => t.note?.contains('เงินค่าตอบแทนพิเศษ') == true);
+
+      expect(tx.workPeriod, '2026-08'); // Month before September 2026 is August 2026
+      expect(tx.isCleared, isFalse); // Accrued income waiting to be marked received
+      expect(tx.expectedAmountSatang, 2500000);
+      expect(tx.taxCategory, '40_2');
+      expect(tx.note, 'เงินค่าตอบแทนพิเศษ'); // Technical metadata stripped cleanly
+    });
+
+    test('Recurring income with prev_month across January boundary correctly rolls back to December of previous year', () async {
+      final now = DateTime(2027, 1, 25);
+      final ruleId = uuid.v4();
+
+      await db.recurringTransactionsDao.createRule(
+        RecurringRulesCompanion.insert(
+          id: ruleId,
+          title: 'ค่าเวรเหมา มกราคม',
+          transactionType: 'income',
+          sourceAccountId: 'acc_main',
+          amountSatang: 1500000, // 15,000 THB
+          currencyCode: 'THB',
+          frequency: 'monthly',
+          dayOfMonth: const Value(25),
+          nextRunDate: DateTime(2027, 1, 25),
+          autoPost: const Value(true),
+          note: const Value('ค่าเวร [work_period:prev_month] [tax_cat:40_2] [accrued]'),
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      final postedCount = await db.recurringTransactionsDao.processDueRules(nowOverride: now);
+      expect(postedCount, 1);
+
+      final txs = await db.transactionsDao.getRecentTransactions(limit: 5);
+      final tx = txs.firstWhere((t) => t.note == 'ค่าเวร');
+
+      expect(tx.workPeriod, '2026-12'); // Month before January 2027 is December 2026
+      expect(tx.isCleared, isFalse);
+      expect(tx.expectedAmountSatang, 1500000);
+      expect(tx.taxCategory, '40_2');
+    });
+
+    test('Recurring income with same_month generates cleared transaction with current month workPeriod', () async {
+      final now = DateTime(2026, 9, 25);
+      final ruleId = uuid.v4();
+
+      await db.recurringTransactionsDao.createRule(
+        RecurringRulesCompanion.insert(
+          id: ruleId,
+          title: 'เงินเดือนประจำ',
+          transactionType: 'income',
+          sourceAccountId: 'acc_main',
+          amountSatang: 6000000, // 60,000 THB
+          currencyCode: 'THB',
+          frequency: 'monthly',
+          dayOfMonth: const Value(25),
+          nextRunDate: DateTime(2026, 9, 25),
+          autoPost: const Value(true),
+          note: const Value('เงินเดือน [work_period:same_month] [tax_cat:40_1]'),
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      final postedCount = await db.recurringTransactionsDao.processDueRules(nowOverride: now);
+      expect(postedCount, 1);
+
+      final txs = await db.transactionsDao.getRecentTransactions(limit: 5);
+      final tx = txs.firstWhere((t) => t.note == 'เงินเดือน');
+
+      expect(tx.workPeriod, '2026-09'); // Same month as September 2026
+      expect(tx.isCleared, isTrue); // Regular income is cleared immediately
+      expect(tx.taxCategory, '40_1');
+    });
   });
 }

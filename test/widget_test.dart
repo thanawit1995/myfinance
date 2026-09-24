@@ -61,10 +61,10 @@ void main() {
     await tester.tap(find.text('รายจ่าย'));
     await tester.pumpAndSettle();
 
-    expect(find.text('บันทึกด่วน (3 แตะ)'), findsOneWidget);
+    expect(find.text('บันทึกด่วน'), findsOneWidget);
 
     // Close quick add sheet
-    Navigator.of(tester.element(find.text('บันทึกด่วน (3 แตะ)'))).pop();
+    Navigator.of(tester.element(find.text('บันทึกด่วน'))).pop();
     await tester.pumpAndSettle();
 
     // 6. Switch to Money tab (default subtab: Transactions)

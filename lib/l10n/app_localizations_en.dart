@@ -43,7 +43,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get quickAdd => 'Quick Add';
 
   @override
-  String get quickAddKeypad => 'Quick Add (3 taps)';
+  String get quickAddKeypad => 'Quick Add';
 
   @override
   String get portfolio => 'Portfolio';

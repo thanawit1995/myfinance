@@ -43,7 +43,7 @@ class AppLocalizationsTh extends AppLocalizations {
   String get quickAdd => 'บันทึกด่วน';
 
   @override
-  String get quickAddKeypad => 'บันทึกด่วน (3 แตะ)';
+  String get quickAddKeypad => 'บันทึกด่วน';
 
   @override
   String get portfolio => 'พอร์ตการลงทุน';

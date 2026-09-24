@@ -1,6 +1,15 @@
 # บันทึกความคืบหน้าโครงการ MyFinance (PROGRESS.md)
 
-อัปเดตล่าสุด: 20 กันยายน 2026
+อัปเดตล่าสุด: 24 กันยายน 2026
+
+- [x] **Quick Add UX Overhaul & Web Theme Status Bar Synchronization**:
+  - รองรับการปรับสี Status Bar ของมือถือบน Web App แบบไดนามิกตาม Theme Mode (Light / Dark / Lumi)
+  - จัดระเบียบหน้าจอ Quick Add เป็นแบบ Compact Single-Screen Layout มองเห็นครบทุกอย่างโดยไม่ต้องเลื่อนจอ (No-scroll)
+  - จัดเรียงหมวดหมู่ตามความถี่การใช้งาน (Most used first) ผ่าน `getActiveCategoriesOrderedByUsage`
+  - วิเคราะห์และจับคู่ประเภทภาษีเงินได้ให้อัตโนมัติเมื่อเลือกหมวดหมู่ (พร้อมให้ผู้ใช้กดเปลี่ยนเองได้)
+  - ย้ายปุ่ม `+ เพิ่มหมวดหมู่ใหม่` ไปเป็นตัวเลือกท้ายสุดของ Dropdown หมวดหมู่
+  - ออกแบบปุ่มและรอบเดือนรายได้ค้างรับ (Accrued Income) ให้กะทัดรัด (Compact Chip) วางคู่กับประเภทภาษี
+  - แก้ไขปัญหา Dropdown โครงการพิเศษในตัวเลือกเพิ่มเติม (Special Project) ด้วย `isExpanded: true` และ `menuMaxHeight: 220` พร้อมแคช Projects ใน State
 
 ---
 

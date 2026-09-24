@@ -48,6 +48,7 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
 
   List<Account> _accounts = [];
   List<Category> _currentCategories = [];
+  List<Project> _projects = [];
 
   // Accrued income & Tax classification options
   bool _isAccruedIncome = false;
@@ -94,12 +95,14 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
 
   Future<void> _loadInitialData() async {
     final accounts = await ref.read(accountsDaoProvider).getActiveAccounts();
-    final categories = await ref.read(categoriesDaoProvider).getActiveCategories(_transactionType);
+    final categories = await ref.read(categoriesDaoProvider).getActiveCategoriesOrderedByUsage(_transactionType);
+    final projects = await ref.read(projectsDaoProvider).getActiveProjects();
 
     if (mounted) {
       setState(() {
         _accounts = accounts;
         _currentCategories = categories;
+        _projects = projects;
         if (accounts.isNotEmpty) {
           _selectedAccountId = accounts.first.id;
           if (accounts.length > 1) {
@@ -115,10 +118,54 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
   }
 
   void _inferTaxCategory([String? newNote, String? newCatId]) {
-    if (_transactionType != 'income' || _userManuallyChangedTax) return;
+    if (_transactionType != 'income') return;
+    if (_userManuallyChangedTax && newCatId == null) return;
     final noteText = (newNote ?? _noteController.text).trim();
     final catId = newCatId ?? _selectedCategoryId;
     final cat = _currentCategories.where((c) => c.id == catId).firstOrNull;
+
+    // 1. Explicit tax type on category if set
+    if (cat?.taxIncomeType != null && cat!.taxIncomeType!.isNotEmpty) {
+      _selectedTaxCategory = cat.taxIncomeType!;
+      return;
+    }
+
+    // 2. Keyword rules for salary, doctor fees, shift, medical practice, non-taxable
+    if (cat != null) {
+      final name = '${cat.nameTh} ${cat.nameEn}'.toLowerCase();
+      if (name.contains('salary') ||
+          name.contains('เงินเดือน') ||
+          name.contains('ค่าจ้าง') ||
+          name.contains('พ.ต.ส.') ||
+          name.contains('p4p')) {
+        _selectedTaxCategory = '40_1';
+        return;
+      }
+      if (name.contains('เวร') ||
+          name.contains('df') ||
+          name.contains('doctor fee') ||
+          name.contains('ไม่ทำเวช') ||
+          name.contains('เบี้ยเลี้ยง') ||
+          name.contains('ค่าตอบแทน') ||
+          name.contains('ot')) {
+        _selectedTaxCategory = '40_2';
+        return;
+      }
+      if (name.contains('แพทย์') ||
+          name.contains('วิชาชีพ') ||
+          name.contains('คลินิก')) {
+        _selectedTaxCategory = '40_6';
+        return;
+      }
+      if (name.contains('top up') ||
+          name.contains('โอนเงิน') ||
+          name.contains('ยกเว้น') ||
+          name.contains('คืนเงิน')) {
+        _selectedTaxCategory = 'non_taxable';
+        return;
+      }
+    }
+
     final combined = '$noteText ${cat?.nameTh ?? ""} ${cat?.nameEn ?? ""}';
     final inferred = CsvImportParser.classifyIncomeTax(
       name: combined,
@@ -131,11 +178,32 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
         inferred.taxCategory == '40_8' ||
         inferred.taxCategory == 'non_taxable') {
       _selectedTaxCategory = inferred.taxCategory;
-    } else if (cat?.taxIncomeType != null && cat!.taxIncomeType!.isNotEmpty) {
-      _selectedTaxCategory = cat.taxIncomeType!;
     } else {
       _selectedTaxCategory = '40_1';
     }
+  }
+
+  String _formatWorkPeriodShort(String period, bool isThai) {
+    final parts = period.split('-');
+    if (parts.length == 2) {
+      final year = int.tryParse(parts[0]);
+      final month = int.tryParse(parts[1]);
+      if (year != null && month != null && month >= 1 && month <= 12) {
+        const thaiShortMonths = [
+          'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+          'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+        ];
+        const enShortMonths = [
+          'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+        ];
+        final shortYear = isThai ? (year + 543) % 100 : year % 100;
+        return isThai
+            ? '${thaiShortMonths[month - 1]} $shortYear'
+            : '${enShortMonths[month - 1]} \'$shortYear';
+      }
+    }
+    return period;
   }
 
   String _formatWorkPeriodDisplay(String period, bool isThai) {
@@ -551,51 +619,60 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
         child: Column(
           children: [
             // 1. Transaction Type Segmented Buttons
-            SegmentedButton<String>(
-              segments: [
-                ButtonSegment(value: 'expense', label: Text(l10n?.expense ?? (isThai ? 'รายจ่าย' : 'Expense')), icon: const Icon(Icons.remove_circle_outline)),
-                ButtonSegment(value: 'income', label: Text(l10n?.income ?? (isThai ? 'รายรับ' : 'Income')), icon: const Icon(Icons.add_circle_outline)),
-                ButtonSegment(value: 'transfer', label: Text(l10n?.transfer ?? (isThai ? 'โอนเงิน' : 'Transfer')), icon: const Icon(Icons.swap_horiz)),
-              ],
-              selected: {_transactionType},
-              onSelectionChanged: (newVal) async {
-                final newType = newVal.first;
-                final cats = await ref.read(categoriesDaoProvider).getActiveCategories(newType);
-                if (mounted) {
-                  setState(() {
-                    _transactionType = newType;
-                    _currentCategories = cats;
-                    _selectedCategoryId = cats.isNotEmpty ? cats.first.id : null;
-                    _userManuallyChangedTax = false;
-                    _inferTaxCategory();
-                  });
-                }
-              },
+            SizedBox(
+              height: 34,
+              width: double.infinity,
+              child: SegmentedButton<String>(
+                style: SegmentedButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                ),
+                segments: [
+                  ButtonSegment(value: 'expense', label: Text(l10n?.expense ?? (isThai ? 'รายจ่าย' : 'Expense'), style: const TextStyle(fontSize: 12)), icon: const Icon(Icons.remove_circle_outline, size: 16)),
+                  ButtonSegment(value: 'income', label: Text(l10n?.income ?? (isThai ? 'รายรับ' : 'Income'), style: const TextStyle(fontSize: 12)), icon: const Icon(Icons.add_circle_outline, size: 16)),
+                  ButtonSegment(value: 'transfer', label: Text(l10n?.transfer ?? (isThai ? 'โอนเงิน' : 'Transfer'), style: const TextStyle(fontSize: 12)), icon: const Icon(Icons.swap_horiz, size: 16)),
+                ],
+                selected: {_transactionType},
+                onSelectionChanged: (newVal) async {
+                  final newType = newVal.first;
+                  final cats = await ref.read(categoriesDaoProvider).getActiveCategoriesOrderedByUsage(newType);
+                  if (mounted) {
+                    setState(() {
+                      _transactionType = newType;
+                      _currentCategories = cats;
+                      _selectedCategoryId = cats.isNotEmpty ? cats.first.id : null;
+                      _userManuallyChangedTax = false;
+                      _inferTaxCategory();
+                    });
+                  }
+                },
+              ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 4),
 
-            // 2. Big Amount Display (Clean, Themed, High Contrast, Dynamic Currency)
+            // 2. Big Amount Display (Compact, Clean, Dynamic Currency)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
               decoration: BoxDecoration(
                 color: amountBgColor,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: amountBorderColor, width: 1.5),
               ),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   if (_transactionType == 'transfer')
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
+                      padding: const EdgeInsets.only(bottom: 2),
                       child: Text(
                         isThai ? 'จำนวนเงินที่โอนออก ($srcCurrency)' : 'Transfer Out Amount ($srcCurrency)',
                         style: TextStyle(
-                          fontSize: 12.5,
+                          fontSize: 11,
                           fontWeight: FontWeight.w600,
                           color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                         ),
@@ -603,11 +680,11 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
                     )
                   else if (srcCurrency != 'THB')
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
+                      padding: const EdgeInsets.only(bottom: 2),
                       child: Text(
                         isThai ? 'สกุลเงิน $srcCurrency' : 'Currency: $srcCurrency',
                         style: TextStyle(
-                          fontSize: 12.5,
+                          fontSize: 11,
                           fontWeight: FontWeight.w600,
                           color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                         ),
@@ -616,7 +693,8 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
                   Center(
                     child: Text(
                       '$srcSymbol$_amountString',
-                      style: theme.textTheme.headlineLarge?.copyWith(
+                      style: TextStyle(
+                        fontSize: 26,
                         fontWeight: FontWeight.bold,
                         color: amountTextColor,
                       ),
@@ -625,84 +703,99 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 5),
 
-            // 2.1 Note / Transaction Title Field (Item 6 - เด่น ชัดเจน เข้าถึงง่าย)
-            TextField(
-              controller: _noteController,
-              decoration: InputDecoration(
-                labelText: isThai ? 'ชื่อรายการ / บันทึกย่อ' : 'Title / Note',
-                hintText: isThai ? 'เช่น เงินเดือน, ค่าเวร, ค่าอาหาร, กาแฟ' : 'e.g. Salary, Shift, Coffee',
-                prefixIcon: const Icon(Icons.edit_note_outlined),
-                border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-                isDense: true,
+            // 3. Category & Account & Note Fields based on Type
+            if (_transactionType == 'transfer') ...[
+              _buildTransferAccountsRow(theme, isThai),
+              const SizedBox(height: 5),
+              TextField(
+                controller: _noteController,
+                decoration: InputDecoration(
+                  labelText: isThai ? 'ชื่อรายการ / บันทึกย่อ' : 'Title / Note',
+                  hintText: isThai ? 'บันทึกช่วยจำ' : 'Note',
+                  prefixIcon: const Icon(Icons.edit_note_outlined, size: 18),
+                  prefixIconConstraints: const BoxConstraints(minWidth: 32),
+                  border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                ),
               ),
-              onChanged: (val) {
-                if (_transactionType == 'income') {
-                  setState(() {
-                    _inferTaxCategory(val, _selectedCategoryId);
-                  });
-                }
-              },
-            ),
-            const SizedBox(height: 12),
-
-            // 3. Category Dropdown (Item 6 - Dropdown เลือกง่าย พร้อมปุ่มเพิ่มหมวดหมู่)
-            if (_transactionType != 'transfer') ...[
-              _buildCategoryDropdown(theme, isThai),
-              const SizedBox(height: 12),
-            ],
-
-            // 3.1 Income Tax & Accrued Income Settings (Item 3 & Item 5)
-            if (_transactionType == 'income') ...[
-              _buildIncomeTaxAndAccruedCard(theme, isThai),
-              const SizedBox(height: 12),
-            ],
-
-            // 4. Account Selector
-            _buildAccountSelector(),
-            const SizedBox(height: 12),
-
-            // 4.1 Cross-Currency Destination Amount Card (USD) - Separate, Prominent Box
-            if (_transactionType == 'transfer') ...[
+              const SizedBox(height: 5),
               _buildCrossCurrencyTransferCard(theme),
-              const SizedBox(height: 12),
-            ],
-
-            // 4.2 Foreign Remittance Card (Auto-detected if Offshore -> Domestic)
-            if (_transactionType == 'transfer') ...[
               _buildRemittanceSection(theme),
-              const SizedBox(height: 12),
+            ] else ...[
+              // Expense & Income: Category Dropdown (with + Add New inside)
+              _buildCategoryDropdown(theme, isThai),
+              const SizedBox(height: 5),
+              // Row: Note (flex 3) + Account (flex 2)
+              Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: TextField(
+                      controller: _noteController,
+                      decoration: InputDecoration(
+                        labelText: isThai ? 'ชื่อรายการ / บันทึก' : 'Title / Note',
+                        hintText: isThai ? 'เช่น เงินเดือน, กาแฟ' : 'e.g. Salary, Coffee',
+                        prefixIcon: const Icon(Icons.edit_note_outlined, size: 18),
+                        prefixIconConstraints: const BoxConstraints(minWidth: 32),
+                        border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      ),
+                      onChanged: (val) {
+                        if (_transactionType == 'income') {
+                          setState(() {
+                            _inferTaxCategory(val, _selectedCategoryId);
+                          });
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: _buildAccountDropdownCompact(theme, isThai),
+                  ),
+                ],
+              ),
+              if (_transactionType == 'income') ...[
+                const SizedBox(height: 5),
+                // Income: Row: Tax Dropdown (flex 3) + Compact Accrued Button (flex 2)
+                _buildIncomeTaxAndAccruedRow(theme, isThai),
+              ],
+              const SizedBox(height: 5),
             ],
 
-            // 5. Additional Options (Project, Recurring)
+            // 4. Additional Options (Project, Recurring)
             _buildAdditionalOptions(theme),
-            const SizedBox(height: 12),
+            const SizedBox(height: 5),
 
-            // 6. Keypad & Submit (Quick 3rd Tap)
+            // 5. Compact Keypad
             _buildKeypad(),
-            const SizedBox(height: 16),
+            const SizedBox(height: 6),
 
-            // Submit Button
+            // 6. Submit Button
             SizedBox(
               width: double.infinity,
-              height: 52,
+              height: 44,
               child: FilledButton.icon(
                 style: FilledButton.styleFrom(
                   backgroundColor: _transactionType == 'expense'
                       ? Colors.red.shade700
                       : (_transactionType == 'income' ? Colors.green.shade700 : Colors.blue.shade700),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                icon: const Icon(Icons.check, size: 24),
+                icon: const Icon(Icons.check, size: 20),
                 label: Text(
                   isThai ? 'บันทึกรายการ' : 'Save Transaction',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 onPressed: _submitTransaction,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 6),
           ],
         ),
       ),
@@ -714,132 +807,217 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
         ? _selectedCategoryId
         : (_currentCategories.isNotEmpty ? _currentCategories.first.id : null);
 
+    return DropdownButtonFormField<String>(
+      key: ValueKey('cat_dropdown_${_transactionType}_$validSelectedId'),
+      decoration: InputDecoration(
+        labelText: isThai ? 'หมวดหมู่ (Category)' : 'Category',
+        prefixIcon: const Icon(Icons.category_outlined, size: 18),
+        prefixIconConstraints: const BoxConstraints(minWidth: 32),
+        border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      ),
+      initialValue: validSelectedId,
+      isExpanded: true,
+      menuMaxHeight: 280,
+      items: [
+        ..._currentCategories.map((cat) {
+          final displayName = isThai
+              ? cat.nameTh
+              : (cat.nameEn.trim().isNotEmpty ? cat.nameEn : cat.nameTh);
+          return DropdownMenuItem<String>(
+            value: cat.id,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(CategoryIconHelper.getIcon(cat.icon), size: 18),
+                const SizedBox(width: 8),
+                Flexible(child: Text(displayName, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13))),
+              ],
+            ),
+          );
+        }),
+        DropdownMenuItem<String>(
+          value: '__ADD_NEW__',
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.add_circle_outline, size: 18, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              Text(
+                isThai ? '+ เพิ่มหมวดหมู่ใหม่...' : '+ Add New Category...',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+      onChanged: (val) async {
+        if (val == '__ADD_NEW__') {
+          final newCat = await CategoryFormDialog.show(
+            context,
+            initialType: _transactionType,
+          );
+          if (newCat != null && mounted) {
+            final updatedCats = await ref.read(categoriesDaoProvider).getActiveCategoriesOrderedByUsage(_transactionType);
+            setState(() {
+              _currentCategories = updatedCats;
+              _selectedCategoryId = newCat.id;
+              _userManuallyChangedTax = false;
+              if (_transactionType == 'income') {
+                _inferTaxCategory(_noteController.text, newCat.id);
+              }
+            });
+          } else {
+            setState(() {});
+          }
+        } else if (val != null) {
+          setState(() {
+            _selectedCategoryId = val;
+            _userManuallyChangedTax = false;
+            if (_transactionType == 'income') {
+              _inferTaxCategory(_noteController.text, val);
+            }
+          });
+        }
+      },
+    );
+  }
+
+  Widget _buildAccountDropdownCompact(ThemeData theme, bool isThai) {
+    final validAccountId = _accounts.any((a) => a.id == _selectedAccountId)
+        ? _selectedAccountId
+        : (_accounts.isNotEmpty ? _accounts.first.id : null);
+
+    return DropdownButtonFormField<String>(
+      key: ValueKey('account_compact_$validAccountId'),
+      initialValue: validAccountId,
+      isExpanded: true,
+      menuMaxHeight: 250,
+      decoration: InputDecoration(
+        labelText: isThai ? 'บัญชี' : 'Account',
+        prefixIcon: const Icon(Icons.account_balance_wallet_outlined, size: 18),
+        prefixIconConstraints: const BoxConstraints(minWidth: 30),
+        border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      ),
+      items: _accounts.map((a) => DropdownMenuItem(
+        value: a.id,
+        child: Text(
+          '${a.name} (${a.currencyCode})',
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 12),
+        ),
+      )).toList(),
+      onChanged: (val) => setState(() => _selectedAccountId = val),
+    );
+  }
+
+  Widget _buildTransferAccountsRow(ThemeData theme, bool isThai) {
+    final destAccounts = _accounts.where((a) => a.id != _selectedAccountId).toList();
+    final effectiveDestId = destAccounts.any((a) => a.id == _selectedDestinationAccountId)
+        ? _selectedDestinationAccountId
+        : (destAccounts.isNotEmpty ? destAccounts.first.id : null);
+
     return Row(
       children: [
         Expanded(
           child: DropdownButtonFormField<String>(
-            key: ValueKey('cat_dropdown_${_transactionType}_$validSelectedId'),
+            key: ValueKey('transfer_src_$_selectedAccountId'),
+            initialValue: _selectedAccountId,
+            isExpanded: true,
+            menuMaxHeight: 250,
             decoration: InputDecoration(
-              labelText: isThai ? 'หมวดหมู่ (Category)' : 'Category',
-              prefixIcon: const Icon(Icons.category_outlined),
-              border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+              labelText: isThai ? 'จากบัญชี' : 'From',
+              border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
               isDense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             ),
-            initialValue: validSelectedId,
-            items: _currentCategories.map((cat) {
-              final displayName = isThai
-                  ? cat.nameTh
-                  : (cat.nameEn.trim().isNotEmpty ? cat.nameEn : cat.nameTh);
-              return DropdownMenuItem(
-                value: cat.id,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(CategoryIconHelper.getIcon(cat.icon), size: 18),
-                    const SizedBox(width: 8),
-                    Text(displayName, overflow: TextOverflow.ellipsis),
-                  ],
-                ),
-              );
-            }).toList(),
+            items: _accounts.map((a) => DropdownMenuItem(
+              value: a.id,
+              child: Text('${a.name} (${a.currencyCode})', overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+            )).toList(),
             onChanged: (val) {
               setState(() {
-                _selectedCategoryId = val;
-                if (_transactionType == 'income') {
-                  _inferTaxCategory(_noteController.text, val);
+                _selectedAccountId = val;
+                if (_selectedDestinationAccountId == val) {
+                  final remaining = _accounts.where((a) => a.id != val).toList();
+                  _selectedDestinationAccountId = remaining.isNotEmpty ? remaining.first.id : null;
                 }
               });
             },
           ),
         ),
-        const SizedBox(width: 8),
-        IconButton.filledTonal(
-          tooltip: isThai ? 'เพิ่มหมวดหมู่ใหม่' : 'Add Category',
-          icon: const Icon(Icons.add),
-          onPressed: () async {
-            final newCat = await CategoryFormDialog.show(
-              context,
-              initialType: _transactionType,
-            );
-            if (newCat != null && mounted) {
-              final updatedCats = await ref.read(categoriesDaoProvider).getActiveCategories(_transactionType);
-              setState(() {
-                _currentCategories = updatedCats;
-                _selectedCategoryId = newCat.id;
-                if (_transactionType == 'income') {
-                  _inferTaxCategory(_noteController.text, newCat.id);
-                }
-              });
-            }
-          },
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 4),
+          child: Icon(Icons.arrow_forward, size: 18),
+        ),
+        Expanded(
+          child: DropdownButtonFormField<String>(
+            key: ValueKey('transfer_dest_$effectiveDestId'),
+            initialValue: effectiveDestId,
+            isExpanded: true,
+            menuMaxHeight: 250,
+            decoration: InputDecoration(
+              labelText: isThai ? 'ไปยังบัญชี' : 'To',
+              border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            ),
+            items: destAccounts.map((a) => DropdownMenuItem(
+              value: a.id,
+              child: Text('${a.name} (${a.currencyCode})', overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+            )).toList(),
+            onChanged: (val) => setState(() => _selectedDestinationAccountId = val),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildIncomeTaxAndAccruedCard(ThemeData theme, bool isThai) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 1. Tax Category Header & Dropdown (Item 5)
-          Row(
-            children: [
-              const Icon(Icons.receipt_long_outlined, size: 18),
-              const SizedBox(width: 8),
-              Text(
-                isThai ? 'ประเภทภาษีเงินได้' : 'Income Tax Category',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-              ),
-              const Spacer(),
-              Text(
-                _userManuallyChangedTax
-                    ? (isThai ? '(ผู้ใช้เลือกเอง)' : '(Custom)')
-                    : (isThai ? '(ประเมินอัตโนมัติ)' : '(Auto-inferred)'),
-                style: TextStyle(
-                  fontSize: 11,
-                  color: _userManuallyChangedTax ? theme.colorScheme.primary : Colors.grey,
-                  fontWeight: _userManuallyChangedTax ? FontWeight.bold : FontWeight.normal,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
+  Widget _buildIncomeTaxAndAccruedRow(ThemeData theme, bool isThai) {
+    return Row(
+      children: [
+        Expanded(
+          flex: 3,
+          child: DropdownButtonFormField<String>(
             key: ValueKey('tax_cat_$_selectedTaxCategory'),
             initialValue: _selectedTaxCategory,
             isExpanded: true,
-            decoration: const InputDecoration(
+            menuMaxHeight: 250,
+            decoration: InputDecoration(
+              labelText: isThai ? 'ประเภทภาษี' : 'Tax Type',
+              prefixIcon: const Icon(Icons.receipt_long_outlined, size: 18),
+              prefixIconConstraints: const BoxConstraints(minWidth: 30),
+              border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
               isDense: true,
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             ),
             items: [
               DropdownMenuItem(
                 value: '40_1',
-                child: Text(isThai ? '40(1) เงินเดือน / P4P / พ.ต.ส.' : '40(1) Salary / P4P / PTS', style: const TextStyle(fontSize: 13)),
+                child: Text(isThai ? '40(1) เงินเดือน / พ.ต.ส.' : '40(1) Salary', overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
               ),
               DropdownMenuItem(
                 value: '40_2',
-                child: Text(isThai ? '40(2) ค่าเวรเหมา / เบี้ยเลี้ยง / DF' : '40(2) Shift / Allowance / DF', style: const TextStyle(fontSize: 13)),
+                child: Text(isThai ? '40(2) ค่าเวร / เบี้ยเลี้ยง' : '40(2) Shift/DF', overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
               ),
               DropdownMenuItem(
                 value: '40_6',
-                child: Text(isThai ? '40(6) วิชาชีพอิสระ (การแพทย์)' : '40(6) Medical Practice', style: const TextStyle(fontSize: 13)),
+                child: Text(isThai ? '40(6) วิชาชีพแพทย์' : '40(6) Medical', overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
               ),
               DropdownMenuItem(
                 value: '40_8',
-                child: Text(isThai ? '40(8) รายได้อื่นๆ' : '40(8) Other Income', style: const TextStyle(fontSize: 13)),
+                child: Text(isThai ? '40(8) อื่นๆ' : '40(8) Other', overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
               ),
               DropdownMenuItem(
                 value: 'non_taxable',
-                child: Text(isThai ? 'ยกเว้นภาษี (Non-taxable / Top up)' : 'Non-taxable / Top up', style: const TextStyle(fontSize: 13)),
+                child: Text(isThai ? 'ยกเว้นภาษี' : 'Non-taxable', overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
               ),
             ],
             onChanged: (val) {
@@ -851,78 +1029,103 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
               }
             },
           ),
-          const SizedBox(height: 10),
-          const Divider(height: 1),
-          const SizedBox(height: 4),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          flex: 2,
+          child: _buildCompactAccruedButton(theme, isThai),
+        ),
+      ],
+    );
+  }
 
-          // 2. Accrued Income Switch & Work Period Picker (Item 3)
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(
-              isThai ? 'รายได้ค้างรับ / เงินตกเบิก (Accrued Income)' : 'Accrued Income / Arrears',
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-            ),
-            subtitle: Text(
-              isThai ? 'เงินยังไม่เข้าบัญชีจริง ระบุรอบเดือนทำงาน' : 'Income not yet received, specify work period',
-              style: const TextStyle(fontSize: 11),
-            ),
-            value: _isAccruedIncome,
-            onChanged: (val) {
-              setState(() {
-                _isAccruedIncome = val;
-              });
-            },
-          ),
-          if (_isAccruedIncome) ...[
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: theme.colorScheme.outlineVariant),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          isThai ? 'รอบเดือนทำงาน (Work Period):' : 'Work Period:',
-                          style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
-                        ),
-                        Text(
-                          _formatWorkPeriodDisplay(_accruedWorkPeriod, isThai),
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                        ),
-                      ],
+  Widget _buildCompactAccruedButton(ThemeData theme, bool isThai) {
+    if (!_isAccruedIncome) {
+      return OutlinedButton.icon(
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          side: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
+        icon: const Icon(Icons.schedule, size: 16),
+        label: Text(
+          isThai ? 'ค้างรับ/ตกเบิก' : 'Accrued',
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 11.5),
+        ),
+        onPressed: () {
+          setState(() {
+            _isAccruedIncome = true;
+          });
+        },
+      );
+    }
+
+    final displayText = _formatWorkPeriodShort(_accruedWorkPeriod, isThai);
+
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
+        border: Border.all(color: theme.colorScheme.primary, width: 1.2),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(6),
+              onTap: () async {
+                final parts = _accruedWorkPeriod.split('-');
+                final curYear = parts.length == 2 ? int.tryParse(parts[0]) ?? DateTime.now().year : DateTime.now().year;
+                final curMonth = parts.length == 2 ? int.tryParse(parts[1]) ?? DateTime.now().month : DateTime.now().month;
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: DateTime(curYear, curMonth),
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                );
+                if (picked != null) {
+                  setState(() {
+                    _accruedWorkPeriod = '${picked.year}-${picked.month.toString().padLeft(2, '0')}';
+                  });
+                }
+              },
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.hourglass_top, size: 13, color: theme.colorScheme.primary),
+                  const SizedBox(width: 3),
+                  Flexible(
+                    child: Text(
+                      displayText,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                IconButton.filledTonal(
-                  icon: const Icon(Icons.edit_calendar, size: 20),
-                  tooltip: isThai ? 'เลือกรอบเดือนทำงาน' : 'Select Work Period',
-                  onPressed: () async {
-                    final parts = _accruedWorkPeriod.split('-');
-                    final curYear = parts.length == 2 ? int.tryParse(parts[0]) ?? DateTime.now().year : DateTime.now().year;
-                    final curMonth = parts.length == 2 ? int.tryParse(parts[1]) ?? DateTime.now().month : DateTime.now().month;
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: DateTime(curYear, curMonth),
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime.now().add(const Duration(days: 365)),
-                    );
-                    if (picked != null) {
-                      setState(() {
-                        _accruedWorkPeriod = '${picked.year}-${picked.month.toString().padLeft(2, '0')}';
-                      });
-                    }
-                  },
-                ),
-              ],
+                  Icon(Icons.arrow_drop_down, size: 14, color: theme.colorScheme.primary),
+                ],
+              ),
             ),
-          ],
+          ),
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () {
+              setState(() {
+                _isAccruedIncome = false;
+              });
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(2),
+              child: Icon(Icons.close, size: 15, color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ),
         ],
       ),
     );
@@ -933,61 +1136,61 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
 
     return Card(
       elevation: 0,
+      margin: EdgeInsets.zero,
       color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         side: BorderSide(color: theme.colorScheme.outlineVariant),
       ),
       child: ExpansionTile(
-        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+        tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+        dense: true,
+        visualDensity: VisualDensity.compact,
         leading: Icon(
           Icons.tune,
+          size: 18,
           color: (_isRecurring || _selectedProjectId != null)
               ? theme.colorScheme.primary
               : null,
         ),
         title: Text(
           isThai ? 'ตัวเลือกเพิ่มเติม (โครงการ, รายการประจำ)' : 'Additional Options (Project, Recurring)',
-          style: theme.textTheme.bodyMedium?.copyWith(
+          style: theme.textTheme.bodySmall?.copyWith(
             fontWeight: (_isRecurring || _selectedProjectId != null) ? FontWeight.bold : FontWeight.normal,
           ),
         ),
         subtitle: (_isRecurring || _selectedProjectId != null)
             ? Text(
                 '${_selectedProjectId != null ? (isThai ? "มีโครงการ " : "Project linked ") : ""}${_isRecurring ? (isThai ? "(รายการประจำ)" : "(Recurring)") : ""}',
-                style: TextStyle(fontSize: 12, color: theme.colorScheme.primary),
+                style: TextStyle(fontSize: 11, color: theme.colorScheme.primary),
               )
             : null,
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
         children: [
-
-          // 2. Project Selector Dropdown
-          FutureBuilder<List<Project>>(
-            future: ref.read(projectsDaoProvider).getActiveProjects(),
-            builder: (context, snapshot) {
-              final projects = snapshot.data ?? [];
-              return DropdownButtonFormField<String?>(
-                decoration: InputDecoration(
-                  labelText: isThai ? 'ผูกกับโครงการพิเศษ (Special Project)' : 'Special Project',
-                  prefixIcon: const Icon(Icons.folder_special_outlined),
-                  border: const OutlineInputBorder(),
-                  isDense: true,
-                ),
-                initialValue: _selectedProjectId,
-                items: [
-                  DropdownMenuItem(value: null, child: Text(isThai ? 'ไม่ระบุโครงการ' : 'No Project')),
-                  ...projects.map((p) => DropdownMenuItem(
-                        value: p.id,
-                        child: Text(p.name),
-                      )),
-                ],
-                onChanged: (val) => setState(() => _selectedProjectId = val),
-              );
-            },
+          // Project Selector Dropdown
+          DropdownButtonFormField<String?>(
+            isExpanded: true,
+            menuMaxHeight: 220,
+            decoration: InputDecoration(
+              labelText: isThai ? 'ผูกกับโครงการพิเศษ (Special Project)' : 'Special Project',
+              prefixIcon: const Icon(Icons.folder_special_outlined, size: 18),
+              border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+            ),
+            initialValue: _selectedProjectId,
+            items: [
+              DropdownMenuItem(value: null, child: Text(isThai ? 'ไม่ระบุโครงการ' : 'No Project', style: const TextStyle(fontSize: 13))),
+              ..._projects.map((p) => DropdownMenuItem(
+                    value: p.id,
+                    child: Text(p.name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
+                  )),
+            ],
+            onChanged: (val) => setState(() => _selectedProjectId = val),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
 
-          // 3. Recurring Options Box
+          // Recurring Options Box
           Container(
             decoration: BoxDecoration(
               color: theme.colorScheme.surface,
@@ -998,8 +1201,9 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
               children: [
                 CheckboxListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                  title: Text(isThai ? 'ตั้งเป็นรายการประจำ (Recurring)' : 'Recurring Transaction', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  subtitle: Text(isThai ? 'บันทึกซ้ำอัตโนมัติตามรอบที่กำหนด' : 'Repeat transaction on schedule', style: const TextStyle(fontSize: 12)),
+                  dense: true,
+                  title: Text(isThai ? 'ตั้งเป็นรายการประจำ (Recurring)' : 'Recurring Transaction', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  subtitle: Text(isThai ? 'บันทึกซ้ำอัตโนมัติตามรอบที่กำหนด' : 'Repeat transaction on schedule', style: const TextStyle(fontSize: 11)),
                   value: _isRecurring,
                   onChanged: (val) => setState(() => _isRecurring = val ?? false),
                 ),
@@ -1009,59 +1213,69 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
                     child: Column(
                       children: [
                         const Divider(height: 1),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 8),
                         DropdownButtonFormField<String>(
+                          isExpanded: true,
+                          menuMaxHeight: 200,
                           decoration: InputDecoration(
                             labelText: isThai ? 'ความถี่ (Frequency)' : 'Frequency',
-                            border: const OutlineInputBorder(),
+                            border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
                             isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                           ),
                           initialValue: _recurringFrequency,
                           items: [
-                            DropdownMenuItem(value: 'daily', child: Text(isThai ? 'ทุกวัน (Daily)' : 'Daily')),
-                            DropdownMenuItem(value: 'weekly', child: Text(isThai ? 'ทุกสัปดาห์ (Weekly)' : 'Weekly')),
-                            DropdownMenuItem(value: 'monthly', child: Text(isThai ? 'ทุกเดือน (Monthly)' : 'Monthly')),
+                            DropdownMenuItem(value: 'daily', child: Text(isThai ? 'ทุกวัน (Daily)' : 'Daily', style: const TextStyle(fontSize: 12))),
+                            DropdownMenuItem(value: 'weekly', child: Text(isThai ? 'ทุกสัปดาห์ (Weekly)' : 'Weekly', style: const TextStyle(fontSize: 12))),
+                            DropdownMenuItem(value: 'monthly', child: Text(isThai ? 'ทุกเดือน (Monthly)' : 'Monthly', style: const TextStyle(fontSize: 12))),
                           ],
                           onChanged: (val) => setState(() => _recurringFrequency = val ?? 'monthly'),
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 8),
                         if (_recurringFrequency == 'monthly')
                           DropdownButtonFormField<int>(
+                            isExpanded: true,
+                            menuMaxHeight: 200,
                             decoration: InputDecoration(
-                              labelText: isThai ? 'ทุกวันที่ของเดือน (Day of month)' : 'Day of Month',
-                              border: const OutlineInputBorder(),
+                              labelText: isThai ? 'ทุกวันที่ของเดือน' : 'Day of Month',
+                              border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
                               isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                             ),
                             initialValue: _recurringDayOfMonth,
                             items: List.generate(31, (i) => i + 1)
-                                .map((day) => DropdownMenuItem(value: day, child: Text(isThai ? 'วันที่ $day ของทุกเดือน' : 'Day $day of month')))
+                                .map((day) => DropdownMenuItem(value: day, child: Text(isThai ? 'วันที่ $day ของทุกเดือน' : 'Day $day of month', style: const TextStyle(fontSize: 12))))
                                 .toList(),
                             onChanged: (val) => setState(() => _recurringDayOfMonth = val ?? 1),
                           ),
                         if (_recurringFrequency == 'weekly')
                           DropdownButtonFormField<int>(
+                            isExpanded: true,
+                            menuMaxHeight: 200,
                             decoration: InputDecoration(
-                              labelText: isThai ? 'ทุกวันในสัปดาห์ (Day of week)' : 'Day of Week',
-                              border: const OutlineInputBorder(),
+                              labelText: isThai ? 'ทุกวันในสัปดาห์' : 'Day of Week',
+                              border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
                               isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                             ),
                             initialValue: _recurringDayOfWeek,
                             items: [
-                              DropdownMenuItem(value: 1, child: Text(isThai ? 'วันจันทร์' : 'Monday')),
-                              DropdownMenuItem(value: 2, child: Text(isThai ? 'วันอังคาร' : 'Tuesday')),
-                              DropdownMenuItem(value: 3, child: Text(isThai ? 'วันพุธ' : 'Wednesday')),
-                              DropdownMenuItem(value: 4, child: Text(isThai ? 'วันพฤหัสบดี' : 'Thursday')),
-                              DropdownMenuItem(value: 5, child: Text(isThai ? 'วันศุกร์' : 'Friday')),
-                              DropdownMenuItem(value: 6, child: Text(isThai ? 'วันเสาร์' : 'Saturday')),
-                              DropdownMenuItem(value: 7, child: Text(isThai ? 'วันอาทิตย์' : 'Sunday')),
+                              DropdownMenuItem(value: 1, child: Text(isThai ? 'วันจันทร์' : 'Monday', style: const TextStyle(fontSize: 12))),
+                              DropdownMenuItem(value: 2, child: Text(isThai ? 'วันอังคาร' : 'Tuesday', style: const TextStyle(fontSize: 12))),
+                              DropdownMenuItem(value: 3, child: Text(isThai ? 'วันพุธ' : 'Wednesday', style: const TextStyle(fontSize: 12))),
+                              DropdownMenuItem(value: 4, child: Text(isThai ? 'วันพฤหัสบดี' : 'Thursday', style: const TextStyle(fontSize: 12))),
+                              DropdownMenuItem(value: 5, child: Text(isThai ? 'วันศุกร์' : 'Friday', style: const TextStyle(fontSize: 12))),
+                              DropdownMenuItem(value: 6, child: Text(isThai ? 'วันเสาร์' : 'Saturday', style: const TextStyle(fontSize: 12))),
+                              DropdownMenuItem(value: 7, child: Text(isThai ? 'วันอาทิตย์' : 'Sunday', style: const TextStyle(fontSize: 12))),
                             ],
                             onChanged: (val) => setState(() => _recurringDayOfWeek = val ?? 1),
                           ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
                         SwitchListTile(
                           contentPadding: EdgeInsets.zero,
-                          title: Text(isThai ? 'บันทึกรายการอัตโนมัติ (Auto-post)' : 'Auto-post Transaction', style: const TextStyle(fontSize: 13)),
-                          subtitle: Text(isThai ? 'บันทึกเข้าบัญชีทันทีเมื่อถึงกำหนด' : 'Post automatically on due date', style: const TextStyle(fontSize: 11)),
+                          dense: true,
+                          title: Text(isThai ? 'บันทึกรายการอัตโนมัติ (Auto-post)' : 'Auto-post Transaction', style: const TextStyle(fontSize: 12)),
+                          subtitle: Text(isThai ? 'บันทึกเข้าบัญชีทันทีเมื่อถึงกำหนด' : 'Post automatically on due date', style: const TextStyle(fontSize: 10.5)),
                           value: _recurringAutoPost,
                           onChanged: (val) => setState(() => _recurringAutoPost = val),
                         ),
@@ -1074,68 +1288,6 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildAccountSelector() {
-    final isThai = Localizations.localeOf(context).languageCode == 'th';
-
-    return FutureBuilder<List<Account>>(
-      future: ref.read(accountsDaoProvider).getActiveAccounts(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const SizedBox.shrink();
-        }
-
-        final accounts = snapshot.data!;
-        if (_transactionType == 'transfer') {
-          final destAccounts = accounts.where((a) => a.id != _selectedAccountId).toList();
-          final effectiveDestId = destAccounts.any((a) => a.id == _selectedDestinationAccountId)
-              ? _selectedDestinationAccountId
-              : (destAccounts.isNotEmpty ? destAccounts.first.id : null);
-
-          return Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  decoration: InputDecoration(labelText: isThai ? 'จากบัญชี' : 'From Account', border: const OutlineInputBorder()),
-                  initialValue: _selectedAccountId,
-                  items: accounts.map((a) => DropdownMenuItem(value: a.id, child: Text('${a.name} (${a.currencyCode})'))).toList(),
-                  onChanged: (val) {
-                    setState(() {
-                      _selectedAccountId = val;
-                      if (_selectedDestinationAccountId == val) {
-                        final remaining = accounts.where((a) => a.id != val).toList();
-                        _selectedDestinationAccountId = remaining.isNotEmpty ? remaining.first.id : null;
-                      }
-                    });
-                  },
-                ),
-              ),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8),
-                child: Icon(Icons.arrow_forward),
-              ),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  key: ValueKey('dest_$effectiveDestId'),
-                  decoration: InputDecoration(labelText: isThai ? 'ไปยังบัญชี' : 'To Account', border: const OutlineInputBorder()),
-                  initialValue: effectiveDestId,
-                  items: destAccounts.map((a) => DropdownMenuItem(value: a.id, child: Text('${a.name} (${a.currencyCode})'))).toList(),
-                  onChanged: (val) => setState(() => _selectedDestinationAccountId = val),
-                ),
-              ),
-            ],
-          );
-        } else {
-          return DropdownButtonFormField<String>(
-            decoration: InputDecoration(labelText: isThai ? 'เลือกบัญชี' : 'Select Account', border: const OutlineInputBorder()),
-            initialValue: _selectedAccountId,
-            items: accounts.map((a) => DropdownMenuItem(value: a.id, child: Text('${a.name} (${a.currencyCode})'))).toList(),
-            onChanged: (val) => setState(() => _selectedAccountId = val),
-          );
-        }
-      },
     );
   }
 
@@ -1497,19 +1649,20 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
     return Column(
       children: keys.map((row) {
         return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(vertical: 2),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: row.map((key) {
               return SizedBox(
-                width: 90,
-                height: 48,
+                width: 96,
+                height: 38,
                 child: OutlinedButton(
                   style: OutlinedButton.styleFrom(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   onPressed: () => _onKeypadTap(key),
-                  child: Text(key, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  child: Text(key, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 ),
               );
             }).toList(),

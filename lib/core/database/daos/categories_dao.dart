@@ -24,6 +24,35 @@ class CategoriesDao extends DatabaseAccessor<AppDatabase> with _$CategoriesDaoMi
     return query.get();
   }
 
+  Future<List<Category>> getActiveCategoriesOrderedByUsage([String? type]) async {
+    final activeCats = await getActiveCategories(type);
+    if (activeCats.isEmpty) return [];
+
+    final rows = await db.customSelect(
+      'SELECT category_id, COUNT(*) as usage_count FROM transactions WHERE deleted_at IS NULL AND category_id IS NOT NULL GROUP BY category_id',
+      readsFrom: {db.transactions},
+    ).get();
+
+    final usageMap = <String, int>{};
+    for (final row in rows) {
+      final catId = row.read<String>('category_id');
+      final count = row.read<int>('usage_count');
+      usageMap[catId] = count;
+    }
+
+    final sorted = List<Category>.from(activeCats);
+    sorted.sort((a, b) {
+      final countA = usageMap[a.id] ?? 0;
+      final countB = usageMap[b.id] ?? 0;
+      if (countB != countA) {
+        return countB.compareTo(countA); // Most used first
+      }
+      return a.nameTh.compareTo(b.nameTh);
+    });
+
+    return sorted;
+  }
+
   Future<List<Category>> getRootCategories([String? type]) {
     final query = select(categories)
       ..where((c) => c.isActive.equals(true) & c.deletedAt.isNull() & c.parentId.isNull());

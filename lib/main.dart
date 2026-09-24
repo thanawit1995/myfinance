@@ -9,6 +9,7 @@ import 'core/database/platform_workaround/sqlite_workaround.dart';
 import 'core/theme/app_theme_style.dart';
 import 'core/theme/lumi_theme.dart';
 import 'core/theme/vault_theme.dart';
+import 'core/services/web_theme_helper/web_theme_helper.dart';
 import 'core/widgets/main_shell.dart';
 import 'l10n/app_localizations.dart';
 
@@ -145,6 +146,14 @@ class _MyFinanceAppState extends State<MyFinanceApp> {
         currentThemeStyle: _themeStyle,
         onThemeStyleChanged: _setThemeStyle,
       ),
+      builder: (context, child) {
+        final theme = Theme.of(context);
+        updateSystemThemeColor(
+          theme.scaffoldBackgroundColor,
+          isDark: theme.brightness == Brightness.dark,
+        );
+        return child ?? const SizedBox.shrink();
+      },
     );
   }
 }

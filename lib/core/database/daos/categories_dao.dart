@@ -24,7 +24,47 @@ class CategoriesDao extends DatabaseAccessor<AppDatabase> with _$CategoriesDaoMi
     return query.get();
   }
 
+  Future<void> ensureEssentialTaxCategories() async {
+    final now = DateTime.now();
+    final essential = [
+      CategoriesCompanion.insert(
+        id: 'cat-exp-0000-4000-8000-000000000014',
+        nameTh: 'เงินสะสม กบข.',
+        nameEn: 'GPF Pension Fund',
+        categoryType: 'expense',
+        icon: const Value('account_balance'),
+        color: const Value('0xFF4CAF50'),
+        isSystem: const Value(true),
+        createdAt: now,
+        updatedAt: now,
+      ),
+      CategoriesCompanion.insert(
+        id: 'cat-exp-0000-4000-8000-000000000015',
+        nameTh: 'เบี้ยประกันชีวิตและออมทรัพย์',
+        nameEn: 'Life & Savings Insurance',
+        categoryType: 'expense',
+        icon: const Value('health_and_safety'),
+        color: const Value('0xFF009688'),
+        isSystem: const Value(true),
+        createdAt: now,
+        updatedAt: now,
+      ),
+    ];
+
+    for (final cat in essential) {
+      final existing = await (select(categories)
+            ..where((c) => (c.nameTh.equals(cat.nameTh.value) | c.nameEn.equals(cat.nameEn.value)) & c.deletedAt.isNull()))
+          .getSingleOrNull();
+      if (existing == null) {
+        await into(categories).insert(cat, mode: InsertMode.insertOrIgnore);
+      }
+    }
+  }
+
   Future<List<Category>> getActiveCategoriesOrderedByUsage([String? type]) async {
+    if (type == null || type == 'expense') {
+      await ensureEssentialTaxCategories();
+    }
     final activeCats = await getActiveCategories(type);
     if (activeCats.isEmpty) return [];
 

@@ -303,6 +303,29 @@ class SeedData {
         updatedAt: now,
       ),
 
+      CategoriesCompanion.insert(
+        id: 'cat-exp-0000-4000-8000-000000000014',
+        nameTh: 'เงินสะสม กบข.',
+        nameEn: 'GPF Pension Fund',
+        categoryType: 'expense',
+        icon: const Value('account_balance'),
+        color: const Value('0xFF4CAF50'),
+        isSystem: const Value(true),
+        createdAt: now,
+        updatedAt: now,
+      ),
+      CategoriesCompanion.insert(
+        id: 'cat-exp-0000-4000-8000-000000000015',
+        nameTh: 'เบี้ยประกันชีวิตและออมทรัพย์',
+        nameEn: 'Life & Savings Insurance',
+        categoryType: 'expense',
+        icon: const Value('health_and_safety'),
+        color: const Value('0xFF009688'),
+        isSystem: const Value(true),
+        createdAt: now,
+        updatedAt: now,
+      ),
+
       // Transfer
       CategoriesCompanion.insert(
         id: 'cat-trf-0000-4000-8000-000000000001',

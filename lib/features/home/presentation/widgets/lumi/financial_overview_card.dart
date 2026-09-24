@@ -26,17 +26,21 @@ class FinancialOverviewCard extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final isNetWorthPositive = netWorthSatang >= 0;
     final isMoMPositive = momChangePercent >= 0;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? VaultTheme.surface(context) : Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFF3DCE5), width: 1.0),
-        boxShadow: const [
+        border: Border.all(
+          color: isDark ? VaultTheme.border(context) : const Color(0xFFF3DCE5),
+          width: 1.0,
+        ),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x0CFF5B9A),
+            color: isDark ? Colors.black.withValues(alpha: 0.25) : const Color(0x0CFF5B9A),
             blurRadius: 14,
-            offset: Offset(0, 3),
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -54,11 +58,11 @@ class FinancialOverviewCard extends StatelessWidget {
                   const SizedBox(width: 6),
                   Text(
                     l10n?.financialOverview ?? 'ภาพรวมสถานะการเงิน',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: VaultTheme.fontFamily,
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF332B32),
+                      color: isDark ? VaultTheme.primaryText(context) : const Color(0xFF332B32),
                     ),
                   ),
                 ],
@@ -105,7 +109,9 @@ class FinancialOverviewCard extends StatelessWidget {
                 style: VaultTheme.tabular(
                   fontSize: 28,
                   fontWeight: FontWeight.w800,
-                  color: isNetWorthPositive ? const Color(0xFF332B32) : const Color(0xFFE64A63),
+                  color: isNetWorthPositive
+                      ? (isDark ? VaultTheme.primaryText(context) : const Color(0xFF332B32))
+                      : const Color(0xFFE64A63),
                 ),
               ),
               const SizedBox(width: 10),
@@ -113,8 +119,8 @@ class FinancialOverviewCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: isMoMPositive
-                      ? const Color(0xFFE8F5EE)
-                      : const Color(0xFFFFECF0),
+                      ? (isDark ? const Color(0xFF1E3A2B) : const Color(0xFFE8F5EE))
+                      : (isDark ? const Color(0xFF3F1D24) : const Color(0xFFFFECF0)),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
@@ -122,7 +128,7 @@ class FinancialOverviewCard extends StatelessWidget {
                   children: [
                     Icon(
                       isMoMPositive ? Icons.arrow_drop_up_rounded : Icons.arrow_drop_down_rounded,
-                      color: isMoMPositive ? const Color(0xFF2E8B57) : const Color(0xFFE64A63),
+                      color: isMoMPositive ? const Color(0xFF4CAF50) : const Color(0xFFFF6B81),
                       size: 16,
                     ),
                     Text(
@@ -130,7 +136,7 @@ class FinancialOverviewCard extends StatelessWidget {
                       style: VaultTheme.tabular(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w700,
-                        color: isMoMPositive ? const Color(0xFF2E8B57) : const Color(0xFFE64A63),
+                        color: isMoMPositive ? const Color(0xFF4CAF50) : const Color(0xFFFF6B81),
                       ),
                     ),
                   ],
@@ -142,10 +148,10 @@ class FinancialOverviewCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             l10n?.netWorthDesc ?? 'ความมั่งคั่งสุทธิ (สินทรัพย์ - หนี้สิน)',
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: VaultTheme.fontFamily,
               fontSize: 12,
-              color: Color(0xFF87767F),
+              color: isDark ? const Color(0xFFA594A1) : const Color(0xFF87767F),
             ),
           ),
 
@@ -156,28 +162,33 @@ class FinancialOverviewCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _buildMiniMetric(
+                  context: context,
                   label: l10n?.monthIncome ?? 'รายรับเดือนนี้',
                   amountSatang: totalIncomeSatang,
-                  color: const Color(0xFF2E8B57),
-                  bgColor: const Color(0xFFF0FAF2),
+                  color: isDark ? const Color(0xFF81C784) : const Color(0xFF2E8B57),
+                  bgColor: isDark ? const Color(0xFF1B2E23) : const Color(0xFFF0FAF2),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: _buildMiniMetric(
+                  context: context,
                   label: l10n?.monthExpense ?? 'รายจ่ายเดือนนี้',
                   amountSatang: totalExpenseSatang,
-                  color: const Color(0xFFE64A63),
-                  bgColor: const Color(0xFFFFF0F5),
+                  color: isDark ? const Color(0xFFFF8A9E) : const Color(0xFFE64A63),
+                  bgColor: isDark ? const Color(0xFF381924) : const Color(0xFFFFF0F5),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: _buildMiniMetric(
+                  context: context,
                   label: l10n?.cashFlow ?? 'กระแสเงินสด',
                   amountSatang: cashFlowMonthSatang,
-                  color: cashFlowMonthSatang >= 0 ? const Color(0xFF2E8B57) : const Color(0xFFE64A63),
-                  bgColor: const Color(0xFFFFF9F5),
+                  color: cashFlowMonthSatang >= 0
+                      ? (isDark ? const Color(0xFF81C784) : const Color(0xFF2E8B57))
+                      : (isDark ? const Color(0xFFFF8A9E) : const Color(0xFFE64A63)),
+                  bgColor: isDark ? const Color(0xFF2B202D) : const Color(0xFFFFF9F5),
                 ),
               ),
             ],
@@ -188,11 +199,13 @@ class FinancialOverviewCard extends StatelessWidget {
   }
 
   Widget _buildMiniMetric({
+    required BuildContext context,
     required String label,
     required int amountSatang,
     required Color color,
     required Color bgColor,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
@@ -205,11 +218,11 @@ class FinancialOverviewCard extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: VaultTheme.fontFamily,
               fontSize: 10.5,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF87767F),
+              color: isDark ? const Color(0xFFA594A1) : const Color(0xFF87767F),
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

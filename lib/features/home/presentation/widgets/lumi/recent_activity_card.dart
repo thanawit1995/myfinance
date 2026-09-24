@@ -20,17 +20,21 @@ class RecentActivityCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? VaultTheme.surface(context) : Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFF3DCE5), width: 1.0),
-        boxShadow: const [
+        border: Border.all(
+          color: isDark ? VaultTheme.border(context) : const Color(0xFFF3DCE5),
+          width: 1.0,
+        ),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x0CFF5B9A),
+            color: isDark ? Colors.black.withValues(alpha: 0.25) : const Color(0x0CFF5B9A),
             blurRadius: 14,
-            offset: Offset(0, 3),
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -48,11 +52,11 @@ class RecentActivityCard extends StatelessWidget {
                   const SizedBox(width: 6),
                   Text(
                     l10n?.recentActivity ?? 'บันทึกรายการล่าสุด',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: VaultTheme.fontFamily,
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF332B32),
+                      color: isDark ? VaultTheme.primaryText(context) : const Color(0xFF332B32),
                     ),
                   ),
                 ],
@@ -97,7 +101,9 @@ class RecentActivityCard extends StatelessWidget {
               physics: const NeverScrollableScrollPhysics(),
               itemCount: transactions.length,
               separatorBuilder: (_, _) => Divider(
-                color: const Color(0xFFF3DCE5).withValues(alpha: 0.6),
+                color: isDark
+                    ? VaultTheme.border(context).withValues(alpha: 0.5)
+                    : const Color(0xFFF3DCE5).withValues(alpha: 0.6),
                 height: 16,
                 thickness: 0.75,
               ),
@@ -116,10 +122,13 @@ class RecentActivityCard extends StatelessWidget {
     final locale = Localizations.localeOf(context).languageCode;
     final isIncome = tx.transactionType == 'income';
     final isTransfer = tx.transactionType == 'transfer';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final Color amountColor = isIncome
-        ? const Color(0xFF2E8B57)
-        : (isTransfer ? const Color(0xFF1976D2) : const Color(0xFF332B32));
+        ? (isDark ? const Color(0xFF81C784) : const Color(0xFF2E8B57))
+        : (isTransfer
+            ? (isDark ? const Color(0xFF64B5F6) : const Color(0xFF1976D2))
+            : (isDark ? VaultTheme.primaryText(context) : const Color(0xFF332B32)));
 
     final String sign = isIncome ? '+' : (isTransfer ? '' : '−');
 
@@ -133,12 +142,16 @@ class RecentActivityCard extends StatelessWidget {
             : (isIncome ? (l10n?.income ?? 'รายรับ') : (l10n?.expense ?? 'รายจ่าย')));
 
     final iconColor = isIncome
-        ? const Color(0xFF2E8B57)
-        : (isTransfer ? const Color(0xFF1976D2) : const Color(0xFFFF5B9A));
+        ? (isDark ? const Color(0xFF81C784) : const Color(0xFF2E8B57))
+        : (isTransfer
+            ? (isDark ? const Color(0xFF64B5F6) : const Color(0xFF1976D2))
+            : const Color(0xFFFF5B9A));
 
     final iconBgColor = isIncome
-        ? const Color(0xFFF0FAF2)
-        : (isTransfer ? const Color(0xFFEEF8FF) : const Color(0xFFFFF0F5));
+        ? (isDark ? const Color(0xFF1A3324) : const Color(0xFFF0FAF2))
+        : (isTransfer
+            ? (isDark ? const Color(0xFF192A3D) : const Color(0xFFEEF8FF))
+            : (isDark ? const Color(0xFF391A29) : const Color(0xFFFFF0F5)));
 
     final iconData = isIncome
         ? Icons.arrow_downward_rounded
@@ -167,11 +180,11 @@ class RecentActivityCard extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: VaultTheme.fontFamily,
                     fontSize: 13.5,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF332B32),
+                    color: isDark ? VaultTheme.primaryText(context) : const Color(0xFF332B32),
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -179,10 +192,10 @@ class RecentActivityCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   dateStr,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: VaultTheme.fontFamily,
                     fontSize: 11.5,
-                    color: Color(0xFF87767F),
+                    color: isDark ? const Color(0xFFA594A1) : const Color(0xFF87767F),
                   ),
                 ),
               ],
@@ -205,6 +218,7 @@ class RecentActivityCard extends StatelessWidget {
 
   Widget _buildEmptyState(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
@@ -214,8 +228,8 @@ class RecentActivityCard extends StatelessWidget {
           Container(
             width: 56,
             height: 56,
-            decoration: const BoxDecoration(
-              color: Color(0xFFFFF0F5),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF391A29) : const Color(0xFFFFF0F5),
               shape: BoxShape.circle,
             ),
             child: const Icon(
@@ -227,21 +241,21 @@ class RecentActivityCard extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             l10n?.noTransactionsThisMonth ?? 'ยังไม่มีรายการในเดือนนี้',
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: VaultTheme.fontFamily,
               fontSize: 14,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF332B32),
+              color: isDark ? VaultTheme.primaryText(context) : const Color(0xFF332B32),
             ),
           ),
           const SizedBox(height: 4),
           Text(
             l10n?.noTransactionsDesc ?? 'เริ่มจดบันทึกรายรับหรือรายจ่ายรายการแรกเพื่อติดตามการเงินของคุณ',
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: VaultTheme.fontFamily,
               fontSize: 12,
-              color: Color(0xFF87767F),
+              color: isDark ? const Color(0xFFA594A1) : const Color(0xFF87767F),
             ),
           ),
           const SizedBox(height: 14),

@@ -37,6 +37,7 @@ class BudgetHeroCard extends StatelessWidget {
         : 0.0;
 
     final isThai = Localizations.localeOf(context).languageCode == 'th';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Semantics(
       button: true,
@@ -46,8 +47,10 @@ class BudgetHeroCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(28),
         child: Container(
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFFFFF7F2), Color(0xFFFFECEF)],
+            gradient: LinearGradient(
+              colors: isDark
+                  ? const [Color(0xFF261925), Color(0xFF1E1424)]
+                  : const [Color(0xFFFFF7F2), Color(0xFFFFECEF)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -55,14 +58,14 @@ class BudgetHeroCard extends StatelessWidget {
             border: Border.all(
               color: isWarning
                   ? const Color(0xFFFF6E82).withValues(alpha: 0.5)
-                  : const Color(0xFFFFDDE5),
+                  : (isDark ? const Color(0xFF4A3448) : const Color(0xFFFFDDE5)),
               width: 1.2,
             ),
-            boxShadow: const [
+            boxShadow: [
               BoxShadow(
-                color: Color(0x14FF5B9A),
+                color: isDark ? Colors.black.withValues(alpha: 0.3) : const Color(0x14FF5B9A),
                 blurRadius: 18,
-                offset: Offset(0, 4),
+                offset: const Offset(0, 4),
               ),
             ],
           ),
@@ -82,9 +85,13 @@ class BudgetHeroCard extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.85),
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.08)
+                                : Colors.white.withValues(alpha: 0.85),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: const Color(0xFFF3DCE5)),
+                            border: Border.all(
+                              color: isDark ? const Color(0xFF4A3448) : const Color(0xFFF3DCE5),
+                            ),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -93,11 +100,11 @@ class BudgetHeroCard extends StatelessWidget {
                               const SizedBox(width: 4),
                               Text(
                                 l10n?.availableToSpendLumi ?? 'เงินที่ใช้ได้ในเดือนนี้ 🌸',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontFamily: VaultTheme.fontFamily,
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xFF87767F),
+                                  color: isDark ? const Color(0xFFD3C5D0) : const Color(0xFF87767F),
                                 ),
                               ),
                             ],
@@ -121,6 +128,7 @@ class BudgetHeroCard extends StatelessWidget {
                           Row(
                             children: [
                               _buildSubMetric(
+                                context: context,
                                 label: l10n?.usedSoFar ?? 'ใช้ไปแล้ว',
                                 value: Money(totalExpenseSatang).format(symbol: '฿'),
                                 color: const Color(0xFFFF5B9A),
@@ -157,7 +165,9 @@ class BudgetHeroCard extends StatelessWidget {
                               style: VaultTheme.tabular(
                                 fontSize: 30,
                                 fontWeight: FontWeight.w900,
-                                color: isWarning ? const Color(0xFFE64A63) : const Color(0xFF332B32),
+                                color: isWarning
+                                    ? const Color(0xFFE64A63)
+                                    : (isDark ? Colors.white : const Color(0xFF332B32)),
                                 letterSpacing: -0.5,
                               ),
                             ),
@@ -171,14 +181,16 @@ class BudgetHeroCard extends StatelessWidget {
                             runSpacing: 4,
                             children: [
                               _buildSubMetric(
+                                context: context,
                                 label: l10n?.usedSoFar ?? 'ใช้ไปแล้ว',
                                 value: Money(totalExpenseSatang).format(symbol: '฿'),
                                 color: const Color(0xFFFF5B9A),
                               ),
                               _buildSubMetric(
+                                context: context,
                                 label: l10n?.fromTotalBudget ?? 'จากงบรวม',
                                 value: Money(totalBudgetSatang).format(symbol: '฿'),
-                                color: const Color(0xFF87767F),
+                                color: isDark ? const Color(0xFFA594A1) : const Color(0xFF87767F),
                               ),
                             ],
                           ),
@@ -241,7 +253,7 @@ class BudgetHeroCard extends StatelessWidget {
                           Container(
                             height: 9,
                             width: double.infinity,
-                            color: Colors.white.withValues(alpha: 0.9),
+                            color: isDark ? Colors.white.withValues(alpha: 0.12) : Colors.white.withValues(alpha: 0.9),
                           ),
                           FractionallySizedBox(
                             widthFactor: progressRatio,
@@ -273,21 +285,23 @@ class BudgetHeroCard extends StatelessWidget {
   }
 
   Widget _buildSubMetric({
+    required BuildContext context,
     required String label,
     required String value,
     required Color color,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: VaultTheme.fontFamily,
             fontSize: 11,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF87767F),
+            color: isDark ? const Color(0xFFA594A1) : const Color(0xFF87767F),
           ),
         ),
         const SizedBox(height: 2),

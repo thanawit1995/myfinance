@@ -166,29 +166,31 @@ class _MainShellState extends ConsumerState<MainShell> {
             children: [
               NavigationRail(
                 minWidth: isLumi ? 92 : 76,
-                backgroundColor: isLumi ? const Color(0xFFFFF9F5) : VaultTheme.surface(context),
+                backgroundColor: isLumi ? (isDark ? VaultTheme.surface(context) : const Color(0xFFFFF9F5)) : VaultTheme.surface(context),
                 selectedIndex: _currentIndex,
                 onDestinationSelected: _onTabSelected,
                 labelType: NavigationRailLabelType.all,
-                indicatorColor: isLumi ? const Color(0xFFFFE5F2) : accentCol.withValues(alpha: 0.15),
+                indicatorColor: isLumi
+                    ? (isDark ? const Color(0xFFFF75A9).withValues(alpha: 0.25) : const Color(0xFFFFE5F2))
+                    : accentCol.withValues(alpha: 0.15),
                 indicatorShape: isLumi
                     ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))
                     : null,
                 selectedIconTheme: IconThemeData(
-                  color: isLumi ? const Color(0xFFFF5B9A) : accentCol,
+                  color: isLumi ? (isDark ? const Color(0xFFFF75A9) : const Color(0xFFFF5B9A)) : accentCol,
                 ),
                 unselectedIconTheme: IconThemeData(
-                  color: isLumi ? const Color(0xFF87767F) : VaultTheme.secondaryText(context),
+                  color: isLumi ? (isDark ? const Color(0xFFBDB2C4) : const Color(0xFF87767F)) : VaultTheme.secondaryText(context),
                 ),
                 selectedLabelTextStyle: TextStyle(
                   fontFamily: VaultTheme.fontFamily,
-                  color: isLumi ? const Color(0xFFFF5B9A) : accentCol,
+                  color: isLumi ? (isDark ? const Color(0xFFFF75A9) : const Color(0xFFFF5B9A)) : accentCol,
                   fontWeight: FontWeight.w700,
                   fontSize: 12,
                 ),
                 unselectedLabelTextStyle: TextStyle(
                   fontFamily: VaultTheme.fontFamily,
-                  color: isLumi ? const Color(0xFF87767F) : VaultTheme.secondaryText(context),
+                  color: isLumi ? (isDark ? const Color(0xFFBDB2C4) : const Color(0xFF87767F)) : VaultTheme.secondaryText(context),
                   fontSize: 12,
                 ),
                 leading: Padding(

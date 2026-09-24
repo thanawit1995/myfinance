@@ -120,7 +120,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
 
     final satang = (amountDouble * 100).round();
     final feeDouble = double.tryParse(_feeController.text.trim()) ?? 0.0;
-    final feeSatang = (feeDouble * 100).round();
+    final feeSatang = _transactionType == 'transfer' ? (feeDouble * 100).round() : 0;
 
     final sourceAccount = _selectedAccountId != null
         ? await ref.read(accountsDaoProvider).getAccountById(_selectedAccountId!)
@@ -507,42 +507,19 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                     onChanged: (val) => setState(() => _selectedTaxCategory = val),
                   ),
                   const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _whtController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                          ],
-                          decoration: const InputDecoration(
-                            isDense: true,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            labelText: 'ภาษีหัก ณ ที่จ่าย',
-                            prefixText: '฿ ',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _feeController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                          ],
-                          decoration: const InputDecoration(
-                            isDense: true,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            labelText: 'ค่าธรรมเนียม (Fee)',
-                            prefixText: '฿ ',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                      ),
+                  TextFormField(
+                    controller: _whtController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                     ],
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      labelText: 'ภาษีหัก ณ ที่จ่าย (WHT)',
+                      prefixText: '฿ ',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   TextFormField(
@@ -555,8 +532,20 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                       border: OutlineInputBorder(),
                     ),
                   ),
+                ] else if (_transactionType == 'expense') ...[
+                  // Expense: Tag only (Fee removed)
+                  TextFormField(
+                    controller: _tagController,
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      labelText: 'ป้ายกำกับ (Tag)',
+                      hintText: 'เช่น เที่ยวญี่ปุ่น, เบิกได้',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
                 ] else ...[
-                  // Expense / Transfer: Tag & Fee in a compact row
+                  // Transfer: Tag & Fee in a compact row
                   Row(
                     children: [
                       Expanded(

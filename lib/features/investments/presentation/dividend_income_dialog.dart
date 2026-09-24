@@ -129,8 +129,12 @@ class _DividendIncomeDialogState extends ConsumerState<DividendIncomeDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+
     return AlertDialog(
-      title: const Text('บันทึกรายได้จากการลงทุน'),
+      title: Text(isThai ? 'บันทึกเงินปันผล' : 'Record Dividend'),
       content: SizedBox(
         width: 480,
         child: SingleChildScrollView(
@@ -286,53 +290,73 @@ class _DividendIncomeDialogState extends ConsumerState<DividendIncomeDialog> {
 
                 // 7. Thai Dividend Tax Credit (Hidden if foreign income!)
                 if (!_isForeignIncome && _incomeType == 'dividend') ...[
-                  Card(
-                    color: Colors.blue.shade50,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('เครดิตภาษีเงินปันผล (มาตรา 47 ทวิ)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                flex: 1,
-                                child: DropdownButtonFormField<double>(
-                                  decoration: const InputDecoration(labelText: 'อัตราภาษีนิติบุคคล', border: OutlineInputBorder()),
-                                  initialValue: _corporateTaxRate,
-                                  items: const [
-                                    DropdownMenuItem(value: 0.20, child: Text('20% (เครดิต 25%)')),
-                                    DropdownMenuItem(value: 0.25, child: Text('25% (เครดิต 33%)')),
-                                    DropdownMenuItem(value: 0.30, child: Text('30% (เครดิต 42%)')),
-                                    DropdownMenuItem(value: 0.0, child: Text('0% (ไม่ได้รับเครดิต)')),
-                                  ],
-                                  onChanged: (val) {
-                                    if (val != null) {
-                                      _corporateTaxRate = val;
-                                      _onGrossChanged();
-                                    }
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                flex: 1,
-                                child: TextFormField(
-                                  controller: _taxCreditController,
-                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
-                                  decoration: const InputDecoration(
-                                    labelText: 'ยอดเครดิตภาษี (บาท)',
-                                    border: OutlineInputBorder(),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                  Container(
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6)
+                          : Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isDark
+                            ? theme.colorScheme.outline.withValues(alpha: 0.3)
+                            : Colors.blue.shade200,
                       ),
+                    ),
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isThai ? 'เครดิตภาษีเงินปันผล (มาตรา 47 ทวิ)' : 'Dividend Tax Credit (Section 47 bis)',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: isDark ? theme.colorScheme.primary : Colors.blue.shade900,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 1,
+                              child: DropdownButtonFormField<double>(
+                                decoration: const InputDecoration(
+                                  isDense: true,
+                                  labelText: 'อัตราภาษีนิติบุคคล',
+                                  border: OutlineInputBorder(),
+                                ),
+                                initialValue: _corporateTaxRate,
+                                items: const [
+                                  DropdownMenuItem(value: 0.20, child: Text('20% (เครดิต 25%)')),
+                                  DropdownMenuItem(value: 0.25, child: Text('25% (เครดิต 33%)')),
+                                  DropdownMenuItem(value: 0.30, child: Text('30% (เครดิต 42%)')),
+                                  DropdownMenuItem(value: 0.0, child: Text('0% (ไม่ได้รับเครดิต)')),
+                                ],
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    _corporateTaxRate = val;
+                                    _onGrossChanged();
+                                  }
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              flex: 1,
+                              child: TextFormField(
+                                controller: _taxCreditController,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+                                decoration: const InputDecoration(
+                                  isDense: true,
+                                  labelText: 'ยอดเครดิตภาษี (บาท)',
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -352,16 +376,33 @@ class _DividendIncomeDialogState extends ConsumerState<DividendIncomeDialog> {
                     return Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.green.shade50,
+                        color: isDark
+                            ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.8)
+                            : Colors.green.shade50,
                         borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isDark
+                              ? Colors.greenAccent.withValues(alpha: 0.3)
+                              : Colors.green.shade200,
+                        ),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('ยอดเงินสุทธิเข้าบัญชี (THB):', style: TextStyle(fontWeight: FontWeight.bold)),
+                          Text(
+                            isThai ? 'ยอดเงินสุทธิเข้าบัญชี (THB):' : 'Net Received (THB):',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? theme.colorScheme.onSurface : Colors.black87,
+                            ),
+                          ),
                           Text(
                             moneyPreview.format(symbol: '฿'),
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green.shade800),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: isDark ? Colors.greenAccent : Colors.green.shade800,
+                            ),
                           ),
                         ],
                       ),
@@ -386,7 +427,7 @@ class _DividendIncomeDialogState extends ConsumerState<DividendIncomeDialog> {
       ),
       actions: [
         TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('ยกเลิก')),
-        FilledButton(onPressed: _submit, child: const Text('บันทึกรายได้')),
+        FilledButton(onPressed: _submit, child: Text(isThai ? 'บันทึกเงินปันผล' : 'Record Dividend')),
       ],
     );
   }

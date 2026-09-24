@@ -16,6 +16,15 @@ class LumiTipCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isThai = Localizations.localeOf(context).languageCode == 'th';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final Color bgColor = isDark
+        ? (isWarning ? const Color(0xFF2E171C) : const Color(0xFF281F14))
+        : (isWarning ? const Color(0xFFFFF0F2) : const Color(0xFFFFF4E3));
+
+    final Color borderColor = isDark
+        ? (isWarning ? const Color(0xFF4F242C) : const Color(0xFF45341E))
+        : (isWarning ? const Color(0xFFFFCCD4) : const Color(0xFFFFE0B8));
 
     return Material(
       color: Colors.transparent,
@@ -24,17 +33,17 @@ class LumiTipCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         child: Container(
           decoration: BoxDecoration(
-            color: isWarning ? const Color(0xFFFFF0F2) : const Color(0xFFFFF4E3),
+            color: bgColor,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isWarning ? const Color(0xFFFFCCD4) : const Color(0xFFFFE0B8),
+              color: borderColor,
               width: 1.0,
             ),
             boxShadow: [
               BoxShadow(
-                color: isWarning
-                    ? const Color(0x0DE64A63)
-                    : const Color(0x0DFF9800),
+                color: isDark
+                    ? Colors.black.withValues(alpha: 0.25)
+                    : (isWarning ? const Color(0x0DE64A63) : const Color(0x0DFF9800)),
                 blurRadius: 10,
                 offset: const Offset(0, 2),
               ),
@@ -49,10 +58,12 @@ class LumiTipCard extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: isDark ? const Color(0xFF231B2B) : Colors.white,
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: isWarning ? const Color(0xFFFFCCD4) : const Color(0xFFFFDDB0),
+                    color: isDark
+                        ? (isWarning ? const Color(0xFF5A2B35) : const Color(0xFF553F24))
+                        : (isWarning ? const Color(0xFFFFCCD4) : const Color(0xFFFFDDB0)),
                     width: 1.5,
                   ),
                 ),
@@ -88,8 +99,8 @@ class LumiTipCard extends StatelessWidget {
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                             color: isWarning
-                                ? const Color(0xFFD32F2F)
-                                : const Color(0xFFD97706),
+                                ? (isDark ? const Color(0xFFFF7A88) : const Color(0xFFD32F2F))
+                                : (isDark ? const Color(0xFFFFB74D) : const Color(0xFFD97706)),
                           ),
                         ),
                       ],
@@ -97,12 +108,12 @@ class LumiTipCard extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       message,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: VaultTheme.fontFamily,
                         fontSize: 13.5,
                         fontWeight: FontWeight.w500,
                         height: 1.35,
-                        color: Color(0xFF332B32),
+                        color: isDark ? VaultTheme.primaryText(context) : const Color(0xFF332B32),
                       ),
                     ),
                   ],
@@ -112,7 +123,9 @@ class LumiTipCard extends StatelessWidget {
               const SizedBox(width: 8),
               Icon(
                 Icons.chevron_right_rounded,
-                color: isWarning ? const Color(0xFFE64A63) : const Color(0xFF87767F),
+                color: isWarning
+                    ? (isDark ? const Color(0xFFFF7A88) : const Color(0xFFE64A63))
+                    : (isDark ? const Color(0xFFA594A1) : const Color(0xFF87767F)),
                 size: 20,
               ),
             ],

@@ -34,9 +34,9 @@ class LumiTheme {
   static const Color lightBorder = Color(0xFFF3DCE5);
 
   // --- Dark Mode (Twilight Bloom) ---
-  static const Color darkBackground = Color(0xFF1B1622);
-  static const Color darkSurface = Color(0xFF261F2E);
-  static const Color darkSurfaceSubtle = Color(0xFF332A3E);
+  static const Color darkBackground = Color(0xFF120E18);
+  static const Color darkSurface = Color(0xFF1B1522);
+  static const Color darkSurfaceSubtle = Color(0xFF251C30);
   static const Color darkPrimaryText = Color(0xFFFFF5F8);
   static const Color darkSecondaryText = Color(0xFFD8CEE0);
   static const Color darkMutedText = Color(0xFFBDB2C4);
@@ -44,7 +44,7 @@ class LumiTheme {
   static const Color darkAccentLight = Color(0xFFFFA8C8);
   static const Color darkPositive = Color(0xFF5ABF80);
   static const Color darkNegative = Color(0xFFFF6E82);
-  static const Color darkBorder = Color(0xFF3B3045);
+  static const Color darkBorder = Color(0xFF32253F);
 
   // --- Light Theme Definition ---
   static ThemeData get lightTheme {
@@ -216,22 +216,22 @@ class LumiTheme {
     const colorScheme = ColorScheme(
       brightness: Brightness.dark,
       primary: darkAccent,
-      onPrimary: Color(0xFF1B1622),
-      primaryContainer: Color(0xFF4A1F33),
+      onPrimary: Color(0xFF120E18),
+      primaryContainer: Color(0xFF3F192B),
       onPrimaryContainer: Color(0xFFFFB3D0),
       secondary: darkAccentLight,
-      onSecondary: Color(0xFF1B1622),
-      secondaryContainer: Color(0xFF423521),
+      onSecondary: Color(0xFF120E18),
+      secondaryContainer: Color(0xFF382A18),
       onSecondaryContainer: Color(0xFFFFE5A3),
       surface: darkSurface,
       onSurface: darkPrimaryText,
       surfaceContainer: darkSurface,
       surfaceContainerLow: darkBackground,
       surfaceContainerHigh: darkSurfaceSubtle,
-      surfaceContainerHighest: Color(0xFF40354E),
+      surfaceContainerHighest: Color(0xFF2E223B),
       onSurfaceVariant: darkSecondaryText,
       outline: darkBorder,
-      outlineVariant: Color(0xFF2C2436),
+      outlineVariant: Color(0xFF22192C),
       error: darkNegative,
       onError: Colors.white,
     );

@@ -146,7 +146,7 @@ class _DividendIncomeDialogState extends ConsumerState<DividendIncomeDialog> {
                       decoration: const InputDecoration(labelText: 'สินทรัพย์ *', border: OutlineInputBorder()),
                       initialValue: _selectedAssetId,
                       items: assets.map((a) {
-                        return DropdownMenuItem(value: a.id, child: Text('${a.symbol} - ${a.name} (${a.currencyCode})'));
+                        return DropdownMenuItem(value: a.id, child: Text(a.symbol));
                       }).toList(),
                       onChanged: (val) {
                         if (val != null) {

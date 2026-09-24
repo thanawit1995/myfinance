@@ -237,7 +237,7 @@ class _BuySellTradeDialogState extends ConsumerState<BuySellTradeDialog> {
                       items: assets.map((a) {
                         return DropdownMenuItem(
                           value: a.id,
-                          child: Text('${a.symbol} - ${a.name} (${a.currencyCode})'),
+                          child: Text(a.symbol),
                         );
                       }).toList(),
                       onChanged: (val) {

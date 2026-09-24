@@ -71,6 +71,18 @@ class GoogleAuthService {
     return null;
   }
 
+  /// Returns user info from local cache only — does NOT trigger Google Sign-In.
+  /// Use this when you only want to display "who is logged in" without connecting.
+  Future<GoogleAuthUser?> getCachedUser() async {
+    final email = await _storage.read(key: _keyEmail);
+    if (email != null && email.isNotEmpty) {
+      final name = await _storage.read(key: _keyName);
+      final photo = await _storage.read(key: _keyPhoto);
+      return GoogleAuthUser(email: email, displayName: name, photoUrl: photo);
+    }
+    return null;
+  }
+
   Future<GoogleAuthUser?> signIn() async {
     if (isSupportedPlatform) {
       try {

@@ -62,7 +62,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _loadGoogleDriveStatus() async {
     final authService = ref.read(googleAuthServiceProvider);
     final syncService = ref.read(googleDriveSyncServiceProvider);
-    final user = await authService.getCurrentUser();
+    // Use cached user only — never trigger silent sign-in on Settings screen load
+    final user = await authService.getCachedUser();
     final status = await syncService.getStatus();
     if (mounted) {
       setState(() {

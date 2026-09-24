@@ -24,6 +24,7 @@ class GoogleAuthService {
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
   static const String driveScope = 'https://www.googleapis.com/auth/drive.file';
+  static const String driveFullScope = 'https://www.googleapis.com/auth/drive';
   static const String webClientId = '25761984668-bisj0948pdlu6k6s1hvlpvbmqi9bb2r3.apps.googleusercontent.com';
 
   final GoogleSignIn _googleSignIn = GoogleSignIn(
@@ -32,6 +33,7 @@ class GoogleAuthService {
     scopes: [
       'email',
       driveScope,
+      driveFullScope,
     ],
   );
 
@@ -76,7 +78,7 @@ class GoogleAuthService {
         if (_account != null) {
           if (kIsWeb) {
             try {
-              await _googleSignIn.requestScopes([driveScope]);
+              await requestDriveScopeOnWeb();
             } catch (e) {
               debugPrint('requestScopes error on signIn: $e');
             }
@@ -100,9 +102,15 @@ class GoogleAuthService {
     await _saveUser(email, displayName, null);
   }
 
-  /// ขอสิทธิ์ Drive scope เพิ่มเติมบน Web
+  /// ขอสิทธิ์ Drive scope เพิ่มเติมบน Web (ลองขอทั้ง full scope และ file scope)
   Future<bool> requestDriveScopeOnWeb() async {
     if (!kIsWeb) return true;
+    try {
+      final granted = await _googleSignIn.requestScopes([driveFullScope, driveScope]);
+      if (granted) return true;
+    } catch (e) {
+      debugPrint('requestDriveScopeOnWeb full scope error: $e, trying driveScope');
+    }
     try {
       return await _googleSignIn.requestScopes([driveScope]);
     } catch (e) {
@@ -125,10 +133,11 @@ class GoogleAuthService {
 
     if (kIsWeb) {
       try {
-        final canAccess = await _googleSignIn.canAccessScopes([driveScope]);
-        if (!canAccess) {
+        final canAccessFull = await _googleSignIn.canAccessScopes([driveFullScope]);
+        final canAccessFile = await _googleSignIn.canAccessScopes([driveScope]);
+        if (!canAccessFull && !canAccessFile) {
           if (requestScopesIfNeeded) {
-            final granted = await _googleSignIn.requestScopes([driveScope]);
+            final granted = await requestDriveScopeOnWeb();
             if (!granted) {
               debugPrint('Drive scope was not granted by user');
               return null;
@@ -141,7 +150,7 @@ class GoogleAuthService {
         debugPrint('canAccessScopes check error: $e');
         if (requestScopesIfNeeded) {
           try {
-            final granted = await _googleSignIn.requestScopes([driveScope]);
+            final granted = await requestDriveScopeOnWeb();
             if (!granted) return null;
           } catch (_) {
             return null;

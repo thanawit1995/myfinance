@@ -192,5 +192,34 @@ void main() {
       expect(status.remoteTotalTransactions, 25);
       expect(status.hasRemoteUpdate, isTrue);
     });
+
+    test('restoreFromDatabaseBytes writes data and creates safety backup', () async {
+      final localDb = File(p.join(tempDir.path, 'myfinance.sqlite'));
+      await localDb.writeAsString('before restore content');
+
+      final newBytes = utf8.encode('new restored content');
+      final res = await syncService.restoreFromDatabaseBytes(newBytes);
+
+      expect(res.success, isTrue);
+      expect(res.message, contains('กู้คืนฐานข้อมูลจากไฟล์สำเร็จ'));
+      expect(await localDb.readAsString(), 'new restored content');
+      expect(res.backupFilePath, isNotNull);
+      expect(await File(res.backupFilePath!).readAsString(), 'before restore content');
+    });
+
+    test('restoreFromDatabasePath reads file, restores database and creates safety backup', () async {
+      final localDb = File(p.join(tempDir.path, 'myfinance.sqlite'));
+      await localDb.writeAsString('pre-path restore content');
+
+      final externalFile = File(p.join(tempDir.path, 'custom_imported.sqlite'));
+      await externalFile.writeAsString('imported path content');
+
+      final res = await syncService.restoreFromDatabasePath(externalFile.path);
+
+      expect(res.success, isTrue);
+      expect(await localDb.readAsString(), 'imported path content');
+      expect(res.backupFilePath, isNotNull);
+      expect(await File(res.backupFilePath!).readAsString(), 'pre-path restore content');
+    });
   });
 }

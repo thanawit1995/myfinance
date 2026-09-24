@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../core/services/cloud_sync_provider.dart';
 import '../../../core/services/google_auth_service.dart';
 import '../../../core/services/google_drive_sync_service.dart';
+import '../../../core/services/web_db_helper/web_db_helper.dart';
 import '../../../core/theme/vault_theme.dart';
 
 class CloudSyncScreen extends ConsumerStatefulWidget {
@@ -325,6 +326,172 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
     );
   }
 
+  Future<void> _handleConnectDriveScope() async {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+    setState(() => _isLoading = true);
+    try {
+      final authService = ref.read(googleAuthServiceProvider);
+      final granted = await authService.requestDriveScopeOnWeb();
+      if (!mounted) return;
+      if (granted) {
+        await _loadData();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isThai ? 'เชื่อมต่อ Google Drive สำเร็จเรียบร้อย' : 'Google Drive connected successfully'),
+            backgroundColor: VaultTheme.positive(context),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isThai ? 'ยังไม่ได้รับการอนุญาตสิทธิ์ Google Drive' : 'Google Drive permission was not granted'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isThai ? 'เกิดข้อผิดพลาดในการเชื่อมต่อ: $e' : 'Connection error: $e'),
+            backgroundColor: VaultTheme.negative(context),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _pickAndRestoreDbFile() async {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['db', 'sqlite'],
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+
+      final file = result.files.first;
+      if (!mounted) return;
+
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Row(
+            children: [
+              const Icon(Icons.file_upload_outlined, color: Colors.teal),
+              const SizedBox(width: 8),
+              Text(isThai ? 'กู้คืนจากไฟล์ฐานข้อมูล?' : 'Restore Database File?'),
+            ],
+          ),
+          content: Text(
+            isThai
+                ? 'คุณต้องการนำเข้าไฟล์ "${file.name}" เพื่อใช้เป็นฐานข้อมูลหลักหรือไม่?\n\n'
+                  '🛡️ เพื่อความปลอดภัย ข้อมูลเดิมจะถูกสำรองไว้ก่อนเสมอ'
+                : 'Replace current database with "${file.name}"?\n\n'
+                  '🛡️ A safety backup will be created before restoring.',
+            style: const TextStyle(fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Colors.teal),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(isThai ? 'ยืนยันกู้คืน' : 'Confirm Restore'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm != true) return;
+
+      setState(() => _isLoading = true);
+      final syncService = ref.read(googleDriveSyncServiceProvider);
+      final GoogleDriveSyncResult res;
+
+      if (file.bytes != null && file.bytes!.isNotEmpty) {
+        res = await syncService.restoreFromDatabaseBytes(file.bytes!);
+      } else if (file.path != null && file.path!.isNotEmpty) {
+        res = await syncService.restoreFromDatabasePath(file.path!);
+      } else {
+        res = GoogleDriveSyncResult(
+          success: false,
+          message: isThai ? 'ไม่สามารถอ่านเนื้อหาไฟล์ได้' : 'Could not read file data',
+          timestamp: DateTime.now(),
+        );
+      }
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      await _loadData();
+
+      if (!mounted) return;
+      final posColor = VaultTheme.positive(context);
+      final negColor = VaultTheme.negative(context);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(res.message),
+          backgroundColor: res.success ? posColor : negColor,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isThai ? 'เกิดข้อผิดพลาดในการเลือกไฟล์: $e' : 'Error selecting file: $e'),
+            backgroundColor: VaultTheme.negative(context),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _exportLocalDbFileWeb() async {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+    try {
+      final bytes = await exportWebDatabase();
+      if (bytes == null || bytes.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(isThai ? 'ไม่พบข้อมูลฐานข้อมูลในเบราว์เซอร์' : 'No database found in browser storage'),
+              backgroundColor: VaultTheme.negative(context),
+            ),
+          );
+        }
+        return;
+      }
+      final nowStr = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+      downloadFileWeb(bytes, 'myfinance_vault_$nowStr.db');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isThai ? 'ดาวน์โหลดไฟล์ฐานข้อมูลสำรองสำเร็จเรียบร้อย' : 'Database backup downloaded successfully'),
+            backgroundColor: VaultTheme.positive(context),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isThai ? 'เกิดข้อผิดพลาดในการส่งออกไฟล์: $e' : 'Export failed: $e'),
+            backgroundColor: VaultTheme.negative(context),
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isThai = Localizations.localeOf(context).languageCode == 'th';
@@ -459,13 +626,19 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                               decoration: BoxDecoration(
                                 color: _status!.isConnected
                                     ? Colors.teal.withValues(alpha: 0.15)
-                                    : Colors.orange.withValues(alpha: 0.15),
+                                    : (_googleUser != null
+                                        ? Colors.blue.withValues(alpha: 0.15)
+                                        : Colors.orange.withValues(alpha: 0.15)),
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
-                                _status!.isConnected ? Icons.cloud_done : Icons.cloud_off,
+                                _status!.isConnected
+                                    ? Icons.cloud_done
+                                    : (_googleUser != null ? Icons.cloud_queue : Icons.cloud_off),
                                 size: 28,
-                                color: _status!.isConnected ? Colors.teal : Colors.orange,
+                                color: _status!.isConnected
+                                    ? Colors.teal
+                                    : (_googleUser != null ? Colors.blueAccent : Colors.orange),
                               ),
                             ),
                             const SizedBox(width: 14),
@@ -476,7 +649,9 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                                   Text(
                                     _status!.isConnected
                                         ? (isThai ? 'เชื่อมต่อ Google Drive เรียบร้อย' : 'Google Drive Connected')
-                                        : (isThai ? 'ยังไม่ได้เชื่อมต่อ Google Drive' : 'Google Drive Disconnected'),
+                                        : (_googleUser != null
+                                            ? (isThai ? 'เข้าสู่ระบบแล้ว (รอสิทธิ์ Drive)' : 'Signed In (Pending Drive Scope)')
+                                            : (isThai ? 'ยังไม่ได้เชื่อมต่อ Google Drive' : 'Google Drive Disconnected')),
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 16,
@@ -487,12 +662,16 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                                   Text(
                                     _status!.isConnected
                                         ? _formatDriveFolderDisplay(_status!.driveFolderPath, isThai)
-                                        : (isThai
-                                            ? 'แตะเลือกโฟลเดอร์ หรือเข้าสู่ระบบ Google เพื่อเริ่มซิงค์'
-                                            : 'Sign in or select a folder to start syncing'),
+                                        : (_googleUser != null
+                                            ? (isThai ? 'แตะ "เชื่อมต่อสิทธิ์ Drive" หรือกด "ดึงจาก Drive" ด้านล่าง' : 'Tap "Authorize Drive" or "Restore" below')
+                                            : (isThai
+                                                ? 'แตะเลือกโฟลเดอร์ หรือเข้าสู่ระบบ Google เพื่อเริ่มซิงค์'
+                                                : 'Sign in or select a folder to start syncing')),
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: _status!.isConnected ? Colors.grey : Colors.orange,
+                                      color: _status!.isConnected
+                                          ? Colors.grey
+                                          : (_googleUser != null ? Colors.blueAccent : Colors.orange),
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
@@ -502,6 +681,45 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                             ),
                           ],
                         ),
+
+                        // Action banner to request Drive scope when signed into Google but scope not yet granted
+                        if (!_status!.isConnected && _googleUser != null) ...[
+                          const SizedBox(height: 14),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.blueAccent.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.blueAccent.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.info_outline, color: Colors.blueAccent, size: 20),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    isThai
+                                        ? 'คุณเข้าสู่ระบบ Gmail แล้ว แตะเพื่ออนุญาตสิทธิ์เข้าถึง Google Drive'
+                                        : 'Signed in. Tap to authorize Google Drive access.',
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                FilledButton.tonal(
+                                  style: FilledButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                  onPressed: _isLoading ? null : _handleConnectDriveScope,
+                                  child: Text(
+                                    isThai ? 'เชื่อมต่อสิทธิ์' : 'Authorize',
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
 
                         // Remote update alert badge
                         if (_status!.hasRemoteUpdate) ...[
@@ -579,45 +797,50 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                         const SizedBox(height: 18),
 
                         // Action Buttons: Backup & Restore
-                        Row(
-                          children: [
-                            Expanded(
-                              child: FilledButton.icon(
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: VaultTheme.accent(context),
-                                  padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 8),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        Builder(
+                          builder: (context) {
+                            final canSync = !_isLoading && (_status!.isConnected || _googleUser != null);
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: FilledButton.icon(
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: VaultTheme.accent(context),
+                                      padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 8),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                    icon: _isLoading
+                                        ? const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                          )
+                                        : const Icon(Icons.cloud_upload_outlined, size: 18),
+                                    label: Text(
+                                      isThai ? 'ส่งขึ้น Drive' : 'Backup to Drive',
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                                    ),
+                                    onPressed: canSync ? _uploadToGoogleDrive : null,
+                                  ),
                                 ),
-                                icon: _isLoading
-                                    ? const SizedBox(
-                                        width: 16,
-                                        height: 16,
-                                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                                      )
-                                    : const Icon(Icons.cloud_upload_outlined, size: 18),
-                                label: Text(
-                                  isThai ? 'ส่งขึ้น Drive' : 'Backup to Drive',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 8),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                    icon: const Icon(Icons.cloud_download_outlined, size: 18),
+                                    label: Text(
+                                      isThai ? 'ดึงจาก Drive' : 'Restore from Drive',
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                                    ),
+                                    onPressed: canSync ? _confirmAndDownloadFromDrive : null,
+                                  ),
                                 ),
-                                onPressed: (_isLoading || !_status!.isConnected) ? null : _uploadToGoogleDrive,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 8),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                                icon: const Icon(Icons.cloud_download_outlined, size: 18),
-                                label: Text(
-                                  isThai ? 'ดึงจาก Drive' : 'Restore from Drive',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
-                                ),
-                                onPressed: (_isLoading || !_status!.isConnected) ? null : _confirmAndDownloadFromDrive,
-                              ),
-                            ),
-                          ],
+                              ],
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -717,7 +940,58 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                   ),
                 ),
 
-                // 4. Collapsible Safety Backups Section (Clean & non-intrusive)
+                // 4. Direct Database File Backup & Restore (Local File / Offline)
+                const SizedBox(height: 16),
+                Card(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  color: VaultTheme.surface(context),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                        child: Text(
+                          isThai ? 'จัดการไฟล์ฐานข้อมูล (.db / .sqlite)' : 'Direct Database File Options',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: VaultTheme.secondaryText(context),
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.file_upload_outlined, color: Colors.teal),
+                        title: Text(isThai ? 'กู้คืนจากไฟล์ฐานข้อมูลในเครื่อง' : 'Restore from Local File (.db)'),
+                        subtitle: Text(
+                          isThai
+                              ? 'เลือกไฟล์ myfinance_vault.db หรือ .sqlite เพื่อนำเข้าข้อมูลทันที'
+                              : 'Select a database file to restore directly into the app',
+                          style: const TextStyle(fontSize: 11.5),
+                        ),
+                        trailing: const Icon(Icons.chevron_right, size: 20),
+                        onTap: _isLoading ? null : _pickAndRestoreDbFile,
+                      ),
+                      if (kIsWeb) ...[
+                        const Divider(height: 1),
+                        ListTile(
+                          leading: const Icon(Icons.file_download_outlined, color: Colors.blueAccent),
+                          title: Text(isThai ? 'ดาวน์โหลดไฟล์สำรอง (.db) ลงเครื่อง' : 'Download Database Backup (.db)'),
+                          subtitle: Text(
+                            isThai
+                                ? 'ส่งออกสำเนาไฟล์ฐานข้อมูล SQLite จากเบราว์เซอร์เก็บไว้ในเครื่อง'
+                                : 'Download a SQLite database copy from browser storage',
+                            style: const TextStyle(fontSize: 11.5),
+                          ),
+                          trailing: const Icon(Icons.download, size: 20),
+                          onTap: _isLoading ? null : _exportLocalDbFileWeb,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+
+                // 5. Collapsible Safety Backups Section (Clean & non-intrusive)
                 if (_backups.isNotEmpty) ...[
                   const SizedBox(height: 14),
                   Card(

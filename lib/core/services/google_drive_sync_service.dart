@@ -136,12 +136,16 @@ class GoogleDriveSyncService {
       final userProfile = Platform.environment['USERPROFILE'] ?? '';
       final candidates = [
         r'G:\My Drive\VAULT',
+        r'G:\My Drive\MyFinance_Backup',
         r'G:\My Drive',
         r'G:\VAULT',
+        r'G:\MyFinance_Backup',
         r'G:\',
         if (userProfile.isNotEmpty) p.join(userProfile, 'Google Drive', 'VAULT'),
+        if (userProfile.isNotEmpty) p.join(userProfile, 'Google Drive', 'MyFinance_Backup'),
         if (userProfile.isNotEmpty) p.join(userProfile, 'Google Drive'),
         if (userProfile.isNotEmpty) p.join(userProfile, 'My Drive', 'VAULT'),
+        if (userProfile.isNotEmpty) p.join(userProfile, 'My Drive', 'MyFinance_Backup'),
         if (userProfile.isNotEmpty) p.join(userProfile, 'My Drive'),
       ];
 
@@ -580,9 +584,10 @@ class GoogleDriveSyncService {
             reloadWebPage();
           });
 
+          final details = (remoteAcc > 0 || remoteTx > 0) ? ' ($remoteAcc บัญชี, $remoteTx รายการ)' : '';
           return GoogleDriveSyncResult(
             success: true,
-            message: 'กู้คืนข้อมูลสำเร็จ ($remoteAcc บัญชี, $remoteTx รายการ) กำลังรีเฟรชหน้าเว็บ...',
+            message: 'กู้คืนข้อมูลสำเร็จ$details กำลังรีเฟรชหน้าเว็บ...',
             totalAccounts: remoteAcc,
             totalTransactions: remoteTx,
             timestamp: now,
@@ -783,4 +788,95 @@ class GoogleDriveSyncService {
 
     return true;
   }
+
+  /// กู้คืนฐานข้อมูลจากข้อมูลไบนารี (Bytes) โดยตรง (สำหรับกรณีผู้ใช้เลือกไฟล์ .db / .sqlite เอง)
+  Future<GoogleDriveSyncResult> restoreFromDatabaseBytes(Uint8List bytes) async {
+    final now = DateTime.now();
+    try {
+      if (kIsWeb) {
+        final restored = await restoreWebDatabase(bytes);
+        if (!restored) {
+          return GoogleDriveSyncResult(
+            success: false,
+            message: 'ไม่สามารถบันทึกข้อมูลลงฐานข้อมูลเบราว์เซอร์ได้',
+            timestamp: now,
+          );
+        }
+        await _setLastSyncTime(now);
+        Future.delayed(const Duration(milliseconds: 1200), () {
+          reloadWebPage();
+        });
+        return GoogleDriveSyncResult(
+          success: true,
+          message: 'กู้คืนข้อมูลสำเร็จ กำลังรีเฟรชหน้าเว็บ...',
+          timestamp: now,
+        );
+      }
+
+      var localDb = await getLocalDatabaseFile();
+      String? backupPath;
+      if (localDb != null && await localDb.exists()) {
+        final docDir = await _getDocumentsDir();
+        final backupDir = Directory(p.join(docDir.path, 'backups'));
+        if (!await backupDir.exists()) {
+          await backupDir.create(recursive: true);
+        }
+        final timeStr = DateFormat('yyyyMMdd_HHmmss').format(now);
+        final safetyBackup = File(p.join(backupDir.path, 'backup_before_sync_$timeStr.db'));
+        await localDb.copy(safetyBackup.path);
+        backupPath = safetyBackup.path;
+
+        try {
+          await db.customStatement('PRAGMA wal_checkpoint(TRUNCATE);');
+        } catch (_) {}
+      } else {
+        final docDir = await _getDocumentsDir();
+        localDb = File(p.join(docDir.path, 'myfinance_vault.sqlite'));
+      }
+
+      await localDb.writeAsBytes(bytes, flush: true);
+
+      final walFile = File('${localDb.path}-wal');
+      final shmFile = File('${localDb.path}-shm');
+      if (await walFile.exists()) await walFile.delete();
+      if (await shmFile.exists()) await shmFile.delete();
+
+      await _setLastSyncTime(now);
+
+      return GoogleDriveSyncResult(
+        success: true,
+        message: 'กู้คืนฐานข้อมูลจากไฟล์สำเร็จเรียบร้อย',
+        timestamp: now,
+        backupFilePath: backupPath,
+      );
+    } catch (e) {
+      return GoogleDriveSyncResult(
+        success: false,
+        message: 'เกิดข้อผิดพลาดในการกู้คืนไฟล์: $e',
+        timestamp: now,
+      );
+    }
+  }
+
+  /// กู้คืนฐานข้อมูลจากเส้นทางไฟล์ (File Path) บนระบบปฏิบัติการแบบ Native
+  Future<GoogleDriveSyncResult> restoreFromDatabasePath(String filePath) async {
+    if (kIsWeb) {
+      return GoogleDriveSyncResult(
+        success: false,
+        message: 'ไม่รองรับการอ่านเส้นทางไฟล์บนเว็บ',
+        timestamp: DateTime.now(),
+      );
+    }
+    final file = File(filePath);
+    if (!await file.exists()) {
+      return GoogleDriveSyncResult(
+        success: false,
+        message: 'ไม่พบไฟล์ที่เลือก',
+        timestamp: DateTime.now(),
+      );
+    }
+    final bytes = await file.readAsBytes();
+    return restoreFromDatabaseBytes(bytes);
+  }
 }
+

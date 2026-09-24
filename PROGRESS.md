@@ -2,6 +2,22 @@
 
 อัปเดตล่าสุด: 24 กันยายน 2026
 
+- [x] **Webapp Google Drive Sync & Database File Restore/Export Fix**:
+  - **ปลดล็อก Deadlock การเชื่อมต่อ Google Drive บน Webapp**:
+    - แก้ไขปัญหาปุ่ม "ส่งขึ้น Drive" และ "ดึงจาก Drive" เป็นสีเทากดไม่ได้เมื่อเข้าสู่ระบบด้วย Gmail
+    - เพิ่มแบนเนอร์แจ้งเตือนสถานะรอสิทธิ์ Drive พร้อมปุ่ม **"เชื่อมต่อสิทธิ์ (Authorize)"** ให้ผู้ใช้กดขอสิทธิ์ Drive ได้ใน 1 คลิก
+    - เมื่อผู้ใช้กดปุ่ม "ดึงจาก Drive" หรือ "ส่งขึ้น Drive" ระบบจะขอสิทธิ์ OAuth และเปิดหน้าต่างยืนยันอัตโนมัติ
+  - **ปรับปรุงการค้นหาไฟล์ฐานข้อมูลข้ามโฟลเดอร์ใน Google Drive Cloud (`GoogleDriveApiClient`)**:
+    - รองรับการค้นหาไฟล์ฐานข้อมูล `myfinance_vault.db` และ metadata จากทั้งโฟลเดอร์ `MyFinance_Backup`, โฟลเดอร์ `VAULT` (ที่ Google Drive for Desktop ซิงค์มาจาก Windows) รวมถึงค้นหาทั่วทั้ง Drive
+  - **ขยายขอบเขตสิทธิ์ Google Drive OAuth**:
+    - รองรับทั้ง `https://www.googleapis.com/auth/drive` และ `https://www.googleapis.com/auth/drive.file` เพื่อให้อ่านไฟล์ที่ซิงค์จากคอมพิวเตอร์ได้
+  - **เพิ่มตัวเลือกนำเข้าไฟล์ฐานข้อมูลตรง (Direct Database File Options)**:
+    - เพิ่มตัวเลือก **"กู้คืนจากไฟล์ฐานข้อมูลในเครื่อง (.db / .sqlite)"** ในหน้า Sync ให้ผู้ใช้นำเข้าไฟล์ฐานข้อมูลเข้าเบราว์เซอร์หรือเครื่องได้ทันที
+    - เพิ่มปุ่ม **"ดาวน์โหลดไฟล์สำรอง (.db) ลงเครื่อง"** บน Webapp ให้ดาวน์โหลดสำเนา SQLite ออกมาเป็นไฟล์ได้โดยตรง
+  - **การทดสอบความถูกต้อง**:
+    - เพิ่มชุดทดสอบ Unit Tests สำหรับ `restoreFromDatabaseBytes` และ `restoreFromDatabasePath`
+    - ผ่านการทดสอบทั้งหมด `143/143 tests passed` (100%) และ `flutter analyze 0 error, 0 warning`
+
 - [x] **Notion Bill CSV Import & Automatic Tax Deduction Engine (กบข. และประกันออมทรัพย์)**:
   - **นำเข้า Notion Bills ลง Expense โดยตรง**:
     - รองรับการ Export ไฟล์ Bill Tracker จาก Notion เข้าสู่ระบบรายจ่าย (Expense) ของแอปโดยตรง

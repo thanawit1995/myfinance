@@ -116,3 +116,16 @@ Future<Uint8List?> exportWebDatabase() async {
 void reloadWebPage() {
   html.window.location.reload();
 }
+
+void downloadFileWeb(Uint8List bytes, String fileName) {
+  try {
+    final blob = html.Blob([bytes]);
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    html.AnchorElement(href: url)
+      ..setAttribute('download', fileName)
+      ..click();
+    html.Url.revokeObjectUrl(url);
+  } catch (e) {
+    debugPrint('downloadFileWeb error: $e');
+  }
+}

@@ -619,9 +619,9 @@ class CsvImportParser {
       // Parse work period if provided (e.g. "July 26" -> "2026-07")
       final workPeriod = parseNotionWorkPeriod(rawPeriod?.toString());
 
-      // Parse clearance status (isCleared): Property == 'Yes' -> true, 'No' -> false
+      // Parse clearance status (isCleared): Only notion_income can have arrears/unreceived status
       bool isCleared = true;
-      if (rawProperty != null) {
+      if (templateType == 'notion_income' && rawProperty != null) {
         final propStr = rawProperty.toString().trim().toLowerCase();
         if (propStr == 'no' || propStr == 'false') {
           isCleared = false;
@@ -643,7 +643,7 @@ class CsvImportParser {
       if (amountSatang == 0 && budgetSatang > 0) {
         amountSatang = budgetSatang;
       }
-      if (rawProperty != null && rawProperty.toString().trim().toLowerCase() == 'no') {
+      if (templateType == 'notion_income' && rawProperty != null && rawProperty.toString().trim().toLowerCase() == 'no') {
         isCleared = false;
       }
 
@@ -738,6 +738,14 @@ class CsvImportParser {
         txType = amountSatang < 0 ? 'expense' : 'income';
       }
 
+      // Expenses MUST NEVER have isCleared = false (or arrears/ตกเบิก).
+      // Only income can be accrued/in arrears.
+      if (txType != 'income') {
+        isCleared = true;
+      }
+      final effectiveWorkPeriod = txType == 'income' ? workPeriod : null;
+      final effectiveExpectedAmount = txType == 'income' ? expectedAmountSatang : null;
+
       // Amounts are stored positive in satang
       amountSatang = amountSatang.abs();
 
@@ -781,8 +789,8 @@ class CsvImportParser {
         isSummaryRow: isSummary,
         validationError: valError,
         rawRow: row,
-        workPeriod: workPeriod,
-        expectedAmountSatang: expectedAmountSatang,
+        workPeriod: effectiveWorkPeriod,
+        expectedAmountSatang: effectiveExpectedAmount,
         isCleared: isCleared,
       ));
     }

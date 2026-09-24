@@ -462,5 +462,12 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
     }
     return false;
   }
+
+  Future<int> cleanupUnclearedExpenses() async {
+    return customUpdate(
+      "UPDATE transactions SET is_cleared = 1, work_period = NULL, expected_amount_satang = NULL WHERE transaction_type != 'income' AND is_cleared = 0;",
+      updates: {transactions},
+    );
+  }
 }
 

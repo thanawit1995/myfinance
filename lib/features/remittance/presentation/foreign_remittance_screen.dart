@@ -42,7 +42,12 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isThai ? 'ติดตามเงินได้ต่างประเทศ (Remittance)' : 'Foreign Remittance Tracking'),
+        title: Text(
+          isThai ? 'ติดตามเงินได้ต่างประเทศ (Remittance)' : 'Foreign Remittance Tracking',
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, height: 1.2),
+          maxLines: 2,
+          softWrap: true,
+        ),
         actions: [
           DropdownButton<int>(
             value: _selectedRemittedYear,

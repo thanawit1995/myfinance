@@ -130,9 +130,9 @@ class _ImportPreviewDialogState extends ConsumerState<ImportPreviewDialog> {
                     runSpacing: 8,
                     children: [
                       _buildBadge('พร้อมนำเข้า: $validCount', VaultTheme.positive(context)),
-                      if (widget.rows.any((r) => !r.isCleared))
+                      if (widget.rows.any((r) => !r.isCleared && r.transactionType == 'income'))
                         _buildBadge(
-                          'ค้างรับ/ตกเบิก: ${widget.rows.where((r) => !r.isCleared && r.isValid && !r.isSummaryRow).length}',
+                          'ค้างรับ/ตกเบิก: ${widget.rows.where((r) => !r.isCleared && r.transactionType == 'income' && r.isValid && !r.isSummaryRow).length}',
                           Colors.amber.shade800,
                         ),
                       if (dupCount > 0) _buildBadge('พบซ้ำในระบบ: $dupCount', Colors.orange),
@@ -245,7 +245,7 @@ class _ImportPreviewDialogState extends ConsumerState<ImportPreviewDialog> {
                                 statusBadge = _buildSmallBadge('สรุปยอด (ข้าม)', Colors.grey);
                               } else if (!row.isValid) {
                                 statusBadge = _buildSmallBadge(row.validationError ?? 'ผิดพลาด', Colors.redAccent);
-                              } else if (!row.isCleared) {
+                              } else if (!row.isCleared && row.transactionType == 'income') {
                                 statusBadge = _buildSmallBadge('ค้างรับ/ตกเบิก', Colors.amber.shade800);
                               } else if (row.isDuplicate) {
                                 statusBadge = _buildSmallBadge('ซ้ำในระบบ', Colors.orange);
@@ -254,7 +254,8 @@ class _ImportPreviewDialogState extends ConsumerState<ImportPreviewDialog> {
                               }
 
                               final dateText = row.date != null ? dateFormat.format(row.date!) : row.rawDateString;
-                              final displaySatang = (!row.isCleared && row.expectedAmountSatang != null && row.expectedAmountSatang! > 0)
+                              final isUnclearedIncome = !row.isCleared && row.transactionType == 'income';
+                              final displaySatang = (isUnclearedIncome && row.expectedAmountSatang != null && row.expectedAmountSatang! > 0)
                                   ? row.expectedAmountSatang!
                                   : row.amountSatang;
                               final amountText = '฿${currencyFormat.format(displaySatang / 100.0)}';
@@ -264,7 +265,7 @@ class _ImportPreviewDialogState extends ConsumerState<ImportPreviewDialog> {
                                   if (row.isSummaryRow) return Colors.grey.withValues(alpha: 0.08);
                                   if (row.isDuplicate) return Colors.orange.withValues(alpha: 0.08);
                                   if (!row.isValid) return Colors.red.withValues(alpha: 0.08);
-                                  if (!row.isCleared) return Colors.amber.withValues(alpha: 0.08);
+                                  if (isUnclearedIncome) return Colors.amber.withValues(alpha: 0.08);
                                   return null;
                                 }),
                                 cells: [
@@ -284,11 +285,11 @@ class _ImportPreviewDialogState extends ConsumerState<ImportPreviewDialog> {
                                   DataCell(Text(row.accountName ?? '-', style: const TextStyle(fontSize: 12))),
                                   DataCell(
                                     Text(
-                                      !row.isCleared ? '$amountText (รอรับ)' : amountText,
+                                      isUnclearedIncome ? '$amountText (รอรับ)' : amountText,
                                       style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.bold,
-                                        color: !row.isCleared
+                                        color: isUnclearedIncome
                                             ? Colors.amber.shade900
                                             : (row.transactionType == 'income'
                                                 ? VaultTheme.positive(context)

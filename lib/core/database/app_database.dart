@@ -139,6 +139,9 @@ class AppDatabase extends _$AppDatabase {
       beforeOpen: (details) async {
         await customStatement('PRAGMA foreign_keys = ON;');
         await categoriesDao.ensureEssentialTaxCategories();
+        await customStatement(
+          "UPDATE transactions SET is_cleared = 1, work_period = NULL, expected_amount_satang = NULL WHERE transaction_type != 'income' AND is_cleared = 0;",
+        );
       },
     );
   }

@@ -399,7 +399,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
             timeStr,
             style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
           ),
-          if (!tx.isCleared) ...[
+          if (isIncome && !tx.isCleared) ...[
             const SizedBox(width: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),

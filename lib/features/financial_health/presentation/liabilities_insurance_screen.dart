@@ -40,7 +40,12 @@ class _LiabilitiesInsuranceScreenState extends ConsumerState<LiabilitiesInsuranc
     final isThai = Localizations.localeOf(context).languageCode == 'th';
     return Scaffold(
       appBar: AppBar(
-        title: Text(isThai ? 'ทะเบียนหนี้สินและกรมธรรม์ประกัน' : 'Debts & Insurance Registry'),
+        title: Text(
+          isThai ? 'ทะเบียนหนี้สินและกรมธรรม์ประกัน' : 'Debts & Insurance Registry',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, height: 1.2),
+          maxLines: 2,
+          softWrap: true,
+        ),
         bottom: TabBar(
           controller: _tabController,
           tabs: [

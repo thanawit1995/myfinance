@@ -18,7 +18,12 @@ class CreditCardSummaryScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('สรุป ${account.name}'),
+        title: Text(
+          'สรุป ${account.name}',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, height: 1.2),
+          maxLines: 2,
+          softWrap: true,
+        ),
       ),
       body: FutureBuilder<CreditCardSummary?>(
         future: ccDao.getSummary(account.id),

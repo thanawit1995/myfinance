@@ -100,7 +100,12 @@ class _MonthlyValuationScreenState extends ConsumerState<MonthlyValuationScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('อัปเดตราคาตลาดประจำเดือน'),
+        title: const Text(
+          'อัปเดตราคาตลาดประจำเดือน',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, height: 1.2),
+          maxLines: 2,
+          softWrap: true,
+        ),
       ),
       body: FutureBuilder<PortfolioSummary>(
         future: invDao.getPortfolioSummary(),

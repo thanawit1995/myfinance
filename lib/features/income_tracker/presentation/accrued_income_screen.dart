@@ -57,10 +57,13 @@ class _AccruedIncomeScreenState extends ConsumerState<AccruedIncomeScreen> {
         backgroundColor: VaultTheme.surface(context),
         title: Text(
           isThai ? 'ติดตามรายได้ค้างรับ & เงินตกเบิก' : 'Accrued Income & Arrears Tracker',
+          maxLines: 2,
+          softWrap: true,
           style: TextStyle(
             fontFamily: VaultTheme.fontFamily,
-            fontSize: 18,
+            fontSize: 16,
             fontWeight: FontWeight.w700,
+            height: 1.2,
             color: VaultTheme.primaryText(context),
           ),
         ),

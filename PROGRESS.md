@@ -2,6 +2,30 @@
 
 อัปเดตล่าสุด: 24 กันยายน 2026
 
+- [x] **UI/UX Optimization & Data Integrity Enhancement (6 ประเด็นการใช้งาน)**:
+  - **1. ปรับปรุงหัวข้อ AppBar ด้านบนไม่ให้ตัดคำ (No Truncation / 2-Line Wrap)**:
+    - ปรับ AppBar ในหน้าที่มีขนาดยาว (`Financial Health & Forecast`, `Liabilities & Insurance Registry`, `Accrued Income & Arrears Tracker`, `Foreign Remittance Tracking`, `Credit Card Summary`, `Monthly Valuation`, `Recurring Rules`) ให้รองรับ 2 บรรทัด (`maxLines: 2, softWrap: true`), ขนาดฟอนต์ 15-16px อ่านสบายตา ไม่ถูกตัดคำเป็น `...` บนมือถือ
+  - **2. & 3. ปรับปรุงหน้าต่างแก้ไขรายการธุรกรรม (Edit Transaction Dialog)**:
+    - **ล็อกประเภทธุรกรรม (Lock Transaction Type)**: นำปุ่มเปลี่ยนประเภท (SegmentedButton) ออก ป้องกันความผิดพลาดของบัญชี โดยแสดงเป็น Type Badge สีระบุสถานะชัดเจน (`[รายจ่าย]`, `[รายรับ]`, `[โอนเงิน]`)
+    - **จัดเรียงลำดับใหม่สำหรับ รายจ่าย และ โอนเงิน**: 1. ชื่อ transaction / บันทึก -> 2. จำนวนเงิน -> 3. หมวดหมู่ (หรือบัญชีปลายทาง) -> 4. บัญชี -> 5. วันที่และเวลา -> 6. ป้ายกำกับ (Tag) และค่าธรรมเนียม
+    - **จัดเรียงลำดับใหม่สำหรับ รายรับ**: 1. ชื่อ transaction / บันทึก -> 2. จำนวนเงิน -> 3. หมวดหมู่ -> 4. บัญชี -> 5. วันที่และเวลา -> 6. ประเภทภาษีเงินได้บุคคลธรรมดา -> 7. ภาษีหัก ณ ที่จ่าย และ ค่าธรรมเนียม -> 8. ป้ายกำกับ (Tag)
+  - **4. กระชับหน้าต่างแก้ไขรายการ (Compact One-Screen Layout)**:
+    - ปรับระยะห่างเป็น 8px, กำหนด `isDense: true` และ `contentPadding` ทุกช่องกรอก
+    - วางช่อง "ภาษีหัก ณ ที่จ่าย" และ "ค่าธรรมเนียม" คู่กันในแถวเดียวแบบ 2 คอลัมน์
+    - ปรับตัวเลือกวันที่เป็น InputDecorator กะทัดรัด ทำให้ฟิลด์ทั้งหมดแสดงได้ครบในหน้าจอเดียวไม่ต้องเลื่อนเยอะ
+  - **5. แก้ไขรายจ่ายไม่ให้มีสถานะตกเบิก/ค้างรับ (Clear Arrears for Expenses)**:
+    - อัปเดต `CsvImportParser` ให้บิลและรายการที่ไม่ใช่รายรับมี `isCleared = true` เสมอ ไม่ติดสถานะตกเบิก
+    - อัปเดต `transaction_list_screen.dart` และ `import_preview_dialog.dart` ให้แสดงป้าย `[ค้างรับ/ตกเบิก]` เฉพาะเมื่อเป็นรายรับ (`income`) เท่านั้น
+    - เพิ่มคำสั่งอัตโนมัติ `cleanupUnclearedExpenses` ใน `beforeOpen` ของฐานข้อมูล เพื่อเคลียร์รายการรายจ่ายเดิมที่เคยติดป้ายตกเบิกออกทั้งหมดอัตโนมัติเมื่อเปิดแอป
+  - **6. แก้ไขปุ่มซื้อสินทรัพย์ทับกับ THB บนมือถือ (Portfolio Uninvested Assets)**:
+    - ปรับปรุงการ์ดสินทรัพย์ที่ยังไม่ได้ลงทุนใหม่ ให้ชื่อหุ้น ป้ายสกุลเงิน `THB` และป้ายตลาด จัดวางแบบ `Wrap` ภายใน `Expanded`
+    - รวมปุ่มแก้ไขและปุ่มลบไว้ในเมนู 3 จุด (`PopupMenuButton`) เพื่อประหยัดพื้นที่
+    - ปุ่ม **"ซื้อ"** วางอยู่ฝั่งขวาสุดอย่างเป็นระเบียบ ไม่มีทางทับซ้อนกับป้าย `THB`
+  - **การทดสอบความถูกต้อง**:
+    - เพิ่ม Unit Tests ใน `notion_bill_import_test.dart` ครอบคลุมการ parse บิลที่มี `Property: No` ให้เป็น `isCleared = true` และการรัน `cleanupUnclearedExpenses`
+    - ผ่านการทดสอบทั้งหมด `145/145 tests passed` (100%) และ `flutter analyze 0 error, 0 warning`
+
+
 - [x] **Webapp Google Drive Sync & Database File Restore/Export Fix**:
   - **ปลดล็อก Deadlock การเชื่อมต่อ Google Drive บน Webapp**:
     - แก้ไขปัญหาปุ่ม "ส่งขึ้น Drive" และ "ดึงจาก Drive" เป็นสีเทากดไม่ได้เมื่อเข้าสู่ระบบด้วย Gmail

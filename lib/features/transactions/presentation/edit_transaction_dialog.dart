@@ -153,6 +153,9 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
       tag: Value(tag.isEmpty ? null : tag),
       note: Value(note.isEmpty ? null : note),
       transactionDate: Value(_transactionDate),
+      workPeriod: Value(_transactionType == 'income' ? widget.transaction.workPeriod : null),
+      expectedAmountSatang: Value(_transactionType == 'income' ? widget.transaction.expectedAmountSatang : null),
+      isCleared: Value(_transactionType == 'income' ? widget.transaction.isCleared : true),
       updatedAt: Value(DateTime.now()),
     );
 
@@ -251,16 +254,96 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
     } catch (_) {}
   }
 
+  Widget _buildTypeBadge(BuildContext context) {
+    Color color;
+    String label;
+    IconData icon;
+
+    if (_transactionType == 'expense') {
+      color = Colors.red;
+      label = 'รายจ่าย';
+      icon = Icons.arrow_upward;
+    } else if (_transactionType == 'income') {
+      color = Colors.green;
+      label = 'รายรับ';
+      icon = Icons.arrow_downward;
+    } else {
+      color = Colors.blue;
+      label = 'โอนเงิน';
+      icon = Icons.swap_horiz;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDatePicker(ThemeData theme) {
+    return InkWell(
+      onTap: _pickDate,
+      borderRadius: BorderRadius.circular(4),
+      child: InputDecorator(
+        decoration: const InputDecoration(
+          isDense: true,
+          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          labelText: 'วันที่และเวลา',
+          border: OutlineInputBorder(),
+          suffixIcon: Icon(Icons.edit_calendar, size: 18),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.calendar_today, size: 16, color: theme.colorScheme.onSurfaceVariant),
+            const SizedBox(width: 8),
+            Text(
+              DateFormat('d MMMM yyyy, HH:mm', 'th').format(_transactionDate),
+              style: const TextStyle(fontSize: 14),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return AlertDialog(
       title: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text('แก้ไขรายการ'),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('แก้ไขรายการ', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(width: 8),
+              _buildTypeBadge(context),
+            ],
+          ),
           IconButton(
             icon: const Icon(Icons.delete_outline, color: Colors.red),
             tooltip: 'ลบรายการนี้',
+            visualDensity: VisualDensity.compact,
             onPressed: _delete,
           ),
         ],
@@ -274,25 +357,18 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 1. Transaction Type
-                SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(value: 'expense', label: Text('รายจ่าย')),
-                    ButtonSegment(value: 'income', label: Text('รายรับ')),
-                    ButtonSegment(value: 'transfer', label: Text('โอนเงิน')),
-                  ],
-                  selected: {_transactionType},
-                  onSelectionChanged: (newVal) async {
-                    setState(() => _transactionType = newVal.first);
-                    if (_transactionType != 'transfer') {
-                      final cats = await ref.read(categoriesDaoProvider).getActiveCategories(_transactionType);
-                      if (cats.isNotEmpty && mounted) {
-                        setState(() => _selectedCategoryId = cats.first.id);
-                      }
-                    }
-                  },
+                // 1. Transaction Title / Note
+                TextFormField(
+                  controller: _noteController,
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    labelText: 'ชื่อ transaction / บันทึก',
+                    hintText: 'เช่น ข้าวเที่ยง, เงินเดือน, เติมน้ำมัน',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 8),
 
                 // 2. Amount
                 TextFormField(
@@ -302,6 +378,8 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                     FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                   ],
                   decoration: InputDecoration(
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     labelText: 'จำนวนเงิน *',
                     prefixText: widget.transaction.currencyCode == 'USD' ? r'$ ' : '฿ ',
                     border: const OutlineInputBorder(),
@@ -313,56 +391,28 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 8),
 
-                // 3. Category (if not transfer)
+                // 3. Category / Destination Account
                 if (_transactionType != 'transfer') ...[
                   FutureBuilder<List<Category>>(
                     future: ref.read(categoriesDaoProvider).getActiveCategories(_transactionType),
                     builder: (context, snapshot) {
                       final categories = snapshot.data ?? [];
                       return DropdownButtonFormField<String>(
-                        decoration: const InputDecoration(labelText: 'หมวดหมู่', border: OutlineInputBorder()),
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          labelText: 'หมวดหมู่',
+                          border: OutlineInputBorder(),
+                        ),
                         initialValue: categories.any((c) => c.id == _selectedCategoryId) ? _selectedCategoryId : null,
                         items: categories.map((c) => DropdownMenuItem(value: c.id, child: Text(c.nameTh))).toList(),
                         onChanged: (val) => setState(() => _selectedCategoryId = val),
                       );
                     },
                   ),
-                  const SizedBox(height: 14),
-                ],
-
-                // Tax Category & WHT (if Income)
-                if (_transactionType == 'income') ...[
-                  DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(labelText: 'ประเภทภาษีเงินได้บุคคลธรรมดา (ภ.ง.ด.)', border: OutlineInputBorder()),
-                    initialValue: _selectedTaxCategory,
-                    items: const [
-                      DropdownMenuItem(value: '40_1', child: Text('40(1) เงินเดือน / โบนัส')),
-                      DropdownMenuItem(value: '40_2', child: Text('40(2) ค่าจ้าง / ฟรีแลนซ์')),
-                      DropdownMenuItem(value: '40_4_interest', child: Text('40(4)(ก) ดอกเบี้ยเงินฝาก')),
-                      DropdownMenuItem(value: '40_4_dividend_th', child: Text('40(4)(ข) เงินปันผลหุ้นไทย')),
-                      DropdownMenuItem(value: '40_4_dividend_foreign', child: Text('40(4) เงินปันผลต่างประเทศ')),
-                      DropdownMenuItem(value: '40_4_crypto', child: Text('40(4) กำไรคริปโตเคอร์เรนซี')),
-                      DropdownMenuItem(value: '40_6_medical', child: Text('40(6) วิชาชีพแพทย์/การประกอบโรคศิลปะ')),
-                      DropdownMenuItem(value: '40_8', child: Text('40(8) ธุรกิจ / การพาณิชย์ / อื่นๆ')),
-                      DropdownMenuItem(value: 'non_taxable', child: Text('ไม่เข้าข่ายเสียภาษี (ยกเว้น)')),
-                    ],
-                    onChanged: (val) => setState(() => _selectedTaxCategory = val),
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: _whtController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                    ],
-                    decoration: const InputDecoration(
-                      labelText: 'ภาษีหัก ณ ที่จ่าย (WHT) (บาท)',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 8),
                 ],
 
                 // 4. Account Selector
@@ -379,7 +429,25 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                       return Column(
                         children: [
                           DropdownButtonFormField<String>(
-                            decoration: const InputDecoration(labelText: 'จากบัญชีต้นทาง', border: OutlineInputBorder()),
+                            key: ValueKey('dest_$effectiveDestId'),
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              labelText: 'ไปยังบัญชีปลายทาง',
+                              border: OutlineInputBorder(),
+                            ),
+                            initialValue: effectiveDestId,
+                            items: destAccounts.map((a) => DropdownMenuItem(value: a.id, child: Text('${a.name} (${a.currencyCode})'))).toList(),
+                            onChanged: (val) => setState(() => _selectedDestinationAccountId = val),
+                          ),
+                          const SizedBox(height: 8),
+                          DropdownButtonFormField<String>(
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              labelText: 'จากบัญชีต้นทาง',
+                              border: OutlineInputBorder(),
+                            ),
                             initialValue: accounts.any((a) => a.id == _selectedAccountId) ? _selectedAccountId : null,
                             items: accounts.map((a) => DropdownMenuItem(value: a.id, child: Text('${a.name} (${a.currencyCode})'))).toList(),
                             onChanged: (val) {
@@ -392,19 +460,16 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                               });
                             },
                           ),
-                          const SizedBox(height: 10),
-                          DropdownButtonFormField<String>(
-                            key: ValueKey('dest_$effectiveDestId'),
-                            decoration: const InputDecoration(labelText: 'ไปยังบัญชีปลายทาง', border: OutlineInputBorder()),
-                            initialValue: effectiveDestId,
-                            items: destAccounts.map((a) => DropdownMenuItem(value: a.id, child: Text('${a.name} (${a.currencyCode})'))).toList(),
-                            onChanged: (val) => setState(() => _selectedDestinationAccountId = val),
-                          ),
                         ],
                       );
                     } else {
                       return DropdownButtonFormField<String>(
-                        decoration: const InputDecoration(labelText: 'บัญชี', border: OutlineInputBorder()),
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          labelText: 'บัญชี',
+                          border: OutlineInputBorder(),
+                        ),
                         initialValue: accounts.any((a) => a.id == _selectedAccountId) ? _selectedAccountId : null,
                         items: accounts.map((a) => DropdownMenuItem(value: a.id, child: Text('${a.name} (${a.currencyCode})'))).toList(),
                         onChanged: (val) => setState(() => _selectedAccountId = val),
@@ -412,54 +477,122 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                     }
                   },
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 8),
 
-                // 5. Date Picker
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.calendar_today),
-                  title: Text(DateFormat('d MMMM yyyy, HH:mm', 'th').format(_transactionDate)),
-                  trailing: const Icon(Icons.edit_calendar),
-                  onTap: _pickDate,
-                ),
-                const SizedBox(height: 10),
+                // 5. Date & Time Picker
+                _buildDatePicker(theme),
+                const SizedBox(height: 8),
 
-                // 6. Fee
-                TextFormField(
-                  controller: _feeController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                  ],
-                  decoration: const InputDecoration(
-                    labelText: 'ค่าธรรมเนียม (บาท)',
-                    hintText: '0.00',
-                    prefixText: '฿ ',
-                    border: OutlineInputBorder(),
+                // Income-specific fields: Tax Category, WHT & Fee in a compact row
+                if (_transactionType == 'income') ...[
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      labelText: 'ประเภทภาษีเงินได้บุคคลธรรมดา (ภ.ง.ด.)',
+                      border: OutlineInputBorder(),
+                    ),
+                    initialValue: _selectedTaxCategory,
+                    items: const [
+                      DropdownMenuItem(value: '40_1', child: Text('40(1) เงินเดือน / โบนัส')),
+                      DropdownMenuItem(value: '40_2', child: Text('40(2) ค่าจ้าง / ฟรีแลนซ์')),
+                      DropdownMenuItem(value: '40_4_interest', child: Text('40(4)(ก) ดอกเบี้ยเงินฝาก')),
+                      DropdownMenuItem(value: '40_4_dividend_th', child: Text('40(4)(ข) เงินปันผลหุ้นไทย')),
+                      DropdownMenuItem(value: '40_4_dividend_foreign', child: Text('40(4) เงินปันผลต่างประเทศ')),
+                      DropdownMenuItem(value: '40_4_crypto', child: Text('40(4) กำไรคริปโตเคอร์เรนซี')),
+                      DropdownMenuItem(value: '40_6_medical', child: Text('40(6) วิชาชีพแพทย์/การประกอบโรคศิลปะ')),
+                      DropdownMenuItem(value: '40_8', child: Text('40(8) ธุรกิจ / การพาณิชย์ / อื่นๆ')),
+                      DropdownMenuItem(value: 'non_taxable', child: Text('ไม่เข้าข่ายเสียภาษี (ยกเว้น)')),
+                    ],
+                    onChanged: (val) => setState(() => _selectedTaxCategory = val),
                   ),
-                ),
-                const SizedBox(height: 14),
-
-                // 7. Note
-                TextFormField(
-                  controller: _noteController,
-                  decoration: const InputDecoration(
-                    labelText: 'บันทึกช่วยจำ (Note)',
-                    hintText: 'เช่น ข้าวเที่ยง, เติมน้ำมัน',
-                    border: OutlineInputBorder(),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _whtController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                          ],
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            labelText: 'ภาษีหัก ณ ที่จ่าย',
+                            prefixText: '฿ ',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _feeController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                          ],
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            labelText: 'ค่าธรรมเนียม (Fee)',
+                            prefixText: '฿ ',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 14),
-
-                // 8. Tag
-                TextFormField(
-                  controller: _tagController,
-                  decoration: const InputDecoration(
-                    labelText: 'ป้ายกำกับ (Tag)',
-                    hintText: 'เช่น เที่ยวญี่ปุ่น, เบิกได้',
-                    border: OutlineInputBorder(),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _tagController,
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      labelText: 'ป้ายกำกับ (Tag)',
+                      hintText: 'เช่น เที่ยวญี่ปุ่น, เบิกได้',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                ),
+                ] else ...[
+                  // Expense / Transfer: Tag & Fee in a compact row
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: TextFormField(
+                          controller: _tagController,
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            labelText: 'ป้ายกำกับ (Tag)',
+                            hintText: 'เช่น เที่ยวญี่ปุ่น, เบิกได้',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 2,
+                        child: TextFormField(
+                          controller: _feeController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                          ],
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            labelText: 'ค่าธรรมเนียม',
+                            prefixText: '฿ ',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),

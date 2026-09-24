@@ -56,7 +56,12 @@ class _RecurringRulesScreenState extends ConsumerState<RecurringRulesScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('รายการอัตโนมัติ (Recurring)'),
+        title: const Text(
+          'รายการอัตโนมัติ (Recurring)',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, height: 1.2),
+          maxLines: 2,
+          softWrap: true,
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.sync),

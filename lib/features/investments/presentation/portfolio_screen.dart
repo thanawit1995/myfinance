@@ -628,43 +628,71 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
             ...summary.uninvestedAssets.map((asset) {
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                    child: Text(
-                      asset.symbol.isNotEmpty ? asset.symbol.substring(0, 1) : '?',
-                      style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
-                    ),
-                  ),
-                  title: Row(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  child: Row(
                     children: [
-                      Text(asset.symbol, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(4),
+                      CircleAvatar(
+                        backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                        child: Text(
+                          asset.symbol.isNotEmpty ? asset.symbol.substring(0, 1) : '?',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
                         ),
-                        child: Text(asset.currencyCode, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
                       ),
-                      if (asset.market != null && asset.market!.isNotEmpty) ...[
-                        const SizedBox(width: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.amber.shade50,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(asset.market!, style: TextStyle(fontSize: 10, color: Colors.amber.shade900)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 6,
+                              runSpacing: 4,
+                              children: [
+                                Text(
+                                  asset.symbol,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.surfaceContainerHighest,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    asset.currencyCode,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: theme.colorScheme.primary,
+                                    ),
+                                  ),
+                                ),
+                                if (asset.market != null && asset.market!.isNotEmpty)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber.shade50,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      asset.market!,
+                                      style: TextStyle(fontSize: 10, color: Colors.amber.shade900),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              asset.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                            ),
+                          ],
                         ),
-                      ],
-                    ],
-                  ),
-                  subtitle: Text(asset.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
+                      ),
+                      const SizedBox(width: 8),
                       FilledButton.tonal(
                         style: FilledButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -676,19 +704,42 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                         },
                         child: Text(isThai ? 'ซื้อ' : 'Buy'),
                       ),
-                      const SizedBox(width: 4),
-                      IconButton(
-                        icon: const Icon(Icons.edit_outlined, size: 20),
-                        tooltip: isThai ? 'แก้ไขข้อมูลสินทรัพย์' : 'Edit Asset',
-                        onPressed: () async {
-                          final ok = await AssetFormDialog.show(context, assetToEdit: asset);
-                          if (ok == true && mounted) setState(() {});
+                      PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert, size: 20),
+                        padding: EdgeInsets.zero,
+                        onSelected: (val) async {
+                          if (val == 'edit') {
+                            final ok = await AssetFormDialog.show(context, assetToEdit: asset);
+                            if (ok == true && mounted) setState(() {});
+                          } else if (val == 'delete') {
+                            _confirmDeleteAsset(asset);
+                          }
                         },
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
-                        tooltip: isThai ? 'ลบสินทรัพย์' : 'Delete Asset',
-                        onPressed: () => _confirmDeleteAsset(asset),
+                        itemBuilder: (ctx) => [
+                          PopupMenuItem(
+                            value: 'edit',
+                            child: Row(
+                              children: [
+                                const Icon(Icons.edit_outlined, size: 18),
+                                const SizedBox(width: 8),
+                                Text(isThai ? 'แก้ไขข้อมูล' : 'Edit Asset'),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Row(
+                              children: [
+                                const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                                const SizedBox(width: 8),
+                                Text(
+                                  isThai ? 'ลบสินทรัพย์' : 'Delete Asset',
+                                  style: const TextStyle(color: Colors.red),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),

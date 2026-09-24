@@ -28,7 +28,12 @@ class _FinancialHealthScreenState extends ConsumerState<FinancialHealthScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isThai ? 'สุขภาพการเงินและพยากรณ์เงิน' : 'Financial Health & Forecast'),
+        title: Text(
+          isThai ? 'สุขภาพการเงินและพยากรณ์เงิน' : 'Financial Health & Forecast',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, height: 1.2),
+          maxLines: 2,
+          softWrap: true,
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.shield_outlined),

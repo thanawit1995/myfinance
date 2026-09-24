@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:myfinance/core/database/app_database.dart';
@@ -178,6 +179,68 @@ void main() {
       // Crucial: Verify 0 recurring rules created!
       final recurringRules = await recurringDao.getAllRules();
       expect(recurringRules.isEmpty, isTrue);
+
+      await db.close();
+    });
+
+    test('Notion bills with Property: No MUST have isCleared = true and no arrears', () {
+      const csvContent = '''Date,Bill,Category,Amount,Property,Detail,Monthly Overview
+"January 26, 2024",Water Bill,Monthly,"THB 500.00",No,Unpaid flag in notion,January 24 (https://notion.so/jan24)
+''';
+
+      final rawRows = CsvImportParser.parseRawCsv(csvContent);
+      final headers = rawRows.first.map((e) => e.toString()).toList();
+      final mapping = CsvImportParser.detectMapping(headers, template: 'notion_bills')!;
+      final parsed = CsvImportParser.parseRows(
+        rawRows: rawRows,
+        mapping: mapping,
+        templateType: 'notion_bills',
+      );
+
+      expect(parsed.length, 1);
+      final row = parsed.first;
+      expect(row.transactionType, 'expense');
+      // Crucial requirement: Expenses must NEVER be uncleared or have arrears
+      expect(row.isCleared, isTrue);
+      expect(row.workPeriod, isNull);
+      expect(row.expectedAmountSatang, isNull);
+    });
+
+    test('cleanupUnclearedExpenses updates any existing uncleared non-income transactions', () async {
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      final transactionsDao = TransactionsDao(db);
+      final now = DateTime.now();
+
+      // Insert an erroneous uncleared expense
+      await transactionsDao.insertTransaction(
+        TransactionsCompanion.insert(
+          id: 'err-expense-1',
+          transactionType: 'expense',
+          amountOriginalSatang: 50000,
+          currencyCode: 'THB',
+          amountThbSatang: 50000,
+          transactionDate: now,
+          isCleared: const Value(false),
+          workPeriod: const Value('2024-01'),
+          expectedAmountSatang: const Value(50000),
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      // Verify it was inserted as uncleared
+      final before = await transactionsDao.getTransactionById('err-expense-1');
+      expect(before!.isCleared, isFalse);
+
+      // Run cleanup
+      final updatedRows = await transactionsDao.cleanupUnclearedExpenses();
+      expect(updatedRows, 1);
+
+      // Verify it is now cleared with no workPeriod
+      final after = await transactionsDao.getTransactionById('err-expense-1');
+      expect(after!.isCleared, isTrue);
+      expect(after.workPeriod, isNull);
+      expect(after.expectedAmountSatang, isNull);
 
       await db.close();
     });

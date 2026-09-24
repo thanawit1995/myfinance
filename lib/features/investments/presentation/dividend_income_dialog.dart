@@ -32,13 +32,11 @@ class _DividendIncomeDialogState extends ConsumerState<DividendIncomeDialog> {
 
   late TextEditingController _grossAmountController;
   late TextEditingController _taxController;
-  late TextEditingController _taxCreditController;
   late TextEditingController _fxRateController;
   late TextEditingController _noteController;
 
   String _currency = 'THB';
   bool _isForeignIncome = false;
-  double _corporateTaxRate = 0.20; // Default 20% corporate tax rate for Thai companies
 
   @override
   void initState() {
@@ -51,7 +49,6 @@ class _DividendIncomeDialogState extends ConsumerState<DividendIncomeDialog> {
 
     _grossAmountController = TextEditingController();
     _taxController = TextEditingController();
-    _taxCreditController = TextEditingController();
     _fxRateController = TextEditingController(text: _currency == 'USD' ? '35.000000' : '1.000000');
     _noteController = TextEditingController();
   }
@@ -60,7 +57,6 @@ class _DividendIncomeDialogState extends ConsumerState<DividendIncomeDialog> {
   void dispose() {
     _grossAmountController.dispose();
     _taxController.dispose();
-    _taxCreditController.dispose();
     _fxRateController.dispose();
     _noteController.dispose();
     super.dispose();
@@ -72,11 +68,6 @@ class _DividendIncomeDialogState extends ConsumerState<DividendIncomeDialog> {
       // 10% Withholding tax standard for dividends
       if (_taxController.text.isEmpty) {
         _taxController.text = (gross * 0.10).toStringAsFixed(2);
-      }
-      // Auto calculate Thai tax credit: gross * (t / (1 - t))
-      if (!_isForeignIncome && _corporateTaxRate > 0) {
-        final credit = gross * (_corporateTaxRate / (1 - _corporateTaxRate));
-        _taxCreditController.text = credit.toStringAsFixed(2);
       }
     }
     setState(() {});
@@ -97,9 +88,6 @@ class _DividendIncomeDialogState extends ConsumerState<DividendIncomeDialog> {
     final taxDouble = double.tryParse(_taxController.text.trim()) ?? 0.0;
     final taxSatang = (taxDouble * 100).round();
 
-    final creditDouble = _isForeignIncome ? 0.0 : (double.tryParse(_taxCreditController.text.trim()) ?? 0.0);
-    final creditSatang = (creditDouble * 100).round();
-
     final fxRate = Decimal.parse(_fxRateController.text.trim());
     final grossThbSatang = (Decimal.fromInt(grossSatang) * fxRate).round().toBigInt().toInt();
     final taxThbSatang = (Decimal.fromInt(taxSatang) * fxRate).round().toBigInt().toInt();
@@ -116,7 +104,7 @@ class _DividendIncomeDialogState extends ConsumerState<DividendIncomeDialog> {
       currencyCode: _currency,
       fxRate: fxRate,
       withholdingTaxThbSatang: taxThbSatang,
-      dividendTaxCreditSatang: creditSatang,
+      dividendTaxCreditSatang: 0,
       netAmountThbSatang: netAmountThbSatang,
       isForeignIncome: _isForeignIncome,
       note: _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),
@@ -273,94 +261,14 @@ class _DividendIncomeDialogState extends ConsumerState<DividendIncomeDialog> {
                 CheckboxListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('เป็นเงินได้จากต่างประเทศ (Foreign Income)'),
-                  subtitle: const Text('เงินได้ต่างประเทศจะไม่มีสิทธิ์เครดิตภาษีตามกฎสรรพากรไทย', style: TextStyle(fontSize: 12)),
                   value: _isForeignIncome,
                   onChanged: (val) {
                     setState(() {
                       _isForeignIncome = val ?? false;
-                      if (_isForeignIncome) {
-                        _taxCreditController.clear();
-                      } else {
-                        _onGrossChanged();
-                      }
                     });
                   },
                 ),
                 const SizedBox(height: 8),
-
-                // 7. Thai Dividend Tax Credit (Hidden if foreign income!)
-                if (!_isForeignIncome && _incomeType == 'dividend') ...[
-                  Container(
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6)
-                          : Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isDark
-                            ? theme.colorScheme.outline.withValues(alpha: 0.3)
-                            : Colors.blue.shade200,
-                      ),
-                    ),
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          isThai ? 'เครดิตภาษีเงินปันผล (มาตรา 47 ทวิ)' : 'Dividend Tax Credit (Section 47 bis)',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                            color: isDark ? theme.colorScheme.primary : Colors.blue.shade900,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              flex: 1,
-                              child: DropdownButtonFormField<double>(
-                                decoration: const InputDecoration(
-                                  isDense: true,
-                                  labelText: 'อัตราภาษีนิติบุคคล',
-                                  border: OutlineInputBorder(),
-                                ),
-                                initialValue: _corporateTaxRate,
-                                items: const [
-                                  DropdownMenuItem(value: 0.20, child: Text('20% (เครดิต 25%)')),
-                                  DropdownMenuItem(value: 0.25, child: Text('25% (เครดิต 33%)')),
-                                  DropdownMenuItem(value: 0.30, child: Text('30% (เครดิต 42%)')),
-                                  DropdownMenuItem(value: 0.0, child: Text('0% (ไม่ได้รับเครดิต)')),
-                                ],
-                                onChanged: (val) {
-                                  if (val != null) {
-                                    _corporateTaxRate = val;
-                                    _onGrossChanged();
-                                  }
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              flex: 1,
-                              child: TextFormField(
-                                controller: _taxCreditController,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
-                                decoration: const InputDecoration(
-                                  isDense: true,
-                                  labelText: 'ยอดเครดิตภาษี (บาท)',
-                                  border: OutlineInputBorder(),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                ],
 
                 // 8. Net preview
                 Builder(

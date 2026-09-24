@@ -167,7 +167,7 @@ abstract class AppLocalizations {
   /// No description provided for @quickAddKeypad.
   ///
   /// In th, this message translates to:
-  /// **'บันทึกด่วน (3 แตะ)'**
+  /// **'บันทึกด่วน'**
   String get quickAddKeypad;
 
   /// No description provided for @portfolio.

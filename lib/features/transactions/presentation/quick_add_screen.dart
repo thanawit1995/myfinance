@@ -355,11 +355,38 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
 
     _note = _noteController.text.trim();
 
-    // Effective tag with optional project association
+    // Effective tag with optional project association & auto-deduction tags
     String? effectiveTag = _tag;
     if (_selectedProjectId != null) {
       final pTag = 'project:$_selectedProjectId';
       effectiveTag = (effectiveTag != null && effectiveTag.isNotEmpty) ? '$effectiveTag,$pTag' : pTag;
+    }
+
+    if (_transactionType == 'expense') {
+      final cat = _selectedCategoryId != null
+          ? _currentCategories.where((c) => c.id == _selectedCategoryId).firstOrNull
+          : null;
+      final catName = '${cat?.nameTh ?? ""} ${cat?.nameEn ?? ""}'.toLowerCase();
+      final noteLower = _note.toLowerCase();
+
+      final tagsList = <String>[];
+      if (effectiveTag != null && effectiveTag.isNotEmpty) {
+        tagsList.addAll(effectiveTag.split(',').map((t) => t.trim()));
+      }
+
+      if (catName.contains('กบข') || catName.contains('gpf') || noteLower.contains('กบข') || noteLower.contains('gpf')) {
+        if (!tagsList.any((t) => t.contains('deduction:gpf'))) {
+          tagsList.add('deduction:gpf');
+        }
+      }
+
+      if (noteLower.contains('ประกันออมทรัพย์') || (catName.contains('ประกัน') && noteLower.contains('ออมทรัพย์'))) {
+        if (!tagsList.any((t) => t.contains('deduction:life_insurance'))) {
+          tagsList.add('deduction:life_insurance');
+        }
+      }
+
+      effectiveTag = tagsList.isNotEmpty ? tagsList.join(',') : null;
     }
 
     String? taxCat;

@@ -755,6 +755,12 @@ class FinancialReportsService {
       endDate: end,
     );
 
+    final allCats = await (db.select(db.categories)..where((c) => c.deletedAt.isNull())).get();
+    final gpfCatIds = allCats
+        .where((c) => c.nameTh.contains('กบข') || c.nameEn.toLowerCase().contains('gpf'))
+        .map((c) => c.id)
+        .toSet();
+
     final incomeEntries = <IncomeEntry>[];
     final incomeTxDetails = <TaxIncomeTransactionDetail>[];
     final grossByCategory = <String, int>{};
@@ -788,7 +794,8 @@ class FinancialReportsService {
       } else if (tx.transactionType == 'expense') {
         final tag = tx.tag ?? '';
         final note = (tx.note ?? '').toLowerCase();
-        if (tag.contains('deduction:gpf') || note.contains('กบข') || note.contains('gpf')) {
+        final isGpfCat = tx.categoryId != null && gpfCatIds.contains(tx.categoryId);
+        if (tag.contains('deduction:gpf') || note.contains('กบข') || note.contains('gpf') || isGpfCat) {
           gpfSatang += tx.amountThbSatang;
         } else if (tag.contains('deduction:life_insurance') || note.contains('ประกันออมทรัพย์')) {
           lifeInsuranceSatang += tx.amountThbSatang;

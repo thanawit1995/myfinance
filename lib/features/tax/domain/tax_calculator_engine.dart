@@ -250,6 +250,7 @@ class TaxCalculatorEngine {
     int ssf = 0;
     int thaiEsg = 0;
     int pvd = 0;
+    int gpf = 0;
     int generalDonations = 0;
     int eduDonations = 0;
 
@@ -286,6 +287,9 @@ class TaxCalculatorEngine {
           break;
         case 'provident_fund':
           pvd += d.amountSatang;
+          break;
+        case 'gpf':
+          gpf += d.amountSatang;
           break;
         case 'donation_general':
           generalDonations += d.amountSatang;
@@ -329,19 +333,21 @@ class TaxCalculatorEngine {
       steps.add('  - ดอกเบี้ยกู้ยืมเพื่อที่อยู่อาศัย: ฿${(allowedHome / 100).toStringAsFixed(2)}');
     }
 
-    // Retirement Group: SSF (max 30% or 200k), RMF (max 30% or 500k), PVD, combined max 500k
+    // Retirement Group: SSF (max 30% or 200k), RMF (max 30% or 500k), PVD (max 15% or 500k), GPF (max 30% or 500k), combined max 500k
     final ssfMax = (deductionLimits['ssfMaxSatang'] as num?)?.toInt() ?? 20000000;
     final rmfMax = (deductionLimits['rmfMaxSatang'] as num?)?.toInt() ?? 50000000;
     final pvdMax = (deductionLimits['providentFundMaxSatang'] as num?)?.toInt() ?? 50000000;
+    final gpfMax = (deductionLimits['gpfMaxSatang'] as num?)?.toInt() ?? 50000000;
     final retirementCombined = (deductionLimits['retirementGroupCombinedMaxSatang'] as num?)?.toInt() ?? 50000000;
 
     final cappedSsf = min(ssf, min(ssfMax, (totalGross * 0.30).round()));
     final cappedRmf = min(rmf, min(rmfMax, (totalGross * 0.30).round()));
     final cappedPvd = min(pvd, min(pvdMax, (totalGross * 0.15).round()));
-    final allowedRetirement = min(cappedSsf + cappedRmf + cappedPvd, retirementCombined);
+    final cappedGpf = min(gpf, min(gpfMax, (totalGross * 0.30).round()));
+    final allowedRetirement = min(cappedSsf + cappedRmf + cappedPvd + cappedGpf, retirementCombined);
     if (allowedRetirement > 0) {
       totalAllowances += allowedRetirement;
-      steps.add('  - กลุ่มเกษียณ (RMF, SSF, PVD เพดานรวม ฿500,000): ฿${(allowedRetirement / 100).toStringAsFixed(2)}');
+      steps.add('  - กลุ่มเกษียณ (กบข., RMF, SSF, PVD เพดานรวม ฿500,000): ฿${(allowedRetirement / 100).toStringAsFixed(2)}');
     }
 
     // ThaiESG (Separate Cap 300,000 THB, max 30%)

@@ -51,9 +51,14 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
           final rows = CsvImportParser.parseRawCsv(content);
           if (rows.isNotEmpty) {
             final headers = rows.first.map((e) => e.toString()).toList();
-            final mapping = CsvImportParser.detectMapping(headers, template: _selectedTemplate);
+            var detectedTemplate = _selectedTemplate;
+            if (headers.any((h) => h.trim().toLowerCase() == 'bill')) {
+              detectedTemplate = 'notion_bills';
+            }
+            final mapping = CsvImportParser.detectMapping(headers, template: detectedTemplate);
 
             setState(() {
+              _selectedTemplate = detectedTemplate;
               _pickedFileName = file.name;
               _rawCsvRows = rows;
               _currentMapping = mapping;
@@ -392,13 +397,26 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
                   children: [
                     Expanded(
                       child: _buildTemplateOption(
+                        id: 'notion_bills',
+                        title: 'Notion บิลรายจ่ายประจำ',
+                        subtitle: 'บิลคงที่, กบข., ประกันออมทรัพย์',
+                        icon: Icons.receipt_long_outlined,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildTemplateOption(
                         id: 'notion_invest_stocks',
                         title: 'Notion ซื้อหุ้น US',
                         subtitle: 'Invest-Stocks (O, JEPQ, NVDA…)',
                         icon: Icons.show_chart,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
                     Expanded(
                       child: _buildTemplateOption(
                         id: 'custom',
@@ -407,6 +425,7 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
                         icon: Icons.tune_outlined,
                       ),
                     ),
+                    const Expanded(child: SizedBox()),
                   ],
                 ),
                 const SizedBox(height: 24),

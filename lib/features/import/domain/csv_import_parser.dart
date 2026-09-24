@@ -99,6 +99,20 @@ class CsvImportParser {
       }
     }
 
+    // Specific template override for Notion Bills
+    if (template == 'notion_bills' || headers.any((h) => h.trim().toLowerCase() == 'bill')) {
+      for (int i = 0; i < headers.length; i++) {
+        final h = headers[i].trim().toLowerCase();
+        if (h == 'date' || h == 'วันที่') dateCol = i;
+        if (h == 'bill' || h == 'รายการ' || h == 'name') nameCol = i;
+        if (h == 'category' || h == 'หมวดหมู่') categoryCol = i;
+        if (h == 'amount' || h == 'จำนวนเงิน') amountCol = i;
+        if (h == 'property' || h == 'paid' || h == 'สถานะ') propertyCol = i;
+        if (h == 'detail' || h == 'หมายเหตุ' || h == 'note') noteCol = i;
+        if (h.contains('monthly overview') || h.contains('overview')) periodCol = i;
+      }
+    }
+
     // Fallbacks if not cleanly matched
     if (dateCol == -1 && headers.isNotEmpty) dateCol = 0;
     if (nameCol == -1 && headers.length > 1) nameCol = 1;
@@ -635,10 +649,89 @@ class CsvImportParser {
 
       final expectedAmountSatang = budgetSatang > 0 ? budgetSatang : amountSatang;
 
-      // Determine transaction type
+      // Determine transaction type, category, and tags
       String txType = 'expense';
+      String canonicalCategory = cleanCategory.isEmpty ? 'ทั่วไป' : cleanCategory;
+      String? rowTag;
+
       if (templateType == 'notion_income') {
         txType = 'income';
+      } else if (templateType == 'notion_bills') {
+        txType = 'expense';
+        final lowerName = rawName.toLowerCase();
+        final lowerNote = (rawNote ?? '').toLowerCase();
+        final lowerCat = cleanCategory.toLowerCase();
+
+        // 1. GPF (กบข.)
+        if (lowerName.contains('กบข') || lowerName.contains('gpf')) {
+          canonicalCategory = 'เงินสะสม กบข.';
+          rowTag = 'deduction:gpf';
+        }
+        // 2. Insurance / ประกันออมทรัพย์
+        else if (lowerName.contains('ประกัน') ||
+            lowerNote.contains('ประกัน') ||
+            lowerCat.contains('insurance')) {
+          canonicalCategory = 'Healthcare';
+          rowTag = 'deduction:life_insurance';
+        }
+        // 3. Housing / ที่พัก
+        else if (lowerName.contains('rental') ||
+            lowerName.contains('peony') ||
+            lowerName.contains('หอพัก') ||
+            lowerName.contains('condo') ||
+            lowerName.contains('คอนโด')) {
+          canonicalCategory = 'Housing';
+        }
+        // 4. Utilities
+        else if (lowerName.contains('electr') ||
+            lowerName.contains('ไฟ') ||
+            lowerName.contains('water') ||
+            lowerName.contains('น้ำ') ||
+            lowerName.contains('coway') ||
+            lowerName.contains('3bb') ||
+            lowerName.contains('wifi') ||
+            lowerName.contains('mobile') ||
+            lowerName.contains('ais') ||
+            lowerName.contains('true') ||
+            lowerName.contains('internet') ||
+            lowerName.contains('เน็ต')) {
+          canonicalCategory = 'Utilities';
+        }
+        // 5. Entertainment
+        else if (lowerName.contains('netflix') ||
+            lowerName.contains('spotify') ||
+            lowerName.contains('xbox') ||
+            lowerName.contains('google')) {
+          canonicalCategory = 'Entertainment';
+        }
+        // 6. Gifts
+        else if (lowerName.contains('พ่อแม่') ||
+            lowerName.contains('แม่') ||
+            lowerName.contains('พ่อ')) {
+          canonicalCategory = 'Gifts';
+        }
+        // 7. Transportation
+        else if (lowerName.contains('พรบ') ||
+            lowerName.contains('ตรอ') ||
+            lowerName.contains('เดินทาง')) {
+          canonicalCategory = 'Transportation';
+        }
+        // 8. Taxes / Financial fees
+        else if (lowerName.contains('tax') || lowerName.contains('ภาษี')) {
+          canonicalCategory = 'Financial Fees';
+        }
+        // 9. Laundry / other
+        else if (lowerName.contains('ซักผ้า')) {
+          canonicalCategory = 'Other Expense';
+        } else {
+          final mapped = NotionCategoryMapper.toAppCategoryNameEn(cleanCategory);
+          canonicalCategory = mapped ??
+              (cleanCategory.isNotEmpty &&
+                      cleanCategory != 'Monthly' &&
+                      cleanCategory != 'Yearly'
+                  ? cleanCategory
+                  : 'Other Expense');
+        }
       } else if (templateType == 'notion_expense') {
         txType = 'expense';
       } else {
@@ -677,10 +770,11 @@ class CsvImportParser {
         date: date,
         rawDateString: rawDate?.toString() ?? '',
         name: rawName.trim(),
-        categoryName: cleanCategory.isEmpty ? 'ทั่วไป' : cleanCategory,
+        categoryName: canonicalCategory,
         accountName: rawAccount != null && rawAccount.isNotEmpty ? rawAccount : null,
         amountSatang: amountSatang,
         transactionType: txType,
+        tag: rowTag,
         taxCategory: taxCategory,
         withholdingTaxSatang: withholdingTaxSatang,
         note: rawNote,

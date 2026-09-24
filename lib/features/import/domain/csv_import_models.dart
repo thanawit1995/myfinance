@@ -72,6 +72,7 @@ class ParsedCsvRow {
   final List<dynamic> rawRow;
   final String? workPeriod; // รอบเดือนผลงาน เช่น '2026-07'
   final int? expectedAmountSatang; // ยอดประมาณการ/Budget
+  final String? tag; // e.g. 'deduction:gpf', 'deduction:life_insurance'
   final bool isCleared; // ได้รับเงินแล้ว (true) หรือ ค้างรับ/ตกเบิก (false)
 
   const ParsedCsvRow({
@@ -83,6 +84,7 @@ class ParsedCsvRow {
     this.accountName,
     required this.amountSatang,
     required this.transactionType,
+    this.tag,
     this.taxCategory,
     this.withholdingTaxSatang = 0,
     this.note,
@@ -106,6 +108,7 @@ class ParsedCsvRow {
     String? accountName,
     int? amountSatang,
     String? transactionType,
+    String? tag,
     String? taxCategory,
     int? withholdingTaxSatang,
     String? note,
@@ -126,6 +129,7 @@ class ParsedCsvRow {
       accountName: accountName ?? this.accountName,
       amountSatang: amountSatang ?? this.amountSatang,
       transactionType: transactionType ?? this.transactionType,
+      tag: tag ?? this.tag,
       taxCategory: taxCategory ?? this.taxCategory,
       withholdingTaxSatang: withholdingTaxSatang ?? this.withholdingTaxSatang,
       note: note ?? this.note,

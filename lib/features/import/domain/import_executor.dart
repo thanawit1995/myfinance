@@ -159,15 +159,16 @@ class ImportExecutor {
           targetCategoryId = categoryMap[catKey];
         } else if (autoCreateMissingCategories) {
           final newCatId = _uuid.v4();
+          final isGpf = row.categoryName.trim() == 'เงินสะสม กบข.';
           await categoriesDao.createCategory(
             CategoriesCompanion.insert(
               id: newCatId,
               nameTh: row.categoryName.trim(),
-              nameEn: row.categoryName.trim(),
+              nameEn: isGpf ? 'GPF Pension Fund' : row.categoryName.trim(),
               categoryType: row.transactionType,
               taxIncomeType: Value(row.taxCategory),
-              icon: const Value('category'),
-              color: const Value('0xFF888888'),
+              icon: Value(isGpf ? 'account_balance' : 'category'),
+              color: Value(isGpf ? '0xFF4CAF50' : '0xFF888888'),
               isSystem: const Value(false),
               createdAt: now,
               updatedAt: now,
@@ -196,6 +197,7 @@ class ImportExecutor {
             fxRate: const Value('1.0'),
             amountThbSatang: row.amountSatang,
             feeThbSatang: const Value(0),
+            tag: Value(row.tag),
             taxCategory: Value(row.taxCategory),
             withholdingTaxSatang: Value(row.withholdingTaxSatang),
             transactionDate: row.date!,

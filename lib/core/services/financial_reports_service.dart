@@ -305,6 +305,7 @@ class TaxPreparationReport {
   final List<RemittanceReportItem> remittances;
   final DividendOptimizationResult dividendOptimization;
   final List<TaxIncomeTransactionDetail> incomeTransactions;
+  final List<DeductionEntry> deductions;
   final int totalRemittanceSatang;
   final int totalRemittanceTaxableSatang;
   final int totalRemittancePrincipalSatang;
@@ -327,6 +328,7 @@ class TaxPreparationReport {
     required this.remittances,
     required this.dividendOptimization,
     this.incomeTransactions = const [],
+    this.deductions = const [],
     this.totalRemittanceSatang = 0,
     this.totalRemittanceTaxableSatang = 0,
     this.totalRemittancePrincipalSatang = 0,
@@ -756,6 +758,8 @@ class FinancialReportsService {
     final incomeEntries = <IncomeEntry>[];
     final incomeTxDetails = <TaxIncomeTransactionDetail>[];
     final grossByCategory = <String, int>{};
+    int gpfSatang = 0;
+    int lifeInsuranceSatang = 0;
 
     for (final tx in txList) {
       if (tx.transactionType == 'income') {
@@ -781,6 +785,14 @@ class FinancialReportsService {
           amountThbSatang: gross,
           withholdingTaxSatang: wht,
         ));
+      } else if (tx.transactionType == 'expense') {
+        final tag = tx.tag ?? '';
+        final note = (tx.note ?? '').toLowerCase();
+        if (tag.contains('deduction:gpf') || note.contains('กบข') || note.contains('gpf')) {
+          gpfSatang += tx.amountThbSatang;
+        } else if (tag.contains('deduction:life_insurance') || note.contains('ประกันออมทรัพย์')) {
+          lifeInsuranceSatang += tx.amountThbSatang;
+        }
       }
     }
 
@@ -833,12 +845,43 @@ class FinancialReportsService {
       ));
     }
 
-    // 5. Run Tax Engine
+    // 5. Deductions
+    final savedDeductions = await taxDao.getDeductionsForYear(taxYear);
+    final deductionEntries = <DeductionEntry>[];
+
+    for (final d in savedDeductions) {
+      deductionEntries.add(DeductionEntry(
+        code: d.deductionType,
+        name: d.deductionType,
+        group: d.deductionGroup,
+        amountSatang: d.amountSatang,
+      ));
+    }
+
+    if (gpfSatang > 0) {
+      deductionEntries.add(DeductionEntry(
+        code: 'gpf',
+        name: 'เงินสะสม กบข.',
+        group: 'fund',
+        amountSatang: gpfSatang,
+      ));
+    }
+
+    if (lifeInsuranceSatang > 0) {
+      deductionEntries.add(DeductionEntry(
+        code: 'life_insurance',
+        name: 'เบี้ยประกันชีวิต/ประกันออมทรัพย์',
+        group: 'insurance',
+        amountSatang: lifeInsuranceSatang,
+      ));
+    }
+
+    // 6. Run Tax Engine
     final calcResult = TaxCalculatorEngine.calculateTax(
       taxYear: taxYear,
       brackets: brackets,
       incomes: incomeEntries,
-      deductions: [],
+      deductions: deductionEntries,
       personalAllowanceSatang: rule?.personalAllowanceSatang ?? 6000000,
       spouseAllowanceSatang: rule?.spouseAllowanceSatang ?? 6000000,
       childAllowanceSatang: rule?.childAllowanceSatang ?? 3000000,
@@ -854,7 +897,7 @@ class FinancialReportsService {
       taxYear: taxYear,
       brackets: brackets,
       incomes: incomeEntries,
-      deductions: [],
+      deductions: deductionEntries,
       personalAllowanceSatang: rule?.personalAllowanceSatang ?? 6000000,
       spouseAllowanceSatang: rule?.spouseAllowanceSatang ?? 6000000,
       childAllowanceSatang: rule?.childAllowanceSatang ?? 3000000,
@@ -883,6 +926,7 @@ class FinancialReportsService {
       remittances: remItems,
       dividendOptimization: opt,
       incomeTransactions: incomeTxDetails,
+      deductions: deductionEntries,
       totalRemittanceSatang: totalRemittanceSatang,
       totalRemittanceTaxableSatang: totalRemittanceTaxableSatang,
       totalRemittancePrincipalSatang: totalRemittancePrincipalSatang,

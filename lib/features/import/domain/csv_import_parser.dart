@@ -456,75 +456,66 @@ class CsvImportParser {
       );
     }
 
-    // 7. เงินเวรเหมา = 40(2) (WHT 0)
+    // 7. เงินเวรเหมา = 40(1) (รพ.ต้นสังกัด)
     if (cleanName.contains('เวรเหมา') || cleanName.contains('เงินเวรเหมา')) {
       return IncomeTaxClassification(
-        taxCategory: '40_2',
+        taxCategory: '40_1',
         withholdingTaxSatang: explicitWhtSatang ?? 0,
-        ruleReason: 'เงินเวรเหมา มาตรา 40(2) ไม่หักภาษี ณ ที่จ่าย',
+        ruleReason: 'เงินเวรเหมา (รพ.ต้นสังกัด) มาตรา 40(1) ไม่หักภาษี ณ ที่จ่าย',
       );
     }
 
-    // 8. เงินรายชั่วโมง = 40(2) (WHT 0)
+    // 8. เงินรายชั่วโมง = 40(1) (รพ.ต้นสังกัด)
     if (cleanName.contains('รายชั่วโมง') || cleanName.contains('ชั่วโมง')) {
       return IncomeTaxClassification(
-        taxCategory: '40_2',
+        taxCategory: '40_1',
         withholdingTaxSatang: explicitWhtSatang ?? 0,
-        ruleReason: 'เงินรายชั่วโมง มาตรา 40(2) ไม่หักภาษี ณ ที่จ่าย',
+        ruleReason: 'เงินรายชั่วโมง (รพ.ต้นสังกัด) มาตรา 40(1) ไม่หักภาษี ณ ที่จ่าย',
       );
     }
 
-    // 9. เงิน DF (Doctor Fee) = 40(2) (WHT 0)
+    // 9. เงิน DF (Doctor Fee) ใน รพ.สังกัด = 40(1)
     if (cleanName.contains('df') || cleanName.contains('doctor fee')) {
       return IncomeTaxClassification(
-        taxCategory: '40_2',
+        taxCategory: '40_1',
         withholdingTaxSatang: explicitWhtSatang ?? 0,
-        ruleReason: 'เงิน DF มาตรา 40(2) ไม่หักภาษี ณ ที่จ่าย',
+        ruleReason: 'เงิน DF (รพ.ต้นสังกัด) มาตรา 40(1) ไม่หักภาษี ณ ที่จ่าย',
       );
     }
 
-    // 10. เงินหมื่น ไม่ทำเวชฯ = 40(2) (WHT 0)
+    // 10. เงินหมื่น ไม่ทำเวชฯ = 40(1)
     if (cleanName.contains('ไม่ทำเวช') || cleanName.contains('เงินหมื่น')) {
       return IncomeTaxClassification(
-        taxCategory: '40_2',
+        taxCategory: '40_1',
         withholdingTaxSatang: explicitWhtSatang ?? 0,
-        ruleReason: 'เงินหมื่นไม่ทำเวชปฏิบัติส่วนตัว มาตรา 40(2) ไม่หักภาษี ณ ที่จ่าย',
+        ruleReason: 'เงินหมื่นไม่ทำเวชปฏิบัติส่วนตัว มาตรา 40(1) ไม่หักภาษี ณ ที่จ่าย',
       );
     }
 
-    // 11. เงินส่งเสริมพิเศษ / เบี้ยกันดาร = 40(2) (WHT 0)
+    // 11. เงินส่งเสริมพิเศษ / เบี้ยกันดาร = 40(1)
     if (cleanName.contains('ส่งเสริมพิเศษ') || cleanName.contains('เบี้ยกันดาร')) {
       return IncomeTaxClassification(
-        taxCategory: '40_2',
+        taxCategory: '40_1',
         withholdingTaxSatang: explicitWhtSatang ?? 0,
-        ruleReason: 'เงินส่งเสริมพิเศษ มาตรา 40(2) ไม่หักภาษี ณ ที่จ่าย',
+        ruleReason: 'เงินส่งเสริมพิเศษ/เบี้ยกันดาร มาตรา 40(1) ไม่หักภาษี ณ ที่จ่าย',
       );
     }
 
-    // 12. P4P = 40(2)
-    if (cleanName.contains('p4p')) {
-      return IncomeTaxClassification(
-        taxCategory: '40_2',
-        withholdingTaxSatang: explicitWhtSatang ?? 0,
-        ruleReason: 'P4P (Pay for Performance) มาตรา 40(2) มีหักภาษี ณ ที่จ่ายตามระเบียบ',
-      );
-    }
-
-    // 13. สมุดตรวจสุขภาพ = 40(2)
+    // 12. สมุดตรวจสุขภาพ = 40(1) (รพ.ต้นสังกัด)
     if (cleanName.contains('สมุดตรวจสุขภาพ') || cleanName.contains('ตรวจสุขภาพ')) {
       return IncomeTaxClassification(
-        taxCategory: '40_2',
+        taxCategory: '40_1',
         withholdingTaxSatang: explicitWhtSatang ?? 0,
-        ruleReason: 'ค่าตรวจสุขภาพ มาตรา 40(2) ไม่หักภาษี ณ ที่จ่าย',
+        ruleReason: 'ค่าตรวจสุขภาพ (รพ.ต้นสังกัด) มาตรา 40(1) ไม่หักภาษี ณ ที่จ่าย',
       );
     }
 
-    // 14. ค่าเวร / เวรนอก / ซื้อเวร = 40(2)
+    // 13. ค่าเวร / on duty = 40(1)
     if (cleanName.contains('เวร') || cleanName.contains('on duty')) {
       return IncomeTaxClassification(
-        taxCategory: '40_2',
+        taxCategory: '40_1',
         withholdingTaxSatang: explicitWhtSatang ?? 0,
-        ruleReason: 'ค่าเวรปฏิบัติการ มาตรา 40(2) ไม่หักภาษี ณ ที่จ่าย',
+        ruleReason: 'ค่าเวรปฏิบัติการ (รพ.ต้นสังกัด) มาตรา 40(1) ไม่หักภาษี ณ ที่จ่าย',
       );
     }
 

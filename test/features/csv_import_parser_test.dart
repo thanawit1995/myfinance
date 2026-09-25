@@ -168,13 +168,13 @@ void main() {
       expect(ptsAfter.taxCategory, '40_1');
       expect(ptsAfter.withholdingTaxSatang, 50000);
 
-      // 7. เงินเวรเหมา = 40(2) (WHT 0)
+      // 7. เงินเวรเหมา = 40(1) (WHT 0)
       final shift = CsvImportParser.classifyIncomeTax(
         name: 'เงินเวรเหมา ER',
         date: DateTime(2026, 8, 1),
         amountSatang: 1200000,
       );
-      expect(shift.taxCategory, '40_2');
+      expect(shift.taxCategory, '40_1');
       expect(shift.withholdingTaxSatang, 0);
 
       // 8. TTCM = 40(2)

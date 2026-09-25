@@ -372,8 +372,6 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
         ? Icons.arrow_upward_rounded
         : (isIncome ? Icons.arrow_downward_rounded : Icons.swap_horiz_rounded);
 
-    final timeStr = DateFormat('HH:mm').format(tx.transactionDate);
-
     final defaultNote = isExpense
         ? (isThai ? 'รายจ่าย' : 'Expense')
         : (isIncome ? (isThai ? 'รายรับ' : 'Income') : (isThai ? 'โอนเงิน' : 'Transfer'));
@@ -393,32 +391,30 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
         tx.note?.isNotEmpty == true ? tx.note! : defaultNote,
         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
       ),
-      subtitle: Row(
-        children: [
-          Text(
-            timeStr,
-            style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
-          ),
-          if (isIncome && !tx.isCleared) ...[
-            const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-              decoration: BoxDecoration(
-                color: Colors.amber.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(4),
+      subtitle: (isIncome && !tx.isCleared)
+          ? Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      tx.workPeriod != null ? 'ค้างรับ (${tx.workPeriod})' : 'ค้างรับ/ตกเบิก',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.amber.shade900,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              child: Text(
-                tx.workPeriod != null ? 'ค้างรับ (${tx.workPeriod})' : 'ค้างรับ/ตกเบิก',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.amber.shade900,
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
+            )
+          : null,
       trailing: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.end,

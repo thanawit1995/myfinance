@@ -127,8 +127,8 @@ class _BuySellTradeDialogState extends ConsumerState<BuySellTradeDialog> {
 
     try {
       final quantity = Decimal.parse(_quantityController.text.trim());
-      final priceDouble = double.parse(_priceController.text.trim());
-      final priceSatang = (priceDouble * 100).round();
+      final priceDecimal = Decimal.parse(_priceController.text.trim());
+      final priceSatang = (priceDecimal * Decimal.fromInt(100)).round().toBigInt().toInt();
       final fxRate = Decimal.parse(_fxRateController.text.trim());
       final feeDouble = double.tryParse(_feeController.text.trim()) ?? 0.0;
       final feeSatang = (feeDouble * 100).round();
@@ -142,6 +142,7 @@ class _BuySellTradeDialogState extends ConsumerState<BuySellTradeDialog> {
           tradeDate: _tradeDate,
           quantity: quantity,
           priceOriginalSatang: priceSatang,
+          pricePerUnitOriginal: priceDecimal,
           currencyCode: _currency,
           fxRate: fxRate,
           feeThbSatang: feeSatang,
@@ -154,6 +155,7 @@ class _BuySellTradeDialogState extends ConsumerState<BuySellTradeDialog> {
           tradeDate: _tradeDate,
           quantity: quantity,
           priceOriginalSatang: priceSatang,
+          pricePerUnitOriginal: priceDecimal,
           currencyCode: _currency,
           fxRate: fxRate,
           feeThbSatang: feeSatang,
@@ -330,8 +332,12 @@ class _BuySellTradeDialogState extends ConsumerState<BuySellTradeDialog> {
                         ),
                         validator: (val) {
                           if (val == null || val.trim().isEmpty) return isThai ? 'กรุณาระบุราคา' : 'Please specify price';
-                          final num = double.tryParse(val.trim());
-                          if (num == null || num <= 0) return '> 0';
+                          try {
+                            final d = Decimal.parse(val.trim());
+                            if (d <= Decimal.zero) return '> 0';
+                          } catch (_) {
+                            return isThai ? 'ราคาไม่ถูกต้อง' : 'Invalid price';
+                          }
                           return null;
                         },
                         onChanged: (_) => setState(() {}),
@@ -416,12 +422,12 @@ class _BuySellTradeDialogState extends ConsumerState<BuySellTradeDialog> {
                 Builder(
                   builder: (context) {
                     final q = Decimal.tryParse(_quantityController.text.trim()) ?? Decimal.zero;
-                    final p = double.tryParse(_priceController.text.trim()) ?? 0.0;
+                    final p = Decimal.tryParse(_priceController.text.trim()) ?? Decimal.zero;
                     final fx = Decimal.tryParse(_fxRateController.text.trim()) ?? Decimal.one;
                     final fee = double.tryParse(_feeController.text.trim()) ?? 0.0;
 
-                    final origTotal = (q * Decimal.parse(p.toStringAsFixed(2))).toDouble();
-                    final thbTotalSatang = (Decimal.parse(origTotal.toStringAsFixed(2)) * fx * Decimal.fromInt(100)).round().toBigInt().toInt() +
+                    final origTotalSatang = (q * p * Decimal.fromInt(100)).round().toBigInt().toInt();
+                    final thbTotalSatang = (Decimal.fromInt(origTotalSatang) * fx).round().toBigInt().toInt() +
                         (_isBuy ? (fee * 100).round() : -(fee * 100).round());
 
                     final moneyPreview = Money(thbTotalSatang > 0 ? thbTotalSatang : 0);

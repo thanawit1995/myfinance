@@ -63,12 +63,14 @@ class _MonthlyValuationScreenState extends ConsumerState<MonthlyValuationScreen>
     int savedCount = 0;
     for (final h in holdings) {
       final ctrl = _priceControllers[h.asset.id];
+      Decimal? pDecimal;
       int pSatang = h.currentPriceOriginalSatang;
 
       if (ctrl != null && ctrl.text.trim().isNotEmpty) {
-        final pDouble = double.tryParse(ctrl.text.trim().replaceAll(',', '.'));
-        if (pDouble != null && pDouble > 0) {
-          pSatang = (pDouble * 100).round();
+        final parsed = Decimal.tryParse(ctrl.text.trim().replaceAll(',', '.'));
+        if (parsed != null && parsed > Decimal.zero) {
+          pDecimal = parsed;
+          pSatang = (parsed * Decimal.fromInt(100)).round().toBigInt().toInt();
         }
       }
 
@@ -78,6 +80,7 @@ class _MonthlyValuationScreenState extends ConsumerState<MonthlyValuationScreen>
         assetId: h.asset.id,
         priceDate: lastDay,
         marketPriceOriginalSatang: pSatang,
+        marketPriceOriginal: pDecimal,
         fxRate: fx,
       );
       savedCount++;
@@ -126,9 +129,12 @@ class _MonthlyValuationScreenState extends ConsumerState<MonthlyValuationScreen>
           // Initialize controllers for each holding if not already
           for (final h in holdings) {
             if (!_priceControllers.containsKey(h.asset.id)) {
+              final currentDec = h.currentPriceOriginal;
               final currentDouble = h.currentPriceOriginalSatang / 100.0;
               _priceControllers[h.asset.id] = TextEditingController(
-                text: currentDouble > 0 ? currentDouble.toStringAsFixed(2) : '',
+                text: currentDec != null
+                    ? currentDec.toString()
+                    : (currentDouble > 0 ? currentDouble.toStringAsFixed(2) : ''),
               );
             }
           }

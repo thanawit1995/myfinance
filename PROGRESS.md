@@ -2,6 +2,30 @@
 
 อัปเดตล่าสุด: 25 กันยายน 2026
 
+- [x] **Notion Invest Import (Funds, Gold, Stocks) & 4-Decimal Trade Precision & Medical Tax 40(1) Update**:
+  - **1. จัดหมวดหมู่ภาษีรายได้การแพทย์เป็น 40(1) ทั้งหมด**:
+    - ปรับปรุงการจัดหมวดหมู่ภาษีในตัวนำเข้า CSV Notion: ค่าเวรโรงพยาบาลที่สังกัด (เวรเหมา/รายชั่วโมง), ค่า DF ที่ตรวจในโรงพยาบาลสังกัด, เงินส่งเสริมพิเศษ (เบี้ยกันดาร), ค่าตรวจสุขภาพ, และเงินหมื่นไม่ทำเวชฯ ให้นับเป็น **มาตรา 40(1)** ตามประมวลรัษฎากรว่าด้วยสัญญาจ้างแรงงานของสถานพยาบาลต้นสังกัด
+    - คงเหลือเฉพาะคลินิก/โรงพยาบาลภายนอก (TTCM) ที่ยังคงเป็น **มาตรา 40(2)** และรายการ Top-up ที่ไม่คิดภาษี
+  - **2. ปรับปรุง UI หน้ารายการธุรกรรม & แก้ไขชื่อเพี้ยนจาก Notion Relation**:
+    - ซ่อนเวลา (เช่น `00:00`) ใน ListTile ของหน้ารายการธุรกรรมเพื่อความกระชับสะอาดตา โดยยังคงแสดงวันที่และเวลาครบถ้วนเมื่อกดเข้าไปดู/แก้ไขรายละเอียด
+    - ปรับปรุง `ImportExecutor` ให้ตัดข้อความ Notion relation link (เช่น `(https://app.notion.com/...)`) และชื่อซ้ำในวงเล็บออกอัตโนมัติ
+    - เพิ่มฟังก์ชัน `cleanDistortedNotionNotes()` ใน `TransactionsDao` ที่รันตอนเปิดแอปอัตโนมัติ (`beforeOpen`) เพื่อชำระข้อมูลเดิมที่เคย import เข้าไปแล้วให้สะอาดสวยงามทันที
+  - **3. รองรับราคาซื้อขายและ NAV ทศนิยมละเอียด 4 หลัก (Decimal 4-Precision)**:
+    - เพิ่มคอลัมน์ `price_per_unit_original` และ `price_per_unit_thb` ในตาราง `InvestmentLots`
+    - เพิ่มคอลัมน์ `market_price_original` และ `market_price_thb` ในตาราง `AssetPrices`
+    - เพิ่ม Database Migration Version 9 รองรับการอัปเกรดฐานข้อมูลอย่างปลอดภัย
+    - ปรับปรุง `InvestmentsDao`, `FifoEngine`, ไดอะล็อกซื้อขาย (`buy_sell_trade_dialog.dart`) และหน้าประเมินมูลค่า (`monthly_valuation_screen.dart`) ให้คำนวณและแสดงราคาต่อหน่วยด้วยทศนิยมละเอียด 4 ตำแหน่ง (เช่น NAV `31.9043`) โดยยอดเงินรวมยังคงเก็บเป็น integer สตางค์ตามกฎ Rule 4 อย่างเคร่งครัด
+  - **4. ระบบนำเข้าพอร์ตการลงทุนจาก Notion (Notion_invest Import Wizard)**:
+    - สร้าง `NotionFundsParser` และ `NotionFundsImportExecutor` รองรับการนำเข้ากองทุนรวม (Mutual Funds: K-SET50, SCBFP-SSF, กบข. ฯลฯ) พร้อมบันทึก NAV ปัจจุบันและคำนวณต้นทุนต่อหน่วยแบบ Decimal
+    - สร้าง `NotionGoldParser` และ `NotionGoldImportExecutor` รองรับการนำเข้าทองคำดิจิทัล (MST-GOLD 99.99%) คำนวณ USD, FX Rate และ THB Satang พร้อมบันทึกราคาตลาด
+    - เพิ่มหน้าต่างพรีวิว `NotionFundsPreviewDialog` และ `NotionGoldPreviewDialog` ให้ผู้ใช้ตรวจสอบ/เลือกรายการก่อนกดยืนยัน
+    - ปรับปรุง `ImportWizardScreen` ให้มีตัวเลือกแทมเพลต "Notion กองทุนรวม" และ "Notion ทองคำ" พร้อมระบบ Auto-detect คอลัมน์อัตโนมัติเมื่อเลือกไฟล์ CSV
+  - **การทดสอบความถูกต้อง**:
+    - เพิ่ม Unit Test ใหม่ใน `test/features/notion_invest_funds_gold_test.dart` และ `test/features/investments_dao_test.dart`
+    - อัปเดตและรัน `flutter test` ผ่านทั้งหมด **158/158 tests passed** (100%)
+    - `flutter analyze` ผ่านฉลุย **0 error, 0 warning**
+
+
 - [x] **Project Files Cleanup & Android APK Build**:
   - **1. คอมไพล์ไฟล์ติดตั้ง Android APK (Release)**:
     - รันคำสั่ง `flutter build apk --release` พร้อมตั้งค่า Android SDK 36, minSdk 26

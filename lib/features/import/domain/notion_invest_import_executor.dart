@@ -112,6 +112,7 @@ class NotionInvestImportExecutor {
           tradeDate: row.buyDate,
           quantity: row.quantity,
           priceOriginalSatang: pricePerShareSatang,
+          pricePerUnitOriginal: row.unitPriceOriginal > Decimal.zero ? row.unitPriceOriginal : null,
           currencyCode: currencyCode,
           fxRate: fxRate,
           feeThbSatang: 0,

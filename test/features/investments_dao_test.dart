@@ -829,5 +829,62 @@ void main() {
       expect(recent, isNotNull);
       expect(recent!.deletedAt, isNotNull);
     });
+
+    test('4-decimal precision for trade price and NAV computes exact satang without rounding drift', () async {
+      const fundId = 'fund-4dec-test';
+      final now = DateTime.now();
+
+      await db.investmentsDao.createAsset(
+        AssetsCompanion.insert(
+          id: fundId,
+          symbol: 'K-SET50-TEST',
+          name: 'K SET50 Index Fund',
+          assetType: 'mutual_fund',
+          currencyCode: 'THB',
+          defaultAccountId: defaultAccountId,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      // Buy 1,000 units at NAV 31.9043 THB
+      final navBuy = Decimal.parse('31.9043');
+      final lotId = await db.investmentsDao.recordBuyTrade(
+        assetId: fundId,
+        accountId: defaultAccountId,
+        tradeDate: DateTime(2026, 6, 1),
+        quantity: Decimal.parse('1000'),
+        priceOriginalSatang: (navBuy * Decimal.fromInt(100)).round().toBigInt().toInt(),
+        pricePerUnitOriginal: navBuy,
+        currencyCode: 'THB',
+        fxRate: Decimal.one,
+        feeThbSatang: 0,
+      );
+
+      final lot = await (db.select(db.investmentLots)..where((l) => l.id.equals(lotId))).getSingle();
+      // Total cost should be 1000 * 31.9043 = 31,904.30 THB = 3,190,430 satang (NOT truncated to 3,190,000!)
+      expect(lot.totalCostThbSatang, 3190430);
+      expect(lot.pricePerUnitOriginal, '31.9043');
+
+      // Record monthly valuation at NAV 35.1234
+      final navVal = Decimal.parse('35.1234');
+      await db.investmentsDao.recordAssetPrice(
+        assetId: fundId,
+        priceDate: DateTime(2026, 6, 30),
+        marketPriceOriginalSatang: (navVal * Decimal.fromInt(100)).round().toBigInt().toInt(),
+        marketPriceOriginal: navVal,
+        fxRate: Decimal.one,
+      );
+
+      final summary = await db.investmentsDao.getPortfolioSummary();
+      final holding = summary.holdings.firstWhere((h) => h.asset.id == fundId);
+
+      // Current value: 1000 * 35.1234 = 35,123.40 THB = 3,512,340 satang
+      expect(holding.currentValueThbSatang, 3512340);
+      expect(holding.currentPriceOriginal, navVal);
+      // Unrealized gain: 3,512,340 - 3,190,430 = 321,910 satang = 3,219.10 THB
+      expect(holding.unrealizedPriceGainLossThbSatang, 321910);
+      expect(holding.totalUnrealizedGainLossThbSatang, 321910);
+    });
   });
 }

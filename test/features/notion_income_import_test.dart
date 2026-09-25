@@ -22,16 +22,14 @@ void main() {
 
     test('Thai medical income tax categories classify correctly', () {
       final date = DateTime(2026, 1, 1);
-      // 40_1: เงินเดือน, พตส., ประจำตำแหน่ง
+      // 40_1: เงินเดือน, พตส., ประจำตำแหน่ง, เวรเหมา, รายชั่วโมง, DF, ไม่ทำเวชฯ
       expect(CsvImportParser.classifyIncomeTax(name: 'เงินเดือน สสจ.', date: date, amountSatang: 5000000).taxCategory, '40_1');
       expect(CsvImportParser.classifyIncomeTax(name: 'เงิน พตส.', date: date, amountSatang: 1000000).taxCategory, '40_1');
       expect(CsvImportParser.classifyIncomeTax(name: 'เงินประจำตำแหน่ง', date: date, amountSatang: 1000000).taxCategory, '40_1');
-
-      // 40_2: เวรเหมา, รายชั่วโมง, DF, ไม่ทำเวชฯ
-      expect(CsvImportParser.classifyIncomeTax(name: 'เวรเหมา 1หมื่น', date: date, amountSatang: 1000000).taxCategory, '40_2');
-      expect(CsvImportParser.classifyIncomeTax(name: 'เงินหมื่น ไม่ทำเวชฯ', date: date, amountSatang: 1000000).taxCategory, '40_2');
-      expect(CsvImportParser.classifyIncomeTax(name: 'เงินรายชั่วโมง', date: date, amountSatang: 1000000).taxCategory, '40_2');
-      expect(CsvImportParser.classifyIncomeTax(name: 'DF cost', date: date, amountSatang: 1000000).taxCategory, '40_2');
+      expect(CsvImportParser.classifyIncomeTax(name: 'เวรเหมา 1หมื่น', date: date, amountSatang: 1000000).taxCategory, '40_1');
+      expect(CsvImportParser.classifyIncomeTax(name: 'เงินหมื่น ไม่ทำเวชฯ', date: date, amountSatang: 1000000).taxCategory, '40_1');
+      expect(CsvImportParser.classifyIncomeTax(name: 'เงินรายชั่วโมง', date: date, amountSatang: 1000000).taxCategory, '40_1');
+      expect(CsvImportParser.classifyIncomeTax(name: 'DF cost', date: date, amountSatang: 1000000).taxCategory, '40_1');
     });
 
     test('Notion Income CSV rows parse budget, amount, property, and isCleared correctly', () {
@@ -65,7 +63,7 @@ void main() {
       expect(row1.workPeriod, '2025-12');
       expect(row1.expectedAmountSatang, 1000000); // 10,000 THB = 1,000,000 satang
       expect(row1.amountSatang, 1000000);
-      expect(row1.taxCategory, '40_2');
+      expect(row1.taxCategory, '40_1');
       expect(row1.isValid, isTrue);
 
       // Row 2: Property: Yes -> Cleared/Received
@@ -75,7 +73,7 @@ void main() {
       expect(row2.workPeriod, '2025-12');
       expect(row2.expectedAmountSatang, 1000000);
       expect(row2.amountSatang, 1000000);
-      expect(row2.taxCategory, '40_2');
+      expect(row2.taxCategory, '40_1');
       expect(row2.isValid, isTrue);
     });
 
@@ -280,6 +278,32 @@ void main() {
       // Account balance must remain 0
       final bal = await db.accountsDao.getAccountBalanceSatang(fallbackAccId);
       expect(bal, 0);
+    });
+
+    test('cleanDistortedNotionNotes cleans up legacy transactions with Notion URLs', () async {
+      final now = DateTime.now();
+      final legacyId = 'legacy-tx-1';
+      await db.transactionsDao.insertTransaction(
+        TransactionsCompanion.insert(
+          id: legacyId,
+          transactionType: 'income',
+          sourceAccountId: const Value('acc-ktb-1'),
+          amountOriginalSatang: 5000000,
+          currencyCode: 'THB',
+          amountThbSatang: 5000000,
+          note: const Value('เงินเดือน (🏧เงินเดือนจาก สสจ._SEP26 (https://app.notion.com/p/12345))'),
+          transactionDate: now,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      final cleanedCount = await db.transactionsDao.cleanDistortedNotionNotes();
+      expect(cleanedCount, 1);
+
+      final tx = await db.transactionsDao.getTransactionById(legacyId);
+      expect(tx, isNotNull);
+      expect(tx!.note, 'เงินเดือน');
     });
   });
 }

@@ -13,6 +13,7 @@ class PortfolioAssetHolding {
   final Decimal totalQuantity;
   final int totalCostThbSatang;
   final int currentPriceOriginalSatang;
+  final Decimal? currentPriceOriginal;
   final Decimal currentFxRate;
   final int currentPriceThbSatang;
   final int currentValueThbSatang;
@@ -25,6 +26,7 @@ class PortfolioAssetHolding {
     required this.totalQuantity,
     required this.totalCostThbSatang,
     required this.currentPriceOriginalSatang,
+    this.currentPriceOriginal,
     required this.currentFxRate,
     required this.currentPriceThbSatang,
     required this.currentValueThbSatang,
@@ -316,6 +318,7 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
     required DateTime tradeDate,
     required Decimal quantity,
     required int priceOriginalSatang,
+    Decimal? pricePerUnitOriginal,
     required String currencyCode,
     required Decimal fxRate,
     required int feeThbSatang,
@@ -331,12 +334,19 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
     final totalCostThbSatang = FifoEngine.calculateBuyTotalCostThbSatang(
       quantity: quantity,
       costPerUnitOriginalSatang: priceOriginalSatang,
+      pricePerUnitOriginal: pricePerUnitOriginal,
       fxRate: fxRate,
       feeThbSatang: feeThbSatang,
     );
 
-    final costPerUnitThbSatang = (Decimal.fromInt(priceOriginalSatang) * fxRate).round().toBigInt().toInt();
-    final amountOriginalSatang = (quantity * Decimal.fromInt(priceOriginalSatang)).round().toBigInt().toInt();
+    final Decimal unitPriceOriginal = pricePerUnitOriginal ??
+        (Decimal.fromInt(priceOriginalSatang) * Decimal.parse('0.01'));
+    final Decimal unitPriceThb = unitPriceOriginal * fxRate;
+
+    final costPerUnitThbSatang = (unitPriceThb * Decimal.fromInt(100)).round().toBigInt().toInt();
+    final effectivePriceOriginalSatang = (unitPriceOriginal * Decimal.fromInt(100)).round().toBigInt().toInt();
+
+    final amountOriginalSatang = (quantity * unitPriceOriginal * Decimal.fromInt(100)).round().toBigInt().toInt();
     final amountThbSatang = (Decimal.fromInt(amountOriginalSatang) * fxRate).round().toBigInt().toInt();
 
     // 1. Record FX Rate if not THB
@@ -368,7 +378,7 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
         feeThbSatang: Value(feeThbSatang),
         sourceAccountId: Value(accountId),
         transactionDate: tradeDate,
-        note: Value(note ?? 'ซื้อ $symbol $quantity หน่วย @ ${priceOriginalSatang / 100.0} $currencyCode'),
+        note: Value(note ?? 'ซื้อ $symbol $quantity หน่วย @ $unitPriceOriginal $currencyCode'),
         tag: Value('investment_buy:$assetId'),
         createdAt: now,
         updatedAt: now,
@@ -384,9 +394,11 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
         buyDate: tradeDate,
         quantity: quantity.toString(),
         remainingQuantity: quantity.toString(),
-        costPerUnitOriginalSatang: priceOriginalSatang,
+        costPerUnitOriginalSatang: effectivePriceOriginalSatang,
         fxRate: fxRate.toString(),
         costPerUnitThbSatang: costPerUnitThbSatang,
+        pricePerUnitOriginal: Value(unitPriceOriginal.toString()),
+        pricePerUnitThb: Value(unitPriceThb.toString()),
         feeThbSatang: feeThbSatang,
         totalCostThbSatang: Value(totalCostThbSatang),
         remainingCostThbSatang: Value(totalCostThbSatang),
@@ -430,6 +442,7 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
     required DateTime tradeDate,
     required Decimal quantity,
     required int priceOriginalSatang,
+    Decimal? pricePerUnitOriginal,
     required String currencyCode,
     required Decimal fxRate,
     required int feeThbSatang,
@@ -440,6 +453,9 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
 
     final asset = await getAssetById(assetId);
     final symbol = asset?.symbol ?? 'ASSET';
+
+    final Decimal unitSellPrice = pricePerUnitOriginal ??
+        (Decimal.fromInt(priceOriginalSatang) * Decimal.parse('0.01'));
 
     // 1. Fetch open lots for asset
     final lotRows = await (select(investmentLots)
@@ -459,6 +475,7 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
         quantity: Decimal.parse(r.quantity),
         remainingQuantity: Decimal.parse(r.remainingQuantity),
         costPerUnitOriginalSatang: r.costPerUnitOriginalSatang,
+        pricePerUnitOriginal: r.pricePerUnitOriginal != null ? Decimal.tryParse(r.pricePerUnitOriginal!) : null,
         fxRate: Decimal.parse(r.fxRate),
         costPerUnitThbSatang: r.costPerUnitThbSatang,
         feeThbSatang: r.feeThbSatang,
@@ -473,6 +490,7 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
       openLots: openLots,
       sellQuantity: quantity,
       sellPriceOriginalSatang: priceOriginalSatang,
+      pricePerUnitOriginal: unitSellPrice,
       sellFxRate: fxRate,
       sellFeeThbSatang: feeThbSatang,
     );
@@ -495,7 +513,7 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
     }
 
     // 4. Record Transaction in ledger (income proceeds into destinationAccountId)
-    final amountOriginalSatang = (quantity * Decimal.fromInt(priceOriginalSatang)).round().toBigInt().toInt();
+    final amountOriginalSatang = (quantity * unitSellPrice * Decimal.fromInt(100)).round().toBigInt().toInt();
 
     await into(transactions).insert(
       TransactionsCompanion.insert(
@@ -508,7 +526,7 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
         feeThbSatang: Value(feeThbSatang),
         destinationAccountId: Value(accountId),
         transactionDate: tradeDate,
-        note: Value(note ?? 'ขาย $symbol $quantity หน่วย @ ${priceOriginalSatang / 100.0} $currencyCode'),
+        note: Value(note ?? 'ขาย $symbol $quantity หน่วย @ $unitSellPrice $currencyCode'),
         tag: Value('investment_sell:$assetId'),
         createdAt: now,
         updatedAt: now,
@@ -624,6 +642,7 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
         quantity: Decimal.parse(r.quantity),
         remainingQuantity: Decimal.parse(r.quantity),
         costPerUnitOriginalSatang: r.costPerUnitOriginalSatang,
+        pricePerUnitOriginal: r.pricePerUnitOriginal != null ? Decimal.tryParse(r.pricePerUnitOriginal!) : null,
         fxRate: Decimal.parse(r.fxRate),
         costPerUnitThbSatang: r.costPerUnitThbSatang,
         feeThbSatang: r.feeThbSatang,
@@ -840,10 +859,15 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
     required String assetId,
     required DateTime priceDate,
     required int marketPriceOriginalSatang,
+    Decimal? marketPriceOriginal,
     required Decimal fxRate,
   }) async {
     final now = DateTime.now();
-    final priceThbSatang = (Decimal.fromInt(marketPriceOriginalSatang) * fxRate).round().toBigInt().toInt();
+    final Decimal unitMarketPrice = marketPriceOriginal ??
+        (Decimal.fromInt(marketPriceOriginalSatang) * Decimal.parse('0.01'));
+    final Decimal unitMarketPriceThb = unitMarketPrice * fxRate;
+    final priceThbSatang = (unitMarketPriceThb * Decimal.fromInt(100)).round().toBigInt().toInt();
+    final effectivePriceOriginalSatang = (unitMarketPrice * Decimal.fromInt(100)).round().toBigInt().toInt();
 
     // Check if price records for this asset on this priceDate already exist
     final existingList = await (select(assetPrices)
@@ -861,9 +885,11 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
       final primary = existingList.first;
       await (update(assetPrices)..where((p) => p.id.equals(primary.id))).write(
         AssetPricesCompanion(
-          marketPriceOriginalSatang: Value(marketPriceOriginalSatang),
+          marketPriceOriginalSatang: Value(effectivePriceOriginalSatang),
           fxRate: Value(fxRate.toString()),
           marketPriceThbSatang: Value(priceThbSatang),
+          marketPriceOriginal: Value(unitMarketPrice.toString()),
+          marketPriceThb: Value(unitMarketPriceThb.toString()),
           updatedAt: Value(now),
         ),
       );
@@ -882,9 +908,11 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
           id: _uuid.v4(),
           assetId: assetId,
           priceDate: priceDate,
-          marketPriceOriginalSatang: marketPriceOriginalSatang,
+          marketPriceOriginalSatang: effectivePriceOriginalSatang,
           fxRate: fxRate.toString(),
           marketPriceThbSatang: priceThbSatang,
+          marketPriceOriginal: Value(unitMarketPrice.toString()),
+          marketPriceThb: Value(unitMarketPriceThb.toString()),
           createdAt: now,
           updatedAt: now,
         ),
@@ -1014,14 +1042,21 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
 
       // Get latest market price
       final latestPriceRow = await getLatestPriceForAsset(asset.id);
-      final int currentPriceOrig = latestPriceRow?.marketPriceOriginalSatang ??
-          lots.last.costPerUnitOriginalSatang;
+      final Decimal unitMarketPriceOrig = (latestPriceRow?.marketPriceOriginal != null)
+          ? Decimal.parse(latestPriceRow!.marketPriceOriginal!)
+          : (latestPriceRow != null
+              ? (Decimal.fromInt(latestPriceRow.marketPriceOriginalSatang) * Decimal.parse('0.01'))
+              : (lots.last.pricePerUnitOriginal != null
+                  ? Decimal.parse(lots.last.pricePerUnitOriginal!)
+                  : (Decimal.fromInt(lots.last.costPerUnitOriginalSatang) * Decimal.parse('0.01'))));
+
+      final int currentPriceOrigSatang = (unitMarketPriceOrig * Decimal.fromInt(100)).round().toBigInt().toInt();
       final Decimal currentFx = latestPriceRow != null
           ? Decimal.parse(latestPriceRow.fxRate)
           : Decimal.parse(lots.last.fxRate);
 
-      final currentPriceThb = (Decimal.fromInt(currentPriceOrig) * currentFx).round().toBigInt().toInt();
-      final currentValThb = (totalQty * Decimal.fromInt(currentPriceOrig) * currentFx).round().toBigInt().toInt();
+      final currentPriceThb = (unitMarketPriceOrig * currentFx * Decimal.fromInt(100)).round().toBigInt().toInt();
+      final currentValThb = (totalQty * unitMarketPriceOrig * currentFx * Decimal.fromInt(100)).round().toBigInt().toInt();
 
       // Unrealized P&L split per lot:
       int assetUnrealizedPrice = 0;
@@ -1032,12 +1067,16 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
         if (remQty <= Decimal.zero) continue;
 
         final lotBuyFx = Decimal.parse(lot.fxRate);
-        final priceDiffOrig = currentPriceOrig - lot.costPerUnitOriginalSatang;
+        final Decimal lotUnitPriceOrig = lot.pricePerUnitOriginal != null
+            ? Decimal.parse(lot.pricePerUnitOriginal!)
+            : (Decimal.fromInt(lot.costPerUnitOriginalSatang) * Decimal.parse('0.01'));
+
+        final priceDiffOrig = unitMarketPriceOrig - lotUnitPriceOrig;
 
         // Price P&L = (P_market - P_buy) * Q * R_buy
-        final pPnl = (Decimal.fromInt(priceDiffOrig) * remQty * lotBuyFx).round().toBigInt().toInt();
+        final pPnl = (priceDiffOrig * remQty * lotBuyFx * Decimal.fromInt(100)).round().toBigInt().toInt();
         // FX P&L = P_market * Q * (R_current - R_buy)
-        final fxPnl = (Decimal.fromInt(currentPriceOrig) * remQty * (currentFx - lotBuyFx)).round().toBigInt().toInt();
+        final fxPnl = (unitMarketPriceOrig * remQty * (currentFx - lotBuyFx) * Decimal.fromInt(100)).round().toBigInt().toInt();
 
         assetUnrealizedPrice += pPnl;
         assetUnrealizedFx += fxPnl;
@@ -1047,7 +1086,8 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
         asset: asset,
         totalQuantity: totalQty,
         totalCostThbSatang: assetTotalCostThb,
-        currentPriceOriginalSatang: currentPriceOrig,
+        currentPriceOriginalSatang: currentPriceOrigSatang,
+        currentPriceOriginal: unitMarketPriceOrig,
         currentFxRate: currentFx,
         currentPriceThbSatang: currentPriceThb,
         currentValueThbSatang: currentValThb,

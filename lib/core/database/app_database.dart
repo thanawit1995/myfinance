@@ -72,7 +72,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.connection);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration {
@@ -135,6 +135,12 @@ class AppDatabase extends _$AppDatabase {
           await m.addColumn(transactions, transactions.workPeriod);
           await m.addColumn(transactions, transactions.expectedAmountSatang);
         }
+        if (from < 9) {
+          await m.addColumn(investmentLots, investmentLots.pricePerUnitOriginal);
+          await m.addColumn(investmentLots, investmentLots.pricePerUnitThb);
+          await m.addColumn(assetPrices, assetPrices.marketPriceOriginal);
+          await m.addColumn(assetPrices, assetPrices.marketPriceThb);
+        }
       },
       beforeOpen: (details) async {
         await customStatement('PRAGMA foreign_keys = ON;');
@@ -142,6 +148,7 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           "UPDATE transactions SET is_cleared = 1, work_period = NULL, expected_amount_satang = NULL WHERE transaction_type != 'income' AND is_cleared = 0;",
         );
+        await transactionsDao.cleanDistortedNotionNotes();
       },
     );
   }

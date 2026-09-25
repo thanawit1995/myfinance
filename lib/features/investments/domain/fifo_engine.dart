@@ -16,6 +16,7 @@ class LotState {
   final Decimal quantity;
   Decimal remainingQuantity;
   final int costPerUnitOriginalSatang;
+  final Decimal? pricePerUnitOriginal;
   final Decimal fxRate;
   final int costPerUnitThbSatang;
   final int feeThbSatang;
@@ -31,6 +32,7 @@ class LotState {
     required this.quantity,
     required this.remainingQuantity,
     required this.costPerUnitOriginalSatang,
+    this.pricePerUnitOriginal,
     required this.fxRate,
     required this.costPerUnitThbSatang,
     required this.feeThbSatang,
@@ -104,9 +106,14 @@ class FifoEngine {
   static int calculateBuyTotalCostThbSatang({
     required Decimal quantity,
     required int costPerUnitOriginalSatang,
+    Decimal? pricePerUnitOriginal,
     required Decimal fxRate,
     required int feeThbSatang,
   }) {
+    if (pricePerUnitOriginal != null) {
+      final baseCostThb = (quantity * pricePerUnitOriginal * fxRate * Decimal.fromInt(100)).round().toBigInt().toInt();
+      return baseCostThb + feeThbSatang;
+    }
     final baseCostThb = (quantity * Decimal.fromInt(costPerUnitOriginalSatang) * fxRate).round().toBigInt().toInt();
     return baseCostThb + feeThbSatang;
   }
@@ -116,6 +123,7 @@ class FifoEngine {
     required List<LotState> openLots,
     required Decimal sellQuantity,
     required int sellPriceOriginalSatang,
+    Decimal? pricePerUnitOriginal,
     required Decimal sellFxRate,
     required int sellFeeThbSatang,
   }) {
@@ -160,6 +168,9 @@ class FifoEngine {
     int totalFxGainLossThb = 0;
     int totalRealizedGainLossThb = 0;
 
+    final Decimal unitSellPrice = pricePerUnitOriginal ??
+        (Decimal.fromInt(sellPriceOriginalSatang) * Decimal.parse('0.01'));
+
     for (int i = 0; i < lotsToConsume.length; i++) {
       final item = lotsToConsume[i];
       final LotState lot = item['lot'] as LotState;
@@ -192,16 +203,18 @@ class FifoEngine {
       }
 
       // 3. Sell revenue in THB
-      final sellPriceThbForLot = (Decimal.fromInt(sellPriceOriginalSatang) * q * sellFxRate).round().toBigInt().toInt();
+      final int sellPriceThbForLot = (unitSellPrice * q * sellFxRate * Decimal.fromInt(100)).round().toBigInt().toInt();
 
       // 4. Price P&L and FX P&L separation
       // Price P&L = (P_sell - P_buy) * Q * R_buy
-      final priceDiffOriginal = sellPriceOriginalSatang - lot.costPerUnitOriginalSatang;
-      final priceGainLossThb = (Decimal.fromInt(priceDiffOriginal) * q * lot.fxRate).round().toBigInt().toInt();
+      final Decimal buyUnitPrice = lot.pricePerUnitOriginal ??
+          (Decimal.fromInt(lot.costPerUnitOriginalSatang) * Decimal.parse('0.01'));
+      final priceDiffOriginal = unitSellPrice - buyUnitPrice;
+      final int priceGainLossThb = (priceDiffOriginal * q * lot.fxRate * Decimal.fromInt(100)).round().toBigInt().toInt();
 
       // FX P&L = P_sell * Q * (R_sell - R_buy)
       final fxDiff = sellFxRate - lot.fxRate;
-      final fxGainLossThb = (Decimal.fromInt(sellPriceOriginalSatang) * q * fxDiff).round().toBigInt().toInt();
+      final int fxGainLossThb = (unitSellPrice * q * fxDiff * Decimal.fromInt(100)).round().toBigInt().toInt();
 
       // Net Realized P&L = Sell revenue - Cost (which includes buy fee/residual) - Sell fee
       final realizedGainLossThb = sellPriceThbForLot - costThbForThisLot - feeForThisLot;

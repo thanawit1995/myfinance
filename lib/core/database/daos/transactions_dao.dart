@@ -481,5 +481,47 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
       updates: {transactions},
     );
   }
+
+  /// Cleans up legacy imported notes that contain Notion relation URLs or duplicate tags
+  Future<int> cleanDistortedNotionNotes() async {
+    final txs = await (select(transactions)
+          ..where((t) => t.note.isNotNull() & t.note.like('%http%')))
+        .get();
+
+    int cleanedCount = 0;
+    for (final tx in txs) {
+      if (tx.note == null) continue;
+      var clean = tx.note!
+          .replaceAll(RegExp(r'\s*\(\s*https?:\/\/[^\)]+\)'), '')
+          .replaceAll(RegExp(r'https?:\/\/\S+'), '')
+          .replaceAll(RegExp(r'\(\s*\)'), '')
+          .trim();
+
+      final parenMatch = RegExp(r'^(.*?)\s*\((.*?)\)$').firstMatch(clean);
+      if (parenMatch != null) {
+        final mainName = parenMatch.group(1)!.trim();
+        final subName = parenMatch.group(2)!.trim();
+        if (subName.contains(mainName) ||
+            mainName.contains(subName) ||
+            subName.contains('_') ||
+            subName.startsWith('🏧') ||
+            subName.startsWith('👝') ||
+            subName.startsWith('💼')) {
+          clean = mainName;
+        }
+      }
+
+      if (clean != tx.note && clean.isNotEmpty) {
+        await (update(transactions)..where((t) => t.id.equals(tx.id))).write(
+          TransactionsCompanion(
+            note: Value(clean),
+            updatedAt: Value(DateTime.now()),
+          ),
+        );
+        cleanedCount++;
+      }
+    }
+    return cleanedCount;
+  }
 }
 

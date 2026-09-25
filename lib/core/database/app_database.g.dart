@@ -6123,6 +6123,28 @@ class $InvestmentLotsTable extends InvestmentLots
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _pricePerUnitOriginalMeta =
+      const VerificationMeta('pricePerUnitOriginal');
+  @override
+  late final GeneratedColumn<String> pricePerUnitOriginal =
+      GeneratedColumn<String>(
+        'price_per_unit_original',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _pricePerUnitThbMeta = const VerificationMeta(
+    'pricePerUnitThb',
+  );
+  @override
+  late final GeneratedColumn<String> pricePerUnitThb = GeneratedColumn<String>(
+    'price_per_unit_thb',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _feeThbSatangMeta = const VerificationMeta(
     'feeThbSatang',
   );
@@ -6209,6 +6231,8 @@ class $InvestmentLotsTable extends InvestmentLots
     costPerUnitOriginalSatang,
     fxRate,
     costPerUnitThbSatang,
+    pricePerUnitOriginal,
+    pricePerUnitThb,
     feeThbSatang,
     totalCostThbSatang,
     remainingCostThbSatang,
@@ -6309,6 +6333,24 @@ class $InvestmentLotsTable extends InvestmentLots
       );
     } else if (isInserting) {
       context.missing(_costPerUnitThbSatangMeta);
+    }
+    if (data.containsKey('price_per_unit_original')) {
+      context.handle(
+        _pricePerUnitOriginalMeta,
+        pricePerUnitOriginal.isAcceptableOrUnknown(
+          data['price_per_unit_original']!,
+          _pricePerUnitOriginalMeta,
+        ),
+      );
+    }
+    if (data.containsKey('price_per_unit_thb')) {
+      context.handle(
+        _pricePerUnitThbMeta,
+        pricePerUnitThb.isAcceptableOrUnknown(
+          data['price_per_unit_thb']!,
+          _pricePerUnitThbMeta,
+        ),
+      );
     }
     if (data.containsKey('fee_thb_satang')) {
       context.handle(
@@ -6414,6 +6456,14 @@ class $InvestmentLotsTable extends InvestmentLots
         DriftSqlType.int,
         data['${effectivePrefix}cost_per_unit_thb_satang'],
       )!,
+      pricePerUnitOriginal: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}price_per_unit_original'],
+      ),
+      pricePerUnitThb: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}price_per_unit_thb'],
+      ),
       feeThbSatang: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}fee_thb_satang'],
@@ -6461,6 +6511,8 @@ class InvestmentLot extends DataClass implements Insertable<InvestmentLot> {
   final int costPerUnitOriginalSatang;
   final String fxRate;
   final int costPerUnitThbSatang;
+  final String? pricePerUnitOriginal;
+  final String? pricePerUnitThb;
   final int feeThbSatang;
   final int totalCostThbSatang;
   final int remainingCostThbSatang;
@@ -6478,6 +6530,8 @@ class InvestmentLot extends DataClass implements Insertable<InvestmentLot> {
     required this.costPerUnitOriginalSatang,
     required this.fxRate,
     required this.costPerUnitThbSatang,
+    this.pricePerUnitOriginal,
+    this.pricePerUnitThb,
     required this.feeThbSatang,
     required this.totalCostThbSatang,
     required this.remainingCostThbSatang,
@@ -6500,6 +6554,12 @@ class InvestmentLot extends DataClass implements Insertable<InvestmentLot> {
     );
     map['fx_rate'] = Variable<String>(fxRate);
     map['cost_per_unit_thb_satang'] = Variable<int>(costPerUnitThbSatang);
+    if (!nullToAbsent || pricePerUnitOriginal != null) {
+      map['price_per_unit_original'] = Variable<String>(pricePerUnitOriginal);
+    }
+    if (!nullToAbsent || pricePerUnitThb != null) {
+      map['price_per_unit_thb'] = Variable<String>(pricePerUnitThb);
+    }
     map['fee_thb_satang'] = Variable<int>(feeThbSatang);
     map['total_cost_thb_satang'] = Variable<int>(totalCostThbSatang);
     map['remaining_cost_thb_satang'] = Variable<int>(remainingCostThbSatang);
@@ -6523,6 +6583,12 @@ class InvestmentLot extends DataClass implements Insertable<InvestmentLot> {
       costPerUnitOriginalSatang: Value(costPerUnitOriginalSatang),
       fxRate: Value(fxRate),
       costPerUnitThbSatang: Value(costPerUnitThbSatang),
+      pricePerUnitOriginal: pricePerUnitOriginal == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pricePerUnitOriginal),
+      pricePerUnitThb: pricePerUnitThb == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pricePerUnitThb),
       feeThbSatang: Value(feeThbSatang),
       totalCostThbSatang: Value(totalCostThbSatang),
       remainingCostThbSatang: Value(remainingCostThbSatang),
@@ -6554,6 +6620,10 @@ class InvestmentLot extends DataClass implements Insertable<InvestmentLot> {
       costPerUnitThbSatang: serializer.fromJson<int>(
         json['costPerUnitThbSatang'],
       ),
+      pricePerUnitOriginal: serializer.fromJson<String?>(
+        json['pricePerUnitOriginal'],
+      ),
+      pricePerUnitThb: serializer.fromJson<String?>(json['pricePerUnitThb']),
       feeThbSatang: serializer.fromJson<int>(json['feeThbSatang']),
       totalCostThbSatang: serializer.fromJson<int>(json['totalCostThbSatang']),
       remainingCostThbSatang: serializer.fromJson<int>(
@@ -6580,6 +6650,8 @@ class InvestmentLot extends DataClass implements Insertable<InvestmentLot> {
       ),
       'fxRate': serializer.toJson<String>(fxRate),
       'costPerUnitThbSatang': serializer.toJson<int>(costPerUnitThbSatang),
+      'pricePerUnitOriginal': serializer.toJson<String?>(pricePerUnitOriginal),
+      'pricePerUnitThb': serializer.toJson<String?>(pricePerUnitThb),
       'feeThbSatang': serializer.toJson<int>(feeThbSatang),
       'totalCostThbSatang': serializer.toJson<int>(totalCostThbSatang),
       'remainingCostThbSatang': serializer.toJson<int>(remainingCostThbSatang),
@@ -6600,6 +6672,8 @@ class InvestmentLot extends DataClass implements Insertable<InvestmentLot> {
     int? costPerUnitOriginalSatang,
     String? fxRate,
     int? costPerUnitThbSatang,
+    Value<String?> pricePerUnitOriginal = const Value.absent(),
+    Value<String?> pricePerUnitThb = const Value.absent(),
     int? feeThbSatang,
     int? totalCostThbSatang,
     int? remainingCostThbSatang,
@@ -6618,6 +6692,12 @@ class InvestmentLot extends DataClass implements Insertable<InvestmentLot> {
         costPerUnitOriginalSatang ?? this.costPerUnitOriginalSatang,
     fxRate: fxRate ?? this.fxRate,
     costPerUnitThbSatang: costPerUnitThbSatang ?? this.costPerUnitThbSatang,
+    pricePerUnitOriginal: pricePerUnitOriginal.present
+        ? pricePerUnitOriginal.value
+        : this.pricePerUnitOriginal,
+    pricePerUnitThb: pricePerUnitThb.present
+        ? pricePerUnitThb.value
+        : this.pricePerUnitThb,
     feeThbSatang: feeThbSatang ?? this.feeThbSatang,
     totalCostThbSatang: totalCostThbSatang ?? this.totalCostThbSatang,
     remainingCostThbSatang:
@@ -6646,6 +6726,12 @@ class InvestmentLot extends DataClass implements Insertable<InvestmentLot> {
       costPerUnitThbSatang: data.costPerUnitThbSatang.present
           ? data.costPerUnitThbSatang.value
           : this.costPerUnitThbSatang,
+      pricePerUnitOriginal: data.pricePerUnitOriginal.present
+          ? data.pricePerUnitOriginal.value
+          : this.pricePerUnitOriginal,
+      pricePerUnitThb: data.pricePerUnitThb.present
+          ? data.pricePerUnitThb.value
+          : this.pricePerUnitThb,
       feeThbSatang: data.feeThbSatang.present
           ? data.feeThbSatang.value
           : this.feeThbSatang,
@@ -6674,6 +6760,8 @@ class InvestmentLot extends DataClass implements Insertable<InvestmentLot> {
           ..write('costPerUnitOriginalSatang: $costPerUnitOriginalSatang, ')
           ..write('fxRate: $fxRate, ')
           ..write('costPerUnitThbSatang: $costPerUnitThbSatang, ')
+          ..write('pricePerUnitOriginal: $pricePerUnitOriginal, ')
+          ..write('pricePerUnitThb: $pricePerUnitThb, ')
           ..write('feeThbSatang: $feeThbSatang, ')
           ..write('totalCostThbSatang: $totalCostThbSatang, ')
           ..write('remainingCostThbSatang: $remainingCostThbSatang, ')
@@ -6696,6 +6784,8 @@ class InvestmentLot extends DataClass implements Insertable<InvestmentLot> {
     costPerUnitOriginalSatang,
     fxRate,
     costPerUnitThbSatang,
+    pricePerUnitOriginal,
+    pricePerUnitThb,
     feeThbSatang,
     totalCostThbSatang,
     remainingCostThbSatang,
@@ -6717,6 +6807,8 @@ class InvestmentLot extends DataClass implements Insertable<InvestmentLot> {
           other.costPerUnitOriginalSatang == this.costPerUnitOriginalSatang &&
           other.fxRate == this.fxRate &&
           other.costPerUnitThbSatang == this.costPerUnitThbSatang &&
+          other.pricePerUnitOriginal == this.pricePerUnitOriginal &&
+          other.pricePerUnitThb == this.pricePerUnitThb &&
           other.feeThbSatang == this.feeThbSatang &&
           other.totalCostThbSatang == this.totalCostThbSatang &&
           other.remainingCostThbSatang == this.remainingCostThbSatang &&
@@ -6736,6 +6828,8 @@ class InvestmentLotsCompanion extends UpdateCompanion<InvestmentLot> {
   final Value<int> costPerUnitOriginalSatang;
   final Value<String> fxRate;
   final Value<int> costPerUnitThbSatang;
+  final Value<String?> pricePerUnitOriginal;
+  final Value<String?> pricePerUnitThb;
   final Value<int> feeThbSatang;
   final Value<int> totalCostThbSatang;
   final Value<int> remainingCostThbSatang;
@@ -6754,6 +6848,8 @@ class InvestmentLotsCompanion extends UpdateCompanion<InvestmentLot> {
     this.costPerUnitOriginalSatang = const Value.absent(),
     this.fxRate = const Value.absent(),
     this.costPerUnitThbSatang = const Value.absent(),
+    this.pricePerUnitOriginal = const Value.absent(),
+    this.pricePerUnitThb = const Value.absent(),
     this.feeThbSatang = const Value.absent(),
     this.totalCostThbSatang = const Value.absent(),
     this.remainingCostThbSatang = const Value.absent(),
@@ -6773,6 +6869,8 @@ class InvestmentLotsCompanion extends UpdateCompanion<InvestmentLot> {
     required int costPerUnitOriginalSatang,
     required String fxRate,
     required int costPerUnitThbSatang,
+    this.pricePerUnitOriginal = const Value.absent(),
+    this.pricePerUnitThb = const Value.absent(),
     required int feeThbSatang,
     this.totalCostThbSatang = const Value.absent(),
     this.remainingCostThbSatang = const Value.absent(),
@@ -6804,6 +6902,8 @@ class InvestmentLotsCompanion extends UpdateCompanion<InvestmentLot> {
     Expression<int>? costPerUnitOriginalSatang,
     Expression<String>? fxRate,
     Expression<int>? costPerUnitThbSatang,
+    Expression<String>? pricePerUnitOriginal,
+    Expression<String>? pricePerUnitThb,
     Expression<int>? feeThbSatang,
     Expression<int>? totalCostThbSatang,
     Expression<int>? remainingCostThbSatang,
@@ -6825,6 +6925,9 @@ class InvestmentLotsCompanion extends UpdateCompanion<InvestmentLot> {
       if (fxRate != null) 'fx_rate': fxRate,
       if (costPerUnitThbSatang != null)
         'cost_per_unit_thb_satang': costPerUnitThbSatang,
+      if (pricePerUnitOriginal != null)
+        'price_per_unit_original': pricePerUnitOriginal,
+      if (pricePerUnitThb != null) 'price_per_unit_thb': pricePerUnitThb,
       if (feeThbSatang != null) 'fee_thb_satang': feeThbSatang,
       if (totalCostThbSatang != null)
         'total_cost_thb_satang': totalCostThbSatang,
@@ -6848,6 +6951,8 @@ class InvestmentLotsCompanion extends UpdateCompanion<InvestmentLot> {
     Value<int>? costPerUnitOriginalSatang,
     Value<String>? fxRate,
     Value<int>? costPerUnitThbSatang,
+    Value<String?>? pricePerUnitOriginal,
+    Value<String?>? pricePerUnitThb,
     Value<int>? feeThbSatang,
     Value<int>? totalCostThbSatang,
     Value<int>? remainingCostThbSatang,
@@ -6868,6 +6973,8 @@ class InvestmentLotsCompanion extends UpdateCompanion<InvestmentLot> {
           costPerUnitOriginalSatang ?? this.costPerUnitOriginalSatang,
       fxRate: fxRate ?? this.fxRate,
       costPerUnitThbSatang: costPerUnitThbSatang ?? this.costPerUnitThbSatang,
+      pricePerUnitOriginal: pricePerUnitOriginal ?? this.pricePerUnitOriginal,
+      pricePerUnitThb: pricePerUnitThb ?? this.pricePerUnitThb,
       feeThbSatang: feeThbSatang ?? this.feeThbSatang,
       totalCostThbSatang: totalCostThbSatang ?? this.totalCostThbSatang,
       remainingCostThbSatang:
@@ -6914,6 +7021,14 @@ class InvestmentLotsCompanion extends UpdateCompanion<InvestmentLot> {
         costPerUnitThbSatang.value,
       );
     }
+    if (pricePerUnitOriginal.present) {
+      map['price_per_unit_original'] = Variable<String>(
+        pricePerUnitOriginal.value,
+      );
+    }
+    if (pricePerUnitThb.present) {
+      map['price_per_unit_thb'] = Variable<String>(pricePerUnitThb.value);
+    }
     if (feeThbSatang.present) {
       map['fee_thb_satang'] = Variable<int>(feeThbSatang.value);
     }
@@ -6955,6 +7070,8 @@ class InvestmentLotsCompanion extends UpdateCompanion<InvestmentLot> {
           ..write('costPerUnitOriginalSatang: $costPerUnitOriginalSatang, ')
           ..write('fxRate: $fxRate, ')
           ..write('costPerUnitThbSatang: $costPerUnitThbSatang, ')
+          ..write('pricePerUnitOriginal: $pricePerUnitOriginal, ')
+          ..write('pricePerUnitThb: $pricePerUnitThb, ')
           ..write('feeThbSatang: $feeThbSatang, ')
           ..write('totalCostThbSatang: $totalCostThbSatang, ')
           ..write('remainingCostThbSatang: $remainingCostThbSatang, ')
@@ -7987,6 +8104,28 @@ class $AssetPricesTable extends AssetPrices
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _marketPriceOriginalMeta =
+      const VerificationMeta('marketPriceOriginal');
+  @override
+  late final GeneratedColumn<String> marketPriceOriginal =
+      GeneratedColumn<String>(
+        'market_price_original',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _marketPriceThbMeta = const VerificationMeta(
+    'marketPriceThb',
+  );
+  @override
+  late final GeneratedColumn<String> marketPriceThb = GeneratedColumn<String>(
+    'market_price_thb',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -8028,6 +8167,8 @@ class $AssetPricesTable extends AssetPrices
     marketPriceOriginalSatang,
     fxRate,
     marketPriceThbSatang,
+    marketPriceOriginal,
+    marketPriceThb,
     createdAt,
     updatedAt,
     deletedAt,
@@ -8095,6 +8236,24 @@ class $AssetPricesTable extends AssetPrices
     } else if (isInserting) {
       context.missing(_marketPriceThbSatangMeta);
     }
+    if (data.containsKey('market_price_original')) {
+      context.handle(
+        _marketPriceOriginalMeta,
+        marketPriceOriginal.isAcceptableOrUnknown(
+          data['market_price_original']!,
+          _marketPriceOriginalMeta,
+        ),
+      );
+    }
+    if (data.containsKey('market_price_thb')) {
+      context.handle(
+        _marketPriceThbMeta,
+        marketPriceThb.isAcceptableOrUnknown(
+          data['market_price_thb']!,
+          _marketPriceThbMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -8150,6 +8309,14 @@ class $AssetPricesTable extends AssetPrices
         DriftSqlType.int,
         data['${effectivePrefix}market_price_thb_satang'],
       )!,
+      marketPriceOriginal: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}market_price_original'],
+      ),
+      marketPriceThb: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}market_price_thb'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -8178,6 +8345,8 @@ class AssetPrice extends DataClass implements Insertable<AssetPrice> {
   final int marketPriceOriginalSatang;
   final String fxRate;
   final int marketPriceThbSatang;
+  final String? marketPriceOriginal;
+  final String? marketPriceThb;
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -8188,6 +8357,8 @@ class AssetPrice extends DataClass implements Insertable<AssetPrice> {
     required this.marketPriceOriginalSatang,
     required this.fxRate,
     required this.marketPriceThbSatang,
+    this.marketPriceOriginal,
+    this.marketPriceThb,
     required this.createdAt,
     required this.updatedAt,
     this.deletedAt,
@@ -8203,6 +8374,12 @@ class AssetPrice extends DataClass implements Insertable<AssetPrice> {
     );
     map['fx_rate'] = Variable<String>(fxRate);
     map['market_price_thb_satang'] = Variable<int>(marketPriceThbSatang);
+    if (!nullToAbsent || marketPriceOriginal != null) {
+      map['market_price_original'] = Variable<String>(marketPriceOriginal);
+    }
+    if (!nullToAbsent || marketPriceThb != null) {
+      map['market_price_thb'] = Variable<String>(marketPriceThb);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     if (!nullToAbsent || deletedAt != null) {
@@ -8219,6 +8396,12 @@ class AssetPrice extends DataClass implements Insertable<AssetPrice> {
       marketPriceOriginalSatang: Value(marketPriceOriginalSatang),
       fxRate: Value(fxRate),
       marketPriceThbSatang: Value(marketPriceThbSatang),
+      marketPriceOriginal: marketPriceOriginal == null && nullToAbsent
+          ? const Value.absent()
+          : Value(marketPriceOriginal),
+      marketPriceThb: marketPriceThb == null && nullToAbsent
+          ? const Value.absent()
+          : Value(marketPriceThb),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent
@@ -8243,6 +8426,10 @@ class AssetPrice extends DataClass implements Insertable<AssetPrice> {
       marketPriceThbSatang: serializer.fromJson<int>(
         json['marketPriceThbSatang'],
       ),
+      marketPriceOriginal: serializer.fromJson<String?>(
+        json['marketPriceOriginal'],
+      ),
+      marketPriceThb: serializer.fromJson<String?>(json['marketPriceThb']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
@@ -8260,6 +8447,8 @@ class AssetPrice extends DataClass implements Insertable<AssetPrice> {
       ),
       'fxRate': serializer.toJson<String>(fxRate),
       'marketPriceThbSatang': serializer.toJson<int>(marketPriceThbSatang),
+      'marketPriceOriginal': serializer.toJson<String?>(marketPriceOriginal),
+      'marketPriceThb': serializer.toJson<String?>(marketPriceThb),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
@@ -8273,6 +8462,8 @@ class AssetPrice extends DataClass implements Insertable<AssetPrice> {
     int? marketPriceOriginalSatang,
     String? fxRate,
     int? marketPriceThbSatang,
+    Value<String?> marketPriceOriginal = const Value.absent(),
+    Value<String?> marketPriceThb = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
@@ -8284,6 +8475,12 @@ class AssetPrice extends DataClass implements Insertable<AssetPrice> {
         marketPriceOriginalSatang ?? this.marketPriceOriginalSatang,
     fxRate: fxRate ?? this.fxRate,
     marketPriceThbSatang: marketPriceThbSatang ?? this.marketPriceThbSatang,
+    marketPriceOriginal: marketPriceOriginal.present
+        ? marketPriceOriginal.value
+        : this.marketPriceOriginal,
+    marketPriceThb: marketPriceThb.present
+        ? marketPriceThb.value
+        : this.marketPriceThb,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
@@ -8300,6 +8497,12 @@ class AssetPrice extends DataClass implements Insertable<AssetPrice> {
       marketPriceThbSatang: data.marketPriceThbSatang.present
           ? data.marketPriceThbSatang.value
           : this.marketPriceThbSatang,
+      marketPriceOriginal: data.marketPriceOriginal.present
+          ? data.marketPriceOriginal.value
+          : this.marketPriceOriginal,
+      marketPriceThb: data.marketPriceThb.present
+          ? data.marketPriceThb.value
+          : this.marketPriceThb,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
@@ -8315,6 +8518,8 @@ class AssetPrice extends DataClass implements Insertable<AssetPrice> {
           ..write('marketPriceOriginalSatang: $marketPriceOriginalSatang, ')
           ..write('fxRate: $fxRate, ')
           ..write('marketPriceThbSatang: $marketPriceThbSatang, ')
+          ..write('marketPriceOriginal: $marketPriceOriginal, ')
+          ..write('marketPriceThb: $marketPriceThb, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt')
@@ -8330,6 +8535,8 @@ class AssetPrice extends DataClass implements Insertable<AssetPrice> {
     marketPriceOriginalSatang,
     fxRate,
     marketPriceThbSatang,
+    marketPriceOriginal,
+    marketPriceThb,
     createdAt,
     updatedAt,
     deletedAt,
@@ -8344,6 +8551,8 @@ class AssetPrice extends DataClass implements Insertable<AssetPrice> {
           other.marketPriceOriginalSatang == this.marketPriceOriginalSatang &&
           other.fxRate == this.fxRate &&
           other.marketPriceThbSatang == this.marketPriceThbSatang &&
+          other.marketPriceOriginal == this.marketPriceOriginal &&
+          other.marketPriceThb == this.marketPriceThb &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt);
@@ -8356,6 +8565,8 @@ class AssetPricesCompanion extends UpdateCompanion<AssetPrice> {
   final Value<int> marketPriceOriginalSatang;
   final Value<String> fxRate;
   final Value<int> marketPriceThbSatang;
+  final Value<String?> marketPriceOriginal;
+  final Value<String?> marketPriceThb;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
@@ -8367,6 +8578,8 @@ class AssetPricesCompanion extends UpdateCompanion<AssetPrice> {
     this.marketPriceOriginalSatang = const Value.absent(),
     this.fxRate = const Value.absent(),
     this.marketPriceThbSatang = const Value.absent(),
+    this.marketPriceOriginal = const Value.absent(),
+    this.marketPriceThb = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
@@ -8379,6 +8592,8 @@ class AssetPricesCompanion extends UpdateCompanion<AssetPrice> {
     required int marketPriceOriginalSatang,
     required String fxRate,
     required int marketPriceThbSatang,
+    this.marketPriceOriginal = const Value.absent(),
+    this.marketPriceThb = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
@@ -8398,6 +8613,8 @@ class AssetPricesCompanion extends UpdateCompanion<AssetPrice> {
     Expression<int>? marketPriceOriginalSatang,
     Expression<String>? fxRate,
     Expression<int>? marketPriceThbSatang,
+    Expression<String>? marketPriceOriginal,
+    Expression<String>? marketPriceThb,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
@@ -8412,6 +8629,9 @@ class AssetPricesCompanion extends UpdateCompanion<AssetPrice> {
       if (fxRate != null) 'fx_rate': fxRate,
       if (marketPriceThbSatang != null)
         'market_price_thb_satang': marketPriceThbSatang,
+      if (marketPriceOriginal != null)
+        'market_price_original': marketPriceOriginal,
+      if (marketPriceThb != null) 'market_price_thb': marketPriceThb,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
@@ -8426,6 +8646,8 @@ class AssetPricesCompanion extends UpdateCompanion<AssetPrice> {
     Value<int>? marketPriceOriginalSatang,
     Value<String>? fxRate,
     Value<int>? marketPriceThbSatang,
+    Value<String?>? marketPriceOriginal,
+    Value<String?>? marketPriceThb,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
@@ -8439,6 +8661,8 @@ class AssetPricesCompanion extends UpdateCompanion<AssetPrice> {
           marketPriceOriginalSatang ?? this.marketPriceOriginalSatang,
       fxRate: fxRate ?? this.fxRate,
       marketPriceThbSatang: marketPriceThbSatang ?? this.marketPriceThbSatang,
+      marketPriceOriginal: marketPriceOriginal ?? this.marketPriceOriginal,
+      marketPriceThb: marketPriceThb ?? this.marketPriceThb,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
@@ -8471,6 +8695,14 @@ class AssetPricesCompanion extends UpdateCompanion<AssetPrice> {
         marketPriceThbSatang.value,
       );
     }
+    if (marketPriceOriginal.present) {
+      map['market_price_original'] = Variable<String>(
+        marketPriceOriginal.value,
+      );
+    }
+    if (marketPriceThb.present) {
+      map['market_price_thb'] = Variable<String>(marketPriceThb.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -8495,6 +8727,8 @@ class AssetPricesCompanion extends UpdateCompanion<AssetPrice> {
           ..write('marketPriceOriginalSatang: $marketPriceOriginalSatang, ')
           ..write('fxRate: $fxRate, ')
           ..write('marketPriceThbSatang: $marketPriceThbSatang, ')
+          ..write('marketPriceOriginal: $marketPriceOriginal, ')
+          ..write('marketPriceThb: $marketPriceThb, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -22203,6 +22437,8 @@ typedef $$InvestmentLotsTableCreateCompanionBuilder =
       required int costPerUnitOriginalSatang,
       required String fxRate,
       required int costPerUnitThbSatang,
+      Value<String?> pricePerUnitOriginal,
+      Value<String?> pricePerUnitThb,
       required int feeThbSatang,
       Value<int> totalCostThbSatang,
       Value<int> remainingCostThbSatang,
@@ -22223,6 +22459,8 @@ typedef $$InvestmentLotsTableUpdateCompanionBuilder =
       Value<int> costPerUnitOriginalSatang,
       Value<String> fxRate,
       Value<int> costPerUnitThbSatang,
+      Value<String?> pricePerUnitOriginal,
+      Value<String?> pricePerUnitThb,
       Value<int> feeThbSatang,
       Value<int> totalCostThbSatang,
       Value<int> remainingCostThbSatang,
@@ -22284,6 +22522,16 @@ class $$InvestmentLotsTableFilterComposer
 
   ColumnFilters<int> get costPerUnitThbSatang => $composableBuilder(
     column: $table.costPerUnitThbSatang,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pricePerUnitOriginal => $composableBuilder(
+    column: $table.pricePerUnitOriginal,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pricePerUnitThb => $composableBuilder(
+    column: $table.pricePerUnitThb,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -22377,6 +22625,16 @@ class $$InvestmentLotsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get pricePerUnitOriginal => $composableBuilder(
+    column: $table.pricePerUnitOriginal,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pricePerUnitThb => $composableBuilder(
+    column: $table.pricePerUnitThb,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get feeThbSatang => $composableBuilder(
     column: $table.feeThbSatang,
     builder: (column) => ColumnOrderings(column),
@@ -22457,6 +22715,16 @@ class $$InvestmentLotsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get pricePerUnitOriginal => $composableBuilder(
+    column: $table.pricePerUnitOriginal,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pricePerUnitThb => $composableBuilder(
+    column: $table.pricePerUnitThb,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<int> get feeThbSatang => $composableBuilder(
     column: $table.feeThbSatang,
     builder: (column) => column,
@@ -22527,6 +22795,8 @@ class $$InvestmentLotsTableTableManager
                 Value<int> costPerUnitOriginalSatang = const Value.absent(),
                 Value<String> fxRate = const Value.absent(),
                 Value<int> costPerUnitThbSatang = const Value.absent(),
+                Value<String?> pricePerUnitOriginal = const Value.absent(),
+                Value<String?> pricePerUnitThb = const Value.absent(),
                 Value<int> feeThbSatang = const Value.absent(),
                 Value<int> totalCostThbSatang = const Value.absent(),
                 Value<int> remainingCostThbSatang = const Value.absent(),
@@ -22545,6 +22815,8 @@ class $$InvestmentLotsTableTableManager
                 costPerUnitOriginalSatang: costPerUnitOriginalSatang,
                 fxRate: fxRate,
                 costPerUnitThbSatang: costPerUnitThbSatang,
+                pricePerUnitOriginal: pricePerUnitOriginal,
+                pricePerUnitThb: pricePerUnitThb,
                 feeThbSatang: feeThbSatang,
                 totalCostThbSatang: totalCostThbSatang,
                 remainingCostThbSatang: remainingCostThbSatang,
@@ -22565,6 +22837,8 @@ class $$InvestmentLotsTableTableManager
                 required int costPerUnitOriginalSatang,
                 required String fxRate,
                 required int costPerUnitThbSatang,
+                Value<String?> pricePerUnitOriginal = const Value.absent(),
+                Value<String?> pricePerUnitThb = const Value.absent(),
                 required int feeThbSatang,
                 Value<int> totalCostThbSatang = const Value.absent(),
                 Value<int> remainingCostThbSatang = const Value.absent(),
@@ -22583,6 +22857,8 @@ class $$InvestmentLotsTableTableManager
                 costPerUnitOriginalSatang: costPerUnitOriginalSatang,
                 fxRate: fxRate,
                 costPerUnitThbSatang: costPerUnitThbSatang,
+                pricePerUnitOriginal: pricePerUnitOriginal,
+                pricePerUnitThb: pricePerUnitThb,
                 feeThbSatang: feeThbSatang,
                 totalCostThbSatang: totalCostThbSatang,
                 remainingCostThbSatang: remainingCostThbSatang,
@@ -23058,6 +23334,8 @@ typedef $$AssetPricesTableCreateCompanionBuilder =
       required int marketPriceOriginalSatang,
       required String fxRate,
       required int marketPriceThbSatang,
+      Value<String?> marketPriceOriginal,
+      Value<String?> marketPriceThb,
       required DateTime createdAt,
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
@@ -23071,6 +23349,8 @@ typedef $$AssetPricesTableUpdateCompanionBuilder =
       Value<int> marketPriceOriginalSatang,
       Value<String> fxRate,
       Value<int> marketPriceThbSatang,
+      Value<String?> marketPriceOriginal,
+      Value<String?> marketPriceThb,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
@@ -23113,6 +23393,16 @@ class $$AssetPricesTableFilterComposer
 
   ColumnFilters<int> get marketPriceThbSatang => $composableBuilder(
     column: $table.marketPriceThbSatang,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get marketPriceOriginal => $composableBuilder(
+    column: $table.marketPriceOriginal,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get marketPriceThb => $composableBuilder(
+    column: $table.marketPriceThb,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -23171,6 +23461,16 @@ class $$AssetPricesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get marketPriceOriginal => $composableBuilder(
+    column: $table.marketPriceOriginal,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get marketPriceThb => $composableBuilder(
+    column: $table.marketPriceThb,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -23215,6 +23515,16 @@ class $$AssetPricesTableAnnotationComposer
 
   GeneratedColumn<int> get marketPriceThbSatang => $composableBuilder(
     column: $table.marketPriceThbSatang,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get marketPriceOriginal => $composableBuilder(
+    column: $table.marketPriceOriginal,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get marketPriceThb => $composableBuilder(
+    column: $table.marketPriceThb,
     builder: (column) => column,
   );
 
@@ -23265,6 +23575,8 @@ class $$AssetPricesTableTableManager
                 Value<int> marketPriceOriginalSatang = const Value.absent(),
                 Value<String> fxRate = const Value.absent(),
                 Value<int> marketPriceThbSatang = const Value.absent(),
+                Value<String?> marketPriceOriginal = const Value.absent(),
+                Value<String?> marketPriceThb = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -23276,6 +23588,8 @@ class $$AssetPricesTableTableManager
                 marketPriceOriginalSatang: marketPriceOriginalSatang,
                 fxRate: fxRate,
                 marketPriceThbSatang: marketPriceThbSatang,
+                marketPriceOriginal: marketPriceOriginal,
+                marketPriceThb: marketPriceThb,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
@@ -23289,6 +23603,8 @@ class $$AssetPricesTableTableManager
                 required int marketPriceOriginalSatang,
                 required String fxRate,
                 required int marketPriceThbSatang,
+                Value<String?> marketPriceOriginal = const Value.absent(),
+                Value<String?> marketPriceThb = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -23300,6 +23616,8 @@ class $$AssetPricesTableTableManager
                 marketPriceOriginalSatang: marketPriceOriginalSatang,
                 fxRate: fxRate,
                 marketPriceThbSatang: marketPriceThbSatang,
+                marketPriceOriginal: marketPriceOriginal,
+                marketPriceThb: marketPriceThb,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,

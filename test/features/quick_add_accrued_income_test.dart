@@ -75,9 +75,9 @@ void main() {
       expect(p4p.taxCategory, '40_1');
       expect(p4p.withholdingTaxSatang, 5000);
 
-      // เวรเหมา -> 40_2 with 0 WHT
+      // เวรเหมา -> 40_1 with 0 WHT
       final duty = CsvImportParser.classifyIncomeTax(name: 'เวรเหมาพิเศษ', date: now, amountSatang: 100000);
-      expect(duty.taxCategory, '40_2');
+      expect(duty.taxCategory, '40_1');
       expect(duty.withholdingTaxSatang, 0);
     });
 

@@ -181,9 +181,28 @@ class ImportExecutor {
 
         // Insert Transaction
         final txId = _uuid.v4();
-        final effectiveNote = (row.note != null && row.note!.isNotEmpty)
-            ? '${row.name} (${row.note})'
-            : row.name;
+        String effectiveNote = row.name
+            .replaceAll(RegExp(r'\s*\(\s*https?:\/\/[^\)]+\)'), '')
+            .replaceAll(RegExp(r'https?:\/\/\S+'), '')
+            .trim();
+        if (row.note != null && row.note!.isNotEmpty) {
+          final cleanNote = row.note!
+              .replaceAll(RegExp(r'\s*\(\s*https?:\/\/[^\)]+\)'), '')
+              .replaceAll(RegExp(r'https?:\/\/\S+'), '')
+              .trim();
+          final parenMatch = RegExp(r'^(.*?)\s*\((.*?)\)$').firstMatch(cleanNote);
+          final noteCandidate = parenMatch != null ? parenMatch.group(1)!.trim() : cleanNote;
+          if (noteCandidate.isNotEmpty &&
+              noteCandidate != effectiveNote &&
+              !effectiveNote.contains(noteCandidate) &&
+              !noteCandidate.contains(effectiveNote) &&
+              !noteCandidate.contains('_') &&
+              !noteCandidate.startsWith('🏧') &&
+              !noteCandidate.startsWith('👝') &&
+              !noteCandidate.startsWith('💼')) {
+            effectiveNote = '$effectiveNote ($noteCandidate)';
+          }
+        }
 
         await transactionsDao.insertTransaction(
           TransactionsCompanion.insert(

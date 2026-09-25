@@ -10,6 +10,7 @@ class ParsedInvestRow {
   final int amountUsdSatang;  // USD amount × 100 (0 if THB-only purchase)
   final Decimal fxRate;       // USD→THB exchange rate, 6 dp (1.0 if THB payment)
   final int amountThbSatang;  // THB invested × 100
+  final Decimal unitPriceOriginal;
   final PaymentType paymentType;
   final String? note;
 
@@ -23,9 +24,10 @@ class ParsedInvestRow {
     required this.amountUsdSatang,
     required this.fxRate,
     required this.amountThbSatang,
+    Decimal? unitPriceOriginal,
     required this.paymentType,
     this.note,
-  });
+  }) : unitPriceOriginal = unitPriceOriginal ?? Decimal.zero;
 }
 
 enum PaymentType {
@@ -71,6 +73,7 @@ class NotionInvestParser {
     final dayCol     = _findCol(headers, ['day']);
     final investedCol= _findCol(headers, ['invested']);
     final rollupCol  = _findCol(headers, ['rollup']);
+    final sharePriceCol = _findCol(headers, ['share price', 'cost/share', 'price']);
     final sharesCol  = _findCol(headers, ['shares', 'share']);
     final stockCol   = _findCol(headers, ['stock']);
     final thbCol     = _findCol(headers, ['thb invested', 'thb']);
@@ -93,6 +96,7 @@ class NotionInvestParser {
       final rawShares = sharesCol != -1 && sharesCol < row.length ? row[sharesCol].toString().trim() : '';
       final rawInvested = investedCol != -1 && investedCol < row.length ? row[investedCol] : null;
       final rawRollup   = rollupCol != -1 && rollupCol < row.length ? row[rollupCol].toString().trim() : '';
+      final rawSharePrice = sharePriceCol != -1 && sharePriceCol < row.length ? row[sharePriceCol]?.toString().trim() : '';
       final rawThb    = thbCol != -1 && thbCol < row.length ? row[thbCol] : null;
       final rawText   = textCol != -1 && textCol < row.length ? row[textCol].toString().trim() : '';
 
@@ -133,6 +137,21 @@ class NotionInvestParser {
       // Parse FX rate from Rollup column
       Decimal fxRate = _parseFxRate(rawRollup, amountUsdSatang, amountThbSatang);
 
+      // Parse Unit Price (up to Decimal precision)
+      Decimal unitPriceOriginal = Decimal.zero;
+      if (rawSharePrice != null && rawSharePrice.isNotEmpty) {
+        final cleanPrice = rawSharePrice.replaceAll(RegExp(r'[^0-9.]'), '');
+        unitPriceOriginal = Decimal.tryParse(cleanPrice) ?? Decimal.zero;
+      }
+      if (unitPriceOriginal <= Decimal.zero && quantity > Decimal.zero) {
+        if (amountUsdSatang > 0 && paymentType != PaymentType.thb) {
+          unitPriceOriginal = ((Decimal.fromInt(amountUsdSatang) * Decimal.parse('0.01')) / quantity)
+              .toDecimal(scaleOnInfinitePrecision: 8);
+        } else if (amountThbSatang > 0) {
+          unitPriceOriginal = ((Decimal.fromInt(amountThbSatang) * Decimal.parse('0.01')) / quantity)
+              .toDecimal(scaleOnInfinitePrecision: 8);
+        }
+      }
 
       results.add(ParsedInvestRow(
         rowIndex: i,
@@ -142,6 +161,7 @@ class NotionInvestParser {
         amountUsdSatang: amountUsdSatang,
         fxRate: fxRate,
         amountThbSatang: amountThbSatang.abs(),
+        unitPriceOriginal: unitPriceOriginal,
         paymentType: paymentType,
         note: rawText.isNotEmpty ? rawText : null,
       ));

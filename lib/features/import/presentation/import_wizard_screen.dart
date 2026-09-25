@@ -5,11 +5,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/vault_theme.dart';
 import '../domain/csv_import_models.dart';
 import '../domain/csv_import_parser.dart';
+import '../domain/notion_funds_import_executor.dart';
+import '../domain/notion_funds_parser.dart';
+import '../domain/notion_gold_import_executor.dart';
+import '../domain/notion_gold_parser.dart';
 import '../domain/notion_invest_parser.dart';
 import '../import_provider.dart';
 import 'column_mapping_dialog.dart';
 import 'import_history_screen.dart';
 import 'import_preview_dialog.dart';
+import 'notion_funds_preview_dialog.dart';
+import 'notion_gold_preview_dialog.dart';
 import 'notion_invest_preview_dialog.dart';
 
 
@@ -26,6 +32,11 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
   List<List<dynamic>> _rawCsvRows = [];
   CsvColumnMapping? _currentMapping;
   bool _isProcessing = false;
+
+  bool get _isInvestTemplate =>
+      _selectedTemplate == 'notion_invest_stocks' ||
+      _selectedTemplate == 'notion_invest_funds' ||
+      _selectedTemplate == 'notion_invest_gold';
 
   Future<void> _pickCsvFile() async {
     try {
@@ -51,9 +62,18 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
           final rows = CsvImportParser.parseRawCsv(content);
           if (rows.isNotEmpty) {
             final headers = rows.first.map((e) => e.toString()).toList();
+            final headersLower = headers.map((h) => h.trim().toLowerCase()).toList();
             var detectedTemplate = _selectedTemplate;
-            if (headers.any((h) => h.trim().toLowerCase() == 'bill')) {
+            if (headersLower.any((h) => h == 'bill')) {
               detectedTemplate = 'notion_bills';
+            } else if (headersLower.any((h) => h.contains('total gold') || h.contains('usdthb price'))) {
+              detectedTemplate = 'notion_invest_gold';
+            } else if (headersLower.any((h) => h.contains('current nav') || h.contains('invest-funds'))) {
+              detectedTemplate = 'notion_invest_funds';
+            } else if (headersLower.any((h) => h.contains('share price') || h.contains('stock') || (headersLower.contains('shares') && headersLower.contains('invested')))) {
+              detectedTemplate = 'notion_invest_stocks';
+            } else if (headersLower.any((h) => h.contains('duty') || h.contains('เงินเดือน') || h.contains('รายได้') || h.contains('เวร'))) {
+              detectedTemplate = 'notion_income';
             }
             final mapping = CsvImportParser.detectMapping(headers, template: detectedTemplate);
 
@@ -99,6 +119,18 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
     // ─── Invest-Stocks path ─────────────────────────────────────────────────
     if (_selectedTemplate == 'notion_invest_stocks') {
       await _proceedToInvestPreview();
+      return;
+    }
+
+    // ─── Invest-Funds path ──────────────────────────────────────────────────
+    if (_selectedTemplate == 'notion_invest_funds') {
+      await _proceedToFundsPreview();
+      return;
+    }
+
+    // ─── Invest-Gold path ───────────────────────────────────────────────────
+    if (_selectedTemplate == 'notion_invest_gold') {
+      await _proceedToGoldPreview();
       return;
     }
 
@@ -211,6 +243,180 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
             if (result.skippedDividends > 0)
               Text('• ข้ามปันผล (ยังไม่รองรับ): ${result.skippedDividends}',
                   style: const TextStyle(color: Colors.grey)),
+            if (result.errors.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              const Text('⚠️ มีข้อผิดพลาด:', style: TextStyle(color: Colors.red)),
+              ...result.errors.map((e) => Text('  • $e', style: const TextStyle(fontSize: 12))),
+            ],
+          ],
+        ),
+        actions: [
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: VaultTheme.accent(context)),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              setState(() {
+                _pickedFileName = null;
+                _rawCsvRows = [];
+                _currentMapping = null;
+              });
+            },
+            child: const Text('เสร็จสิ้น'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Handles the mutual funds import preview flow.
+  Future<void> _proceedToFundsPreview() async {
+    if (_rawCsvRows.isEmpty) return;
+
+    setState(() => _isProcessing = true);
+    try {
+      final rows = NotionFundsParser.parseRows(_rawCsvRows);
+
+      if (!mounted) return;
+      setState(() => _isProcessing = false);
+
+      if (rows.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('ไม่พบข้อมูลกองทุนรวมในไฟล์ CSV นี้'),
+            backgroundColor: VaultTheme.negative(context),
+          ),
+        );
+        return;
+      }
+
+      final result = await NotionFundsPreviewDialog.show(
+        context,
+        fileName: _pickedFileName ?? 'mutual_funds.csv',
+        rows: rows,
+      );
+
+      if (result != null && mounted) {
+        _showFundsSuccessDialog(result);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาดในการอ่านไฟล์กองทุน: $e'),
+            backgroundColor: VaultTheme.negative(context),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showFundsSuccessDialog(NotionFundsImportResult result) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.check_circle, color: VaultTheme.positive(context)),
+            const SizedBox(width: 8),
+            const Text('นำเข้ากองทุนรวมสำเร็จ!'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('• นำเข้าสำเร็จ: ${result.imported} กองทุน'),
+            if (result.skippedDuplicates > 0)
+              Text('• ข้ามกองทุนซ้ำ: ${result.skippedDuplicates}',
+                  style: const TextStyle(color: Colors.orange)),
+            if (result.errors.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              const Text('⚠️ มีข้อผิดพลาด:', style: TextStyle(color: Colors.red)),
+              ...result.errors.map((e) => Text('  • $e', style: const TextStyle(fontSize: 12))),
+            ],
+          ],
+        ),
+        actions: [
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: VaultTheme.accent(context)),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              setState(() {
+                _pickedFileName = null;
+                _rawCsvRows = [];
+                _currentMapping = null;
+              });
+            },
+            child: const Text('เสร็จสิ้น'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Handles the gold import preview flow.
+  Future<void> _proceedToGoldPreview() async {
+    if (_rawCsvRows.isEmpty) return;
+
+    setState(() => _isProcessing = true);
+    try {
+      final rows = NotionGoldParser.parseRows(_rawCsvRows);
+
+      if (!mounted) return;
+      setState(() => _isProcessing = false);
+
+      if (rows.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('ไม่พบข้อมูลทองคำในไฟล์ CSV นี้'),
+            backgroundColor: VaultTheme.negative(context),
+          ),
+        );
+        return;
+      }
+
+      final result = await NotionGoldPreviewDialog.show(
+        context,
+        fileName: _pickedFileName ?? 'gold.csv',
+        rows: rows,
+      );
+
+      if (result != null && mounted) {
+        _showGoldSuccessDialog(result);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาดในการอ่านไฟล์ทองคำ: $e'),
+            backgroundColor: VaultTheme.negative(context),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showGoldSuccessDialog(NotionGoldImportResult result) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.check_circle, color: VaultTheme.positive(context)),
+            const SizedBox(width: 8),
+            const Text('นำเข้าทองคำสำเร็จ!'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('• นำเข้าสำเร็จ: ${result.imported} รายการ'),
+            if (result.skippedDuplicates > 0)
+              Text('• ข้ามรายการซ้ำ: ${result.skippedDuplicates}',
+                  style: const TextStyle(color: Colors.orange)),
             if (result.errors.isNotEmpty) ...[
               const SizedBox(height: 8),
               const Text('⚠️ มีข้อผิดพลาด:', style: TextStyle(color: Colors.red)),
@@ -419,6 +625,28 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
                   children: [
                     Expanded(
                       child: _buildTemplateOption(
+                        id: 'notion_invest_funds',
+                        title: 'Notion กองทุนรวม',
+                        subtitle: 'K-SET50, SSF, กบข. ฯลฯ',
+                        icon: Icons.pie_chart_outline,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildTemplateOption(
+                        id: 'notion_invest_gold',
+                        title: 'Notion ทองคำ',
+                        subtitle: 'MST-GOLD 99.99%',
+                        icon: Icons.savings_outlined,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildTemplateOption(
                         id: 'custom',
                         title: 'CSV ทั่วไป',
                         subtitle: 'กำหนดคอลัมน์เอง',
@@ -485,7 +713,7 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
                 const SizedBox(height: 24),
 
                 // Step 3: Column Mapping Status & Preview Button
-                if (_pickedFileName != null && (_currentMapping != null || _selectedTemplate == 'notion_invest_stocks')) ...[
+                if (_pickedFileName != null && (_currentMapping != null || _isInvestTemplate)) ...[
                   const Text(
                     'ขั้นตอนที่ 3: ตรวจสอบและนำเข้า',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
@@ -499,14 +727,18 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (_selectedTemplate == 'notion_invest_stocks') ...[
+                          if (_isInvestTemplate) ...[
                             Row(
                               children: [
                                 const Icon(Icons.check, color: Colors.green, size: 20),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    'รูปแบบ Invest-Stocks (ตรวจจับคอลัมน์ Stock, Date, Shares, Invested อัตโนมัติ)',
+                                    _selectedTemplate == 'notion_invest_stocks'
+                                        ? 'รูปแบบ Invest-Stocks (ตรวจจับคอลัมน์ Stock, Date, Shares, Invested อัตโนมัติ)'
+                                        : _selectedTemplate == 'notion_invest_funds'
+                                            ? 'รูปแบบ Mutual Funds (ตรวจจับคอลัมน์ กองทุน, Shares, Current NAV, Invest อัตโนมัติ)'
+                                            : 'รูปแบบ Gold (ตรวจจับคอลัมน์ Total gold, Total invest, USDTHB price อัตโนมัติ)',
                                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                                   ),
                                 ),

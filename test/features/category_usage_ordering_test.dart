@@ -127,7 +127,7 @@ void main() {
         date: DateTime.now(),
         amountSatang: 1500000,
       );
-      expect(shiftInference.taxCategory, '40_2');
+      expect(shiftInference.taxCategory, '40_1');
 
       final topUpInference = CsvImportParser.classifyIncomeTax(
         name: 'Top up เติมเงินพอร์ต',

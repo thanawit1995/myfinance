@@ -13,6 +13,8 @@ class InvestmentLots extends Table {
   IntColumn get costPerUnitOriginalSatang => integer()();
   TextColumn get fxRate => text()(); // Decimal string with 6 decimals
   IntColumn get costPerUnitThbSatang => integer()();
+  TextColumn get pricePerUnitOriginal => text().nullable()(); // Decimal string with 4-8 decimals e.g. "31.9043"
+  TextColumn get pricePerUnitThb => text().nullable()(); // Decimal string with 4-8 decimals
   IntColumn get feeThbSatang => integer()();
   IntColumn get totalCostThbSatang => integer().withDefault(const Constant(0))();
   IntColumn get remainingCostThbSatang => integer().withDefault(const Constant(0))();

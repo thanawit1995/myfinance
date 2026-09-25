@@ -1,6 +1,20 @@
 # บันทึกความคืบหน้าโครงการ MyFinance (PROGRESS.md)
 
-อัปเดตล่าสุด: 24 กันยายน 2026
+อัปเดตล่าสุด: 25 กันยายน 2026
+
+- [x] **Fix GitHub Actions Web Deployment & Conditional SQLite FFI**:
+  - **1. แก้ไขข้อผิดพลาด Flutter Web Build บน GitHub Actions (Runs #42 and #43)**:
+    - สาเหตุ: ไฟล์ `backup_restore_service.dart` มีการ import `package:sqlite3/sqlite3.dart` โดยตรง ซึ่งดึง `dart:ffi` เข้ามา ทำให้ Flutter Web คอมไพล์ไม่ผ่าน (`Error: Only JS interop members may be 'external'`)
+    - แก้ไข: แยกการทำงานของ SQLite Inspector ออกมาเป็นระบบ Conditional Export ในโฟลเดอร์ `lib/core/services/backup_inspect/`
+      - `backup_inspector_native.dart`: สำหรับ Windows / Android (ทำงานผ่าน SQLite FFI ตรวจดูตารางและสรุปข้อมูลในไฟล์ `.db`)
+      - `backup_inspector_stub.dart`: สำหรับ Web (Web-safe stub ปลอดภัยจาก FFI)
+      - `backup_inspector.dart`: ทำการเลือก export ไฟล์ตามแพลตฟอร์มอัตโนมัติ (`if (dart.library.io)`)
+  - **การทดสอบความถูกต้อง**:
+    - ทดสอบคอมไพล์ `flutter build web --release --base-href /myfinance/` สำเร็จเรียบร้อย 100%
+    - ทดสอบ `flutter analyze` ผ่านฉลุย `No issues found!` (0 error, 0 warning)
+    - ทดสอบ `flutter test` ผ่านทั้งหมด `148/148 tests passed`
+    - Push ขึ้น GitHub repository สำเร็จเรียบร้อย
+
 
 - [x] **Local File Backup & Restore System with Pre-Restore Inspection**:
   - **1. ยกเครื่องระบบสำรองข้อมูลเป็นแบบไฟล์ในเครื่อง (Local File Backup / Share)**:

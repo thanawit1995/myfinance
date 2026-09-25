@@ -147,25 +147,7 @@ class BackupRestoreService {
     final exportFileName = 'myfinance_backup_$nowStr.db';
 
     if (kIsWeb) {
-      final bytes = await exportWebDatabase();
-      if (bytes == null || bytes.isEmpty) {
-        throw Exception(isThai ? 'ไม่พบข้อมูลในเบราว์เซอร์' : 'No database in browser storage');
-      }
-      try {
-        final xFile = XFile.fromData(
-          bytes,
-          name: exportFileName,
-          mimeType: 'application/octet-stream',
-        );
-        await Share.shareXFiles(
-          [xFile],
-          text: isThai ? 'ไฟล์สำรองข้อมูล MyFinance ($nowStr)' : 'MyFinance Backup ($nowStr)',
-        );
-        return exportFileName;
-      } catch (_) {
-        downloadFileWeb(bytes, exportFileName);
-        return exportFileName;
-      }
+      return await saveDatabaseWithPickerWeb(exportFileName);
     }
 
     // Flush WAL to make sure database is fully checkpointed to the main file

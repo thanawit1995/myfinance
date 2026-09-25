@@ -799,9 +799,9 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                                 padding: const EdgeInsets.symmetric(vertical: 13),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               ),
-                              icon: const Icon(Icons.share_rounded, size: 20),
+                              icon: const Icon(Icons.save_as_rounded, size: 20),
                               label: Text(
-                                isThai ? 'แชร์ / เลือกที่บันทึกไฟล์สำรอง (.db)' : 'Share / Save Backup File (.db)',
+                                isThai ? 'บันทึกไฟล์สำรอง (เลือกโฟลเดอร์/ไดรฟ์)' : 'Save Backup File (Choose Folder/Drive)',
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                               ),
                               onPressed: _isLoading ? null : _handleExport,
@@ -819,7 +819,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                               ),
                               icon: const Icon(Icons.file_download_outlined, size: 20),
                               label: Text(
-                                isThai ? 'ดาวน์โหลดไฟล์สำรอง (.db) ลงเครื่องทันที' : 'Download Backup File (.db) Directly',
+                                isThai ? 'ดาวน์โหลดลงโฟลเดอร์ Downloads ทันที' : 'Download to Downloads Directly',
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                               ),
                               onPressed: _isLoading ? null : _handleDirectDownload,
@@ -859,8 +859,8 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                                 Expanded(
                                   child: Text(
                                     isThai
-                                        ? 'คำแนะนำ: บนมือถือ กดปุ่ม "แชร์ / เลือกที่บันทึก" เพื่อส่งเข้า Google Drive, LINE หรือเลือกโฟลเดอร์ในเครื่องได้ทันที\nส่วนบนคอมพิวเตอร์ หากต้องการให้เด้งถามโฟลเดอร์ปลายทางทุกครั้ง สามารถเปิด "ถามตำแหน่งที่จะบันทึกไฟล์ทุกครั้ง" ในการตั้งค่า Chrome/Edge ได้ครับ'
-                                        : 'Tip: On mobile, tap "Share / Save Backup" to save directly to Drive, LINE, or select a device folder.\nOn desktop browser, enable "Ask where to save each file before downloading" in Chrome/Edge settings to always choose a folder.',
+                                        ? '💡 คำแนะนำสำหรับมือถือและคอมพิวเตอร์:\n• ปุ่ม "บันทึกไฟล์สำรอง" จะเปิดหน้าต่างให้เลือกโฟลเดอร์หรือ Google Drive เพื่อเซฟไฟล์\n• หากเบราว์เซอร์ Chrome ในเครื่องของคุณดาวน์โหลดเข้า Downloads ทันทีโดยไม่ถาม ให้เปิดการตั้งค่า Chrome: แตะจุด 3 จุด ➔ การตั้งค่า (Settings) ➔ ดาวน์โหลด (Downloads) ➔ เปิดสวิตช์ "ถามตำแหน่งที่จะบันทึกไฟล์"'
+                                        : '💡 Tips for Mobile & Desktop:\n• "Save Backup File" opens a dialog to select your target folder or Google Drive.\n• If Chrome downloads directly without asking, enable "Ask where to save files" in Chrome Settings > Downloads.',
                                     style: const TextStyle(fontSize: 11.5, color: Colors.grey, height: 1.35),
                                   ),
                                 ),

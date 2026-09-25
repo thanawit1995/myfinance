@@ -1,6 +1,7 @@
 // ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:html' as html;
 import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
 import 'package:flutter/foundation.dart';
 import 'package:sqlite3/wasm.dart';
 import 'package:web/web.dart' as web;
@@ -128,4 +129,51 @@ void downloadFileWeb(Uint8List bytes, String fileName) {
   } catch (e) {
     debugPrint('downloadFileWeb error: $e');
   }
+}
+
+Future<String?> saveDatabaseWithPickerWeb(String fileName) async {
+  try {
+    if (globalContext.has('showSaveFilePicker')) {
+      final options = JSObject();
+      options['suggestedName'] = fileName.toJS;
+
+      // 1. Show file picker dialog while user gesture is fresh
+      final handlePromise = globalContext.callMethod<JSPromise<JSObject>>(
+        'showSaveFilePicker'.toJS,
+        options,
+      );
+      final handle = await handlePromise.toDart;
+
+      // 2. Export database bytes
+      final bytes = await exportWebDatabase();
+      if (bytes == null || bytes.isEmpty) {
+        throw Exception('Database is empty or could not be read');
+      }
+
+      // 3. Write to selected file
+      final writablePromise = handle.callMethod<JSPromise<JSObject>>('createWritable'.toJS);
+      final writable = await writablePromise.toDart;
+      final writePromise = writable.callMethod<JSPromise<JSAny?>>('write'.toJS, bytes.toJS);
+      await writePromise.toDart;
+      final closePromise = writable.callMethod<JSPromise<JSAny?>>('close'.toJS);
+      await closePromise.toDart;
+
+      return fileName;
+    }
+  } catch (e) {
+    final errStr = e.toString().toLowerCase();
+    if (errStr.contains('abort')) {
+      // User cancelled picker dialog
+      return null;
+    }
+    debugPrint('saveDatabaseWithPickerWeb error: $e');
+  }
+
+  // Fallback for browsers that do not support showSaveFilePicker
+  final bytes = await exportWebDatabase();
+  if (bytes != null && bytes.isNotEmpty) {
+    downloadFileWeb(bytes, fileName);
+    return fileName;
+  }
+  return null;
 }

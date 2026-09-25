@@ -7,3 +7,5 @@ Future<Uint8List?> exportWebDatabase() async => null;
 void reloadWebPage() {}
 
 void downloadFileWeb(Uint8List bytes, String fileName) {}
+
+Future<String?> saveDatabaseWithPickerWeb(String fileName) async => null;

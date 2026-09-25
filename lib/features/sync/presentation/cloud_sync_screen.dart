@@ -102,16 +102,23 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
     } catch (e) {
       if (mounted) {
         final errText = e.toString();
-        final msg = errText.contains('10') || errText.contains('sign_in_failed')
-            ? (isThai
-                ? 'บริการ Google Play ปฏิเสธการเข้าสู่ระบบ (ต้องใช้ SHA-1 ในระบบ Google) คุณยังสามารถกดเลือกโฟลเดอร์ Google Drive บนเครื่องเพื่อซิงค์ข้อมูลได้ตามปกติ'
-                : 'Google Sign-In rejected (OAuth config required).')
-            : (isThai ? 'เข้าสู่ระบบไม่สำเร็จ: $errText' : 'Sign in failed: $errText');
+        final String msg;
+        if (errText.contains('10') || errText.contains('sign_in_failed')) {
+          msg = isThai
+              ? 'บริการ Google Play ปฏิเสธการเข้าสู่ระบบ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตหรือบัญชี Google'
+              : 'Google Sign-In was rejected. Please check your network or Google account.';
+        } else if (errText.contains('People API')) {
+          msg = isThai
+              ? 'Google Cloud ยังไม่ได้เปิดสิทธิ์ People API กรุณาเปิดใช้งานใน Google Console หรือลองใหม่อีกครั้ง'
+              : 'People API is disabled in Google Cloud project.';
+        } else {
+          msg = isThai ? 'เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' : 'Sign in failed. Please try again.';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(msg),
             backgroundColor: VaultTheme.negative(context),
-            duration: const Duration(seconds: 5),
+            duration: const Duration(seconds: 4),
           ),
         );
       }
@@ -138,7 +145,7 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isThai ? 'ซิงค์ไม่สำเร็จ: $e' : 'Sync failed: $e'),
+            content: Text(isThai ? 'ซิงค์ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' : 'Sync failed. Please try again.'),
             backgroundColor: VaultTheme.negative(context),
           ),
         );
@@ -210,87 +217,118 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                   elevation: 2,
                   child: Padding(
                     padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: _googleUser != null
-                                ? Colors.teal.withValues(alpha: 0.15)
-                                : Colors.blue.withValues(alpha: 0.15),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: _googleUser != null
-                                ? Text(
+                    child: _googleUser != null
+                        ? Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: Colors.teal.withValues(alpha: 0.15),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Center(
+                                  child: Text(
                                     _googleUser!.email.substring(0, 1).toUpperCase(),
                                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.teal),
-                                  )
-                                : const Icon(Icons.account_circle_outlined, color: Colors.blue, size: 26),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _googleUser!.displayName ?? _googleUser!.email,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                        color: VaultTheme.primaryText(context),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      _googleUser!.email,
+                                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              TextButton(
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                ),
+                                onPressed: _isLoading ? null : _handleSignOut,
+                                child: Text(
+                                  isThai ? 'ออกจากระบบ' : 'Sign Out',
+                                  style: const TextStyle(color: Colors.red, fontSize: 12.5, fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                            ],
+                          )
+                        : Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                _googleUser != null
-                                    ? (_googleUser!.displayName ?? _googleUser!.email)
-                                    : (isThai ? 'เข้าสู่ระบบด้วย Gmail' : 'Sign in with Gmail'),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                  color: VaultTheme.primaryText(context),
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.withValues(alpha: 0.15),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Center(
+                                      child: Icon(Icons.account_circle_outlined, color: Colors.blue, size: 26),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          isThai ? 'เข้าสู่ระบบด้วย Google' : 'Sign in with Google',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 15,
+                                            color: VaultTheme.primaryText(context),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          isThai ? 'เชื่อมต่อ Google Drive เพื่อซิงค์ข้อมูล' : 'Connect Google Drive for cloud backup',
+                                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                _googleUser != null
-                                    ? _googleUser!.email
-                                    : (isThai ? 'เชื่อมต่อ Google Drive เพื่อสำรองข้อมูล' : 'Connect Google Drive for cloud backup'),
-                                style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                              const SizedBox(height: 14),
+                              SizedBox(
+                                width: double.infinity,
+                                child: FilledButton.tonalIcon(
+                                  style: FilledButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                  onPressed: _isLoading ? null : _handleSignIn,
+                                  icon: const Icon(Icons.login, size: 18),
+                                  label: Text(
+                                    isThai ? 'เข้าสู่ระบบ Google' : 'Sign In with Google',
+                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
                               ),
                             ],
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        if (_googleUser != null)
-                          TextButton(
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            ),
-                            onPressed: _isLoading ? null : _handleSignOut,
-                            child: Text(
-                              isThai ? 'ออกจากระบบ' : 'Sign Out',
-                              style: const TextStyle(color: Colors.red, fontSize: 12.5, fontWeight: FontWeight.w600),
-                            ),
-                          )
-                        else
-                          FilledButton.tonal(
-                            style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                            ),
-                            onPressed: _isLoading ? null : _handleSignIn,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.login, size: 16),
-                                const SizedBox(width: 6),
-                                Text(
-                                  isThai ? 'เข้าสู่ระบบ' : 'Sign In',
-                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                                ),
-                              ],
-                            ),
-                          ),
-                      ],
-                    ),
                   ),
                 ),
 

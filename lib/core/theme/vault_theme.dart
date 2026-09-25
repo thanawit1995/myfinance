@@ -186,6 +186,13 @@ class VaultTheme {
           side: BorderSide(color: darkBorder, width: 0.75),
         ),
       ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        elevation: 4,
+        dismissDirection: DismissDirection.horizontal,
+      ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: darkAccent,
         foregroundColor: Color(0xFF111315),
@@ -283,6 +290,13 @@ class VaultTheme {
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           side: BorderSide(color: lightBorder, width: 0.75),
         ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        elevation: 4,
+        dismissDirection: DismissDirection.horizontal,
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: lightAccent,

@@ -45,13 +45,6 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
   List<Category> _categories = [];
   bool _isLoading = true;
 
-  final Map<String, String> _freqLabels = {
-    'daily': 'รายวัน (Daily)',
-    'weekly': 'รายสัปดาห์ (Weekly)',
-    'monthly': 'รายเดือน (Monthly)',
-    'yearly': 'รายปี (Yearly)',
-  };
-
   @override
   void initState() {
     super.initState();
@@ -145,11 +138,11 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
     }
   }
 
-  Future<void> _save() async {
+  Future<void> _save(bool isThai) async {
     if (!_formKey.currentState!.validate()) return;
     if (_sourceAccountId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณาเลือกบัญชี')),
+        SnackBar(content: Text(isThai ? 'กรุณาเลือกบัญชี' : 'Please select an account')),
       );
       return;
     }
@@ -215,9 +208,19 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.ruleToEdit != null;
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+
+    final freqLabels = {
+      'daily': isThai ? 'รายวัน (Daily)' : 'Daily',
+      'weekly': isThai ? 'รายสัปดาห์ (Weekly)' : 'Weekly',
+      'monthly': isThai ? 'รายเดือน (Monthly)' : 'Monthly',
+      'yearly': isThai ? 'รายปี (Yearly)' : 'Yearly',
+    };
 
     return AlertDialog(
-      title: Text(isEditing ? 'แก้ไขรายการอัตโนมัติ' : 'สร้างรายการอัตโนมัติใหม่'),
+      title: Text(isEditing
+          ? (isThai ? 'แก้ไขรายการอัตโนมัติ' : 'Edit Recurring Rule')
+          : (isThai ? 'สร้างรายการอัตโนมัติใหม่' : 'New Recurring Rule')),
       content: _isLoading
           ? const SizedBox(height: 120, child: Center(child: CircularProgressIndicator()))
           : SizedBox(
@@ -231,13 +234,17 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
                     children: [
                       TextFormField(
                         controller: _titleController,
-                        decoration: const InputDecoration(
-                          labelText: 'ชื่อรายการ *',
-                          hintText: 'เช่น ค่าเช่าห้อง, เงินเดือน, ค่าสมาชิกรายเดือน',
+                        decoration: InputDecoration(
+                          labelText: isThai ? 'ชื่อรายการ *' : 'Rule Title *',
+                          hintText: isThai
+                              ? 'เช่น ค่าเช่าห้อง, เงินเดือน, ค่าสมาชิก'
+                              : 'e.g. Rent, Salary, Netflix subscription',
                           isDense: true,
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
                         ),
-                        validator: (v) => (v == null || v.trim().isEmpty) ? 'กรุณาระบุชื่อ' : null,
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? (isThai ? 'กรุณาระบุชื่อ' : 'Title is required')
+                            : null,
                       ),
                       const SizedBox(height: 12),
                       Row(
@@ -245,15 +252,24 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
                           Expanded(
                             child: DropdownButtonFormField<String>(
                               initialValue: _transactionType,
-                              decoration: const InputDecoration(
-                                labelText: 'ประเภทรายการ',
+                              decoration: InputDecoration(
+                                labelText: isThai ? 'ประเภทรายการ' : 'Type',
                                 isDense: true,
-                                border: OutlineInputBorder(),
+                                border: const OutlineInputBorder(),
                               ),
-                              items: const [
-                                DropdownMenuItem(value: 'expense', child: Text('รายจ่าย (Expense)')),
-                                DropdownMenuItem(value: 'income', child: Text('รายรับ (Income)')),
-                                DropdownMenuItem(value: 'transfer', child: Text('โอนเงิน (Transfer)')),
+                              items: [
+                                DropdownMenuItem(
+                                  value: 'expense',
+                                  child: Text(isThai ? 'รายจ่าย (Expense)' : 'Expense'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'income',
+                                  child: Text(isThai ? 'รายรับ (Income)' : 'Income'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'transfer',
+                                  child: Text(isThai ? 'โอนเงิน (Transfer)' : 'Transfer'),
+                                ),
                               ],
                               onChanged: (val) {
                                 if (val != null) _onTransactionTypeChanged(val);
@@ -266,16 +282,20 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
                               controller: _amountController,
                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
                               inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
-                              decoration: const InputDecoration(
-                                labelText: 'จำนวนเงิน (บาท) *',
+                              decoration: InputDecoration(
+                                labelText: isThai ? 'จำนวนเงิน (บาท) *' : 'Amount (THB) *',
                                 hintText: '0.00',
                                 suffixText: '฿',
                                 isDense: true,
-                                border: OutlineInputBorder(),
+                                border: const OutlineInputBorder(),
                               ),
                               validator: (v) {
-                                if (v == null || v.trim().isEmpty) return 'กรุณาระบุจำนวนเงิน';
-                                if (double.tryParse(v.trim()) == null) return 'ตัวเลขไม่ถูกต้อง';
+                                if (v == null || v.trim().isEmpty) {
+                                  return isThai ? 'กรุณาระบุจำนวนเงิน' : 'Amount required';
+                                }
+                                if (double.tryParse(v.trim()) == null) {
+                                  return isThai ? 'ตัวเลขไม่ถูกต้อง' : 'Invalid number';
+                                }
                                 return null;
                               },
                             ),
@@ -288,12 +308,12 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
                           Expanded(
                             child: DropdownButtonFormField<String>(
                               initialValue: _frequency,
-                              decoration: const InputDecoration(
-                                labelText: 'ความถี่รอบรายการ',
+                              decoration: InputDecoration(
+                                labelText: isThai ? 'ความถี่รอบรายการ' : 'Frequency',
                                 isDense: true,
-                                border: OutlineInputBorder(),
+                                border: const OutlineInputBorder(),
                               ),
-                              items: _freqLabels.entries
+                              items: freqLabels.entries
                                   .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
                                   .toList(),
                               onChanged: (val) {
@@ -308,12 +328,12 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
                               controller: _intervalController,
                               keyboardType: TextInputType.number,
                               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                              decoration: const InputDecoration(
-                                labelText: 'ทุกๆ (รอบ)',
+                              decoration: InputDecoration(
+                                labelText: isThai ? 'ทุกๆ (รอบ)' : 'Interval',
                                 hintText: '1',
-                                suffixText: 'รอบ',
+                                suffixText: isThai ? 'รอบ' : 'cycle(s)',
                                 isDense: true,
-                                border: OutlineInputBorder(),
+                                border: const OutlineInputBorder(),
                               ),
                               validator: (v) => (v == null || int.tryParse(v.trim()) == null || int.parse(v.trim()) <= 0)
                                   ? '>= 1'
@@ -331,16 +351,20 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
                             FilteringTextInputFormatter.digitsOnly,
                             LengthLimitingTextInputFormatter(2),
                           ],
-                          decoration: const InputDecoration(
-                            labelText: 'วันที่ทำรายการของเดือน (1-31)',
-                            hintText: 'เช่น 1, 25, 31 (ระบบจะปัดวันสิ้นเดือนให้อัตโนมัติ)',
+                          decoration: InputDecoration(
+                            labelText: isThai ? 'วันที่ทำรายการของเดือน (1-31)' : 'Day of Month (1-31)',
+                            hintText: isThai
+                                ? 'เช่น 1, 25, 31 (ระบบจะปัดวันสิ้นเดือนให้อัตโนมัติ)'
+                                : 'e.g. 1, 25, 31 (auto-adjusted for month-end)',
                             isDense: true,
-                            border: OutlineInputBorder(),
+                            border: const OutlineInputBorder(),
                           ),
                           validator: (v) {
                             if (v != null && v.trim().isNotEmpty) {
                               final d = int.tryParse(v.trim());
-                              if (d == null || d < 1 || d > 31) return 'วันที่ต้องอยู่ระหว่าง 1-31';
+                              if (d == null || d < 1 || d > 31) {
+                                return isThai ? 'วันที่ต้องอยู่ระหว่าง 1-31' : 'Must be between 1-31';
+                              }
                             }
                             return null;
                           },
@@ -353,7 +377,9 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
                             child: DropdownButtonFormField<String?>(
                               initialValue: _sourceAccountId,
                               decoration: InputDecoration(
-                                labelText: _transactionType == 'income' ? 'เข้าบัญชี' : 'จากบัญชี',
+                                labelText: _transactionType == 'income'
+                                    ? (isThai ? 'เข้าบัญชี' : 'To Account')
+                                    : (isThai ? 'จากบัญชี' : 'From Account'),
                                 isDense: true,
                                 border: const OutlineInputBorder(),
                               ),
@@ -368,10 +394,10 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
                             Expanded(
                               child: DropdownButtonFormField<String?>(
                                 initialValue: _destinationAccountId,
-                                decoration: const InputDecoration(
-                                  labelText: 'ไปยังบัญชี',
+                                decoration: InputDecoration(
+                                  labelText: isThai ? 'ไปยังบัญชี' : 'To Account',
                                   isDense: true,
-                                  border: OutlineInputBorder(),
+                                  border: const OutlineInputBorder(),
                                 ),
                                 items: _accounts
                                     .map((a) => DropdownMenuItem(value: a.id, child: Text(a.name)))
@@ -386,14 +412,20 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String?>(
                           initialValue: _categoryId,
-                          decoration: const InputDecoration(
-                            labelText: 'หมวดหมู่ (Category)',
+                          decoration: InputDecoration(
+                            labelText: isThai ? 'หมวดหมู่ (Category)' : 'Category',
                             isDense: true,
-                            border: OutlineInputBorder(),
+                            border: const OutlineInputBorder(),
                           ),
                           items: [
-                            const DropdownMenuItem<String?>(value: null, child: Text('-- ไม่ระบุหมวดหมู่ --')),
-                            ..._categories.map((c) => DropdownMenuItem(value: c.id, child: Text(c.nameTh))),
+                            DropdownMenuItem<String?>(
+                              value: null,
+                              child: Text(isThai ? '-- ไม่ระบุหมวดหมู่ --' : '-- No Category --'),
+                            ),
+                            ..._categories.map((c) => DropdownMenuItem(
+                                  value: c.id,
+                                  child: Text(isThai ? c.nameTh : c.nameEn),
+                                )),
                           ],
                           onChanged: (val) => setState(() => _categoryId = val),
                         ),
@@ -405,28 +437,34 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
                             child: OutlinedButton.icon(
                               style: OutlinedButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
                               onPressed: _pickNextRunDate,
                               icon: const Icon(Icons.event, size: 18),
                               label: Text(
-                                'รอบถัดไป: ${DateFormat('dd/MM/yyyy').format(_nextRunDate)}',
+                                '${isThai ? "รอบถัดไป: " : "Next: "}${DateFormat('dd/MM/yyyy').format(_nextRunDate)}',
                                 style: const TextStyle(fontSize: 12),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 8),
                           Expanded(
                             child: OutlinedButton.icon(
                               style: OutlinedButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
                               onPressed: _pickEndDate,
                               icon: const Icon(Icons.stop_circle_outlined, size: 18),
                               label: Text(
-                                _endDate != null ? 'สิ้นสุด: ${DateFormat('dd/MM/yyyy').format(_endDate!)}' : 'ไม่มีวันสิ้นสุด',
+                                _endDate != null
+                                    ? '${isThai ? "สิ้นสุด: " : "End: "}${DateFormat('dd/MM/yyyy').format(_endDate!)}'
+                                    : (isThai ? 'ไม่มีวันสิ้นสุด' : 'No End Date'),
                                 style: const TextStyle(fontSize: 12),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ),
@@ -434,18 +472,22 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
                             IconButton(
                               icon: const Icon(Icons.clear, size: 18),
                               onPressed: () => setState(() => _endDate = null),
-                              tooltip: 'ล้างวันสิ้นสุด',
+                              tooltip: isThai ? 'ล้างวันสิ้นสุด' : 'Clear end date',
                             ),
                         ],
                       ),
                       const SizedBox(height: 12),
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: const Text('บันทึกอัตโนมัติ (Auto-Post)'),
+                        title: Text(isThai ? 'บันทึกอัตโนมัติ (Auto-Post)' : 'Auto-Post'),
                         subtitle: Text(
                           _autoPost
-                              ? 'ระบบจะสร้างรายการลงบัญชีให้ทันทีเมื่อถึงกำหนดรอบ'
-                              : 'ระบบจะรอให้คุณกดยืนยันการทำรายการด้วยตนเองก่อนบันทึก',
+                              ? (isThai
+                                  ? 'ระบบจะสร้างรายการลงบัญชีให้ทันทีเมื่อถึงกำหนดรอบ'
+                                  : 'Automatically create transaction on due date')
+                              : (isThai
+                                  ? 'ระบบจะรอให้คุณกดยืนยันการทำรายการด้วยตนเองก่อนบันทึก'
+                                  : 'Requires manual confirmation before posting'),
                           style: const TextStyle(fontSize: 11.5),
                         ),
                         value: _autoPost,
@@ -454,10 +496,10 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
                       const SizedBox(height: 6),
                       TextFormField(
                         controller: _noteController,
-                        decoration: const InputDecoration(
-                          labelText: 'บันทึกช่วยจำเพิ่มเติม',
+                        decoration: InputDecoration(
+                          labelText: isThai ? 'บันทึกช่วยจำเพิ่มเติม' : 'Note (Optional)',
                           isDense: true,
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
                         ),
                       ),
                     ],
@@ -468,11 +510,13 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('ยกเลิก'),
+          child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
         ),
         FilledButton(
-          onPressed: _isLoading ? null : _save,
-          child: Text(isEditing ? 'บันทึกการแก้ไข' : 'สร้างรายการอัตโนมัติ'),
+          onPressed: _isLoading ? null : () => _save(isThai),
+          child: Text(isEditing
+              ? (isThai ? 'บันทึกการแก้ไข' : 'Save Changes')
+              : (isThai ? 'สร้างรายการอัตโนมัติ' : 'Create Rule')),
         ),
       ],
     );

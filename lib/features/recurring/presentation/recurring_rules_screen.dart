@@ -33,7 +33,7 @@ class _RecurringRulesScreenState extends ConsumerState<RecurringRulesScreen>
     setState(() {});
   }
 
-  Future<void> _processDueRules() async {
+  Future<void> _processDueRules(bool isThai) async {
     final dao = ref.read(recurringTransactionsDaoProvider);
     final count = await dao.processDueRules();
 
@@ -42,8 +42,12 @@ class _RecurringRulesScreenState extends ConsumerState<RecurringRulesScreen>
         SnackBar(
           content: Text(
             count > 0
-                ? 'ประมวลผลสำเร็จ: ทำรายการอัตโนมัติแล้ว $count รายการ'
-                : 'ไม่มีรายการที่ถึงกำหนดรอบในขณะนี้',
+                ? (isThai
+                    ? 'ประมวลผลสำเร็จ: ทำรายการอัตโนมัติแล้ว $count รายการ'
+                    : 'Processed $count recurring transaction(s)')
+                : (isThai
+                    ? 'ไม่มีรายการที่ถึงกำหนดรอบในขณะนี้'
+                    : 'No rules due for processing'),
           ),
           backgroundColor: count > 0 ? Colors.green.shade700 : Colors.blueGrey,
         ),
@@ -54,26 +58,28 @@ class _RecurringRulesScreenState extends ConsumerState<RecurringRulesScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'รายการอัตโนมัติ (Recurring)',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, height: 1.2),
+        title: Text(
+          isThai ? 'รายการอัตโนมัติ (Recurring)' : 'Recurring Rules',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, height: 1.2),
           maxLines: 2,
           softWrap: true,
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.sync),
-            tooltip: 'ตรวจสอบและทำรายการที่ถึงกำหนด',
-            onPressed: _processDueRules,
+            tooltip: isThai ? 'ตรวจสอบและทำรายการที่ถึงกำหนด' : 'Process due rules',
+            onPressed: () => _processDueRules(isThai),
           ),
         ],
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(icon: Icon(Icons.repeat), text: 'กฎที่บันทึกไว้'),
-            Tab(icon: Icon(Icons.calendar_month_outlined), text: 'พยากรณ์ 30 วันล่วงหน้า'),
+          tabs: [
+            Tab(icon: const Icon(Icons.repeat), text: isThai ? 'กฎที่บันทึกไว้' : 'Saved Rules'),
+            Tab(icon: const Icon(Icons.calendar_month_outlined), text: isThai ? 'พยากรณ์ 30 วัน' : '30-Day Forecast'),
           ],
         ),
       ),
@@ -96,6 +102,7 @@ class _RulesListTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dao = ref.watch(recurringTransactionsDaoProvider);
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
@@ -110,7 +117,7 @@ class _RulesListTab extends ConsumerWidget {
         }
 
         if (snapshot.hasError) {
-          return Center(child: Text('เกิดข้อผิดพลาด: ${snapshot.error}'));
+          return Center(child: Text('${isThai ? "เกิดข้อผิดพลาด: " : "Error: "}${snapshot.error}'));
         }
 
         final rules = snapshot.data![0] as List<RecurringRule>;
@@ -124,7 +131,7 @@ class _RulesListTab extends ConsumerWidget {
               if (created == true) onChanged();
             },
             icon: const Icon(Icons.add),
-            label: const Text('สร้างกฎใหม่'),
+            label: Text(isThai ? 'สร้างกฎใหม่' : 'New Rule'),
           ),
           body: rules.isEmpty
               ? Container(
@@ -135,13 +142,15 @@ class _RulesListTab extends ConsumerWidget {
                     children: [
                       Icon(Icons.repeat_on_outlined, size: 64, color: Colors.blue.shade300),
                       const SizedBox(height: 12),
-                      const Text(
-                        'ยังไม่มีกฎรายการอัตโนมัติ',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      Text(
+                        isThai ? 'ยังไม่มีกฎรายการอัตโนมัติ' : 'No Recurring Rules Yet',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'สร้างกฎเพื่อช่วยบันทึกรายรับรายจ่ายประจำอัตโนมัติ เช่น เงินเดือน ค่าเช่า หรือค่าน้ำไฟ',
+                        isThai
+                            ? 'สร้างกฎเพื่อช่วยบันทึกรายรับรายจ่ายประจำอัตโนมัติ เช่น เงินเดือน ค่าเช่า หรือค่าน้ำไฟ'
+                            : 'Create rules to automate recurring income, expenses, or transfers.',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: Colors.grey.shade600),
                       ),
@@ -179,7 +188,7 @@ class _RulesListTab extends ConsumerWidget {
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
-                                    _getTypeLabel(rule.transactionType),
+                                    _getTypeLabel(rule.transactionType, isThai),
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.bold,
@@ -195,7 +204,7 @@ class _RulesListTab extends ConsumerWidget {
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
-                                    rule.autoPost ? 'Auto-Post' : 'รอยืนยัน',
+                                    rule.autoPost ? 'Auto-Post' : (isThai ? 'รอยืนยัน' : 'Manual'),
                                     style: TextStyle(
                                       fontSize: 10.5,
                                       fontWeight: FontWeight.w600,
@@ -223,8 +232,11 @@ class _RulesListTab extends ConsumerWidget {
                                   child: Text(
                                     rule.title,
                                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
+                                const SizedBox(width: 8),
                                 Text(
                                   Money(rule.amountSatang).format(symbol: '฿'),
                                   style: TextStyle(
@@ -239,60 +251,70 @@ class _RulesListTab extends ConsumerWidget {
 
                             // Frequency and Account info
                             Text(
-                              'ความถี่: ${_formatFrequency(rule)}',
+                              '${isThai ? "ความถี่: " : "Frequency: "}${_formatFrequency(rule, isThai)}',
                               style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700),
                             ),
                             if (sourceAcc != null) ...[
                               const SizedBox(height: 2),
                               Text(
                                 rule.transactionType == 'transfer' && destAcc != null
-                                    ? 'โอนจาก: ${sourceAcc.name} → ${destAcc.name}'
-                                    : 'บัญชี: ${sourceAcc.name}',
+                                    ? '${isThai ? "โอนจาก: " : "Transfer: "}${sourceAcc.name} → ${destAcc.name}'
+                                    : '${isThai ? "บัญชี: " : "Account: "}${sourceAcc.name}',
                                 style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
                             const Divider(height: 18),
 
-                            // Next run date and actions
+                            // Next run date and actions (No overflow on small screens)
                             Row(
                               children: [
                                 Icon(
-                                  Icons.event,
+                                  Icons.event_outlined,
                                   size: 15,
                                   color: isDue ? Colors.red.shade600 : Colors.blueGrey,
                                 ),
                                 const SizedBox(width: 4),
-                                Text(
-                                  'รอบถัดไป: ${DateFormat('dd/MM/yyyy').format(rule.nextRunDate)}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: isDue ? FontWeight.bold : FontWeight.normal,
-                                    color: isDue ? Colors.red.shade700 : Colors.grey.shade800,
+                                Expanded(
+                                  child: Text(
+                                    '${isThai ? "รอบถัดไป: " : "Next: "}${DateFormat('dd/MM/yyyy').format(rule.nextRunDate)}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: isDue ? FontWeight.bold : FontWeight.normal,
+                                      color: isDue ? Colors.red.shade700 : Colors.grey.shade800,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                                const Spacer(),
-                                if (isDue && !rule.autoPost && rule.isActive)
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 8),
-                                    child: FilledButton.tonal(
-                                      style: FilledButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                        textStyle: const TextStyle(fontSize: 11),
-                                      ),
-                                      onPressed: () async {
-                                        await dao.postSingleOccurrence(rule.id, rule.nextRunDate);
-                                        if (context.mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(content: Text('บันทึกรายการ "${rule.title}" เรียบร้อยแล้ว')),
-                                          );
-                                        }
-                                        onChanged();
-                                      },
-                                      child: const Text('ยืนยันทำรายการ'),
+                                if (isDue && !rule.autoPost && rule.isActive) ...[
+                                  FilledButton.tonal(
+                                    style: FilledButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      visualDensity: VisualDensity.compact,
                                     ),
+                                    onPressed: () async {
+                                      await dao.postSingleOccurrence(rule.id, rule.nextRunDate);
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(isThai
+                                                ? 'บันทึกรายการ "${rule.title}" เรียบร้อยแล้ว'
+                                                : 'Recorded "${rule.title}"'),
+                                          ),
+                                        );
+                                      }
+                                      onChanged();
+                                    },
+                                    child: Text(isThai ? 'ทำรายการ' : 'Post', style: const TextStyle(fontSize: 11)),
                                   ),
+                                  const SizedBox(width: 4),
+                                ],
                                 IconButton(
                                   icon: const Icon(Icons.edit_outlined, size: 18),
+                                  visualDensity: VisualDensity.compact,
+                                  tooltip: isThai ? 'แก้ไข' : 'Edit',
                                   onPressed: () async {
                                     final edited = await RecurringRuleDialog.show(context, rule: rule);
                                     if (edited == true) onChanged();
@@ -300,18 +322,25 @@ class _RulesListTab extends ConsumerWidget {
                                 ),
                                 IconButton(
                                   icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                                  visualDensity: VisualDensity.compact,
+                                  tooltip: isThai ? 'ลบ' : 'Delete',
                                   onPressed: () async {
                                     final confirm = await showDialog<bool>(
                                       context: context,
                                       builder: (ctx) => AlertDialog(
-                                        title: const Text('ยืนยันลบกฎ'),
-                                        content: Text('คุณต้องการลบ "${rule.title}" หรือไม่?'),
+                                        title: Text(isThai ? 'ยืนยันลบกฎ' : 'Delete Rule'),
+                                        content: Text(isThai
+                                            ? 'คุณต้องการลบ "${rule.title}" หรือไม่?'
+                                            : 'Delete rule "${rule.title}"?'),
                                         actions: [
-                                          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('ยกเลิก')),
+                                          TextButton(
+                                            onPressed: () => Navigator.of(ctx).pop(false),
+                                            child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+                                          ),
                                           FilledButton(
                                             style: FilledButton.styleFrom(backgroundColor: Colors.red),
                                             onPressed: () => Navigator.of(ctx).pop(true),
-                                            child: const Text('ลบ'),
+                                            child: Text(isThai ? 'ลบ' : 'Delete'),
                                           ),
                                         ],
                                       ),
@@ -349,33 +378,50 @@ class _RulesListTab extends ConsumerWidget {
     }
   }
 
-  String _getTypeLabel(String type) {
+  String _getTypeLabel(String type, bool isThai) {
     switch (type) {
       case 'income':
-        return 'รายรับ';
+        return isThai ? 'รายรับ' : 'Income';
       case 'expense':
-        return 'รายจ่าย';
+        return isThai ? 'รายจ่าย' : 'Expense';
       case 'transfer':
-        return 'โอนเงิน';
+        return isThai ? 'โอนเงิน' : 'Transfer';
       default:
         return type;
     }
   }
 
-  String _formatFrequency(RecurringRule rule) {
-    final interval = rule.intervalUnits > 1 ? 'ทุกๆ ${rule.intervalUnits} ' : 'ทุก';
-    switch (rule.frequency) {
-      case 'daily':
-        return '$intervalวัน';
-      case 'weekly':
-        return '$intervalสัปดาห์';
-      case 'monthly':
-        final dayStr = rule.dayOfMonth != null ? ' (วันที่ ${rule.dayOfMonth})' : '';
-        return '$intervalเดือน$dayStr';
-      case 'yearly':
-        return '$intervalปี';
-      default:
-        return rule.frequency;
+  String _formatFrequency(RecurringRule rule, bool isThai) {
+    if (isThai) {
+      final interval = rule.intervalUnits > 1 ? 'ทุกๆ ${rule.intervalUnits} ' : 'ทุก';
+      switch (rule.frequency) {
+        case 'daily':
+          return '$intervalวัน';
+        case 'weekly':
+          return '$intervalสัปดาห์';
+        case 'monthly':
+          final dayStr = rule.dayOfMonth != null ? ' (วันที่ ${rule.dayOfMonth})' : '';
+          return '$intervalเดือน$dayStr';
+        case 'yearly':
+          return '$intervalปี';
+        default:
+          return rule.frequency;
+      }
+    } else {
+      final interval = rule.intervalUnits > 1 ? 'Every ${rule.intervalUnits} ' : 'Every ';
+      switch (rule.frequency) {
+        case 'daily':
+          return rule.intervalUnits > 1 ? '${interval}days' : 'Daily';
+        case 'weekly':
+          return rule.intervalUnits > 1 ? '${interval}weeks' : 'Weekly';
+        case 'monthly':
+          final dayStr = rule.dayOfMonth != null ? ' (Day ${rule.dayOfMonth})' : '';
+          return rule.intervalUnits > 1 ? '${interval}months$dayStr' : 'Monthly$dayStr';
+        case 'yearly':
+          return rule.intervalUnits > 1 ? '${interval}years' : 'Yearly';
+        default:
+          return rule.frequency;
+      }
     }
   }
 }
@@ -389,6 +435,7 @@ class _ProjectionTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final dao = ref.watch(recurringTransactionsDaoProvider);
     final theme = Theme.of(context);
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
 
     return FutureBuilder(
       future: dao.getUpcoming30Days(windowDays: 30),
@@ -398,7 +445,7 @@ class _ProjectionTab extends ConsumerWidget {
         }
 
         if (snapshot.hasError) {
-          return Center(child: Text('เกิดข้อผิดพลาด: ${snapshot.error}'));
+          return Center(child: Text('${isThai ? "เกิดข้อผิดพลาด: " : "Error: "}${snapshot.error}'));
         }
 
         final items = snapshot.data ?? [];
@@ -429,12 +476,17 @@ class _ProjectionTab extends ConsumerWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'ประมาณการกระแสเงินสด 30 วันข้างหน้า',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        Expanded(
+                          child: Text(
+                            isThai ? 'ประมาณการกระแสเงินสด 30 วันข้างหน้า' : '30-Day Cash Flow Projection',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         Text(
-                          '${items.length} รายการ',
+                          '${items.length} ${isThai ? "รายการ" : "items"}',
                           style: TextStyle(fontSize: 12, color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
                         ),
                       ],
@@ -443,41 +495,53 @@ class _ProjectionTab extends ConsumerWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        Column(
-                          children: [
-                            const Text('คาดว่าจะรับ', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                            const SizedBox(height: 2),
-                            Text(
-                              Money(projectedIncomeSatang).format(symbol: '฿'),
-                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.green.shade700),
-                            ),
-                          ],
-                        ),
-                        Container(height: 30, width: 1, color: Colors.grey.shade300),
-                        Column(
-                          children: [
-                            const Text('คาดว่าจะจ่าย', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                            const SizedBox(height: 2),
-                            Text(
-                              Money(projectedExpenseSatang).format(symbol: '฿'),
-                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.red.shade700),
-                            ),
-                          ],
-                        ),
-                        Container(height: 30, width: 1, color: Colors.grey.shade300),
-                        Column(
-                          children: [
-                            const Text('สุทธิ', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                            const SizedBox(height: 2),
-                            Text(
-                              Money(projectedIncomeSatang - projectedExpenseSatang).format(symbol: '฿'),
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: (projectedIncomeSatang - projectedExpenseSatang) >= 0 ? Colors.green.shade800 : Colors.red.shade800,
+                        Expanded(
+                          child: Column(
+                            children: [
+                              Text(isThai ? 'คาดว่าจะรับ' : 'Expected In', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                              const SizedBox(height: 2),
+                              Text(
+                                Money(projectedIncomeSatang).format(symbol: '฿'),
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.green.shade700),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
+                        ),
+                        Container(height: 30, width: 1, color: Colors.grey.shade300),
+                        Expanded(
+                          child: Column(
+                            children: [
+                              Text(isThai ? 'คาดว่าจะจ่าย' : 'Expected Out', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                              const SizedBox(height: 2),
+                              Text(
+                                Money(projectedExpenseSatang).format(symbol: '฿'),
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.red.shade700),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(height: 30, width: 1, color: Colors.grey.shade300),
+                        Expanded(
+                          child: Column(
+                            children: [
+                              Text(isThai ? 'สุทธิ' : 'Net', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                              const SizedBox(height: 2),
+                              Text(
+                                Money(projectedIncomeSatang - projectedExpenseSatang).format(symbol: '฿'),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: (projectedIncomeSatang - projectedExpenseSatang) >= 0 ? Colors.green.shade800 : Colors.red.shade800,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -491,7 +555,12 @@ class _ProjectionTab extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.all(32),
                 child: Center(
-                  child: Text('ไม่มีรายการที่คาดว่าจะเกิดขึ้นใน 30 วันข้างหน้า', style: TextStyle(color: Colors.grey.shade600)),
+                  child: Text(
+                    isThai
+                        ? 'ไม่มีรายการที่คาดว่าจะเกิดขึ้นใน 30 วันข้างหน้า'
+                        : 'No upcoming transactions in the next 30 days',
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
                 ),
               )
             else
@@ -515,9 +584,14 @@ class _ProjectionTab extends ConsumerWidget {
                         size: 20,
                       ),
                     ),
-                    title: Text(item.rule.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                    title: Text(
+                      item.rule.title,
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     subtitle: Text(
-                      'กำหนด: ${DateFormat('dd/MM/yyyy').format(item.projectedDate)} (${item.rule.autoPost ? 'Auto-Post' : 'รอยืนยัน'})',
+                      '${isThai ? "กำหนด: " : "Due: "}${DateFormat('dd/MM/yyyy').format(item.projectedDate)} (${item.rule.autoPost ? "Auto-Post" : (isThai ? "รอยืนยัน" : "Manual")})',
                       style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                     ),
                     trailing: Text(

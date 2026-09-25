@@ -142,6 +142,13 @@ class LumiTheme {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         ),
       ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        elevation: 4,
+        dismissDirection: DismissDirection.horizontal,
+      ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: lightAccent,
         foregroundColor: Colors.white,
@@ -289,6 +296,13 @@ class LumiTheme {
             fontSize: 15,
           ),
         ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        elevation: 4,
+        dismissDirection: DismissDirection.horizontal,
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: darkAccent,

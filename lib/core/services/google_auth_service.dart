@@ -29,7 +29,7 @@ class GoogleAuthService {
 
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     clientId: kIsWeb ? webClientId : null,
-    serverClientId: webClientId,
+    serverClientId: null,
     scopes: [
       'email',
       driveScope,
@@ -136,9 +136,11 @@ class GoogleAuthService {
     if (!isSupportedPlatform) return null;
 
     if (_account == null) {
-      try {
-        _account = await _googleSignIn.signInSilently();
-      } catch (_) {}
+      if (requestScopesIfNeeded) {
+        try {
+          _account = await _googleSignIn.signInSilently();
+        } catch (_) {}
+      }
     }
 
     if (_account == null) return null;

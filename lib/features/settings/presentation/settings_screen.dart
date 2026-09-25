@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import '../../../../core/security/auth_provider.dart';
-import '../../../../core/services/cloud_sync_provider.dart';
-import '../../../../core/services/google_auth_service.dart';
-import '../../../../core/services/google_drive_sync_service.dart';
 import '../../../../core/theme/vault_theme.dart';
 import '../../../../core/widgets/pin_lock_dialog.dart';
 import '../../../../core/widgets/pin_setup_dialog.dart';
@@ -17,7 +13,7 @@ import '../../tax/presentation/tax_screen.dart';
 import '../../remittance/presentation/foreign_remittance_screen.dart';
 import '../../../core/theme/app_theme_style.dart';
 import '../../reports/presentation/reports_screen.dart';
-import '../../sync/presentation/cloud_sync_screen.dart';
+import '../../backup/presentation/backup_restore_screen.dart';
 import '../../import/presentation/import_wizard_screen.dart';
 import 'trash_bin_screen.dart';
 
@@ -49,29 +45,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _isBiometricEnabled = false;
   bool _isBiometricSupported = false;
   int _sessionTimeoutMinutes = 15;
-  GoogleAuthUser? _googleUser;
-  GoogleDriveSyncStatus? _gdriveStatus;
 
   @override
   void initState() {
     super.initState();
     _loadSettings();
-    _loadGoogleDriveStatus();
   }
 
-  Future<void> _loadGoogleDriveStatus() async {
-    final authService = ref.read(googleAuthServiceProvider);
-    final syncService = ref.read(googleDriveSyncServiceProvider);
-    // Use cached user only — never trigger silent sign-in on Settings screen load
-    final user = await authService.getCachedUser();
-    final status = await syncService.getStatus();
-    if (mounted) {
-      setState(() {
-        _googleUser = user;
-        _gdriveStatus = status;
-      });
-    }
-  }
 
   Future<void> _loadSettings() async {
     final auth = ref.read(authServiceProvider);
@@ -359,48 +339,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           const SizedBox(height: 18),
 
-          // 5. Cloud Backup & Sync (Google Drive Only) - Single Unified Entry Point
-          _buildSectionHeader(isThai ? 'ข้อมูลและการสำรองข้อมูล' : 'Data & Cloud Backup'),
+          // 5. Backup & Restore (Local File Backup)
+          _buildSectionHeader(isThai ? 'ข้อมูลและการสำรองข้อมูล' : 'Data & Backup'),
           _buildSectionCard([
             _buildTile(
-              icon: Icons.cloud_sync_rounded,
-              iconColor: Colors.blueAccent,
-              title: isThai ? 'สำรองและกู้คืนข้อมูล Google Drive' : 'Google Drive Backup & Sync',
-              subtitle: _googleUser != null
-                  ? (isThai
-                      ? 'เชื่อมต่อแล้ว: ${_googleUser!.email}${_gdriveStatus?.lastSyncTime != null ? " • ล่าสุด: ${DateFormat('d MMM, HH:mm', 'th_TH').format(_gdriveStatus!.lastSyncTime!)}" : ""}'
-                      : 'Connected: ${_googleUser!.email}${_gdriveStatus?.lastSyncTime != null ? " • Last: ${DateFormat('d MMM, HH:mm', 'en_US').format(_gdriveStatus!.lastSyncTime!)}" : ""}')
-                  : (isThai
-                      ? 'เชื่อมต่อ Gmail เพื่อสำรองข้อมูลขึ้น Google Drive อย่างปลอดภัย'
-                      : 'Connect Gmail to back up securely to Google Drive'),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_googleUser != null)
-                    Container(
-                      margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: VaultTheme.positive(context).withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        isThai ? 'เชื่อมต่อแล้ว' : 'Connected',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: VaultTheme.positive(context),
-                        ),
-                      ),
-                    ),
-                  Icon(Icons.chevron_right_rounded, color: VaultTheme.secondaryText(context)),
-                ],
-              ),
-              onTap: () async {
-                await Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const CloudSyncScreen()),
+              icon: Icons.backup_rounded,
+              iconColor: Colors.teal,
+              title: isThai ? 'สำรองและกู้คืนข้อมูล (Backup & Restore)' : 'Backup & Restore',
+              subtitle: isThai
+                  ? 'ส่งออกไฟล์สำรอง, กู้คืนข้อมูลจากไฟล์ (.db) พร้อมพรีวิวสรุปข้อมูลก่อนกู้คืน'
+                  : 'Export & share backup, restore from file (.db) with preview summary',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const BackupRestoreScreen()),
                 );
-                await _loadGoogleDriveStatus();
               },
             ),
             _buildDivider(),

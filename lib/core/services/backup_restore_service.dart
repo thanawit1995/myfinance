@@ -6,33 +6,13 @@ import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../database/app_database.dart';
 import '../database/database_provider.dart';
+import 'backup_inspect/backup_inspector.dart';
 import 'web_db_helper/web_db_helper.dart';
 
-class BackupInspectionResult {
-  final bool isValid;
-  final String? errorMessage;
-  final int totalAccounts;
-  final List<String> sampleAccountNames;
-  final int totalTransactions;
-  final DateTime? latestTransactionDate;
-  final int sizeBytes;
-  final String fileName;
-
-  const BackupInspectionResult({
-    required this.isValid,
-    this.errorMessage,
-    this.totalAccounts = 0,
-    this.sampleAccountNames = const [],
-    this.totalTransactions = 0,
-    this.latestTransactionDate,
-    this.sizeBytes = 0,
-    required this.fileName,
-  });
-}
+export 'backup_inspect/backup_inspector.dart';
 
 class SafetyBackupItem {
   final String path;
@@ -109,102 +89,7 @@ class BackupRestoreService {
 
   /// ตรวจสอบและดึงข้อมูลสรุปจากไฟล์สำรอง (.db) ก่อนกดยืนยันกู้คืน
   Future<BackupInspectionResult> inspectBackupFile(String filePath, {Uint8List? bytes, String? name}) async {
-    final fileName = name ?? p.basename(filePath);
-
-    if (kIsWeb) {
-      final byteLength = bytes?.length ?? 0;
-      return BackupInspectionResult(
-        isValid: byteLength > 0,
-        fileName: fileName,
-        sizeBytes: byteLength,
-      );
-    }
-
-    File tempFile;
-    bool isTemp = false;
-
-    if (bytes != null) {
-      final tempDir = await getTemporaryDirectory();
-      tempFile = File(p.join(tempDir.path, 'inspect_${DateTime.now().millisecondsSinceEpoch}.db'));
-      await tempFile.writeAsBytes(bytes);
-      isTemp = true;
-    } else {
-      tempFile = File(filePath);
-      if (!await tempFile.exists()) {
-        return BackupInspectionResult(
-          isValid: false,
-          errorMessage: 'ไม่พบไฟล์ที่เลือก',
-          fileName: fileName,
-        );
-      }
-    }
-
-    final fileSize = await tempFile.length();
-    if (fileSize < 100) {
-      if (isTemp) await tempFile.delete().catchError((_) => tempFile);
-      return BackupInspectionResult(
-        isValid: false,
-        errorMessage: 'ขนาดไฟล์เล็กเกินไป ไม่ใช่ไฟล์ฐานข้อมูล SQLite ที่ถูกต้อง',
-        fileName: fileName,
-        sizeBytes: fileSize,
-      );
-    }
-
-    try {
-      final inspectedDb = sqlite.sqlite3.open(tempFile.path, mode: sqlite.OpenMode.readOnly);
-      try {
-        // 1. ตรวจสอบตาราง accounts
-        int accountsCount = 0;
-        final sampleNames = <String>[];
-        try {
-          final accRow = inspectedDb.select('SELECT count(*) as cnt FROM accounts WHERE deleted_at IS NULL');
-          accountsCount = accRow.first['cnt'] as int? ?? 0;
-
-          final nameRows = inspectedDb.select('SELECT name FROM accounts WHERE deleted_at IS NULL LIMIT 5');
-          for (final r in nameRows) {
-            final n = r['name'];
-            if (n is String && n.isNotEmpty) sampleNames.add(n);
-          }
-        } catch (_) {}
-
-        // 2. ตรวจสอบตาราง transactions
-        int txCount = 0;
-        DateTime? latestDate;
-        try {
-          final txRow = inspectedDb.select('SELECT count(*) as cnt, max(transaction_date) as max_date FROM transactions WHERE deleted_at IS NULL');
-          txCount = txRow.first['cnt'] as int? ?? 0;
-          final maxD = txRow.first['max_date'];
-          if (maxD is String && maxD.isNotEmpty) {
-            latestDate = DateTime.tryParse(maxD);
-          } else if (maxD is int) {
-            latestDate = DateTime.fromMillisecondsSinceEpoch(maxD);
-          }
-        } catch (_) {}
-
-        return BackupInspectionResult(
-          isValid: true,
-          totalAccounts: accountsCount,
-          sampleAccountNames: sampleNames,
-          totalTransactions: txCount,
-          latestTransactionDate: latestDate,
-          sizeBytes: fileSize,
-          fileName: fileName,
-        );
-      } finally {
-        inspectedDb.dispose();
-      }
-    } catch (e) {
-      return BackupInspectionResult(
-        isValid: false,
-        errorMessage: 'ไม่สามารถอ่านโครงสร้างฐานข้อมูลได้: $e',
-        fileName: fileName,
-        sizeBytes: fileSize,
-      );
-    } finally {
-      if (isTemp) {
-        await tempFile.delete().catchError((_) => tempFile);
-      }
-    }
+    return inspectSqliteDatabaseFile(filePath, bytes: bytes, name: name);
   }
 
   /// ส่งออกและเปิดแชร์ไฟล์สำรอง (.db)

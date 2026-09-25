@@ -330,7 +330,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['db', 'sqlite'],
+        allowedExtensions: ['db', 'sqlite', 'txt'],
         withData: true,
       );
 
@@ -799,9 +799,9 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                                 padding: const EdgeInsets.symmetric(vertical: 13),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               ),
-                              icon: const Icon(Icons.save_as_rounded, size: 20),
+                              icon: const Icon(Icons.share_rounded, size: 20),
                               label: Text(
-                                isThai ? 'บันทึกไฟล์สำรอง (เลือกโฟลเดอร์/ไดรฟ์)' : 'Save Backup File (Choose Folder/Drive)',
+                                isThai ? 'แชร์เข้า Google Drive / LINE / เลือกโฟลเดอร์' : 'Share to Google Drive / LINE / Files',
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                               ),
                               onPressed: _isLoading ? null : _handleExport,
@@ -819,7 +819,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                               ),
                               icon: const Icon(Icons.file_download_outlined, size: 20),
                               label: Text(
-                                isThai ? 'ดาวน์โหลดลงโฟลเดอร์ Downloads ทันที' : 'Download to Downloads Directly',
+                                isThai ? 'ดาวน์โหลดไฟล์ .db ลง Downloads ทันที' : 'Download .db to Downloads Directly',
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                               ),
                               onPressed: _isLoading ? null : _handleDirectDownload,
@@ -837,7 +837,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                               ),
                               icon: const Icon(Icons.restore_page_outlined, size: 20),
                               label: Text(
-                                isThai ? 'เลือกไฟล์สำรอง (.db) เพื่อกู้คืนข้อมูล' : 'Upload Backup File to Restore',
+                                isThai ? 'เลือกไฟล์สำรอง (.db หรือ .txt) เพื่อกู้คืนข้อมูล' : 'Upload Backup (.db or .txt) to Restore',
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                               ),
                               onPressed: _isLoading ? null : _handlePickAndRestore,
@@ -851,18 +851,28 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
                             ),
-                            child: Row(
+                            child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(Icons.lightbulb_outline, size: 18, color: Colors.blue),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    isThai
-                                        ? '💡 คำแนะนำสำหรับมือถือและคอมพิวเตอร์:\n• ปุ่ม "บันทึกไฟล์สำรอง" จะเปิดหน้าต่างให้เลือกโฟลเดอร์หรือ Google Drive เพื่อเซฟไฟล์\n• หากเบราว์เซอร์ Chrome ในเครื่องของคุณดาวน์โหลดเข้า Downloads ทันทีโดยไม่ถาม ให้เปิดการตั้งค่า Chrome: แตะจุด 3 จุด ➔ การตั้งค่า (Settings) ➔ ดาวน์โหลด (Downloads) ➔ เปิดสวิตช์ "ถามตำแหน่งที่จะบันทึกไฟล์"'
-                                        : '💡 Tips for Mobile & Desktop:\n• "Save Backup File" opens a dialog to select your target folder or Google Drive.\n• If Chrome downloads directly without asking, enable "Ask where to save files" in Chrome Settings > Downloads.',
-                                    style: const TextStyle(fontSize: 11.5, color: Colors.grey, height: 1.35),
-                                  ),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.help_outline_rounded, size: 18, color: Colors.blue),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      isThai ? 'ทำไม Chrome ในมือถือถึงเปลี่ยนโฟลเดอร์ไม่ได้?' : 'Why can\'t I change folder in Chrome?',
+                                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Colors.blue),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  isThai
+                                      ? 'เบราว์เซอร์ Chrome บนมือถือ Android ถูกระบบล็อกไว้ให้ดาวน์โหลดลงโฟลเดอร์ "ดาวน์โหลด" (Downloads) เท่านั้น ไม่ยอมให้เลือกโฟลเดอร์อื่นในเครื่องครับ\n\n'
+                                        '💡 วิธีเลือกโฟลเดอร์หรือบันทึกลง Google Drive:\n'
+                                        'ให้แตะปุ่มสีเขียว "แชร์เข้า Google Drive / LINE / เลือกโฟลเดอร์" ด้านบน หน้าต่างของมือถือจะเด้งขึ้นมา ให้เลือก "บันทึกลงไดรฟ์" (เลือกโฟลเดอร์ใน Google Drive ได้ตามใจชอบ) หรือส่งเข้า LINE / จัดการไฟล์ ได้ทันทีครับ!'
+                                      : 'Chrome on Android restricts downloads strictly to the Downloads folder.\n\n'
+                                        'To select a custom folder or Google Drive, tap "Share to Google Drive / LINE / Files" above!',
+                                  style: const TextStyle(fontSize: 11.5, color: Colors.grey, height: 1.4),
                                 ),
                               ],
                             ),

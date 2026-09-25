@@ -147,7 +147,29 @@ class BackupRestoreService {
     final exportFileName = 'myfinance_backup_$nowStr.db';
 
     if (kIsWeb) {
-      return await saveDatabaseWithPickerWeb(exportFileName);
+      final bytes = await exportWebDatabase();
+      if (bytes == null || bytes.isEmpty) {
+        throw Exception(isThai ? 'ไม่พบข้อมูลในเบราว์เซอร์' : 'No database in browser storage');
+      }
+
+      // ใช้ .txt เพื่อให้ระบบความปลอดภัยของ Chromium บน Android ยอมเปิดเมนูแชร์ของระบบ (Share Sheet)
+      final shareFileName = 'myfinance_backup_$nowStr.txt';
+      final xFile = XFile.fromData(
+        bytes,
+        name: shareFileName,
+        mimeType: 'text/plain',
+      );
+
+      try {
+        await Share.shareXFiles(
+          [xFile],
+          text: isThai ? 'ไฟล์สำรองข้อมูล MyFinance ($nowStr)' : 'MyFinance Backup ($nowStr)',
+        );
+        return shareFileName;
+      } catch (_) {
+        downloadFileWeb(bytes, 'myfinance_backup_$nowStr.db');
+        return 'myfinance_backup_$nowStr.db';
+      }
     }
 
     // Flush WAL to make sure database is fully checkpointed to the main file

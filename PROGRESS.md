@@ -2,6 +2,20 @@
 
 อัปเดตล่าสุด: 25 กันยายน 2026
 
+- [x] **Project Files Cleanup & Android APK Build**:
+  - **1. คอมไพล์ไฟล์ติดตั้ง Android APK (Release)**:
+    - รันคำสั่ง `flutter build apk --release` พร้อมตั้งค่า Android SDK 36, minSdk 26
+    - สร้างไฟล์ติดตั้ง [MyFinance.apk](file:///c:/Projects/myfinance/MyFinance.apk) (40.6 MB) วางไว้ที่รากของโปรเจกต์สำหรับนำไปติดตั้งบนโทรศัพท์และแท็บเล็ต Android
+  - **2. ทำความสะอาดไฟล์และโฟลเดอร์ที่ไม่ใช้งาน (Clean Up Project Files)**:
+    - ลบโฟลเดอร์ `windows/` ออกตามความประสงค์ของผู้ใช้ที่เน้นใช้งานเฉพาะ Webapp และ Android App
+    - ลบโฟลเดอร์ CSV ของ Notion ที่ซ้ำซ้อน (`Notion_expense/`, `Notion_income/`, `Notion_invest/`) โดยยังคงรักษาโฟลเดอร์ต้นฉบับ `Notion data/` ไว้ตามที่ผู้ใช้เลือก
+    - ลบไฟล์ APK เวอร์ชั่นเก่า (`OURS.apk`)
+    - ล้างโฟลเดอร์แคช `build/` ได้พื้นที่หน่วยความจำในเครื่องคืนมากว่า **2.12 GB**
+    - ลบไฟล์สคริปต์เก่า (`implementation_plan.md`, `upload_github.ps1`)
+  - **การทดสอบความถูกต้อง**:
+    - `flutter analyze` ผ่านฉลุย `No issues found!` (0 error, 0 warning)
+    - `flutter test` ผ่านทั้งหมด `151/151 tests passed` (100%)
+
 - [x] **Designated Backup Folder Auto-Sync & 3-Version Rolling Backup**:
   - **1. ระบบกำหนดและจดจำโฟลเดอร์สำหรับสำรองข้อมูล (Designated Backup Folder)**:
     - เมื่อเข้าหน้าสำรองข้อมูล ระบบจะให้ผู้ใช้เลือกโฟลเดอร์ปลายทางที่ต้องการ (เช่น Google Drive for Desktop, OneDrive หรือ Documents)

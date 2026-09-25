@@ -139,9 +139,9 @@ class BackupRestoreService {
   }
 
   /// ส่งออกและเปิดแชร์ไฟล์สำรอง (.db)
-  /// - บนมือถือ: เปิด Share sheet (บันทึกลง Drive, ส่งเข้า Line, บันทึกลงเครื่อง)
+  /// - บนมือถือ / Webapp บนมือถือ: เปิด Share sheet (บันทึกลง Drive, ส่งเข้า Line, บันทึกลงเครื่อง)
   /// - บน Windows: เปิด FilePicker ให้เลือกที่บันทึก
-  /// - บน Web: ดาวน์โหลดไฟล์ .db ลงเบราว์เซอร์
+  /// - บน Web: ถ้าแชร์ไม่ได้ จะดาวน์โหลดไฟล์ .db ลงเบราว์เซอร์อัตโนมัติ
   Future<String?> exportAndShareBackup({bool isThai = true}) async {
     final nowStr = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
     final exportFileName = 'myfinance_backup_$nowStr.db';
@@ -151,8 +151,21 @@ class BackupRestoreService {
       if (bytes == null || bytes.isEmpty) {
         throw Exception(isThai ? 'ไม่พบข้อมูลในเบราว์เซอร์' : 'No database in browser storage');
       }
-      downloadFileWeb(bytes, exportFileName);
-      return exportFileName;
+      try {
+        final xFile = XFile.fromData(
+          bytes,
+          name: exportFileName,
+          mimeType: 'application/octet-stream',
+        );
+        await Share.shareXFiles(
+          [xFile],
+          text: isThai ? 'ไฟล์สำรองข้อมูล MyFinance ($nowStr)' : 'MyFinance Backup ($nowStr)',
+        );
+        return exportFileName;
+      } catch (_) {
+        downloadFileWeb(bytes, exportFileName);
+        return exportFileName;
+      }
     }
 
     // Flush WAL to make sure database is fully checkpointed to the main file
@@ -198,6 +211,23 @@ class BackupRestoreService {
       );
 
       return result.status == ShareResultStatus.success ? shareFile.path : shareFile.path;
+    }
+  }
+
+  /// ดาวน์โหลดไฟล์สำรอง (.db) ตรงๆ สู่เครื่อง (สำหรับ Web)
+  Future<String?> downloadBackupDirectly({bool isThai = true}) async {
+    final nowStr = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
+    final exportFileName = 'myfinance_backup_$nowStr.db';
+
+    if (kIsWeb) {
+      final bytes = await exportWebDatabase();
+      if (bytes == null || bytes.isEmpty) {
+        throw Exception(isThai ? 'ไม่พบข้อมูลในเบราว์เซอร์' : 'No database in browser storage');
+      }
+      downloadFileWeb(bytes, exportFileName);
+      return exportFileName;
+    } else {
+      return exportAndShareBackup(isThai: isThai);
     }
   }
 

@@ -292,6 +292,37 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     }
   }
 
+  Future<void> _handleDirectDownload() async {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+    setState(() => _isLoading = true);
+    try {
+      final service = ref.read(backupRestoreServiceProvider);
+      final exportedPath = await service.downloadBackupDirectly(isThai: isThai);
+
+      if (!mounted) return;
+      if (exportedPath != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isThai ? 'ดาวน์โหลดไฟล์สำรองเรียบร้อย' : 'Backup downloaded successfully'),
+            backgroundColor: VaultTheme.positive(context),
+          ),
+        );
+        _loadStats();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${isThai ? "ดาวน์โหลดไม่สำเร็จ: " : "Download failed: "}$e'),
+            backgroundColor: VaultTheme.negative(context),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _handlePickAndRestore() async {
     final isThai = Localizations.localeOf(context).languageCode == 'th';
     final service = ref.read(backupRestoreServiceProvider);
@@ -308,9 +339,12 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       final pickedFile = result.files.first;
       setState(() => _isLoading = true);
 
+      // Safe access: on web, pickedFile.path throws UnimplementedError
+      final safePath = kIsWeb ? '' : (pickedFile.path ?? '');
+
       // 1. Inspect file first to preview summary to user
       final inspection = await service.inspectBackupFile(
-        pickedFile.path ?? '',
+        safePath,
         bytes: pickedFile.bytes,
         name: pickedFile.name,
       );
@@ -352,7 +386,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       // 3. Perform Restore
       setState(() => _isLoading = true);
       final ok = await service.restoreDatabase(
-        filePath: pickedFile.path,
+        filePath: kIsWeb ? null : pickedFile.path,
         bytes: pickedFile.bytes,
         isThai: isThai,
       );
@@ -761,13 +795,13 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                             width: double.infinity,
                             child: FilledButton.icon(
                               style: FilledButton.styleFrom(
-                                backgroundColor: Colors.blue.shade700,
+                                backgroundColor: Colors.teal.shade700,
                                 padding: const EdgeInsets.symmetric(vertical: 13),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               ),
-                              icon: const Icon(Icons.file_download_outlined, size: 20),
+                              icon: const Icon(Icons.share_rounded, size: 20),
                               label: Text(
-                                isThai ? 'ดาวน์โหลดไฟล์สำรอง (.db) ลงเครื่อง' : 'Download Backup File (.db)',
+                                isThai ? 'แชร์ / เลือกที่บันทึกไฟล์สำรอง (.db)' : 'Share / Save Backup File (.db)',
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                               ),
                               onPressed: _isLoading ? null : _handleExport,
@@ -778,8 +812,26 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                             width: double.infinity,
                             child: OutlinedButton.icon(
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.teal,
-                                side: const BorderSide(color: Colors.teal, width: 1.2),
+                                foregroundColor: Colors.blue.shade700,
+                                side: BorderSide(color: Colors.blue.shade400, width: 1.2),
+                                padding: const EdgeInsets.symmetric(vertical: 13),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              icon: const Icon(Icons.file_download_outlined, size: 20),
+                              label: Text(
+                                isThai ? 'ดาวน์โหลดไฟล์สำรอง (.db) ลงเครื่องทันที' : 'Download Backup File (.db) Directly',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                              ),
+                              onPressed: _isLoading ? null : _handleDirectDownload,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.purple.shade700,
+                                side: BorderSide(color: Colors.purple.shade400, width: 1.2),
                                 padding: const EdgeInsets.symmetric(vertical: 13),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               ),
@@ -789,6 +841,30 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                               ),
                               onPressed: _isLoading ? null : _handlePickAndRestore,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.lightbulb_outline, size: 18, color: Colors.blue),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    isThai
+                                        ? 'คำแนะนำ: บนมือถือ กดปุ่ม "แชร์ / เลือกที่บันทึก" เพื่อส่งเข้า Google Drive, LINE หรือเลือกโฟลเดอร์ในเครื่องได้ทันที\nส่วนบนคอมพิวเตอร์ หากต้องการให้เด้งถามโฟลเดอร์ปลายทางทุกครั้ง สามารถเปิด "ถามตำแหน่งที่จะบันทึกไฟล์ทุกครั้ง" ในการตั้งค่า Chrome/Edge ได้ครับ'
+                                        : 'Tip: On mobile, tap "Share / Save Backup" to save directly to Drive, LINE, or select a device folder.\nOn desktop browser, enable "Ask where to save each file before downloading" in Chrome/Edge settings to always choose a folder.',
+                                    style: const TextStyle(fontSize: 11.5, color: Colors.grey, height: 1.35),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],

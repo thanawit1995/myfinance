@@ -47,6 +47,9 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
 
   static const _uuid = Uuid();
 
+  /// Callback ที่ถูกเรียกเมื่อมีการบันทึก แก้ไข หรือลบรายการธุรกรรม
+  void Function()? onLedgerModified;
+
   Stream<List<Transaction>> watchRecentTransactions({int limit = 50}) {
     return (select(transactions)
           ..where((t) => t.deletedAt.isNull())
@@ -157,6 +160,9 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
       }
     }
 
+    // 5. Notify ledger modification (for rolling auto-backup)
+    onLedgerModified?.call();
+
     return result;
   }
 
@@ -211,6 +217,9 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
       if (tx != null) {
         await db.remittancesDao.syncFromTransferTransaction(tx);
       }
+
+      // Notify ledger modification (for rolling auto-backup)
+      onLedgerModified?.call();
     }
 
     return success > 0;
@@ -251,6 +260,9 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
           updatedAt: now,
         ),
       );
+
+      // Notify ledger modification (for rolling auto-backup)
+      onLedgerModified?.call();
     }
 
     return count > 0;

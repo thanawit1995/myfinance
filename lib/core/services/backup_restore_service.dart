@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -6,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../database/app_database.dart';
 import '../database/database_provider.dart';
@@ -28,15 +30,59 @@ class SafetyBackupItem {
   });
 }
 
+class RollingBackupItem {
+  final String path;
+  final String fileName;
+  final DateTime createdAt;
+  final int sizeBytes;
+  final int versionOrder; // 1 = latest, 2 = previous, 3 = older
+
+  const RollingBackupItem({
+    required this.path,
+    required this.fileName,
+    required this.createdAt,
+    required this.sizeBytes,
+    required this.versionOrder,
+  });
+}
+
 final backupRestoreServiceProvider = Provider<BackupRestoreService>((ref) {
   final db = ref.watch(databaseProvider);
-  return BackupRestoreService(db: db);
+  final service = BackupRestoreService(db: db);
+  ref.onDispose(() => service.dispose());
+  return service;
 });
 
 class BackupRestoreService {
   final AppDatabase db;
+  StreamSubscription? _txSubscription;
+  Timer? _autoBackupDebounceTimer;
 
-  BackupRestoreService({required this.db});
+  static const String designatedFolderKey = 'designated_backup_folder';
+
+  BackupRestoreService({required this.db}) {
+    _initAutoBackupListener();
+  }
+
+  void _initAutoBackupListener() {
+    if (kIsWeb) return;
+    try {
+      db.transactionsDao.onLedgerModified = triggerAutoBackup;
+      _txSubscription = db.select(db.transactions).watch().skip(1).listen((_) {
+        triggerAutoBackup();
+      });
+    } catch (_) {}
+  }
+
+  void dispose() {
+    _autoBackupDebounceTimer?.cancel();
+    _txSubscription?.cancel();
+    try {
+      if (db.transactionsDao.onLedgerModified == triggerAutoBackup) {
+        db.transactionsDao.onLedgerModified = null;
+      }
+    } catch (_) {}
+  }
 
   /// ค้นหาไฟล์ฐานข้อมูล SQLite ปัจจุบันของแอปในเครื่อง
   Future<File?> getLocalDatabaseFile() async {
@@ -255,5 +301,166 @@ class BackupRestoreService {
   /// ย้อนกลับไปใช้ไฟล์สำรองฉุกเฉิน
   Future<bool> rollbackSafetyBackup(String backupFilePath) async {
     return restoreDatabase(filePath: backupFilePath);
+  }
+
+  /// อ่านโฟลเดอร์สำหรับสำรองข้อมูลที่ผู้ใช้ตั้งค่าไว้
+  Future<String?> getDesignatedBackupDirectory() async {
+    if (kIsWeb) return null;
+    final prefs = await SharedPreferences.getInstance();
+    final path = prefs.getString(designatedFolderKey);
+    if (path == null || path.trim().isEmpty) return null;
+    final dir = Directory(path);
+    if (!await dir.exists()) {
+      try {
+        await dir.create(recursive: true);
+      } catch (_) {
+        return null;
+      }
+    }
+    return dir.path;
+  }
+
+  /// กำหนดและจดจำโฟลเดอร์สำหรับสำรองข้อมูลอัตโนมัติ
+  Future<String> setDesignatedBackupDirectory(String folderPath) async {
+    final prefs = await SharedPreferences.getInstance();
+    var targetDir = Directory(folderPath);
+    final baseName = p.basename(targetDir.path).toLowerCase();
+    if (!baseName.contains('myfinance')) {
+      targetDir = Directory(p.join(targetDir.path, 'MyFinance_Backup'));
+    }
+    if (!await targetDir.exists()) {
+      await targetDir.create(recursive: true);
+    }
+    await prefs.setString(designatedFolderKey, targetDir.path);
+    // ทำการสำรองข้อมูลลงโฟลเดอร์นี้ทันที 1 เวอร์ชั่น
+    await saveRollingBackup(customFolderPath: targetDir.path);
+    return targetDir.path;
+  }
+
+  /// ล้างการตั้งค่าโฟลเดอร์สำรองข้อมูล
+  Future<void> clearDesignatedBackupDirectory() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(designatedFolderKey);
+  }
+
+  /// ทำการสำรองข้อมูลลงโฟลเดอร์ปลายทางที่กำหนด และดูแลให้มี 3 เวอร์ชั่นล่าสุดเสมอ
+  Future<String?> saveRollingBackup({String? customFolderPath, File? customSourceDb}) async {
+    if (kIsWeb) return null;
+
+    final folderPath = customFolderPath ?? await getDesignatedBackupDirectory();
+    if (folderPath == null || folderPath.isEmpty) return null;
+
+    final targetDir = Directory(folderPath);
+    if (!await targetDir.exists()) {
+      await targetDir.create(recursive: true);
+    }
+
+    // Flush WAL checkpoint เพื่อให้ข้อมูลล่าสุดลงไฟล์หลักครบ 100%
+    try {
+      await db.customStatement('PRAGMA wal_checkpoint(TRUNCATE);');
+    } catch (_) {}
+
+    final localDb = customSourceDb ?? await getLocalDatabaseFile();
+    if (localDb == null || !await localDb.exists()) return null;
+
+    final nowStr = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+    var backupFileName = 'myfinance_backup_$nowStr.db';
+    var targetFile = File(p.join(targetDir.path, backupFileName));
+    if (await targetFile.exists()) {
+      backupFileName = 'myfinance_backup_${nowStr}_${DateTime.now().millisecond}.db';
+      targetFile = File(p.join(targetDir.path, backupFileName));
+    }
+
+    await localDb.copy(targetFile.path);
+
+    // ดูแลรักษาไฟล์สำรองให้มีเพียง 3 เวอร์ชั่นล่าสุด
+    await _maintainRollingVersions(targetDir, keepCount: 3);
+
+    return targetFile.path;
+  }
+
+  Future<void> _maintainRollingVersions(Directory dir, {int keepCount = 3}) async {
+    try {
+      final files = dir
+          .listSync()
+          .whereType<File>()
+          .where((f) {
+            final name = p.basename(f.path).toLowerCase();
+            return name.startsWith('myfinance_backup_') && name.endsWith('.db');
+          })
+          .toList();
+
+      if (files.length <= keepCount) return;
+
+      // เรียงจากใหม่ไปเก่า (เวลาแก้ไขล่าสุดมาก่อน)
+      files.sort((a, b) {
+        final cmp = b.lastModifiedSync().compareTo(a.lastModifiedSync());
+        if (cmp != 0) return cmp;
+        return b.path.compareTo(a.path);
+      });
+
+      // ลบไฟล์ที่เกินโควตา 3 เวอร์ชั่นออก
+      for (var i = keepCount; i < files.length; i++) {
+        try {
+          await files[i].delete();
+        } catch (_) {}
+      }
+    } catch (_) {}
+  }
+
+  /// ดึงรายการไฟล์สำรอง 3 เวอร์ชั่นล่าสุดในโฟลเดอร์หลัก
+  Future<List<RollingBackupItem>> getRollingBackupsInDesignatedDirectory({String? customFolderPath}) async {
+    if (kIsWeb) return [];
+
+    final folderPath = customFolderPath ?? await getDesignatedBackupDirectory();
+    if (folderPath == null || folderPath.isEmpty) return [];
+
+    final dir = Directory(folderPath);
+    if (!await dir.exists()) return [];
+
+    try {
+      final files = dir
+          .listSync()
+          .whereType<File>()
+          .where((f) {
+            final name = p.basename(f.path).toLowerCase();
+            return (name.startsWith('myfinance_backup_') || name.startsWith('myfinance')) &&
+                (name.endsWith('.db') || name.endsWith('.sqlite'));
+          })
+          .toList();
+
+      files.sort((a, b) {
+        final cmp = b.lastModifiedSync().compareTo(a.lastModifiedSync());
+        if (cmp != 0) return cmp;
+        return b.path.compareTo(a.path);
+      });
+
+      final limited = files.take(3).toList();
+      return List.generate(limited.length, (index) {
+        final f = limited[index];
+        return RollingBackupItem(
+          path: f.path,
+          fileName: p.basename(f.path),
+          createdAt: f.lastModifiedSync(),
+          sizeBytes: f.lengthSync(),
+          versionOrder: index + 1,
+        );
+      });
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// สั่งสำรองข้อมูลอัตโนมัติ (พร้อม Debounce 1.5 วินาที เพื่อประสิทธิภาพ)
+  void triggerAutoBackup() {
+    if (kIsWeb) return;
+    _autoBackupDebounceTimer?.cancel();
+    _autoBackupDebounceTimer = Timer(const Duration(milliseconds: 1500), () async {
+      try {
+        await saveRollingBackup();
+      } catch (e) {
+        debugPrint('Auto-backup error: $e');
+      }
+    });
   }
 }

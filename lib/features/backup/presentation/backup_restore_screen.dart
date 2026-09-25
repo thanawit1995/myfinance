@@ -20,6 +20,8 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
   int _currentTxCount = 0;
   int _currentDbSize = 0;
   List<SafetyBackupItem> _safetyBackups = [];
+  String? _designatedFolder;
+  List<RollingBackupItem> _rollingBackups = [];
 
   @override
   void initState() {
@@ -43,6 +45,8 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       }
 
       final safetyBackups = await service.getSafetyBackups();
+      final designatedFolder = await service.getDesignatedBackupDirectory();
+      final rollingBackups = await service.getRollingBackupsInDesignatedDirectory();
 
       if (mounted) {
         setState(() {
@@ -50,9 +54,183 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
           _currentTxCount = txCount;
           _currentDbSize = dbSize;
           _safetyBackups = safetyBackups;
+          _designatedFolder = designatedFolder;
+          _rollingBackups = rollingBackups;
         });
       }
     } catch (_) {}
+  }
+
+  Future<void> _handleSelectDesignatedFolder() async {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+    try {
+      final selectedDir = await FilePicker.platform.getDirectoryPath(
+        dialogTitle: isThai ? 'เลือกโฟลเดอร์สำหรับสำรองข้อมูล' : 'Select Backup Folder',
+      );
+
+      if (selectedDir == null || selectedDir.trim().isEmpty) return;
+
+      setState(() => _isLoading = true);
+      final service = ref.read(backupRestoreServiceProvider);
+      final targetPath = await service.setDesignatedBackupDirectory(selectedDir);
+      await _loadStats();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isThai
+                ? 'ตั้งค่าโฟลเดอร์สำรองข้อมูลเรียบร้อยแล้ว: $targetPath'
+                : 'Backup folder configured: $targetPath',
+          ),
+          backgroundColor: VaultTheme.positive(context),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${isThai ? "เกิดข้อผิดพลาด: " : "Error: "}$e'),
+            backgroundColor: VaultTheme.negative(context),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _handleManualSyncNow() async {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+    setState(() => _isLoading = true);
+    try {
+      final service = ref.read(backupRestoreServiceProvider);
+      final path = await service.saveRollingBackup();
+      await _loadStats();
+
+      if (!mounted) return;
+      if (path != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isThai ? 'บันทึกเวอร์ชั่นสำรองใหม่เรียบร้อยแล้ว' : 'Backup version saved successfully'),
+            backgroundColor: VaultTheme.positive(context),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${isThai ? "สำรองไม่สำเร็จ: " : "Backup failed: "}$e'),
+            backgroundColor: VaultTheme.negative(context),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _handleRestoreRollingVersion(RollingBackupItem item) async {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+    final service = ref.read(backupRestoreServiceProvider);
+
+    setState(() => _isLoading = true);
+    try {
+      final inspection = await service.inspectBackupFile(
+        item.path,
+        name: item.fileName,
+      );
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      if (!inspection.isValid) {
+        await showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red),
+                const SizedBox(width: 8),
+                Text(isThai ? 'ไฟล์ไม่ถูกต้อง' : 'Invalid File'),
+              ],
+            ),
+            content: Text(
+              inspection.errorMessage ??
+                  (isThai
+                      ? 'ไฟล์สำรองนี้ไม่สมบูรณ์หรือไม่ใช่ฐานข้อมูล MyFinance ที่ถูกต้อง'
+                      : 'This backup file is invalid or not a valid MyFinance database.'),
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(isThai ? 'ตกลง' : 'OK'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
+      final confirmed = await _showPreviewAndConfirmDialog(inspection, isThai);
+      if (confirmed != true) return;
+
+      setState(() => _isLoading = true);
+      final ok = await service.restoreDatabase(
+        filePath: item.path,
+        isThai: isThai,
+      );
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      if (ok) {
+        await _loadStats();
+        if (!mounted) return;
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.teal),
+                const SizedBox(width: 8),
+                Text(isThai ? 'กู้คืนข้อมูลสำเร็จ' : 'Restore Complete'),
+              ],
+            ),
+            content: Text(
+              isThai
+                  ? 'กู้คืนข้อมูลจากเวอร์ชั่นที่เลือกเรียบร้อยแล้ว แนะนำให้ปิดและเปิดแอปใหม่อีกครั้งเพื่อให้ทุกหน้าแสดงผลสมบูรณ์'
+                  : 'Data restored successfully from selected version. Please restart the app for all changes to take full effect.',
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(isThai ? 'ตกลง' : 'OK'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isThai ? 'เกิดข้อผิดพลาดในการกู้คืน' : 'Failed to restore database'),
+            backgroundColor: VaultTheme.negative(context),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${isThai ? "เกิดข้อผิดพลาด: " : "Error: "}$e'),
+            backgroundColor: VaultTheme.negative(context),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _handleExport() async {
@@ -504,7 +682,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
 
                 const SizedBox(height: 18),
 
-                // 2. Export / Share Backup Action Card
+                // 2. Designated Backup Folder Card
                 Card(
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   color: VaultTheme.surface(context),
@@ -519,29 +697,41 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                             Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: Colors.blue.withValues(alpha: 0.15),
+                                color: (_designatedFolder != null ? Colors.teal : Colors.blue).withValues(alpha: 0.15),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.share_rounded, size: 24, color: Colors.blue),
+                              child: Icon(
+                                _designatedFolder != null ? Icons.folder_special_rounded : Icons.create_new_folder_outlined,
+                                size: 24,
+                                color: _designatedFolder != null ? Colors.teal : Colors.blue,
+                              ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    isThai ? 'สร้างและแชร์ไฟล์สำรอง' : 'Export & Share Backup',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 15,
-                                      color: VaultTheme.primaryText(context),
-                                    ),
+                                  Row(
+                                    children: [
+                                      Text(
+                                        isThai ? 'โฟลเดอร์สำรองข้อมูลอัตโนมัติ' : 'Auto-Backup Folder',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15,
+                                          color: VaultTheme.primaryText(context),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    isThai
-                                        ? 'ส่งเข้า Google Drive ส่วนตัว, ส่งเข้า LINE หรือบันทึกลงเครื่อง'
-                                        : 'Save to personal Google Drive, share via LINE, or save locally',
+                                    _designatedFolder != null
+                                        ? (isThai
+                                            ? 'ซิงค์สำรองอัตโนมัติเมื่อบันทึก/แก้ไข/ลบ (3 เวอร์ชั่น)'
+                                            : 'Auto-syncs on transaction changes (keeps 3 versions)')
+                                        : (isThai
+                                            ? 'เลือกโฟลเดอร์ปลายทาง (เช่น ใน Google Drive, OneDrive) เพื่อเปิดใช้งาน'
+                                            : 'Select target folder (e.g. in Google Drive or OneDrive) to enable'),
                                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                                   ),
                                 ],
@@ -549,19 +739,289 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
+                        if (_designatedFolder != null) ...[
+                          const SizedBox(height: 14),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: VaultTheme.background(context),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: VaultTheme.border(context)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.folder_open_rounded, size: 18, color: Colors.blueAccent),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _designatedFolder!,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontFamily: 'monospace',
+                                      color: VaultTheme.primaryText(context),
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              TextButton.icon(
+                                icon: const Icon(Icons.edit_location_alt_outlined, size: 18),
+                                label: Text(isThai ? 'เปลี่ยนโฟลเดอร์' : 'Change Folder'),
+                                onPressed: _isLoading ? null : _handleSelectDesignatedFolder,
+                              ),
+                              const Spacer(),
+                              OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                                icon: const Icon(Icons.sync_rounded, size: 18),
+                                label: Text(
+                                  isThai ? 'สำรองเวอร์ชั่นใหม่ตอนนี้' : 'Backup Now',
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                ),
+                                onPressed: _isLoading ? null : _handleManualSyncNow,
+                              ),
+                            ],
+                          ),
+                        ] else ...[
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: Colors.blue.shade700,
+                                padding: const EdgeInsets.symmetric(vertical: 13),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              icon: const Icon(Icons.folder_open_rounded, size: 20),
+                              label: Text(
+                                isThai ? 'เลือกโฟลเดอร์สำหรับสำรองข้อมูล' : 'Select Backup Folder',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                              ),
+                              onPressed: _isLoading ? null : _handleSelectDesignatedFolder,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+
+                // 3. Rolling Backups Card (3 Latest Versions in Designated Folder)
+                if (_designatedFolder != null) ...[
+                  const SizedBox(height: 18),
+                  Card(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    color: VaultTheme.surface(context),
+                    elevation: 2,
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: Colors.teal.withValues(alpha: 0.15),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.history_toggle_off_rounded, size: 24, color: Colors.teal),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      isThai ? 'เวอร์ชั่นสำรองในโฟลเดอร์ (เลือกกู้คืนได้ทันที)' : 'Backup Versions in Folder',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                        color: VaultTheme.primaryText(context),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      isThai
+                                          ? 'แตะที่เวอร์ชั่นเพื่อพรีวิวและกู้คืนข้อมูลได้ทันที'
+                                          : 'Tap any version to preview and restore',
+                                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          if (_rollingBackups.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Text(
+                                isThai
+                                    ? 'ยังไม่พบไฟล์สำรองในโฟลเดอร์นี้ ระบบจะเริ่มสำรองอัตโนมัติเมื่อมีการบันทึกธุรกรรม หรือกด "สำรองเวอร์ชั่นใหม่ตอนนี้" ด้านบน'
+                                    : 'No backups in this folder yet. Automatic backups will occur when transactions change, or tap "Backup Now".',
+                                style: const TextStyle(fontSize: 12.5, color: Colors.grey),
+                              ),
+                            )
+                          else
+                            Column(
+                              children: _rollingBackups.map((item) {
+                                final isLatest = item.versionOrder == 1;
+                                final sizeKb = (item.sizeBytes / 1024).toStringAsFixed(1);
+                                final dateFormat = DateFormat('dd MMM yyyy, HH:mm:ss', isThai ? 'th' : 'en_US');
+
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 10),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: VaultTheme.background(context),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: isLatest
+                                          ? Colors.teal.withValues(alpha: 0.6)
+                                          : VaultTheme.border(context),
+                                      width: isLatest ? 1.5 : 1.0,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: (isLatest ? Colors.teal : Colors.blueGrey).withValues(alpha: 0.15),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(
+                                          isLatest ? Icons.star_rounded : Icons.history_rounded,
+                                          color: isLatest ? Colors.teal : Colors.blueGrey,
+                                          size: 20,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  '${isThai ? "เวอร์ชั่น" : "Version"} ${item.versionOrder}',
+                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: (isLatest ? Colors.teal : Colors.grey).withValues(alpha: 0.15),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                  ),
+                                                  child: Text(
+                                                    isLatest
+                                                        ? (isThai ? 'ล่าสุด' : 'Latest')
+                                                        : (item.versionOrder == 2
+                                                            ? (isThai ? 'ก่อนหน้า' : 'Previous')
+                                                            : (isThai ? 'เก่ากว่า' : 'Older')),
+                                                    style: TextStyle(
+                                                      fontSize: 10.5,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: isLatest ? Colors.teal : Colors.grey,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 3),
+                                            Text(
+                                              '${dateFormat.format(item.createdAt)}  •  $sizeKb KB',
+                                              style: const TextStyle(fontSize: 11.5, color: Colors.grey),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      FilledButton.tonal(
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: isLatest ? Colors.teal.withValues(alpha: 0.18) : null,
+                                          foregroundColor: isLatest ? Colors.teal : null,
+                                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
+                                        onPressed: _isLoading ? null : () => _handleRestoreRollingVersion(item),
+                                        child: Text(
+                                          isThai ? 'กู้คืน' : 'Restore',
+                                          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 18),
+
+                // 4. Other Restore & Export Options
+                Card(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  color: VaultTheme.surface(context),
+                  elevation: 2,
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isThai ? 'ตัวเลือกเพิ่มเติม' : 'Additional Options',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: VaultTheme.secondaryText(context),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
                         SizedBox(
                           width: double.infinity,
-                          child: FilledButton.icon(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: Colors.blue.shade700,
-                              padding: const EdgeInsets.symmetric(vertical: 13),
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.teal,
+                              side: const BorderSide(color: Colors.teal, width: 1.2),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
-                            icon: const Icon(Icons.file_upload_outlined, size: 20),
+                            icon: const Icon(Icons.file_download_outlined, size: 20),
                             label: Text(
-                              isThai ? 'ส่งออกและแชร์ไฟล์สำรอง (.db)' : 'Export Backup File (.db)',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                              isThai ? 'เลือกไฟล์สำรองอื่นจากเครื่อง...' : 'Pick Other Backup File...',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                            onPressed: _isLoading ? null : _handlePickAndRestore,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: TextButton.icon(
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.blueAccent,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            icon: const Icon(Icons.share_rounded, size: 18),
+                            label: Text(
+                              isThai ? 'ส่งออกและแชร์ไฟล์สำรอง (.db) นอกโฟลเดอร์' : 'Export & Share Backup (.db)',
+                              style: const TextStyle(fontSize: 13),
                             ),
                             onPressed: _isLoading ? null : _handleExport,
                           ),
@@ -571,77 +1031,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 18),
-
-                // 3. Import & Restore Backup Card
-                Card(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  color: VaultTheme.surface(context),
-                  elevation: 2,
-                  child: Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: Colors.teal.withValues(alpha: 0.15),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.restore_page_outlined, size: 24, color: Colors.teal),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    isThai ? 'กู้คืนข้อมูลจากไฟล์สำรอง' : 'Restore from Backup File',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 15,
-                                      color: VaultTheme.primaryText(context),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    isThai
-                                        ? 'เลือกไฟล์ .db เพื่อกู้คืน (มีกล่องพรีวิวสรุปข้อมูลให้ตรวจสอบก่อน)'
-                                        : 'Pick .db file to restore (shows preview summary before restoring)',
-                                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.teal,
-                              side: const BorderSide(color: Colors.teal, width: 1.2),
-                              padding: const EdgeInsets.symmetric(vertical: 13),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                            icon: const Icon(Icons.file_download_outlined, size: 20),
-                            label: Text(
-                              isThai ? 'เลือกไฟล์สำรองเพื่อกู้คืน' : 'Pick Backup File to Restore',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
-                            ),
-                            onPressed: _isLoading ? null : _handlePickAndRestore,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // 4. Safety Backups History Card
+                // 5. Safety Backups History Card
                 if (_safetyBackups.isNotEmpty) ...[
                   const SizedBox(height: 18),
                   Card(

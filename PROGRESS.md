@@ -2,6 +2,26 @@
 
 อัปเดตล่าสุด: 25 กันยายน 2026
 
+- [x] **Designated Backup Folder Auto-Sync & 3-Version Rolling Backup**:
+  - **1. ระบบกำหนดและจดจำโฟลเดอร์สำหรับสำรองข้อมูล (Designated Backup Folder)**:
+    - เมื่อเข้าหน้าสำรองข้อมูล ระบบจะให้ผู้ใช้เลือกโฟลเดอร์ปลายทางที่ต้องการ (เช่น Google Drive for Desktop, OneDrive หรือ Documents)
+    - ระบบจะสร้างโฟลเดอร์ `MyFinance_Backup` ให้อัตโนมัติและจดจำตำแหน่งไว้ใน SharedPreferences
+    - แสดงที่อยู่โฟลเดอร์บนหน้าจอ พร้อมปุ่ม "เปลี่ยนโฟลเดอร์" และปุ่ม "สำรองเวอร์ชั่นใหม่ตอนนี้"
+  - **2. สำรองข้อมูลอัตโนมัติทุกครั้งที่มีการบันทึก/แก้ไข/ลบ (Continuous Rolling Backup)**:
+    - เชื่อมต่อตัวตรวจจับการเปลี่ยนแปลงธุรกรรมผ่าน `TransactionsDao.onLedgerModified` และ Drift stream listener
+    - ทำงานอัตโนมัติเมื่อมีการ เพิ่ม (`insert`), แก้ไข (`update`), ลบ (`softDelete`) หรือเคลียร์รายการธุรกรรม
+    - มีระบบ Debounce 1.5 วินาที เพื่อประสิทธิภาพ ไม่เขียนไฟล์ซ้ำซ้อน
+    - บันทึกไฟล์ในรูปแบบ `myfinance_backup_YYYYMMDD_HHmmss.db` พร้อมตัดทิ้งอัตโนมัติให้คงเหลือ **3 เวอร์ชั่นล่าสุด** เสมอ
+  - **3. กู้คืนข้อมูลแบบค้นหาจากโฟลเดอร์หลักเป็นหลัก (Smart Restore from 3 Rolling Versions)**:
+    - แสดงการ์ด 3 เวอร์ชั่นล่าสุดในโฟลเดอร์ พร้อมเวลา ขนาดไฟล์ และป้ายกำกับ `[ล่าสุด]`, `[ก่อนหน้า]`, `[เก่ากว่า]`
+    - เมื่อผู้ใช้กด "กู้คืน" ในเวอร์ชั่นใด ระบบจะเปิดกล่องพรีวิวสรุปข้อมูล (จำนวนบัญชี, ธุรกรรม, วันที่ล่าสุด) ให้ตรวจสอบความถูกต้องก่อนกดยืนยันเสมอ
+    - มีปุ่มทางเลือก "เลือกไฟล์สำรองอื่นจากเครื่อง..." และ "ส่งออกแชร์ไฟล์สำรอง (.db)"
+  - **การทดสอบความถูกต้อง**:
+    - เพิ่ม Unit Tests ใน `backup_restore_service_test.dart` ครอบคลุมการตั้งค่าโฟลเดอร์, การจำกัด 3 เวอร์ชั่นล่าสุด (ลบไฟล์เก่าทิ้ง), และ callback การแจ้งเตือนธุรกรรม
+    - ผ่านการทดสอบทั้งหมด `151/151 tests passed` (100%)
+    - `flutter analyze` ผ่านฉลุย `No issues found!` (0 error, 0 warning)
+
+
 - [x] **Fix GitHub Actions Web Deployment & Conditional SQLite FFI**:
   - **1. แก้ไขข้อผิดพลาด Flutter Web Build บน GitHub Actions (Runs #42 and #43)**:
     - สาเหตุ: ไฟล์ `backup_restore_service.dart` มีการ import `package:sqlite3/sqlite3.dart` โดยตรง ซึ่งดึง `dart:ffi` เข้ามา ทำให้ Flutter Web คอมไพล์ไม่ผ่าน (`Error: Only JS interop members may be 'external'`)

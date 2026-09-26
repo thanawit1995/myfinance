@@ -7,8 +7,8 @@ import '../../../../core/database/app_database.dart';
 import '../../../../core/database/database_provider.dart';
 import '../../../../core/money/money.dart';
 import '../../../../features/investments/domain/fifo_engine.dart';
-
 import '../../../../core/theme/vault_theme.dart';
+import 'asset_form_dialog.dart';
 
 class BuySellTradeScreen extends ConsumerStatefulWidget {
   final Asset? initialAsset;
@@ -57,6 +57,9 @@ class _BuySellTradeScreenState extends ConsumerState<BuySellTradeScreen> {
 
   String _currency = 'THB';
   bool _isLoading = false;
+  List<Asset> _assets = [];
+  List<Account> _accounts = [];
+  bool _isDataLoaded = false;
 
   @override
   void initState() {
@@ -72,6 +75,29 @@ class _BuySellTradeScreenState extends ConsumerState<BuySellTradeScreen> {
     _fxRateController = TextEditingController(text: _currency == 'USD' ? '35.000000' : '1.000000');
     _feeController = TextEditingController(text: '0.00');
     _noteController = TextEditingController();
+
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final assets = await ref.read(investmentsDaoProvider).getAssets();
+    final accounts = await ref.read(accountsDaoProvider).getActiveAccounts();
+    if (mounted) {
+      setState(() {
+        _assets = assets;
+        _accounts = accounts;
+        if (_selectedAssetId == null && assets.isNotEmpty) {
+          _selectedAssetId = assets.first.id;
+          _currency = assets.first.currencyCode;
+          _selectedAccountId = assets.first.defaultAccountId;
+          _fxRateController.text = _currency == 'USD' ? '35.000000' : '1.000000';
+        }
+        if (_selectedAccountId == null && accounts.isNotEmpty) {
+          _selectedAccountId = accounts.first.id;
+        }
+        _isDataLoaded = true;
+      });
+    }
   }
 
   @override
@@ -213,102 +239,142 @@ class _BuySellTradeScreenState extends ConsumerState<BuySellTradeScreen> {
           ),
         ),
       ),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                // 1. Toggle Buy / Sell
-                SegmentedButton<bool>(
-                  segments: [
-                    ButtonSegment(
-                      value: true,
-                      label: Text(isThai ? 'ซื้อ (Buy)' : 'Buy'),
-                      icon: const Icon(Icons.add_shopping_cart),
-                    ),
-                    ButtonSegment(
-                      value: false,
-                      label: Text(isThai ? 'ขาย (Sell)' : 'Sell'),
-                      icon: const Icon(Icons.sell),
-                    ),
-                  ],
-                  selected: {_isBuy},
-                  onSelectionChanged: (set) => setState(() => _isBuy = set.first),
-                ),
-                const SizedBox(height: 14),
-
-                // 2. Asset Selector
-                FutureBuilder<List<Asset>>(
-                  future: ref.read(investmentsDaoProvider).getAssets(),
-                  builder: (context, snapshot) {
-                    final assets = snapshot.data ?? [];
-                    if (_selectedAssetId == null && assets.isNotEmpty) {
-                      _selectedAssetId = assets.first.id;
-                      _currency = assets.first.currencyCode;
-                      _selectedAccountId = assets.first.defaultAccountId;
-                    }
-                    return DropdownButtonFormField<String>(
-                      decoration: InputDecoration(
-                        labelText: isThai ? 'สินทรัพย์ *' : 'Asset *',
-                        border: const OutlineInputBorder(),
+      body: !_isDataLoaded
+          ? Center(child: CircularProgressIndicator(color: VaultTheme.accent(context)))
+          : SafeArea(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 640),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                      // 1. Toggle Buy / Sell
+                      SegmentedButton<bool>(
+                        segments: [
+                          ButtonSegment(
+                            value: true,
+                            label: Text(isThai ? 'ซื้อ (Buy)' : 'Buy'),
+                            icon: const Icon(Icons.add_shopping_cart),
+                          ),
+                          ButtonSegment(
+                            value: false,
+                            label: Text(isThai ? 'ขาย (Sell)' : 'Sell'),
+                            icon: const Icon(Icons.sell),
+                          ),
+                        ],
+                        selected: {_isBuy},
+                        onSelectionChanged: (set) => setState(() => _isBuy = set.first),
                       ),
-                      initialValue: _selectedAssetId,
-                      items: assets.map((a) {
-                        return DropdownMenuItem(
-                          value: a.id,
-                          child: Text(a.symbol),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          final match = assets.firstWhere((a) => a.id == val);
-                          setState(() {
-                            _selectedAssetId = val;
-                            _currency = match.currencyCode;
-                            _selectedAccountId = match.defaultAccountId;
-                            _fxRateController.text = _currency == 'USD' ? '35.000000' : '1.000000';
-                          });
-                        }
-                      },
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
+                      const SizedBox(height: 14),
 
-                // 3. Account Selector
-                FutureBuilder<List<Account>>(
-                  future: ref.read(accountsDaoProvider).getActiveAccounts(),
-                  builder: (context, snapshot) {
-                    final accounts = snapshot.data ?? [];
-                    if (_selectedAccountId == null && accounts.isNotEmpty) {
-                      _selectedAccountId = accounts.first.id;
-                    }
-                    final accLabel = _isBuy
-                        ? (isThai ? 'หักเงินจากบัญชี *' : 'Deduct from Account *')
-                        : (isThai ? 'รับเงินเข้าบัญชี *' : 'Deposit to Account *');
-                    return DropdownButtonFormField<String>(
-                      decoration: InputDecoration(
-                        labelText: accLabel,
-                        border: const OutlineInputBorder(),
+                      // 2. Asset Selector
+                      if (_assets.isEmpty) ...[
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: VaultTheme.surfaceSubtle(context),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: VaultTheme.border(context)),
+                          ),
+                          child: Column(
+                            children: [
+                              Text(
+                                isThai ? 'ยังไม่มีสินทรัพย์ในระบบ' : 'No assets in system yet',
+                                style: TextStyle(
+                                  fontFamily: VaultTheme.fontFamily,
+                                  fontSize: 13,
+                                  color: VaultTheme.secondaryText(context),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              FilledButton.icon(
+                                style: FilledButton.styleFrom(backgroundColor: VaultTheme.accent(context)),
+                                icon: const Icon(Icons.add, size: 18),
+                                label: Text(isThai ? 'เพิ่มสินทรัพย์ใหม่' : 'Add New Asset'),
+                                onPressed: () async {
+                                  final ok = await AssetFormDialog.show(context);
+                                  if (ok == true) _loadData();
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                      ] else ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                decoration: InputDecoration(
+                                  labelText: isThai ? 'สินทรัพย์ *' : 'Asset *',
+                                  border: const OutlineInputBorder(),
+                                ),
+                                isExpanded: true,
+                                initialValue: _selectedAssetId,
+                                items: _assets.map((a) {
+                                  return DropdownMenuItem(
+                                    value: a.id,
+                                    child: Text(
+                                      '${a.symbol} - ${a.name}',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    final match = _assets.firstWhere((a) => a.id == val);
+                                    setState(() {
+                                      _selectedAssetId = val;
+                                      _currency = match.currencyCode;
+                                      _selectedAccountId = match.defaultAccountId;
+                                      _fxRateController.text = _currency == 'USD' ? '35.000000' : '1.000000';
+                                    });
+                                  }
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Tooltip(
+                              message: isThai ? 'สร้างสินทรัพย์ใหม่' : 'Create New Asset',
+                              child: IconButton.filled(
+                                icon: const Icon(Icons.add, size: 20),
+                                onPressed: () async {
+                                  final ok = await AssetFormDialog.show(context);
+                                  if (ok == true) _loadData();
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+
+                      // 3. Account Selector
+                      DropdownButtonFormField<String>(
+                        decoration: InputDecoration(
+                          labelText: _isBuy
+                              ? (isThai ? 'หักเงินจากบัญชี *' : 'Deduct from Account *')
+                              : (isThai ? 'รับเงินเข้าบัญชี *' : 'Deposit to Account *'),
+                          border: const OutlineInputBorder(),
+                        ),
+                        isExpanded: true,
+                        initialValue: _selectedAccountId,
+                        items: _accounts.map((a) {
+                          return DropdownMenuItem(
+                            value: a.id,
+                            child: Text(
+                              '${a.name} (${a.currencyCode})',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (val) => setState(() => _selectedAccountId = val),
                       ),
-                      initialValue: _selectedAccountId,
-                      items: accounts.map((a) {
-                        return DropdownMenuItem(
-                          value: a.id,
-                          child: Text('${a.name} (${a.currencyCode})'),
-                        );
-                      }).toList(),
-                      onChanged: (val) => setState(() => _selectedAccountId = val),
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
+                      const SizedBox(height: 12),
 
                 // 4. Quantity & Price
                 Row(

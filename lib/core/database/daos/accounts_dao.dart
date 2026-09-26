@@ -61,6 +61,15 @@ class AccountsDao extends DatabaseAccessor<AppDatabase> with _$AccountsDaoMixin 
     );
   }
 
+  Future<int> updateAccountName(String id, String newName) {
+    return (update(accounts)..where((a) => a.id.equals(id))).write(
+      AccountsCompanion(
+        name: Value(newName),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
   /// Soft deletes an account and cascades soft-delete to all related transactions.
   /// Transactions are marked with tag 'account_deleted:{accountId}' so they can be restored accurately.
   Future<bool> softDeleteAccount(String accountId) async {

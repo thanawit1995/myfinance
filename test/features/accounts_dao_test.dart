@@ -209,5 +209,18 @@ void main() {
       expect(breakdown.thbEquivalentSatang, equals(3550000));
       expect(breakdown.fxRate, equals(Decimal.parse('35.5')));
     });
+
+    test('updateAccountName successfully renames account', () async {
+      final accounts = await db.accountsDao.getActiveAccounts();
+      final target = accounts.first;
+      final originalName = target.name;
+
+      final updatedCount = await db.accountsDao.updateAccountName(target.id, 'My New Account Name');
+      expect(updatedCount, equals(1));
+
+      final updatedAcc = await db.accountsDao.getAccountById(target.id);
+      expect(updatedAcc?.name, equals('My New Account Name'));
+      expect(updatedAcc?.name, isNot(equals(originalName)));
+    });
   });
 }

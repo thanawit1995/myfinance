@@ -29,6 +29,10 @@ class CategoriesDao extends DatabaseAccessor<AppDatabase> with _$CategoriesDaoMi
     return query.get();
   }
 
+  Future<List<Category>> getAllCategories() {
+    return (select(categories)..where((c) => c.deletedAt.isNull())).get();
+  }
+
   Future<void> updateCategorySortOrders(List<String> orderedCategoryIds) async {
     await batch((b) {
       for (var i = 0; i < orderedCategoryIds.length; i++) {

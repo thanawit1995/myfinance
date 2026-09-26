@@ -514,6 +514,7 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
+          duration: const Duration(seconds: 5),
           content: Text(successMsg),
           backgroundColor: VaultTheme.positive(context),
           action: SnackBarAction(
@@ -525,7 +526,7 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
       );
 
       widget.onTransactionSaved?.call();
-      if (widget.isModal && Navigator.of(context).canPop()) {
+      if (Navigator.of(context).canPop()) {
         Navigator.of(context).pop(true);
       } else {
         // Reset amount and additional options

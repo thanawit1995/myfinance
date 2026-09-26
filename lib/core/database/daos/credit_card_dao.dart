@@ -1,4 +1,5 @@
-﻿import 'package:drift/drift.dart';
+import 'package:drift/drift.dart';
+import 'package:uuid/uuid.dart';
 import '../app_database.dart';
 import '../tables/accounts_table.dart';
 import '../tables/transactions_table.dart';
@@ -25,6 +26,28 @@ class CreditCardBillingCycle {
   });
 }
 
+class CreditCardCycleStatement {
+  final String label;
+  final DateTime cycleStart;
+  final DateTime cycleEnd;
+  final DateTime dueDate;
+  final int chargesSatang;
+  final int paymentsSatang;
+  final int netDebtSatang;
+  final List<Transaction> transactions;
+
+  const CreditCardCycleStatement({
+    required this.label,
+    required this.cycleStart,
+    required this.cycleEnd,
+    required this.dueDate,
+    required this.chargesSatang,
+    required this.paymentsSatang,
+    required this.netDebtSatang,
+    required this.transactions,
+  });
+}
+
 class CreditCardSummary {
   final Account account;
   final CreditCardBillingCycle cycle;
@@ -32,6 +55,8 @@ class CreditCardSummary {
   final int currentCycleDebtSatang;
   final int totalDebtSatang;
   final List<Transaction> currentCycleTransactions;
+  final List<Transaction> allTransactions;
+  final List<CreditCardCycleStatement> statementCycles;
 
   const CreditCardSummary({
     required this.account,
@@ -40,12 +65,16 @@ class CreditCardSummary {
     required this.currentCycleDebtSatang,
     required this.totalDebtSatang,
     required this.currentCycleTransactions,
+    this.allTransactions = const [],
+    this.statementCycles = const [],
   });
 }
 
 @DriftAccessor(tables: [Accounts, Transactions])
 class CreditCardDao extends DatabaseAccessor<AppDatabase> with _$CreditCardDaoMixin {
   CreditCardDao(super.db);
+
+  static const _uuid = Uuid();
 
   static CreditCardBillingCycle calculateCycle(DateTime ref, {int statementDay = 23, int dueDay = 10}) {
     DateTime cycleStart;
@@ -144,6 +173,50 @@ class CreditCardDao extends DatabaseAccessor<AppDatabase> with _$CreditCardDaoMi
     final totalDebt = totalCharges - totalPayments;
     final prevStatementUnpaid = (prevCycleCharges - paymentsAfterPrevStatement).clamp(0, totalDebt);
 
+    // Build statement cycles (up to 6 cycles)
+    final statementCycles = <CreditCardCycleStatement>[];
+    final c0End = cycle.cycleEnd;
+    for (int k = 0; k < 6; k++) {
+      final cEnd = DateTime(c0End.year, c0End.month - k, statementDay, 23, 59, 59, 999);
+      final cStart = DateTime(c0End.year, c0End.month - k - 1, statementDay + 1, 0, 0, 0);
+      final due = DateTime(cEnd.year, cEnd.month + 1, dueDay);
+
+      final cycleTxs = allTrans.where((t) =>
+        !t.transactionDate.isBefore(cStart) && !t.transactionDate.isAfter(cEnd)
+      ).toList();
+
+      int cCharges = 0;
+      int cPayments = 0;
+      for (final t in cycleTxs) {
+        final cost = t.amountThbSatang + t.feeThbSatang;
+        if (t.sourceAccountId == accountId && t.transactionType == 'expense') {
+          cCharges += cost;
+        } else if (t.destinationAccountId == accountId && t.transactionType == 'transfer') {
+          cPayments += t.amountThbSatang;
+        }
+      }
+
+      String label;
+      if (k == 0) {
+        label = 'รอบปัจจุบัน';
+      } else if (k == 1) {
+        label = 'รอบที่แล้ว';
+      } else {
+        label = 'รอบย้อนหลัง $k เดือน';
+      }
+
+      statementCycles.add(CreditCardCycleStatement(
+        label: label,
+        cycleStart: cStart,
+        cycleEnd: cEnd,
+        dueDate: due,
+        chargesSatang: cCharges,
+        paymentsSatang: cPayments,
+        netDebtSatang: cCharges - cPayments,
+        transactions: cycleTxs,
+      ));
+    }
+
     return CreditCardSummary(
       account: account,
       cycle: cycle,
@@ -151,6 +224,39 @@ class CreditCardDao extends DatabaseAccessor<AppDatabase> with _$CreditCardDaoMi
       currentCycleDebtSatang: currentCycleCharges,
       totalDebtSatang: totalDebt,
       currentCycleTransactions: currentCycleTrans,
+      allTransactions: allTrans,
+      statementCycles: statementCycles,
     );
+  }
+
+  Future<int> recordCreditCardPayment({
+    required String fromAccountId,
+    required String creditCardAccountId,
+    required int amountSatang,
+    DateTime? paymentDate,
+    String? note,
+  }) async {
+    final now = DateTime.now();
+    final date = paymentDate ?? now;
+    final card = await (select(accounts)..where((a) => a.id.equals(creditCardAccountId))).getSingleOrNull();
+    final cardName = card?.name ?? 'บัตรเครดิต';
+    final txNote = note ?? 'ชำระหนี้ $cardName';
+
+    final tx = TransactionsCompanion.insert(
+      id: _uuid.v4(),
+      transactionType: 'transfer',
+      sourceAccountId: Value(fromAccountId),
+      destinationAccountId: Value(creditCardAccountId),
+      amountOriginalSatang: amountSatang,
+      currencyCode: 'THB',
+      amountThbSatang: amountSatang,
+      feeThbSatang: const Value(0),
+      transactionDate: date,
+      note: Value(txNote),
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    return into(transactions).insert(tx);
   }
 }

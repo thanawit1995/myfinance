@@ -43,14 +43,14 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (context) {
+      builder: (sheetContext) {
         return SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                  backgroundColor: Theme.of(sheetContext).colorScheme.primaryContainer,
                   child: Text(holding.asset.symbol.substring(0, 1)),
                 ),
                 title: Text('${holding.asset.symbol} - ${holding.asset.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -61,7 +61,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                 leading: const Icon(Icons.add_shopping_cart, color: Colors.blue),
                 title: Text(isThai ? 'ซื้อเพิ่ม (Buy)' : 'Buy more (Buy)'),
                 onTap: () async {
-                  Navigator.pop(context);
+                  Navigator.pop(sheetContext);
                   final ok = await BuySellTradeDialog.show(context, initialAsset: holding.asset, initialIsBuy: true);
                   if (ok == true && mounted) setState(() {});
                 },
@@ -70,7 +70,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                 leading: const Icon(Icons.sell, color: Colors.green),
                 title: Text(isThai ? 'ขายทำกำไร/ตัดขาดทุน (Sell FIFO)' : 'Sell (Sell FIFO)'),
                 onTap: () async {
-                  Navigator.pop(context);
+                  Navigator.pop(sheetContext);
                   final ok = await BuySellTradeDialog.show(context, initialAsset: holding.asset, initialIsBuy: false);
                   if (ok == true && mounted) setState(() {});
                 },
@@ -79,7 +79,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                 leading: const Icon(Icons.receipt_long, color: Colors.purple),
                 title: Text(isThai ? 'ตรวจสอบ Lot และประวัติการตัดขาย (FIFO)' : 'Inspect Lots & FIFO history'),
                 onTap: () {
-                  Navigator.pop(context);
+                  Navigator.pop(sheetContext);
                   LotInspectionScreen.show(context, holding.asset);
                 },
               ),
@@ -87,7 +87,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                 leading: const Icon(Icons.edit, color: Colors.orange),
                 title: Text(isThai ? 'แก้ไขข้อมูลสินทรัพย์' : 'Edit Asset Info'),
                 onTap: () async {
-                  Navigator.pop(context);
+                  Navigator.pop(sheetContext);
                   final ok = await AssetFormDialog.show(context, assetToEdit: holding.asset);
                   if (ok == true && mounted) setState(() {});
                 },

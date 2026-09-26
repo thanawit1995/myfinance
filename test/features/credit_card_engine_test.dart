@@ -127,5 +127,44 @@ void main() {
       final summary2 = await ccDao.getSummary(cardAcc.id, DateTime(2026, 9, 17));
       expect(summary2!.totalDebtSatang, equals(0));
     });
+
+    test('getSummary generates statementCycles and recordCreditCardPayment clears balance', () async {
+      final cardAcc = (await db.accountsDao.getActiveAccounts())
+          .firstWhere((a) => a.accountType == 'credit_card');
+      final bankAcc = (await db.accountsDao.getActiveAccounts())
+          .firstWhere((a) => a.name == 'SCB');
+
+      // Charge 3,000 THB in current cycle
+      await db.transactionsDao.insertTransaction(
+        TransactionsCompanion.insert(
+          id: 'card-tx-cycle',
+          transactionType: 'expense',
+          sourceAccountId: Value(cardAcc.id),
+          amountOriginalSatang: 300000,
+          currencyCode: 'THB',
+          amountThbSatang: 300000,
+          transactionDate: DateTime(2026, 9, 25),
+          createdAt: DateTime(2026, 9, 25),
+          updatedAt: DateTime(2026, 9, 25),
+        ),
+      );
+
+      final summary = await ccDao.getSummary(cardAcc.id, DateTime(2026, 9, 26));
+      expect(summary, isNotNull);
+      expect(summary!.statementCycles.length, equals(6));
+      expect(summary.allTransactions.isNotEmpty, isTrue);
+      expect(summary.totalDebtSatang, equals(300000));
+
+      // Record payment via DAO helper
+      await ccDao.recordCreditCardPayment(
+        fromAccountId: bankAcc.id,
+        creditCardAccountId: cardAcc.id,
+        amountSatang: 300000,
+        paymentDate: DateTime(2026, 9, 26),
+      );
+
+      final summaryAfterPay = await ccDao.getSummary(cardAcc.id, DateTime(2026, 9, 26));
+      expect(summaryAfterPay!.totalDebtSatang, equals(0));
+    });
   });
 }

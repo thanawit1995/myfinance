@@ -16,6 +16,14 @@ class AccountDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
+  late String _accountName;
+
+  @override
+  void initState() {
+    super.initState();
+    _accountName = widget.account.name;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -25,8 +33,13 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.account.name),
+        title: Text(_accountName),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: isThai ? 'แก้ไขชื่อบัญชี' : 'Edit account name',
+            onPressed: () => _editAccountName(isThai),
+          ),
           IconButton(
             icon: Icon(widget.account.isActive ? Icons.archive_outlined : Icons.unarchive_outlined),
             tooltip: widget.account.isActive
@@ -234,4 +247,55 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
       }
     }
   }
+
+  Future<void> _editAccountName(bool isThai) async {
+    final controller = TextEditingController(text: _accountName);
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(isThai ? 'แก้ไขชื่อบัญชี' : 'Edit Account Name'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: isThai ? 'ชื่อบัญชี' : 'Account Name',
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final trimmed = controller.text.trim();
+              if (trimmed.isNotEmpty) {
+                Navigator.of(ctx).pop(trimmed);
+              }
+            },
+            child: Text(isThai ? 'บันทึก' : 'Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (newName != null && newName.isNotEmpty && newName != _accountName) {
+      await ref.read(accountsDaoProvider).updateAccountName(widget.account.id, newName);
+      if (mounted) {
+        setState(() {
+          _accountName = newName;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            duration: const Duration(seconds: 5),
+            content: Text(isThai
+                ? 'แก้ไขชื่อบัญชีเป็น "$newName" สำเร็จ'
+                : 'Account name updated to "$newName"'),
+          ),
+        );
+      }
+    }
+  }
 }
+

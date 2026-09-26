@@ -870,6 +870,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                             labelText: isThai ? 'เลือกหมวดหมู่' : 'Select Category',
                             border: const OutlineInputBorder(),
                           ),
+                          isExpanded: true,
                           initialValue: selectedCatId,
                           items: categories
                               .map((c) => DropdownMenuItem(
@@ -878,7 +879,12 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                                       children: [
                                         Icon(CategoryIconHelper.getIcon(c.icon), size: 18),
                                         const SizedBox(width: 8),
-                                        Text(c.localizedName(context)),
+                                        Expanded(
+                                          child: Text(
+                                            c.localizedName(context),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ))
@@ -975,6 +981,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                             labelText: isThai ? 'เลือกหมวดหมู่' : 'Select Category',
                             border: const OutlineInputBorder(),
                           ),
+                          isExpanded: true,
                           initialValue: selectedCatId,
                           items: categories
                               .map((c) => DropdownMenuItem(
@@ -983,7 +990,12 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                                       children: [
                                         Icon(CategoryIconHelper.getIcon(c.icon), size: 18),
                                         const SizedBox(width: 8),
-                                        Text(c.localizedName(context)),
+                                        Expanded(
+                                          child: Text(
+                                            c.localizedName(context),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ))
@@ -1195,50 +1207,97 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                       maxLines: 2,
                     ),
                     const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            icon: const Icon(Icons.calendar_today, size: 16),
-                            label: Text(
-                              '${isThai ? "เริ่ม" : "Start"}: ${startDate.day}/${startDate.month}/${startDate.year}',
-                              style: const TextStyle(fontSize: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Theme.of(dialogCtx).dividerColor),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isThai ? 'ระยะเวลาโครงการ' : 'Project Period',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(dialogCtx).hintColor,
                             ),
-                            onPressed: () async {
-                              final picked = await showDatePicker(
-                                context: dialogCtx,
-                                initialDate: startDate,
-                                firstDate: DateTime(2020),
-                                lastDate: DateTime(2050),
-                              );
-                              if (picked != null) {
-                                setDialogState(() => startDate = picked);
-                              }
-                            },
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            icon: const Icon(Icons.event, size: 16),
-                            label: Text(
-                              '${isThai ? "สิ้นสุด" : "End"}: ${endDate.day}/${endDate.month}/${endDate.year}',
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                            onPressed: () async {
-                              final picked = await showDatePicker(
-                                context: dialogCtx,
-                                initialDate: endDate,
-                                firstDate: DateTime(2020),
-                                lastDate: DateTime(2050),
-                              );
-                              if (picked != null) {
-                                setDialogState(() => endDate = picked);
-                              }
-                            },
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(6),
+                                  onTap: () async {
+                                    final picked = await showDatePicker(
+                                      context: dialogCtx,
+                                      initialDate: startDate,
+                                      firstDate: DateTime(2020),
+                                      lastDate: DateTime(2050),
+                                    );
+                                    if (picked != null) {
+                                      setDialogState(() => startDate = picked);
+                                    }
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 4),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.calendar_today, size: 16, color: VaultTheme.accent(dialogCtx)),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            '${isThai ? "เริ่ม: " : "Start: "}${startDate.day}/${startDate.month}/${startDate.year}',
+                                            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 6),
+                                child: Icon(Icons.arrow_forward, size: 14, color: Theme.of(dialogCtx).hintColor),
+                              ),
+                              Expanded(
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(6),
+                                  onTap: () async {
+                                    final picked = await showDatePicker(
+                                      context: dialogCtx,
+                                      initialDate: endDate,
+                                      firstDate: DateTime(2020),
+                                      lastDate: DateTime(2050),
+                                    );
+                                    if (picked != null) {
+                                      setDialogState(() => endDate = picked);
+                                    }
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 4),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.event, size: 16, color: VaultTheme.accent(dialogCtx)),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            '${isThai ? "สิ้นสุด: " : "End: "}${endDate.day}/${endDate.month}/${endDate.year}',
+                                            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ],
                 ),

@@ -204,6 +204,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
               );
               if (mounted) setState(() {});
             },
+            onLongPress: () => _showEditAccountDialog(account, isThai),
           ),
         );
       },
@@ -257,9 +258,58 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                 ),
               );
             },
+            onLongPress: () => _showEditAccountDialog(account, isThai),
           ),
         );
       },
     );
+  }
+
+  Future<void> _showEditAccountDialog(Account account, bool isThai) async {
+    final controller = TextEditingController(text: account.name);
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(isThai ? 'แก้ไขชื่อบัญชี' : 'Edit Account Name'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: isThai ? 'ชื่อบัญชี' : 'Account Name',
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final trimmed = controller.text.trim();
+              if (trimmed.isNotEmpty) {
+                Navigator.of(ctx).pop(trimmed);
+              }
+            },
+            child: Text(isThai ? 'บันทึก' : 'Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (newName != null && newName.isNotEmpty && newName != account.name) {
+      await ref.read(accountsDaoProvider).updateAccountName(account.id, newName);
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            duration: const Duration(seconds: 5),
+            content: Text(isThai
+                ? 'แก้ไขชื่อบัญชีเป็น "$newName" สำเร็จ'
+                : 'Account name updated to "$newName"'),
+          ),
+        );
+      }
+    }
   }
 }

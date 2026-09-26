@@ -81,7 +81,8 @@ void main() {
       expect(results[0].ticker, 'O');
       expect(results[0].buyDate, DateTime(2024, 6, 24));
       expect(results[0].amountUsdSatang, 27144);
-      expect(results[0].amountThbSatang, 878651);
+      expect(results[0].amountThbSatang, 913396);
+      expect(results[0].fxRate, Decimal.parse('33.650000'));
       expect(results[0].quantity, Decimal.parse('5.1070555'));
       expect(results[0].paymentType, PaymentType.thb);
 

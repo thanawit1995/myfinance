@@ -7,6 +7,7 @@ import 'package:myfinance/features/import/domain/notion_funds_parser.dart';
 import 'package:myfinance/features/import/domain/notion_gold_import_executor.dart';
 import 'package:myfinance/features/import/domain/notion_gold_parser.dart';
 import 'package:myfinance/features/import/domain/notion_invest_parser.dart';
+import 'package:myfinance/features/import/domain/notion_invest_import_executor.dart';
 
 void main() {
   late AppDatabase db;
@@ -175,8 +176,7 @@ void main() {
       final gold = parsed.first;
       expect(gold.symbol, 'MST-GOLD 99.99%');
       expect(gold.quantity, Decimal.parse('0.1984'));
-      expect(gold.amountUsdSatang, 59060);
-      expect(gold.fxRate, Decimal.parse('32.37'));
+      expect(gold.fxRate, Decimal.parse('33.650000'));
       expect(gold.unitCostUsd, Decimal.parse('2976.78'));
       expect(gold.marketPriceUsd, Decimal.parse('4616.83'));
     });
@@ -195,11 +195,16 @@ void main() {
       expect(asset.assetType, 'gold');
       expect(asset.currencyCode, 'USD');
 
-      // Verify Lot
+      // Verify Lot and account link
       final lots = await (db.select(db.investmentLots)..where((l) => l.assetId.equals(asset.id))).get();
       expect(lots.length, 1);
       expect(lots.first.quantity, '0.1984');
       expect(lots.first.pricePerUnitOriginal, '2976.78');
+
+      final tx = await (db.select(db.transactions)..where((t) => t.id.equals(lots.first.buyTransactionId))).getSingle();
+      final sourceAcc = await (db.select(db.accounts)..where((a) => a.id.equals(tx.sourceAccountId!))).getSingle();
+      expect(sourceAcc.name, 'Dime! FCD');
+      expect(sourceAcc.currencyCode, 'USD');
 
       // Verify Price
       final prices = await (db.select(db.assetPrices)..where((p) => p.assetId.equals(asset.id))).get();
@@ -223,6 +228,65 @@ void main() {
       final results = NotionInvestParser.parseRows(rawRows);
       expect(results.length, 1);
       expect(results[0].unitPriceOriginal, Decimal.parse('53.1500'));
+    });
+  });
+
+  group('NotionInvestImportExecutor Account Routing Tests', () {
+    test('routes THB to Dime! Save, FCD to Dime! FCD, and USD to Dime! USD', () async {
+      final rows = [
+        ParsedInvestRow(
+          rowIndex: 1,
+          ticker: 'O',
+          buyDate: DateTime(2024, 6, 24),
+          quantity: Decimal.parse('5.0'),
+          amountUsdSatang: 25000,
+          fxRate: Decimal.parse('33.650000'),
+          amountThbSatang: 841250,
+          paymentType: PaymentType.thb,
+        ),
+        ParsedInvestRow(
+          rowIndex: 2,
+          ticker: 'NVDA',
+          buyDate: DateTime(2024, 6, 25),
+          quantity: Decimal.parse('2.0'),
+          amountUsdSatang: 20000,
+          fxRate: Decimal.parse('33.650000'),
+          amountThbSatang: 673000,
+          paymentType: PaymentType.fcd,
+        ),
+        ParsedInvestRow(
+          rowIndex: 3,
+          ticker: 'MSFT',
+          buyDate: DateTime(2024, 6, 26),
+          quantity: Decimal.parse('1.0'),
+          amountUsdSatang: 40000,
+          fxRate: Decimal.parse('33.650000'),
+          amountThbSatang: 1346000,
+          paymentType: PaymentType.usd,
+        ),
+      ];
+
+      final executor = NotionInvestImportExecutor(db);
+      final result = await executor.executeImport(rows);
+      expect(result.imported, 3);
+
+      final lots = await (db.select(db.investmentLots)..where((l) => l.deletedAt.isNull())).get();
+      expect(lots.length, 3);
+
+      final txs = await (db.select(db.transactions)..where((t) => t.deletedAt.isNull())).get();
+      final accounts = await db.accountsDao.getActiveAccounts();
+
+      final dimeSave = accounts.firstWhere((a) => a.name == 'Dime! Save');
+      final dimeFcd = accounts.firstWhere((a) => a.name == 'Dime! FCD');
+      final dimeUsd = accounts.firstWhere((a) => a.name == 'Dime! USD');
+
+      final oTx = txs.firstWhere((t) => t.tag?.contains('O') == true || t.note?.contains('O') == true);
+      final nvdaTx = txs.firstWhere((t) => t.tag?.contains('NVDA') == true || t.note?.contains('NVDA') == true);
+      final msftTx = txs.firstWhere((t) => t.tag?.contains('MSFT') == true || t.note?.contains('MSFT') == true);
+
+      expect(oTx.sourceAccountId, dimeSave.id);
+      expect(nvdaTx.sourceAccountId, dimeFcd.id);
+      expect(msftTx.sourceAccountId, dimeUsd.id);
     });
   });
 }

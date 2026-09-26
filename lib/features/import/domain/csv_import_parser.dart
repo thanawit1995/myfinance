@@ -579,9 +579,12 @@ class CsvImportParser {
       final rawName = mapping.nameCol < row.length ? row[mapping.nameCol].toString().trim() : '';
       var rawCategory = mapping.categoryCol < row.length ? row[mapping.categoryCol].toString() : '';
       final rawAmount = mapping.amountCol < row.length ? row[mapping.amountCol] : null;
-      final rawAccount = mapping.accountCol != null && mapping.accountCol! < row.length
+      var rawAccount = mapping.accountCol != null && mapping.accountCol! < row.length
           ? row[mapping.accountCol!].toString().trim()
           : null;
+      if (templateType.startsWith('notion') && rawAccount != null && rawAccount.isNotEmpty) {
+        rawAccount = cleanNotionRelation(rawAccount);
+      }
       final rawNote = mapping.noteCol != null && mapping.noteCol! < row.length
           ? row[mapping.noteCol!].toString().trim()
           : null;
@@ -665,7 +668,9 @@ class CsvImportParser {
 
       // Determine transaction type, category, and tags
       String txType = 'expense';
-      String canonicalCategory = cleanCategory.isEmpty ? 'ทั่วไป' : cleanCategory;
+      String canonicalCategory = (cleanCategory.isEmpty || cleanCategory == 'ทั่วไป')
+          ? 'Other Expense'
+          : cleanCategory;
       String? rowTag;
 
       if (templateType == 'notion_income') {

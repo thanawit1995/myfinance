@@ -22,7 +22,7 @@ class NotionGoldImportExecutor {
   final InvestmentsDao _dao;
   static const _uuid = Uuid();
 
-  static const _accountIdDimeUsd = '00000000-0000-4000-8000-000000000005';
+  static const _accountIdDimeFcd = '00000000-0000-4000-8000-000000000004';
 
   NotionGoldImportExecutor(this._db) : _dao = _db.investmentsDao;
 
@@ -59,27 +59,25 @@ class NotionGoldImportExecutor {
           continue;
         }
 
-        // Default to Dime! USD or any USD account, fallback to first account
-        String accountId = _accountIdDimeUsd;
+        // Default to Dime! FCD or any FCD/USD account
         final accounts = await _db.accountsDao.getActiveAccounts();
-        final usdAccounts = accounts.where((a) => a.currencyCode == 'USD').toList();
-        if (accounts.isEmpty) {
+        final dimeFcd = accounts.where((a) => a.name.trim().toLowerCase() == 'dime! fcd' || a.name.trim().toLowerCase() == 'dime fcd').firstOrNull;
+        String accountId = dimeFcd?.id ?? _accountIdDimeFcd;
+
+        if (accounts.isEmpty || !accounts.any((a) => a.id == accountId)) {
           final now = DateTime.now();
           await _db.accountsDao.createAccount(
             AccountsCompanion.insert(
-              id: _accountIdDimeUsd,
-              name: 'Dime! USD',
-              accountType: 'bank',
+              id: _accountIdDimeFcd,
+              name: 'Dime! FCD',
+              accountType: 'fcd',
               currencyCode: 'USD',
-              isDomestic: false,
+              isDomestic: true,
               createdAt: now,
               updatedAt: now,
             ),
           );
-        } else if (usdAccounts.isNotEmpty && !accounts.any((a) => a.id == accountId)) {
-          accountId = usdAccounts.first.id;
-        } else if (!accounts.any((a) => a.id == accountId)) {
-          accountId = accounts.first.id;
+          accountId = _accountIdDimeFcd;
         }
 
         final int priceSatang = (row.unitCostUsd * Decimal.fromInt(100)).round().toBigInt().toInt();
@@ -150,7 +148,7 @@ class NotionGoldImportExecutor {
         name: name,
         assetType: 'gold',
         currencyCode: 'USD',
-        defaultAccountId: _accountIdDimeUsd,
+        defaultAccountId: _accountIdDimeFcd,
         note: const Value('ทองคำดิจิทัล (MST-GOLD)'),
         createdAt: now,
         updatedAt: now,

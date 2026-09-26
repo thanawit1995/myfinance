@@ -90,11 +90,39 @@ class ImportExecutor {
       }
     }
 
+    // Resolve SCB account: Map Money, Online banking -> SCB
+    final scbAcc = existingAccounts.where((a) => a.name.trim().toLowerCase() == 'scb').firstOrNull;
+    String? scbAccountId = scbAcc?.id;
+    if (scbAccountId == null) {
+      final defaultScb = existingAccounts.where((a) => a.id == '00000000-0000-4000-8000-000000000001').firstOrNull;
+      if (defaultScb != null) {
+        scbAccountId = defaultScb.id;
+      }
+    }
+    if (scbAccountId != null) {
+      accountMap['money'] = scbAccountId;
+      accountMap['online banking'] = scbAccountId;
+      accountMap['online_banking'] = scbAccountId;
+      accountMap['onlinebanking'] = scbAccountId;
+      accountMap['online bank'] = scbAccountId;
+    }
 
     final categoryMap = <String, String>{}; // name.toLowerCase() -> id
     for (final c in existingCategories) {
       categoryMap[c.nameTh.trim().toLowerCase()] = c.id;
       categoryMap[c.nameEn.trim().toLowerCase()] = c.id;
+    }
+
+    // Map "ทั่วไป" and "general" -> "Other Expense" / "ค่าใช้จ่ายอื่นๆ"
+    final otherExpCat = existingCategories.where((c) =>
+      c.nameEn.trim().toLowerCase() == 'other expense' ||
+      c.nameTh.trim() == 'ค่าใช้จ่ายอื่นๆ'
+    ).firstOrNull;
+    if (otherExpCat != null) {
+      categoryMap['ทั่วไป'] = otherExpCat.id;
+      categoryMap['general'] = otherExpCat.id;
+      categoryMap['other expense'] = otherExpCat.id;
+      categoryMap['ค่าใช้จ่ายอื่นๆ'] = otherExpCat.id;
     }
 
     // Default account validation
@@ -140,13 +168,16 @@ class ImportExecutor {
           if (accountMap.containsKey(accKey)) {
             targetAccountId = accountMap[accKey]!;
           } else if (autoCreateMissingAccounts) {
-            final newAccId = _uuid.v4();
+            final isScb = accKey == 'money' || accKey.contains('online bank') || accKey.contains('online_bank');
             final isCc = accKey.contains('credit') || accKey.contains('เครดิต');
+            final newAccId = isScb ? '00000000-0000-4000-8000-000000000001' : _uuid.v4();
+            final accName = isScb ? 'SCB' : row.accountName!.trim();
+            final accType = isCc ? 'credit_card' : (isScb ? 'bank' : 'cash');
             await accountsDao.createAccount(
               AccountsCompanion.insert(
                 id: newAccId,
-                name: row.accountName!.trim(),
-                accountType: isCc ? 'credit_card' : 'cash',
+                name: accName,
+                accountType: accType,
                 currencyCode: 'THB',
                 isDomestic: true,
                 closingDay: isCc ? const Value(23) : const Value(null),
@@ -156,7 +187,12 @@ class ImportExecutor {
               ),
             );
             accountMap[accKey] = newAccId;
-            createdAccounts.add(row.accountName!.trim());
+            if (isScb) {
+              accountMap['money'] = newAccId;
+              accountMap['online banking'] = newAccId;
+              accountMap['scb'] = newAccId;
+            }
+            createdAccounts.add(accName);
             targetAccountId = newAccId;
           }
 

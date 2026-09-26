@@ -10,6 +10,8 @@ void main() {
       expect(NotionCategoryMapper.toAppCategoryNameEn('Health & Fitness'), 'Healthcare');
       expect(NotionCategoryMapper.toAppCategoryNameEn('Home'), 'Housing');
       expect(NotionCategoryMapper.toAppCategoryNameEn('Entertainment'), 'Entertainment');
+      expect(NotionCategoryMapper.toAppCategoryNameEn('ทั่วไป'), 'Other Expense');
+      expect(NotionCategoryMapper.toAppCategoryNameEn('general'), 'Other Expense');
     });
 
     test('maps confirmed custom categories: Lover -> Gifts, Cat -> Yuzu, Car -> Transportation, Travel -> Travel', () {

@@ -2,6 +2,25 @@
 
 อัปเดตล่าสุด: 26 กันยายน 2026
 
+- [x] **Notion Import Enhancements (Notion_expense & Notion_invest with Fixed 33.65 FX Rate)**:
+  - **1. ปรับปรุงการนำเข้า Notion_expense (รายจ่าย)**:
+    - เพิ่มการแม็ปบัญชี: `'money'`, `'online banking'`, `'online_banking'`, `'onlinebanking'` $\rightarrow$ บัญชี **`SCB`** อัตโนมัติ (หากไม่มีให้สร้างบัญชี SCB)
+    - เพิ่มการคลีนคอลัมน์บัญชี (Account/Wallet) ด้วย `cleanNotionRelation` ตัดลิงก์ URL และ Emoji ออกให้เป็นชื่อที่ถูกต้อง
+    - เพิ่มการแม็ปหมวดหมู่: `'ทั่วไป'`, `'general'`, และแถวที่ไม่มีหมวดหมู่ $\rightarrow$ หมวดหมู่ **`ค่าใช้จ่ายอื่นๆ`** (`Other Expense`)
+  - **2. ปรับปรุงการนำเข้า Notion_invest (การลงทุน)**:
+    - **กำหนดอัตราแลกเปลี่ยนคงที่ (Fixed Rate)**: ใช้อัตราแลกเปลี่ยน **`33.650000`** บาท/USD สำหรับรายการลงทุนต่างประเทศ (หุ้น และ ทองคำ) ตามความต้องการของผู้ใช้
+    - **กองทุนรวม (Mutual Funds)**: เงิน THB ตัดจากบัญชี **`SCB`**
+    - **ทองคำ (Gold)**: เงิน USD อัตราแลกเปลี่ยน 33.65 ตัดจากบัญชี **`Dime! FCD`**
+    - **หุ้นต่างประเทศ (Stocks)**: คัดแยกบัญชีตัดเงินตามช่อง Text ใน Notion:
+      - `THB` $\rightarrow$ ตัดจากบัญชี **`Dime! Save`** (คำนวณหักเป็นเงินบาท THB ตามเรต 33.65)
+      - `FCD` $\rightarrow$ ตัดจากบัญชี **`Dime! FCD`** (USD)
+      - `USD` หรือ `ปันผล` $\rightarrow$ ตัดจากบัญชี **`Dime! USD`** (USD)
+  - **3. การตรวจสอบ & ผลลัพธ์**:
+    - เพิ่มและปรับปรุง Unit Tests: `test/import/notion_category_mapper_test.dart`, `test/import/notion_invest_parser_test.dart`, `test/features/notion_invest_funds_gold_test.dart`, `test/features/csv_import_executor_test.dart`
+    - `flutter analyze`: **0 errors, 0 warnings**
+    - `flutter test`: ผ่านทั้งหมด **165/165 tests passed** (100%)
+    - บิลด์เวอร์ชัน Web Release สำเร็จสมบูรณ์ (`flutter build web --release`)
+
 - [x] **Auto Credit Card Settle (Historical Debt < 24 ส.ค. 69) & Encrypted Backup Inspection Fix**:
   - **1. ตัดยอดหนี้ประวัติศาสตร์ของบัตรเครดิตอัตโนมัติ (Credit Card Historical Debt Settlement)**:
     - เพิ่มฟังก์ชัน `settleHistoricalDebt` และ `getHistoricalDebtSatang` ใน `CreditCardDao` สำหรับคำนวณยอดค้างชำระก่อน 24 ส.ค. 2569 (วันตัดรอบ 23 ส.ค. 2569 เวลา 23:59:59) และบันทึกรายการหักล้างยอดประวัติศาสตร์เป็นธุรกรรมโอนเงิน (Transfer) เข้าบัตรเครดิตโดยตรง (`sourceAccountId: null`)

@@ -32,6 +32,8 @@ class NotionCategoryMapper {
     'car': 'Transportation',
     'travel': 'Travel',
     'other expense': 'Other Expense',
+    'ทั่วไป': 'Other Expense',
+    'general': 'Other Expense',
 
     // ─── Income ────────────────────────────────────────────────────────────
     'salary': 'Salary',

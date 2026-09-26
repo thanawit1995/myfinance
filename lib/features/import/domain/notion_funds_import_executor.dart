@@ -59,11 +59,11 @@ class NotionFundsImportExecutor {
           continue;
         }
 
-        // Default to SCB account or first THB account
-        String accountId = _accountIdScb;
+        // Default to SCB account
         final accounts = await _db.accountsDao.getActiveAccounts();
-        final thbAccounts = accounts.where((a) => a.currencyCode == 'THB').toList();
-        if (accounts.isEmpty) {
+        final scbAccount = accounts.where((a) => a.name.trim().toLowerCase() == 'scb').firstOrNull;
+        String accountId = scbAccount?.id ?? _accountIdScb;
+        if (accounts.isEmpty || !accounts.any((a) => a.id == accountId)) {
           final now = DateTime.now();
           await _db.accountsDao.createAccount(
             AccountsCompanion.insert(
@@ -76,10 +76,7 @@ class NotionFundsImportExecutor {
               updatedAt: now,
             ),
           );
-        } else if (thbAccounts.isNotEmpty && !accounts.any((a) => a.id == accountId)) {
-          accountId = thbAccounts.first.id;
-        } else if (!accounts.any((a) => a.id == accountId)) {
-          accountId = accounts.first.id;
+          accountId = _accountIdScb;
         }
 
         final int priceSatang = (row.unitCostThb * Decimal.fromInt(100)).round().toBigInt().toInt();

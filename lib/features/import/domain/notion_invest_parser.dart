@@ -72,7 +72,6 @@ class NotionInvestParser {
     final dateCol    = _findCol(headers, ['date']);
     final dayCol     = _findCol(headers, ['day']);
     final investedCol= _findCol(headers, ['invested']);
-    final rollupCol  = _findCol(headers, ['rollup']);
     final sharePriceCol = _findCol(headers, ['share price', 'cost/share', 'price']);
     final sharesCol  = _findCol(headers, ['shares', 'share']);
     final stockCol   = _findCol(headers, ['stock']);
@@ -95,7 +94,6 @@ class NotionInvestParser {
       final rawStock  = stockCol != -1 && stockCol < row.length ? row[stockCol].toString() : '';
       final rawShares = sharesCol != -1 && sharesCol < row.length ? row[sharesCol].toString().trim() : '';
       final rawInvested = investedCol != -1 && investedCol < row.length ? row[investedCol] : null;
-      final rawRollup   = rollupCol != -1 && rollupCol < row.length ? row[rollupCol].toString().trim() : '';
       final rawSharePrice = sharePriceCol != -1 && sharePriceCol < row.length ? row[sharePriceCol]?.toString().trim() : '';
       final rawThb    = thbCol != -1 && thbCol < row.length ? row[thbCol] : null;
       final rawText   = textCol != -1 && textCol < row.length ? row[textCol].toString().trim() : '';
@@ -128,14 +126,20 @@ class NotionInvestParser {
       }
       if (quantity == Decimal.zero) continue;
 
+      // FX Rate: Fixed at 33.65 as specified by user
+      final Decimal fxRate = Decimal.parse('33.650000');
+
       // Parse USD invested amount
-      final amountUsdSatang = CsvImportParser.parseAmountSatang(rawInvested);
+      int amountUsdSatang = CsvImportParser.parseAmountSatang(rawInvested);
 
       // Parse THB invested amount
-      final amountThbSatang = CsvImportParser.parseAmountSatang(rawThb);
+      int amountThbSatang = CsvImportParser.parseAmountSatang(rawThb);
 
-      // Parse FX rate from Rollup column
-      Decimal fxRate = _parseFxRate(rawRollup, amountUsdSatang, amountThbSatang);
+      if (amountUsdSatang > 0) {
+        amountThbSatang = (Decimal.fromInt(amountUsdSatang) * fxRate).round().toBigInt().toInt();
+      } else if (amountThbSatang > 0) {
+        amountUsdSatang = (Decimal.fromInt(amountThbSatang) / fxRate).round().toInt();
+      }
 
       // Parse Unit Price (up to Decimal precision)
       Decimal unitPriceOriginal = Decimal.zero;
@@ -144,11 +148,11 @@ class NotionInvestParser {
         unitPriceOriginal = Decimal.tryParse(cleanPrice) ?? Decimal.zero;
       }
       if (unitPriceOriginal <= Decimal.zero && quantity > Decimal.zero) {
-        if (amountUsdSatang > 0 && paymentType != PaymentType.thb) {
+        if (amountUsdSatang > 0) {
           unitPriceOriginal = ((Decimal.fromInt(amountUsdSatang) * Decimal.parse('0.01')) / quantity)
               .toDecimal(scaleOnInfinitePrecision: 8);
         } else if (amountThbSatang > 0) {
-          unitPriceOriginal = ((Decimal.fromInt(amountThbSatang) * Decimal.parse('0.01')) / quantity)
+          unitPriceOriginal = (((Decimal.fromInt(amountThbSatang) * Decimal.parse('0.01')) / fxRate) / quantity.toRational())
               .toDecimal(scaleOnInfinitePrecision: 8);
         }
       }
@@ -207,28 +211,5 @@ class NotionInvestParser {
     if (t == 'usd') return PaymentType.usd;
     // "THB" or "THB + ปันผล" without "ปันผล only" → THB buy
     return PaymentType.thb;
-  }
-
-  /// Parses FX rate from Rollup column.
-  /// Falls back to computing from THB/USD amounts if Rollup is unusable.
-  static Decimal _parseFxRate(String rawRollup, int amountUsdSatang, int amountThbSatang) {
-    // Try to extract a number from rawRollup (e.g. "32.37", "32.370000")
-    final numMatch = RegExp(r'(\d+\.\d+)').firstMatch(rawRollup);
-    if (numMatch != null) {
-      try {
-        final rate = Decimal.parse(numMatch.group(1)!);
-        if (rate > Decimal.zero) return rate;
-      } catch (_) {}
-    }
-
-    // Compute from THB / USD amounts if both are available
-    if (amountUsdSatang > 0 && amountThbSatang > 0) {
-      final computed = (Decimal.fromInt(amountThbSatang) / Decimal.fromInt(amountUsdSatang))
-          .toDecimal(scaleOnInfinitePrecision: 6);
-      if (computed > Decimal.zero) return computed;
-    }
-
-    // Default fallback (should rarely be used)
-    return Decimal.parse('32.370000');
   }
 }

@@ -203,5 +203,56 @@ void main() {
       expect(checked[0].isDuplicate, isTrue);
       expect(checked[1].isDuplicate, isFalse);
     });
+
+    test('Notion_expense maps Money and Online banking to SCB, and ทั่วไป to Other Expense', () async {
+      final rows = [
+        ParsedCsvRow(
+          rowIndex: 1,
+          date: DateTime(2026, 9, 10),
+          rawDateString: '10-Sep-26',
+          name: 'กาแฟสด',
+          categoryName: 'ทั่วไป',
+          accountName: 'Online banking',
+          amountSatang: 6500,
+          transactionType: 'expense',
+          rawRow: ['10-Sep-26', 'กาแฟสด', 'ทั่วไป', 'Online banking', '65.00'],
+        ),
+        ParsedCsvRow(
+          rowIndex: 2,
+          date: DateTime(2026, 9, 11),
+          rawDateString: '11-Sep-26',
+          name: 'ค่าน้ำมัน',
+          categoryName: 'Transportation',
+          accountName: 'Money',
+          amountSatang: 12000,
+          transactionType: 'expense',
+          rawRow: ['11-Sep-26', 'ค่าน้ำมัน', 'Transportation', 'Money', '120.00'],
+        ),
+      ];
+
+      final result = await executor.executeImport(
+        fileName: 'expense_test.csv',
+        templateType: 'notion_expense',
+        rows: rows,
+        defaultAccountId: '',
+      );
+
+      expect(result.importedCount, 2);
+
+      // Verify SCB account was used
+      final scbAcc = (await db.accountsDao.getActiveAccounts()).firstWhere((a) => a.name == 'SCB');
+      final allTx = await db.transactionsDao.getAllTransactions();
+      final tx1 = allTx.firstWhere((t) => t.amountThbSatang == 6500);
+      final tx2 = allTx.firstWhere((t) => t.amountThbSatang == 12000);
+
+      expect(tx1.sourceAccountId, scbAcc.id);
+      expect(tx2.sourceAccountId, scbAcc.id);
+
+      // Verify category for tx1 is Other Expense
+      final otherExpCat = (await db.categoriesDao.getActiveCategories()).firstWhere(
+        (c) => c.nameEn == 'Other Expense' || c.nameTh == 'ค่าใช้จ่ายอื่นๆ',
+      );
+      expect(tx1.categoryId, otherExpCat.id);
+    });
   });
 }

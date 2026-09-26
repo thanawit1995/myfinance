@@ -35,7 +35,7 @@ class NotionInvestImportExecutor {
   static const _uuid = Uuid();
 
   // Fixed seed account IDs (from seed_data.dart)
-  static const _accountIdKrungthai = '00000000-0000-4000-8000-000000000002';
+  static const _accountIdDimeSave  = '00000000-0000-4000-8000-000000000003';
   static const _accountIdDimeFcd   = '00000000-0000-4000-8000-000000000004';
   static const _accountIdDimeUsd   = '00000000-0000-4000-8000-000000000005';
 
@@ -59,6 +59,57 @@ class NotionInvestImportExecutor {
     final existingKeys = <String>{};
     for (final lot in existingLots) {
       existingKeys.add(_lotKey(lot.assetId, lot.buyDate, lot.quantity));
+    }
+
+    // Resolve Dime accounts from DB
+    final accounts = await _db.accountsDao.getActiveAccounts();
+    final dimeSaveAcc = accounts.where((a) => a.name.trim().toLowerCase() == 'dime! save' || a.name.trim().toLowerCase() == 'dime save').firstOrNull;
+    final dimeFcdAcc = accounts.where((a) => a.name.trim().toLowerCase() == 'dime! fcd' || a.name.trim().toLowerCase() == 'dime fcd').firstOrNull;
+    final dimeUsdAcc = accounts.where((a) => a.name.trim().toLowerCase() == 'dime! usd' || a.name.trim().toLowerCase() == 'dime usd').firstOrNull;
+
+    final dimeSaveId = dimeSaveAcc?.id ?? _accountIdDimeSave;
+    final dimeFcdId = dimeFcdAcc?.id ?? _accountIdDimeFcd;
+    final dimeUsdId = dimeUsdAcc?.id ?? _accountIdDimeUsd;
+
+    final now = DateTime.now();
+    if (!accounts.any((a) => a.id == dimeSaveId)) {
+      await _db.accountsDao.createAccount(
+        AccountsCompanion.insert(
+          id: _accountIdDimeSave,
+          name: 'Dime! Save',
+          accountType: 'bank',
+          currencyCode: 'THB',
+          isDomestic: true,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+    }
+    if (!accounts.any((a) => a.id == dimeFcdId)) {
+      await _db.accountsDao.createAccount(
+        AccountsCompanion.insert(
+          id: _accountIdDimeFcd,
+          name: 'Dime! FCD',
+          accountType: 'fcd',
+          currencyCode: 'USD',
+          isDomestic: true,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+    }
+    if (!accounts.any((a) => a.id == dimeUsdId)) {
+      await _db.accountsDao.createAccount(
+        AccountsCompanion.insert(
+          id: _accountIdDimeUsd,
+          name: 'Dime! USD',
+          accountType: 'offshore',
+          currencyCode: 'USD',
+          isDomestic: false,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
     }
 
     // Cache for asset symbol → Asset (avoids repeated DB reads per row)
@@ -89,21 +140,24 @@ class NotionInvestImportExecutor {
         }
 
         // 3. Resolve source account
-        final accountId = _resolveAccountId(row.paymentType);
+        final accountId = _resolveAccountId(
+          row.paymentType,
+          dimeSaveId: dimeSaveId,
+          dimeFcdId: dimeFcdId,
+          dimeUsdId: dimeUsdId,
+        );
 
         // 4. Compute per-share price (in USD satang)
-        // price = totalUSD / quantity
         final pricePerShareSatang = _computePricePerShare(
           row.amountUsdSatang,
           row.quantity,
           row.amountThbSatang,
           row.fxRate,
-          row.paymentType,
         );
 
-        // 5. Currency code
-        final currencyCode = row.paymentType == PaymentType.thb ? 'THB' : 'USD';
-        final fxRate = row.paymentType == PaymentType.thb ? Decimal.one : row.fxRate;
+        // 5. Currency code & FX rate
+        const currencyCode = 'USD';
+        final fxRate = row.fxRate;
 
         // 6. Record buy trade via DAO (atomic: Transaction + Lot + Audit)
         await _dao.recordBuyTrade(
@@ -174,35 +228,31 @@ class NotionInvestImportExecutor {
     return created;
   }
 
-  String _resolveAccountId(PaymentType type) {
+  String _resolveAccountId(
+    PaymentType type, {
+    String? dimeSaveId,
+    String? dimeFcdId,
+    String? dimeUsdId,
+  }) {
     switch (type) {
       case PaymentType.fcd:
-        return _accountIdDimeFcd;
+        return dimeFcdId ?? _accountIdDimeFcd;
       case PaymentType.usd:
-        return _accountIdDimeUsd;
-      case PaymentType.thb:
       case PaymentType.dividend:
-        return _accountIdKrungthai;
+        return dimeUsdId ?? _accountIdDimeUsd;
+      case PaymentType.thb:
+        return dimeSaveId ?? _accountIdDimeSave;
     }
   }
 
-  /// Computes the price per share in the original currency (USD satang usually).
-  /// For THB payments: price is in THB satang (fxRate = 1).
+  /// Computes the price per share in USD satang (cents).
   int _computePricePerShare(
     int amountUsdSatang,
     Decimal quantity,
     int amountThbSatang,
     Decimal fxRate,
-    PaymentType type,
   ) {
     if (quantity == Decimal.zero) return 0;
-
-    if (type == PaymentType.thb) {
-      // Return THB price per share
-      return (Decimal.fromInt(amountThbSatang) / quantity)
-          .round()
-          .toInt();
-    }
 
     if (amountUsdSatang > 0) {
       return (Decimal.fromInt(amountUsdSatang) / quantity)

@@ -42,7 +42,6 @@ class NotionGoldParser {
     final nameCol = _findCol(headers, ['name', 'gold', 'ทอง']);
     final goldCol = _findCol(headers, ['total gold', 'gold', 'น้ำหนัก']);
     final investCol = _findCol(headers, ['total invest', 'invest', 'เงินลงทุน']);
-    final fxCol = _findCol(headers, ['usdthb price', 'usdthb', 'fx']);
     final currentPriceCol = _findCol(headers, ['current price', 'ราคาตลาด']);
     final avgCostCol = _findCol(headers, ['ราคาต้นทุนเฉลี่ย', 'avg cost', 'cost']);
 
@@ -62,16 +61,8 @@ class NotionGoldParser {
       final rawInvest = investCol != -1 && investCol < row.length ? row[investCol] : null;
       final int amountUsdSatang = CsvImportParser.parseAmountSatang(rawInvest).abs();
 
-      // FX Rate
-      Decimal fxRate = Decimal.parse('35.000000');
-      if (fxCol != -1 && fxCol < row.length) {
-        final rawFx = row[fxCol].toString().trim();
-        final cleanFx = rawFx.replaceAll(RegExp(r'[^\d.]'), '');
-        final parsed = Decimal.tryParse(cleanFx);
-        if (parsed != null && parsed > Decimal.zero) {
-          fxRate = parsed;
-        }
-      }
+      // FX Rate: Fixed at 33.65 as specified by user
+      final Decimal fxRate = Decimal.parse('33.650000');
 
       // Total Cost THB
       final int totalCostThbSatang = (Decimal.fromInt(amountUsdSatang) * fxRate).round().toBigInt().toInt();

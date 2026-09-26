@@ -2,6 +2,22 @@
 
 อัปเดตล่าสุด: 26 กันยายน 2026
 
+- [x] **Auto Credit Card Settle (Historical Debt < 24 ส.ค. 69) & Encrypted Backup Inspection Fix**:
+  - **1. ตัดยอดหนี้ประวัติศาสตร์ของบัตรเครดิตอัตโนมัติ (Credit Card Historical Debt Settlement)**:
+    - เพิ่มฟังก์ชัน `settleHistoricalDebt` และ `getHistoricalDebtSatang` ใน `CreditCardDao` สำหรับคำนวณยอดค้างชำระก่อน 24 ส.ค. 2569 (วันตัดรอบ 23 ส.ค. 2569 เวลา 23:59:59) และบันทึกรายการหักล้างยอดประวัติศาสตร์เป็นธุรกรรมโอนเงิน (Transfer) เข้าบัตรเครดิตโดยตรง (`sourceAccountId: null`)
+    - รักษารายการธุรกรรมย้อนหลัง 595 รายการ (ตั้งแต่ปี 2023) และสถิติรายจ่าย/หมวดหมู่เดิมไว้ครบถ้วน 100%
+    - เพิ่มแบนเนอร์แจ้งเตือนและปุ่มคลิกเดียว *"ตัดยอดประวัติศาสตร์ (ก่อน 24 ส.ค. 69)"* ในหน้าสรุปบัตรเครดิต (`CreditCardSummaryScreen`) สำหรับฐานข้อมูลที่มีอยู่แล้ว
+    - เพิ่มระบบตัดยอดอัตโนมัติทันทีหลังนำเข้า Notion (`ImportExecutor`) พร้อม map บัญชี `'credit card'`, `'credit_card'`, `'บัตรเครดิต'` เข้าสู่บัญชีบัตรเครดิตที่ถูกต้อง
+    - ผลลัพธ์: บัตรเครดิตแสดงเฉพาะ 2 รอบบิลล่าสุดตามที่ต้องการ คือรอบก่อนหน้า (24/8/69 - 23/9/69) และรอบปัจจุบัน (24/9/69 เป็นต้นไป)
+  - **2. แก้ไขการตรวจสอบไฟล์สำรองข้อมูล (Backup Restore Inspection Web Fix)**:
+    - แก้ไขปัญหาข้อผิดพลาด `ไฟล์ไม่ถูกต้อง: ไฟล์ที่เลือกไม่ใช่ฐานข้อมูล SQLite ของ MyFinance` บนเว็บ
+    - ปรับปรุง `backup_inspector_stub.dart` ให้ตรวจจับ Header การเข้ารหัส AES-256 (`MYFINANCE_ENC_V1`) และถอดรหัสตรวจสอบข้อมูลก่อนยืนยันความถูกต้องของไฟล์ ทำให้การกู้คืนไฟล์สำรองข้อมูลบนเว็บเบราว์เซอร์ทำงานได้อย่างราบรื่น
+  - **3. การตรวจสอบ & ทดสอบ**:
+    - เพิ่ม Unit Tests ใน `test/features/credit_card_engine_test.dart` และ `test/core/backup_inspect_stub_test.dart`
+    - `flutter analyze`: **0 errors, 0 warnings**
+    - `flutter test`: ผ่านทั้งหมด **163/163 tests passed** (100%)
+    - บิลด์เวอร์ชันเว็บสำเร็จสมบูรณ์ (`flutter build web --release`)
+
 - [x] **Auto Investment Category for Buy Trades, Action Button Cleanup & Release Build**:
   - **1. หมวดหมู่ "การลงทุน" สำหรับการซื้อสินทรัพย์ (Auto Investment Expense Category)**:
     - เพิ่มฟังก์ชัน `getOrCreateInvestmentExpenseCategory()` ใน `CategoriesDao` เพื่อสร้าง/เรียกใช้หมวดหมู่รายจ่าย "การลงทุน" (Investment)

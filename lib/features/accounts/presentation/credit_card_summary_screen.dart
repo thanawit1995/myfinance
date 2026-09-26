@@ -308,7 +308,78 @@ class _CreditCardSummaryScreenState extends ConsumerState<CreditCardSummaryScree
                   ],
                 ),
               ),
+
+              // 3.1 Historical Debt Banner (if any charges exist before 24 Aug 2026)
+              FutureBuilder<int>(
+                future: ccDao.getHistoricalDebtSatang(widget.account.id),
+                builder: (context, histSnapshot) {
+                  final histDebt = histSnapshot.data ?? 0;
+                  if (histDebt <= 0) return const SizedBox.shrink();
+                  final histMoney = Money(histDebt);
+
+                  return Container(
+                    margin: const EdgeInsets.only(top: 12),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade900.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.amber.shade700.withValues(alpha: 0.4), width: 1),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.history_rounded, size: 20, color: Colors.amber.shade600),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                isThai ? 'มียอดค้างชำระในอดีต (ก่อน 24 ส.ค. 69)' : 'Historical balance before 24 Aug 2026',
+                                style: TextStyle(
+                                  fontFamily: VaultTheme.fontFamily,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.amber.shade400,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          isThai
+                              ? 'ตรวจพบยอดใช้จ่ายในอดีต ${histMoney.format(symbol: "฿")} จากการนำเข้าข้อมูล หากคุณชำระรอบเก่าไปหมดแล้ว สามารถกดตัดยอดเพื่อให้ยอดหนี้เหลือเฉพาะ 2 รอบล่าสุดได้ทันที'
+                              : 'Found ${histMoney.format(symbol: "฿")} from historical imports. If already paid, you can clear it to keep only the 2 recent cycles.',
+                          style: TextStyle(
+                            fontFamily: VaultTheme.fontFamily,
+                            fontSize: 12,
+                            color: secondaryText,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: FilledButton.tonalIcon(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Colors.amber.shade800.withValues(alpha: 0.3),
+                              foregroundColor: Colors.amber.shade200,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            ),
+                            icon: const Icon(Icons.check_circle_outline, size: 16),
+                            label: Text(
+                              isThai ? 'ตัดยอดประวัติศาสตร์ (ก่อน 24 ส.ค. 69)' : 'Clear Historical Debt',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                            ),
+                            onPressed: () => _handleSettleHistoricalDebt(ccDao, histDebt, isThai),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
               const SizedBox(height: 20),
+
 
               // 4. Billing Cycle Selector Chips
               Row(
@@ -514,7 +585,51 @@ class _CreditCardSummaryScreenState extends ConsumerState<CreditCardSummaryScree
     );
   }
 
+
+  Future<void> _handleSettleHistoricalDebt(CreditCardDao ccDao, int debtSatang, bool isThai) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(isThai ? 'ยืนยันตัดยอดประวัติศาสตร์' : 'Confirm Historical Settle'),
+        content: Text(
+          isThai
+              ? 'ระบบจะบันทึกว่ายอดใช้จ่ายบัตรเครดิตก่อนวันที่ 24 ส.ค. 2569 จำนวน ${Money(debtSatang).format(symbol: "฿")} ได้รับการชำระครบแล้ว โดยประวัติรายจ่ายทั้งหมดยังคงอยู่ครบถ้วน\n\nต้องการดำเนินการต่อหรือไม่?'
+              : 'The app will mark all credit card charges before 24 Aug 2026 (${Money(debtSatang).format(symbol: "฿")}) as fully settled. All past expense records will be preserved.\n\nProceed?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(isThai ? 'ตัดยอดทันที' : 'Settle Now'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final settled = await ccDao.settleHistoricalDebt(widget.account.id);
+      ref.read(transactionsVersionProvider.notifier).state++;
+      if (!mounted) return;
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isThai
+                ? 'ตัดยอดประวัติศาสตร์ ${Money(settled).format(symbol: "฿")} สำเร็จ ยอดหนี้คงเหลือเฉพาะ 2 รอบล่าสุดแล้ว'
+                : 'Historical debt ${Money(settled).format(symbol: "฿")} settled successfully.',
+          ),
+          backgroundColor: VaultTheme.positive(context),
+        ),
+      );
+    }
+  }
+
+
   Future<void> _showPaymentSheet(CreditCardSummary summary, bool isThai) async {
+
     final accDao = ref.read(accountsDaoProvider);
     final allAccounts = await accDao.getActiveAccounts();
     // Only bank/deposit/cash accounts that are not credit cards

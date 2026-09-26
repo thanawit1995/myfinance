@@ -83,7 +83,13 @@ class ImportExecutor {
     final accountMap = <String, String>{}; // name.toLowerCase() -> id
     for (final a in existingAccounts) {
       accountMap[a.name.trim().toLowerCase()] = a.id;
+      if (a.accountType == 'credit_card') {
+        accountMap['credit card'] = a.id;
+        accountMap['credit_card'] = a.id;
+        accountMap['บัตรเครดิต'] = a.id;
+      }
     }
+
 
     final categoryMap = <String, String>{}; // name.toLowerCase() -> id
     for (final c in existingCategories) {
@@ -135,13 +141,16 @@ class ImportExecutor {
             targetAccountId = accountMap[accKey]!;
           } else if (autoCreateMissingAccounts) {
             final newAccId = _uuid.v4();
+            final isCc = accKey.contains('credit') || accKey.contains('เครดิต');
             await accountsDao.createAccount(
               AccountsCompanion.insert(
                 id: newAccId,
                 name: row.accountName!.trim(),
-                accountType: 'cash',
+                accountType: isCc ? 'credit_card' : 'cash',
                 currencyCode: 'THB',
                 isDomestic: true,
+                closingDay: isCc ? const Value(23) : const Value(null),
+                dueDay: isCc ? const Value(10) : const Value(null),
                 createdAt: now,
                 updatedAt: now,
               ),
@@ -150,6 +159,7 @@ class ImportExecutor {
             createdAccounts.add(row.accountName!.trim());
             targetAccountId = newAccId;
           }
+
         }
 
         // Category Resolution
@@ -240,7 +250,18 @@ class ImportExecutor {
       );
     });
 
+    // 5. Auto-settle historical credit card debt before 24 Aug 2026 for Notion expense imports
+    if (templateType == 'notion_expense' || templateType == 'notion_bills') {
+      final activeAccs = await accountsDao.getActiveAccounts();
+      for (final acc in activeAccs) {
+        if (acc.accountType == 'credit_card') {
+          await db.creditCardDao.settleHistoricalDebt(acc.id);
+        }
+      }
+    }
+
     return CsvImportBatchResult(
+
       batchId: batchId,
       fileName: fileName,
       templateType: templateType,

@@ -70,12 +70,25 @@ void main() {
           'ปันผล',
           '',
           ''
+        ],
+        [
+          '@28/06/2024 ',
+          'June 28, 2024',
+          '\$20.00',
+          '32.50',
+          '\$20.00',
+          '1.0000000',
+          'QQQM',
+          '650.00',
+          'THB + ปันผล',
+          '',
+          ''
         ]
       ];
 
       final results = NotionInvestParser.parseRows(rawRows);
 
-      expect(results.length, 4);
+      expect(results.length, 5);
 
       // Row 1: O
       expect(results[0].ticker, 'O');
@@ -99,6 +112,10 @@ void main() {
       // Row 4: Dividend
       expect(results[3].ticker, 'O');
       expect(results[3].paymentType, PaymentType.dividend);
+
+      // Row 5: THB + ปันผล
+      expect(results[4].ticker, 'QQQM');
+      expect(results[4].paymentType, PaymentType.thb);
     });
 
     test('ignores header repetitions and blank rows', () {

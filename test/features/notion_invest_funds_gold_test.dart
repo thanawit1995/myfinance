@@ -232,7 +232,7 @@ void main() {
   });
 
   group('NotionInvestImportExecutor Account Routing Tests', () {
-    test('routes THB to Dime! Save, FCD to Dime! FCD, and USD to Dime! USD', () async {
+    test('routes THB to Dime! Save, FCD to Dime! FCD, USD to Dime! USD, and Dividend to Dime! USD', () async {
       final rows = [
         ParsedInvestRow(
           rowIndex: 1,
@@ -264,14 +264,24 @@ void main() {
           amountThbSatang: 1346000,
           paymentType: PaymentType.usd,
         ),
+        ParsedInvestRow(
+          rowIndex: 4,
+          ticker: 'JEPQ',
+          buyDate: DateTime(2024, 6, 27),
+          quantity: Decimal.parse('0.5'),
+          amountUsdSatang: 2500,
+          fxRate: Decimal.parse('33.650000'),
+          amountThbSatang: 84125,
+          paymentType: PaymentType.dividend,
+        ),
       ];
 
       final executor = NotionInvestImportExecutor(db);
       final result = await executor.executeImport(rows);
-      expect(result.imported, 3);
+      expect(result.imported, 4);
 
       final lots = await (db.select(db.investmentLots)..where((l) => l.deletedAt.isNull())).get();
-      expect(lots.length, 3);
+      expect(lots.length, 4);
 
       final txs = await (db.select(db.transactions)..where((t) => t.deletedAt.isNull())).get();
       final accounts = await db.accountsDao.getActiveAccounts();
@@ -283,10 +293,13 @@ void main() {
       final oTx = txs.firstWhere((t) => t.tag?.contains('O') == true || t.note?.contains('O') == true);
       final nvdaTx = txs.firstWhere((t) => t.tag?.contains('NVDA') == true || t.note?.contains('NVDA') == true);
       final msftTx = txs.firstWhere((t) => t.tag?.contains('MSFT') == true || t.note?.contains('MSFT') == true);
+      final jepqTx = txs.firstWhere((t) => t.tag?.contains('JEPQ') == true || t.note?.contains('JEPQ') == true);
 
       expect(oTx.sourceAccountId, dimeSave.id);
       expect(nvdaTx.sourceAccountId, dimeFcd.id);
       expect(msftTx.sourceAccountId, dimeUsd.id);
+      expect(jepqTx.sourceAccountId, dimeUsd.id);
+      expect(jepqTx.note, contains('ปันผล'));
     });
   });
 }

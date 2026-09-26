@@ -240,9 +240,6 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
             if (result.skippedDuplicates > 0)
               Text('• ข้าม lot ซ้ำ: ${result.skippedDuplicates}',
                   style: const TextStyle(color: Colors.orange)),
-            if (result.skippedDividends > 0)
-              Text('• ข้ามปันผล (ยังไม่รองรับ): ${result.skippedDividends}',
-                  style: const TextStyle(color: Colors.grey)),
             if (result.errors.isNotEmpty) ...[
               const SizedBox(height: 8),
               const Text('⚠️ มีข้อผิดพลาด:', style: TextStyle(color: Colors.red)),

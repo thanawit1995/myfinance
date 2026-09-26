@@ -121,12 +121,6 @@ class NotionInvestImportExecutor {
         continue;
       }
 
-      // Skip dividends — not imported as buy trades
-      if (row.paymentType == PaymentType.dividend) {
-        skippedDividends++;
-        continue;
-      }
-
       try {
         // 1. Find or create Asset
         final asset = await _findOrCreateAsset(row.ticker, assetCache);
@@ -160,6 +154,7 @@ class NotionInvestImportExecutor {
         final fxRate = row.fxRate;
 
         // 6. Record buy trade via DAO (atomic: Transaction + Lot + Audit)
+        final paymentLabel = row.paymentType == PaymentType.dividend ? 'ปันผล' : row.paymentType.name.toUpperCase();
         await _dao.recordBuyTrade(
           assetId: asset.id,
           accountId: accountId,
@@ -170,7 +165,7 @@ class NotionInvestImportExecutor {
           currencyCode: currencyCode,
           fxRate: fxRate,
           feeThbSatang: 0,
-          note: 'Imported from Notion — ${row.ticker} (${row.paymentType.name})',
+          note: 'Imported from Notion — ${row.ticker} ($paymentLabel)',
         );
 
         // 7. Add to in-memory duplicate set so subsequent rows with same key are skipped

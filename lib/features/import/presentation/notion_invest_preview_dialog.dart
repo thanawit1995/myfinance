@@ -59,11 +59,8 @@ class _NotionInvestPreviewDialogState
   @override
   void initState() {
     super.initState();
-    // Select all non-dividend rows by default
-    _selectedIndices = widget.rows
-        .where((r) => r.paymentType != PaymentType.dividend)
-        .map((r) => r.rowIndex)
-        .toSet();
+    // Select all rows by default
+    _selectedIndices = widget.rows.map((r) => r.rowIndex).toSet();
   }
 
   Future<void> _executeImport() async {
@@ -103,10 +100,6 @@ class _NotionInvestPreviewDialogState
     final dateFormat = DateFormat('dd/MM/yyyy');
     final numberFormat = NumberFormat('#,##0.00');
 
-    final dividendCount = widget.rows
-        .where((r) => r.paymentType == PaymentType.dividend)
-        .length;
-
     return AlertDialog(
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -123,14 +116,6 @@ class _NotionInvestPreviewDialogState
             'ไฟล์: ${widget.fileName} (ทั้งหมด ${widget.rows.length} รายการ, เลือก ${_selectedIndices.length})',
             style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
           ),
-          if (dividendCount > 0)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                'ℹ️ มีรายการปันผล $dividendCount รายการ (ข้ามอัตโนมัติ)',
-                style: const TextStyle(fontSize: 12, color: Colors.orange),
-              ),
-            ),
         ],
       ),
       content: SizedBox(
@@ -163,37 +148,32 @@ class _NotionInvestPreviewDialogState
                         DataColumn(label: Text('ประเภทชำระ')),
                       ],
                       rows: widget.rows.map((row) {
-                        final isDividend = row.paymentType == PaymentType.dividend;
                         final isSelected = _selectedIndices.contains(row.rowIndex);
 
                         return DataRow(
                           selected: isSelected,
-                          onSelectChanged: isDividend
-                              ? null
-                              : (selected) {
+                          onSelectChanged: (selected) {
+                            setState(() {
+                              if (selected ?? false) {
+                                _selectedIndices.add(row.rowIndex);
+                              } else {
+                                _selectedIndices.remove(row.rowIndex);
+                              }
+                            });
+                          },
+                          cells: [
+                            DataCell(
+                              Checkbox(
+                                value: isSelected,
+                                onChanged: (val) {
                                   setState(() {
-                                    if (selected ?? false) {
+                                    if (val ?? false) {
                                       _selectedIndices.add(row.rowIndex);
                                     } else {
                                       _selectedIndices.remove(row.rowIndex);
                                     }
                                   });
                                 },
-                          cells: [
-                            DataCell(
-                              Checkbox(
-                                value: isSelected,
-                                onChanged: isDividend
-                                    ? null
-                                    : (val) {
-                                        setState(() {
-                                          if (val ?? false) {
-                                            _selectedIndices.add(row.rowIndex);
-                                          } else {
-                                            _selectedIndices.remove(row.rowIndex);
-                                          }
-                                        });
-                                      },
                               ),
                             ),
                             DataCell(Text(dateFormat.format(row.buyDate))),
@@ -226,12 +206,12 @@ class _NotionInvestPreviewDialogState
                             ),
                             DataCell(
                               Text(
-                                isDividend
-                                    ? 'ปันผล (ข้าม)'
-                                    : row.paymentType.name.toUpperCase(),
-                                style: TextStyle(
-                                  color: isDividend ? Colors.grey : null,
-                                ),
+                                switch (row.paymentType) {
+                                  PaymentType.dividend => 'ปันผล (Dime! USD)',
+                                  PaymentType.thb => 'THB (Dime! Save)',
+                                  PaymentType.fcd => 'FCD (Dime! FCD)',
+                                  PaymentType.usd => 'USD (Dime! USD)',
+                                },
                               ),
                             ),
                           ],

@@ -206,10 +206,10 @@ class NotionInvestParser {
   /// Maps the Notion `Text` field to a [PaymentType].
   static PaymentType _parsePaymentType(String rawText) {
     final t = rawText.toLowerCase().trim();
-    if (t.contains('ปันผล')) return PaymentType.dividend;
     if (t == 'fcd') return PaymentType.fcd;
     if (t == 'usd') return PaymentType.usd;
-    // "THB" or "THB + ปันผล" without "ปันผล only" → THB buy
+    if (t.contains('thb')) return PaymentType.thb;
+    if (t.contains('ปันผล')) return PaymentType.dividend;
     return PaymentType.thb;
   }
 }

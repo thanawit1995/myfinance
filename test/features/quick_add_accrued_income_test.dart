@@ -220,5 +220,63 @@ void main() {
       expect(tx.isCleared, isTrue); // Regular income is cleared immediately
       expect(tx.taxCategory, '40_1');
     });
+
+    test('FinancialReportsService & FinancialHealthDao exclude uncleared accrued income from real income', () async {
+      final now = DateTime(2026, 9, 15);
+
+      // 1. Cleared real income: 50,000 THB
+      await db.transactionsDao.insertTransaction(
+        TransactionsCompanion.insert(
+          id: uuid.v4(),
+          transactionType: 'income',
+          sourceAccountId: const Value('acc_main'),
+          amountOriginalSatang: 5000000,
+          currencyCode: 'THB',
+          amountThbSatang: 5000000,
+          isCleared: const Value(true),
+          transactionDate: now,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      // 2. Uncleared accrued income: 20,000 THB
+      await db.transactionsDao.insertTransaction(
+        TransactionsCompanion.insert(
+          id: uuid.v4(),
+          transactionType: 'income',
+          sourceAccountId: const Value('acc_main'),
+          amountOriginalSatang: 2000000,
+          currencyCode: 'THB',
+          amountThbSatang: 2000000,
+          isCleared: const Value(false),
+          workPeriod: const Value('2026-08'),
+          transactionDate: now,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      // 3. Regular expense: 15,000 THB
+      await db.transactionsDao.insertTransaction(
+        TransactionsCompanion.insert(
+          id: uuid.v4(),
+          transactionType: 'expense',
+          sourceAccountId: const Value('acc_main'),
+          amountOriginalSatang: 1500000,
+          currencyCode: 'THB',
+          amountThbSatang: 1500000,
+          isCleared: const Value(true),
+          transactionDate: now,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      // Test FinancialHealthDao
+      final cashFlow = await db.financialHealthDao.getCurrentMonthCashFlow();
+      expect(cashFlow.incomeSatang, equals(5000000)); // only 50k, NOT 70k!
+      expect(cashFlow.expenseSatang, equals(1500000));
+    });
   });
 }

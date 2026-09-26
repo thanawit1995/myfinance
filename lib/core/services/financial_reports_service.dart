@@ -380,6 +380,7 @@ class FinancialReportsService {
 
     for (final tx in txList) {
       if (tx.transactionType == 'income') {
+        if (!tx.isCleared) continue;
         income += tx.amountThbSatang;
       } else if (tx.transactionType == 'expense') {
         final total = tx.amountThbSatang + tx.feeThbSatang;
@@ -407,6 +408,7 @@ class FinancialReportsService {
     int prevExpense = 0;
     for (final tx in prevTxList) {
       if (tx.transactionType == 'income') {
+        if (!tx.isCleared) continue;
         prevIncome += tx.amountThbSatang;
       } else if (tx.transactionType == 'expense') {
         prevExpense += (tx.amountThbSatang + tx.feeThbSatang);
@@ -475,6 +477,7 @@ class FinancialReportsService {
       int mExpense = 0;
       for (final tx in txList) {
         if (tx.transactionType == 'income') {
+          if (!tx.isCleared) continue;
           mIncome += tx.amountThbSatang;
         } else if (tx.transactionType == 'expense') {
           mExpense += (tx.amountThbSatang + tx.feeThbSatang);
@@ -504,6 +507,7 @@ class FinancialReportsService {
     int prevTotalExpense = 0;
     for (final tx in prevTxList) {
       if (tx.transactionType == 'income') {
+        if (!tx.isCleared) continue;
         prevTotalIncome += tx.amountThbSatang;
       } else if (tx.transactionType == 'expense') {
         prevTotalExpense += (tx.amountThbSatang + tx.feeThbSatang);
@@ -543,6 +547,7 @@ class FinancialReportsService {
     for (final tx in txList) {
       final note = tx.note?.isNotEmpty == true ? tx.note! : 'รายการทางการเงิน';
       if (tx.transactionType == 'income') {
+        if (!tx.isCleared) continue;
         if (tx.taxCategory == '40_4_dividend_th' ||
             tx.taxCategory == '40_4_dividend_foreign' ||
             tx.taxCategory == '40_4_interest') {

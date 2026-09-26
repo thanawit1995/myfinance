@@ -43,9 +43,8 @@ dependencies:
   path_provider: ^2.1.5
   path: ^1.9.1
 
-  # State Management & Routing
+  # State Management
   flutter_riverpod: ^2.6.1
-  go_router: ^14.8.1
 
   # Data & Math
   decimal: ^3.0.2
@@ -57,6 +56,7 @@ dependencies:
   flutter_secure_storage: ^9.2.4
   local_auth: ^2.3.0
   shared_preferences: ^2.5.2
+  encrypt: ^5.0.3
 
   # Charts & Exports
   fl_chart: ^0.70.2
@@ -64,18 +64,13 @@ dependencies:
   pdf: ^3.11.1
   printing: ^5.13.3
   share_plus: ^10.1.4
-  archive: ^3.6.1
 
   # Widget
   home_widget: ^0.7.0
 
-  # Cloud Sync & File Import (Google Drive Sync & CSV Import)
+  # File Import & Local Backup
   csv: ^6.0.0
   file_picker: ^8.1.4
-  connectivity_plus: ^6.1.1
-  google_sign_in: ^6.2.1
-  googleapis: ^13.1.0
-  http: ^1.2.2
   drift_flutter: ^0.2.8
 
 dev_dependencies:

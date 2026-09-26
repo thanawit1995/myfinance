@@ -82,11 +82,16 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
     final currentTxs = await txsDao.searchTransactions(startDate: start, endDate: end);
 
     int incomeSatang = 0;
+    int accruedIncomeSatang = 0;
     int expenseSatang = 0;
 
     for (final t in currentTxs) {
       if (t.transactionType == 'income') {
-        incomeSatang += t.amountThbSatang;
+        if (t.isCleared) {
+          incomeSatang += t.amountThbSatang;
+        } else {
+          accruedIncomeSatang += t.amountThbSatang;
+        }
       } else if (t.transactionType == 'expense') {
         expenseSatang += (t.amountThbSatang + t.feeThbSatang);
       }
@@ -104,7 +109,9 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
     int prevExpense = 0;
     for (final t in prevTxs) {
       if (t.transactionType == 'income') {
-        prevIncome += t.amountThbSatang;
+        if (t.isCleared) {
+          prevIncome += t.amountThbSatang;
+        }
       } else if (t.transactionType == 'expense') {
         prevExpense += (t.amountThbSatang + t.feeThbSatang);
       }
@@ -135,6 +142,7 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
 
     return _MonthlyReportData(
       incomeSatang: incomeSatang,
+      accruedIncomeSatang: accruedIncomeSatang,
       expenseSatang: expenseSatang,
       savingsSatang: savingsSatang,
       savingsMoMPercent: savingsMoMPercent,
@@ -176,6 +184,7 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
           final data = snapshot.data ??
               _MonthlyReportData(
                 incomeSatang: 0,
+                accruedIncomeSatang: 0,
                 expenseSatang: 0,
                 savingsSatang: 0,
                 savingsMoMPercent: null,
@@ -362,6 +371,31 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
                     ),
                   ],
                 ),
+                if (data.accruedIncomeSatang > 0) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: isLumi ? const Color(0xFFFFF3E0) : Colors.orange.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: isLumi ? const Color(0xFFFFCC80) : Colors.orange.withValues(alpha: 0.3),
+                        width: 0.5,
+                      ),
+                    ),
+                    child: Text(
+                      'ตกเบิกค้างรับ: ${Money(data.accruedIncomeSatang).format(symbol: "฿")}',
+                      style: TextStyle(
+                        fontFamily: VaultTheme.fontFamily,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: isLumi ? const Color(0xFFE65100) : Colors.orange.shade300,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -659,6 +693,7 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
 
 class _MonthlyReportData {
   final int incomeSatang;
+  final int accruedIncomeSatang;
   final int expenseSatang;
   final int savingsSatang;
   final int? savingsMoMPercent;
@@ -667,6 +702,7 @@ class _MonthlyReportData {
 
   const _MonthlyReportData({
     required this.incomeSatang,
+    required this.accruedIncomeSatang,
     required this.expenseSatang,
     required this.savingsSatang,
     required this.savingsMoMPercent,

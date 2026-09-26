@@ -75,6 +75,47 @@ void main() {
       expect(row2.amountSatang, 1000000);
       expect(row2.taxCategory, '40_1');
       expect(row2.isValid, isTrue);
+      // Aligned from Jan 5, 2026 to Dec 5, 2025 because Monthly Overview is December 25
+      expect(row2.date!.year, 2025);
+      expect(row2.date!.month, 12);
+      expect(row2.date!.day, 5);
+      expect(row2.note, contains('รับเงินจริง: 05/01/2026'));
+    });
+
+    test('P4P received in September with August Monthly Overview aligns date to August and notes pay date', () {
+      const csvContent = '''Date,Income,Category,Budget,Amount,Property,Monthly Overview,Type
+"September 25, 2026",P4P,Salary,"THB9,840.93","THB9,348.88",Yes,August 26 (https://notion.so/aug26),Salary_AUG26
+"September 25, 2026",เงินเดือน,Salary,"THB24,220.00","THB24,220.00",Yes,September 26 (https://notion.so/sep26),Salary_SEP26
+''';
+
+      final rawRows = CsvImportParser.parseRawCsv(csvContent);
+      final headers = rawRows.first.map((e) => e.toString()).toList();
+      final mapping = CsvImportParser.detectMapping(headers);
+
+      final parsed = CsvImportParser.parseRows(
+        rawRows: rawRows,
+        mapping: mapping!,
+        templateType: 'notion_income',
+      );
+
+      expect(parsed.length, 2);
+
+      // P4P: date aligns to August 2026!
+      final p4pRow = parsed[0];
+      expect(p4pRow.name, 'P4P');
+      expect(p4pRow.workPeriod, '2026-08');
+      expect(p4pRow.date!.year, 2026);
+      expect(p4pRow.date!.month, 8);
+      expect(p4pRow.date!.day, 25);
+      expect(p4pRow.note, contains('รับเงินจริง: 25/09/2026'));
+
+      // Salary: date stays September 2026
+      final salaryRow = parsed[1];
+      expect(salaryRow.name, 'เงินเดือน');
+      expect(salaryRow.workPeriod, '2026-09');
+      expect(salaryRow.date!.year, 2026);
+      expect(salaryRow.date!.month, 9);
+      expect(salaryRow.date!.day, 25);
     });
 
     test('Real Notion Income CSV file parses successfully if present', () async {
@@ -304,6 +345,34 @@ void main() {
       final tx = await db.transactionsDao.getTransactionById(legacyId);
       expect(tx, isNotNull);
       expect(tx!.note, 'เงินเดือน');
+    });
+
+    test('alignIncomeDatesWithWorkPeriod updates legacy transactions to match workPeriod', () async {
+      final txId = 'test_p4p_legacy';
+      await db.into(db.transactions).insert(
+        TransactionsCompanion.insert(
+          id: txId,
+          transactionType: 'income',
+          sourceAccountId: const Value('acc-ktb-1'),
+          amountOriginalSatang: 934888,
+          currencyCode: 'THB',
+          amountThbSatang: 934888,
+          transactionDate: DateTime(2026, 9, 25),
+          workPeriod: const Value('2026-08'),
+          isCleared: const Value(true),
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      );
+
+      final updated = await db.transactionsDao.alignIncomeDatesWithWorkPeriod();
+      expect(updated, greaterThanOrEqualTo(1));
+
+      final updatedTx = await (db.select(db.transactions)..where((t) => t.id.equals(txId))).getSingle();
+      expect(updatedTx.transactionDate.year, 2026);
+      expect(updatedTx.transactionDate.month, 8);
+      expect(updatedTx.transactionDate.day, 25);
+      expect(updatedTx.note, contains('รับเงินจริง: 25/09/2026'));
     });
   });
 }

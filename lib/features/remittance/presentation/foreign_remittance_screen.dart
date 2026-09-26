@@ -43,39 +43,9 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          isThai ? 'ติดตามเงินได้ต่างประเทศ (Remittance)' : 'Foreign Remittance Tracking',
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, height: 1.2),
-          maxLines: 2,
-          softWrap: true,
+          isThai ? 'ติดตามเงินได้ต่างประเทศ' : 'Foreign Remittance',
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
         ),
-        actions: [
-          DropdownButton<int>(
-            value: _selectedRemittedYear,
-            underline: const SizedBox.shrink(),
-            dropdownColor: VaultTheme.surface(context),
-            style: TextStyle(
-              color: VaultTheme.primaryText(context),
-              fontFamily: VaultTheme.fontFamily,
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
-            ),
-            items: _availableRemittedYears().map((y) {
-              final beYear = y + 543;
-              return DropdownMenuItem(
-                value: y,
-                child: Text(isThai ? 'ปีที่นำเข้า $y (พ.ศ. $beYear)' : 'Remitted Year $y'),
-              );
-            }).toList(),
-            onChanged: (y) {
-              if (y != null) setState(() => _selectedRemittedYear = y);
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.calendar_month),
-            tooltip: isThai ? 'ระบุจำนวนวันที่อยู่ในไทย (เกณฑ์ 180 วัน)' : 'Days in Thailand (180-day rule)',
-            onPressed: () => _showDaysInThailandDialog(),
-          ),
-        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         icon: const Icon(Icons.add),
@@ -101,6 +71,62 @@ class _ForeignRemittanceScreenState extends ConsumerState<ForeignRemittanceScree
                   return ListView(
                     padding: const EdgeInsets.all(16),
                     children: [
+                      // Year & Days In Thailand Selector Row
+                      Container(
+                        decoration: BoxDecoration(
+                          color: VaultTheme.surface(context),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: VaultTheme.border(context), width: 0.75),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.event_note_rounded, size: 20, color: VaultTheme.accent(context)),
+                                const SizedBox(width: 8),
+                                DropdownButtonHideUnderline(
+                                  child: DropdownButton<int>(
+                                    value: _selectedRemittedYear,
+                                    dropdownColor: VaultTheme.surface(context),
+                                    style: TextStyle(
+                                      color: VaultTheme.primaryText(context),
+                                      fontFamily: VaultTheme.fontFamily,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13.5,
+                                    ),
+                                    items: _availableRemittedYears().map((y) {
+                                      final beYear = y + 543;
+                                      return DropdownMenuItem(
+                                        value: y,
+                                        child: Text(isThai ? 'ปีที่นำเข้า $y (พ.ศ. $beYear)' : 'Remitted Year $y'),
+                                      );
+                                    }).toList(),
+                                    onChanged: (y) {
+                                      if (y != null) setState(() => _selectedRemittedYear = y);
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                            OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                side: BorderSide(color: VaultTheme.border(context)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              icon: const Icon(Icons.calendar_month, size: 16),
+                              label: Text(
+                                isThai ? 'จำนวนวัน' : 'Days',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              onPressed: () => _showDaysInThailandDialog(),
+                            ),
+                          ],
+                        ),
+                      ),
                       // Residency Info Banner
                       Container(
                         decoration: BoxDecoration(

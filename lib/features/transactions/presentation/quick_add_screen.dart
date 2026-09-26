@@ -12,7 +12,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/vault_theme.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../core/widgets/category_icon_helper.dart';
-import '../../categories/presentation/category_form_dialog.dart';
+import '../../categories/presentation/category_picker_sheet.dart';
 import '../../recurring/domain/recurring_engine.dart';
 import '../../import/domain/csv_import_parser.dart';
 
@@ -849,88 +849,55 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
   }
 
   Widget _buildCategoryDropdown(ThemeData theme, bool isThai) {
-    final validSelectedId = _currentCategories.any((c) => c.id == _selectedCategoryId)
-        ? _selectedCategoryId
-        : (_currentCategories.isNotEmpty ? _currentCategories.first.id : null);
+    final selectedCat = _currentCategories.where((c) => c.id == _selectedCategoryId).firstOrNull ??
+        (_currentCategories.isNotEmpty ? _currentCategories.first : null);
 
-    return DropdownButtonFormField<String>(
-      key: ValueKey('cat_dropdown_${_transactionType}_$validSelectedId'),
-      decoration: InputDecoration(
-        labelText: isThai ? 'หมวดหมู่ (Category)' : 'Category',
-        prefixIcon: const Icon(Icons.category_outlined, size: 20),
-        prefixIconConstraints: const BoxConstraints(minWidth: 36),
-        border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      ),
-      initialValue: validSelectedId,
-      isExpanded: true,
-      menuMaxHeight: 280,
-      items: [
-        ..._currentCategories.map((cat) {
-          final displayName = isThai
-              ? cat.nameTh
-              : (cat.nameEn.trim().isNotEmpty ? cat.nameEn : cat.nameTh);
-          return DropdownMenuItem<String>(
-            value: cat.id,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(CategoryIconHelper.getIcon(cat.icon), size: 18),
-                const SizedBox(width: 8),
-                Flexible(child: Text(displayName, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13))),
-              ],
-            ),
-          );
-        }),
-        DropdownMenuItem<String>(
-          value: '__ADD_NEW__',
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.add_circle_outline, size: 18, color: theme.colorScheme.primary),
-              const SizedBox(width: 8),
-              Text(
-                isThai ? '+ เพิ่มหมวดหมู่ใหม่...' : '+ Add New Category...',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-      onChanged: (val) async {
-        if (val == '__ADD_NEW__') {
-          final newCat = await CategoryFormDialog.show(
-            context,
-            initialType: _transactionType,
-          );
-          if (newCat != null && mounted) {
-            final updatedCats = await ref.read(categoriesDaoProvider).getActiveCategoriesOrderedByUsage(_transactionType);
-            setState(() {
-              _currentCategories = updatedCats;
-              _selectedCategoryId = newCat.id;
-              _userManuallyChangedTax = false;
-              if (_transactionType == 'income') {
-                _inferTaxCategory(_noteController.text, newCat.id);
-              }
-            });
-          } else {
-            setState(() {});
-          }
-        } else if (val != null) {
+    final displayName = selectedCat != null
+        ? (isThai ? selectedCat.nameTh : (selectedCat.nameEn.trim().isNotEmpty ? selectedCat.nameEn : selectedCat.nameTh))
+        : (isThai ? 'เลือกหมวดหมู่' : 'Select Category');
+
+    return InkWell(
+      onTap: () async {
+        final chosen = await CategoryPickerSheet.show(
+          context,
+          categoryType: _transactionType,
+          selectedCategoryId: _selectedCategoryId,
+        );
+        if (chosen != null && mounted) {
+          final updatedCats = await ref.read(categoriesDaoProvider).getActiveCategoriesOrderedByUsage(_transactionType);
           setState(() {
-            _selectedCategoryId = val;
+            _currentCategories = updatedCats;
+            _selectedCategoryId = chosen.id;
             _userManuallyChangedTax = false;
             if (_transactionType == 'income') {
-              _inferTaxCategory(_noteController.text, val);
+              _inferTaxCategory(_noteController.text, chosen.id);
             }
           });
         }
       },
+      borderRadius: const BorderRadius.all(Radius.circular(10)),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: isThai ? 'หมวดหมู่ (Category)' : 'Category',
+          prefixIcon: selectedCat != null
+              ? Icon(CategoryIconHelper.getIcon(selectedCat.icon), size: 20)
+              : const Icon(Icons.category_outlined, size: 20),
+          prefixIconConstraints: const BoxConstraints(minWidth: 36),
+          suffixIcon: const Icon(Icons.chevron_right_rounded, size: 20),
+          border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        ),
+        child: Text(
+          displayName,
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: selectedCat != null ? FontWeight.w600 : FontWeight.normal,
+            color: selectedCat != null ? VaultTheme.primaryText(context) : VaultTheme.secondaryText(context),
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
     );
   }
 

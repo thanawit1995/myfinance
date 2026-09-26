@@ -36,6 +36,130 @@
     window.addEventListener('load', lockPortrait);
     window.addEventListener('resize', lockPortrait);
     document.addEventListener('fullscreenchange', lockPortrait);
+
+    // WebAuthn / Passkeys Biometric Helper for MyFinance Webapp
+    function bufferToBase64Url(buffer) {
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+
+    function base64UrlToUint8Array(base64Url) {
+      const padding = '='.repeat((4 - (base64Url.length % 4)) % 4);
+      const base64 = (base64Url + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const rawData = window.atob(base64);
+      const outputArray = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+      }
+      return outputArray;
+    }
+
+    var MyFinanceWebAuthn = {
+      isSupported: async function() {
+        try {
+          if (!window.isSecureContext) {
+            console.warn("WebAuthn requires HTTPS or localhost (Secure Context).");
+            return false;
+          }
+          if (!window.PublicKeyCredential) return false;
+          if (typeof PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable !== 'function') return false;
+          return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+        } catch (e) {
+          console.warn("WebAuthn isSupported check error:", e);
+          return false;
+        }
+      },
+      hasRegisteredCredential: function() {
+        return !!localStorage.getItem('myfinance_webauthn_id');
+      },
+      register: async function() {
+        try {
+          if (!window.isSecureContext) {
+            alert("ระบบสแกนนิ้ว/ใบหน้าบนเว็บ จำเป็นต้องใช้งานผ่าน HTTPS หรือ localhost เท่านั้น");
+            return false;
+          }
+          const challenge = new Uint8Array(32);
+          window.crypto.getRandomValues(challenge);
+          const userId = new Uint8Array(16);
+          window.crypto.getRandomValues(userId);
+
+          const rp = { name: "OURS Finance" };
+          if (window.location.hostname && !/^[0-9.]+$/.test(window.location.hostname)) {
+            rp.id = window.location.hostname;
+          }
+
+          const cred = await navigator.credentials.create({
+            publicKey: {
+              challenge: challenge,
+              rp: rp,
+              user: {
+                id: userId,
+                name: "ours_user",
+                displayName: "OURS User"
+              },
+              pubKeyCredParams: [
+                { type: "public-key", alg: -7 },   // ES256
+                { type: "public-key", alg: -257 }, // RS256
+                { type: "public-key", alg: -8 }    // Ed25519
+              ],
+              authenticatorSelection: {
+                authenticatorAttachment: "platform",
+                userVerification: "preferred"
+              },
+              timeout: 60000
+            }
+          });
+          if (cred && cred.rawId) {
+            const idBase64 = bufferToBase64Url(cred.rawId);
+            localStorage.setItem('myfinance_webauthn_id', idBase64);
+            return true;
+          }
+          return false;
+        } catch (e) {
+          console.warn("WebAuthn register failed:", e);
+          return false;
+        }
+      },
+      authenticate: async function() {
+        try {
+          const challenge = new Uint8Array(32);
+          window.crypto.getRandomValues(challenge);
+          const credId = localStorage.getItem('myfinance_webauthn_id');
+
+          const options = {
+            challenge: challenge,
+            userVerification: "preferred",
+            timeout: 60000
+          };
+          if (credId) {
+            try {
+              options.allowCredentials = [{
+                id: base64UrlToUint8Array(credId),
+                type: "public-key"
+              }];
+            } catch (err) {
+              console.warn("Failed to parse credId:", err);
+            }
+          }
+
+          const assertion = await navigator.credentials.get({
+            publicKey: options
+          });
+          return !!assertion;
+        } catch (e) {
+          console.warn("WebAuthn authenticate failed:", e);
+          return false;
+        }
+      },
+      removeCredential: function() {
+        localStorage.removeItem('myfinance_webauthn_id');
+      }
+    };
+    window.MyFinanceWebAuthn = MyFinanceWebAuthn;
   </script>
 </head>
 <body style="margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #FAF8F5;">

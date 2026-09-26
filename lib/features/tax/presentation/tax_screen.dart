@@ -96,7 +96,7 @@ class _TaxScreenState extends ConsumerState<TaxScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isThai ? 'วางแผนภาษี (ภ.ง.ด. 90/91)' : 'Tax Planning (P.N.D. 90/91)'),
+        title: Text(isThai ? 'วางแผนภาษี' : 'Tax Planning'),
         actions: [
           IconButton(
             icon: const Icon(Icons.tune),

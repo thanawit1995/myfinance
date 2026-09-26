@@ -84,12 +84,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         elevation: 0,
         scrolledUnderElevation: 1,
         title: Text(
-          (l10n?.more ?? 'MORE').toUpperCase(),
+          isThai ? 'การตั้งค่า' : 'Setting',
           style: TextStyle(
             fontFamily: VaultTheme.fontFamily,
             fontSize: 18,
             fontWeight: FontWeight.w700,
-            letterSpacing: 2.0,
+            letterSpacing: isThai ? 0.5 : 1.5,
             color: VaultTheme.primaryText(context),
           ),
         ),
@@ -214,8 +214,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 value: _isBiometricSupported && _isBiometricEnabled,
                 onChanged: _isBiometricSupported
                     ? (val) async {
-                        await ref.read(authServiceProvider).setBiometricsEnabled(val);
-                        setState(() => _isBiometricEnabled = val);
+                        final messenger = ScaffoldMessenger.of(context);
+                        try {
+                          await ref.read(authServiceProvider).setBiometricsEnabled(val);
+                          if (mounted) setState(() => _isBiometricEnabled = val);
+                        } catch (e) {
+                          if (mounted) {
+                            messenger.showSnackBar(
+                              SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+                            );
+                          }
+                        }
                       }
                     : null,
               ),

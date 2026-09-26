@@ -159,16 +159,143 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     }
   }
 
+  Future<String?> _promptBackupPassword(BuildContext context, bool isThai) async {
+    final controller = TextEditingController();
+    bool obscure = true;
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          title: Row(
+            children: [
+              const Icon(Icons.lock, color: Colors.amber),
+              const SizedBox(width: 8),
+              Text(isThai ? 'ไฟล์สำรองถูกเข้ารหัส' : 'Encrypted Backup'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isThai
+                    ? 'ไฟล์สำรองนี้ได้รับการเข้ารหัสเพื่อความปลอดภัย กรุณากรอกรหัสผ่านเพื่อถอดรหัสและกู้คืน:'
+                    : 'This backup is encrypted for security. Please enter the password to decrypt:',
+                style: const TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                obscureText: obscure,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: isThai ? 'รหัสผ่าน' : 'Password',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.key),
+                  suffixIcon: IconButton(
+                    icon: Icon(obscure ? Icons.visibility : Icons.visibility_off),
+                    onPressed: () => setDlgState(() => obscure = !obscure),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, null),
+              child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+              child: Text(isThai ? 'ยืนยัน' : 'Confirm'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<String?> _promptExportPassword(BuildContext context, bool isThai) async {
+    final controller = TextEditingController();
+    bool obscure = true;
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          title: Row(
+            children: [
+              const Icon(Icons.shield, color: Colors.teal),
+              const SizedBox(width: 8),
+              Text(isThai ? 'ความปลอดภัยไฟล์สำรอง' : 'Backup Security'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isThai
+                    ? 'ไฟล์จะถูกเข้ารหัสระดับ AES-256 เสมอ คุณสามารถเว้นว่างไว้เพื่อใช้คีย์ความปลอดภัยของเครื่องนี้ หรือตั้งรหัสผ่านเองหากต้องการนำไปเปิดที่เครื่องอื่น'
+                    : 'The backup is encrypted with AES-256. Leave blank to use this device key, or enter a custom password to restore on other devices.',
+                style: const TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                obscureText: obscure,
+                decoration: InputDecoration(
+                  labelText: isThai ? 'รหัสผ่านเพิ่มเติม (ไม่บังคับ)' : 'Custom Password (Optional)',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  suffixIcon: IconButton(
+                    icon: Icon(obscure ? Icons.visibility : Icons.visibility_off),
+                    onPressed: () => setDlgState(() => obscure = !obscure),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, null),
+              child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, controller.text.trim().isEmpty ? '' : controller.text.trim()),
+              child: Text(isThai ? 'ส่งออก' : 'Export'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _handleRestoreRollingVersion(RollingBackupItem item) async {
     final isThai = Localizations.localeOf(context).languageCode == 'th';
     final service = ref.read(backupRestoreServiceProvider);
 
     setState(() => _isLoading = true);
     try {
-      final inspection = await service.inspectBackupFile(
+      var inspection = await service.inspectBackupFile(
         item.path,
         name: item.fileName,
       );
+
+      String? backupPassword;
+      while (inspection.requiresPassword) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        final pwd = await _promptBackupPassword(context, isThai);
+        if (pwd == null || pwd.isEmpty) return;
+        setState(() => _isLoading = true);
+        backupPassword = pwd;
+        inspection = await service.inspectBackupFile(
+          item.path,
+          name: item.fileName,
+          password: pwd,
+        );
+      }
 
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -207,6 +334,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       setState(() => _isLoading = true);
       final ok = await service.restoreDatabase(
         filePath: item.path,
+        password: backupPassword,
         isThai: isThai,
       );
 
@@ -263,16 +391,22 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
 
   Future<void> _handleExport() async {
     final isThai = Localizations.localeOf(context).languageCode == 'th';
+    final customPwd = await _promptExportPassword(context, isThai);
+    if (customPwd == null) return; // user cancelled
+
     setState(() => _isLoading = true);
     try {
       final service = ref.read(backupRestoreServiceProvider);
-      final exportedPath = await service.exportAndShareBackup(isThai: isThai);
+      final exportedPath = await service.exportAndShareBackup(
+        isThai: isThai,
+        customPassword: customPwd.isEmpty ? null : customPwd,
+      );
 
       if (!mounted) return;
       if (exportedPath != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isThai ? 'ส่งออกไฟล์สำรองสำเร็จเรียบร้อย' : 'Backup exported successfully'),
+            content: Text(isThai ? 'ส่งออกไฟล์สำรองสำเร็จเรียบร้อย (เข้ารหัสปลอดภัย)' : 'Backup exported successfully (AES-256 encrypted)'),
             backgroundColor: VaultTheme.positive(context),
           ),
         );
@@ -294,16 +428,22 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
 
   Future<void> _handleDirectDownload() async {
     final isThai = Localizations.localeOf(context).languageCode == 'th';
+    final customPwd = await _promptExportPassword(context, isThai);
+    if (customPwd == null) return;
+
     setState(() => _isLoading = true);
     try {
       final service = ref.read(backupRestoreServiceProvider);
-      final exportedPath = await service.downloadBackupDirectly(isThai: isThai);
+      final exportedPath = await service.downloadBackupDirectly(
+        isThai: isThai,
+        customPassword: customPwd.isEmpty ? null : customPwd,
+      );
 
       if (!mounted) return;
       if (exportedPath != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isThai ? 'ดาวน์โหลดไฟล์สำรองเรียบร้อย' : 'Backup downloaded successfully'),
+            content: Text(isThai ? 'ดาวน์โหลดไฟล์สำรองเรียบร้อย (เข้ารหัสปลอดภัย)' : 'Backup downloaded successfully (AES-256 encrypted)'),
             backgroundColor: VaultTheme.positive(context),
           ),
         );
@@ -343,11 +483,27 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       final safePath = kIsWeb ? '' : (pickedFile.path ?? '');
 
       // 1. Inspect file first to preview summary to user
-      final inspection = await service.inspectBackupFile(
+      var inspection = await service.inspectBackupFile(
         safePath,
         bytes: pickedFile.bytes,
         name: pickedFile.name,
       );
+
+      String? backupPassword;
+      while (inspection.requiresPassword) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        final pwd = await _promptBackupPassword(context, isThai);
+        if (pwd == null || pwd.isEmpty) return;
+        setState(() => _isLoading = true);
+        backupPassword = pwd;
+        inspection = await service.inspectBackupFile(
+          safePath,
+          bytes: pickedFile.bytes,
+          name: pickedFile.name,
+          password: pwd,
+        );
+      }
 
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -388,6 +544,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       final ok = await service.restoreDatabase(
         filePath: kIsWeb ? null : pickedFile.path,
         bytes: pickedFile.bytes,
+        password: backupPassword,
         isThai: isThai,
       );
 

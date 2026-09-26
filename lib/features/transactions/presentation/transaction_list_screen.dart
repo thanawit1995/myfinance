@@ -7,7 +7,6 @@ import '../../../../core/database/database_provider.dart';
 import '../../../../core/money/money.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/category_name_helper.dart';
-import '../../income_tracker/presentation/accrued_income_screen.dart';
 import 'edit_transaction_dialog.dart';
 
 class TransactionListScreen extends ConsumerStatefulWidget {
@@ -27,6 +26,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
   String? _selectedCategoryId;
   DateTimeRange? _selectedDateRange;
   String? _selectedType; // null = ทั้งหมด, 'income', 'expense', 'transfer'
+  bool _isSearchExpanded = false;
 
   List<Transaction>? _transactions;
   bool _isLoading = false;
@@ -101,69 +101,97 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
     final isThai = Localizations.localeOf(context).languageCode == 'th';
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(isThai ? 'ประวัติรายการ' : 'Transactions'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.pending_actions_outlined),
-            tooltip: isThai ? 'ติดตามรายได้ค้างรับ & เงินตกเบิก' : 'Accrued Income',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AccruedIncomeScreen()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.filter_list),
-            onPressed: _showFilterDialog,
-            tooltip: isThai ? 'ตัวกรอง' : 'Filter',
-          ),
-        ],
-      ),
       body: Column(
         children: [
-          // Search input
+          // Filter Chips + Search & Filter Action Buttons
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: isThai ? 'ค้นหาบันทึกย่อ หรือ tag...' : 'Search notes or tags...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          _loadTransactions();
-                        },
-                      )
-                    : null,
-                isDense: true,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              onChanged: (_) => _loadTransactions(),
+            padding: const EdgeInsets.only(left: 12, right: 6, top: 8, bottom: 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _typeChip(label: isThai ? 'ทั้งหมด' : 'All', value: null, icon: Icons.list_alt_rounded),
+                        const SizedBox(width: 6),
+                        _typeChip(label: isThai ? 'รายรับ' : 'Income', value: 'income', icon: Icons.arrow_downward_rounded, color: Colors.green),
+                        const SizedBox(width: 6),
+                        _typeChip(label: isThai ? 'รายจ่าย' : 'Expense', value: 'expense', icon: Icons.arrow_upward_rounded, color: Colors.red),
+                        const SizedBox(width: 6),
+                        _typeChip(label: isThai ? 'โอนเงิน' : 'Transfer', value: 'transfer', icon: Icons.swap_horiz_rounded, color: Colors.blueGrey),
+                      ],
+                    ),
+                  ),
+                ),
+                // Search button
+                IconButton(
+                  icon: Icon(
+                    _isSearchExpanded ? Icons.close : Icons.search,
+                    color: (_isSearchExpanded || _searchController.text.isNotEmpty)
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
+                    size: 21,
+                  ),
+                  tooltip: isThai ? 'ค้นหา' : 'Search',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () {
+                    setState(() {
+                      _isSearchExpanded = !_isSearchExpanded;
+                      if (!_isSearchExpanded && _searchController.text.isNotEmpty) {
+                        _searchController.clear();
+                        _loadTransactions();
+                      }
+                    });
+                  },
+                ),
+                // Filter button
+                IconButton(
+                  icon: Icon(
+                    Icons.filter_list,
+                    color: (_selectedAccountId != null || _selectedCategoryId != null || _selectedDateRange != null)
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
+                    size: 21,
+                  ),
+                  onPressed: _showFilterDialog,
+                  tooltip: isThai ? 'ตัวกรอง' : 'Filter',
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
             ),
           ),
 
-          // Type filter chips
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _typeChip(label: isThai ? 'ทั้งหมด' : 'All', value: null, icon: Icons.list_alt_rounded),
-                  const SizedBox(width: 8),
-                  _typeChip(label: isThai ? 'รายรับ' : 'Income', value: 'income', icon: Icons.arrow_downward_rounded, color: Colors.green),
-                  const SizedBox(width: 8),
-                  _typeChip(label: isThai ? 'รายจ่าย' : 'Expense', value: 'expense', icon: Icons.arrow_upward_rounded, color: Colors.red),
-                  const SizedBox(width: 8),
-                  _typeChip(label: isThai ? 'โอนเงิน' : 'Transfer', value: 'transfer', icon: Icons.swap_horiz_rounded, color: Colors.blueGrey),
-                ],
-              ),
-            ),
+          // Animated Search Bar (only when expanded or active query)
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            child: (_isSearchExpanded || _searchController.text.isNotEmpty)
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: TextField(
+                      controller: _searchController,
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        hintText: isThai ? 'ค้นหาบันทึกย่อ หรือ tag...' : 'Search notes or tags...',
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        suffixIcon: _searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 18),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  _loadTransactions();
+                                },
+                              )
+                            : null,
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onChanged: (_) => _loadTransactions(),
+                    ),
+                  )
+                : const SizedBox.shrink(),
           ),
 
           // Active filter chips

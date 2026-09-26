@@ -1,6 +1,77 @@
 # บันทึกความคืบหน้าโครงการ MyFinance (PROGRESS.md)
 
-อัปเดตล่าสุด: 25 กันยายน 2026
+อัปเดตล่าสุด: 26 กันยายน 2026
+
+- [x] **UI/UX Overhaul, Spacing Optimization, Category Picker & Chrome Android WebAuthn Fix**:
+  - **1. แก้ไขระบบสแกนลายนิ้วมือบน Chrome บน Android (WebAuthn / Passkeys)**:
+    - แก้ไข Dart JS Interop annotation จาก `@JS('window.MyFinanceWebAuthn')` เป็น `@JS('MyFinanceWebAuthn')` เพื่อให้ Dart เชื่อมต่อไปยัง global object บนเบราว์เซอร์ได้อย่างถูกต้อง
+    - ปรับปรุงการแปลง ArrayBuffer ของ Credential ID ด้วย `bufferToBase64Url` และ `base64UrlToUint8Array` ป้องกันปัญหา Padding error ใน `atob()`
+    - ปรับ `userVerification` เป็น `preferred` เพื่อรองรับระบบล็อกหน้าจอและสแกนนิ้วบนอุปกรณ์ Android ทุกยี่ห้อ พร้อมแจ้งเตือนเป็นภาษาไทยกรณีเข้าเว็บผ่าน HTTP (ต้องเป็น HTTPS หรือ localhost ตามมาตรฐานความปลอดภัยสากล)
+  - **2. เพิ่มพื้นที่แสดง Transactions ในหน้า Money**:
+    - ลบปุ่มรายงาน (Report) และปุ่มเงินตกเบิกที่ซ้ำซ้อนออกจาก AppBar ด้านบน
+    - ย่อกล่องค้นหาข้อความเดิมที่กินพื้นที่แนวตั้ง ให้กลายเป็นปุ่มไอคอนรูปแว่นขยาย (`Icons.search`) วางอยู่ข้างปุ่มตัวกรอง (`Icons.filter_list`)
+    - ซ่อน/แสดงแถบค้นหาด้วยแอนิเมชันเปิด-ปิด (`AnimatedSize`) ลื่นไหล ไม่กินพื้นที่หน้าจอเมื่อไม่ได้ใช้งาน ทำให้พื้นที่แสดงรายการธุรกรรมเพิ่มขึ้นเกือบ 50%
+  - **3. ปรับปรุงการเลือกหมวดหมู่ (Category Selection UX)**:
+    - สร้าง `CategoryPickerSheet` แบบ Modal BottomSheet รองรับการค้นหาชื่อหมวดหมู่แบบเรียลไทม์ พร้อมไอคอนสวยงามและปุ่มสร้างหมวดหมู่ใหม่
+    - นำมาแทนที่ `DropdownButtonFormField` เดิมในหน้าบันทึกด่วน (`QuickAddScreen`) และหน้าแก้ไขรายการ (`EditTransactionDialog`)
+  - **4. ป้องกันการเผลอปิดแอปด้วยการปัด/กดย้อนกลับ (Double Back / Swipe Exit Confirmation)**:
+    - ติดตั้ง `PopScope` ใน `MainShell`: เมื่อผู้ใช้ปัดขอบจอหรือกดย้อนกลับที่หน้าหลัก ระบบจะแจ้งเตือนแถบข้อความ "ปัดหรือกดย้อนกลับอีกครั้งเพื่อออกจากแอป" หากทำซ้ำภายใน 2 วินาทีถึงจะปิดแอป
+  - **5. แอนิเมชันและ Micro-interactions ที่รวดเร็ว**:
+    - เพิ่มแอนิเมชันเปลี่ยนแท็บเมนูหลักด้วย `AnimatedSwitcher` (Fade Transition 200ms) นุ่มนวลและตอบสนองทันใจ
+    - เพิ่มระบบ Haptic Feedback ในปุ่มบันทึกธุรกรรม
+  - **6. ปรับแต่งส่วนหัวและหน้าจอการตั้งค่า (Settings & Related Screens UI)**:
+    - หัวข้อหน้าจอการตั้งค่า: เปลี่ยนเป็น `การตั้งค่า` (TH) / `Setting` (EN)
+    - หน้ารายการประจำ (Recurring): ปรับสีกรอบ "กระแสเงินสด 30 วัน" ให้ใช้ `VaultTheme.surface` และตัวอักษรสีชัดเจน ไม่กลืนกับพื้นหลังมืด พร้อมย่นความยาวข้อความให้กระชับ
+    - หน้าวางแผนภาษี (Tax Planning): ย่นชื่อหัวข้อ AppBar ให้สั้นกระชับเป็น "วางแผนภาษี"
+    - หน้าติดตามเงินได้ต่างประเทศ (Foreign Remittance): ย่นชื่อหัวข้อ AppBar และย้ายเมนูเลือก "ปีที่นำเข้า" กับปุ่ม "ระบุจำนวนวันในไทย" ลงมาจัดวางในการ์ดควบคุมด้านบนของเนื้อหา body อย่างลงตัว ไม่เบียดกับหัวข้อ
+  - **การทดสอบความถูกต้อง**:
+    - `flutter analyze` ผ่านฉลุย **No issues found! (0 error, 0 warning)**
+    - `flutter test` ผ่านทั้งหมดครบถ้วน **154/154 tests passed** (100%)
+    - `flutter build web --release --base-href /myfinance/` คอมไพล์ผ่านฉลุย 100%
+
+- [x] **Notion Income Work Period Alignment (P4P / Medical Shifts) & Webapp Biometrics (WebAuthn / Passkeys)**:
+  - **1. จัดงวดรายรับ Notion ตามคอลัมน์ Monthly Overview (P4P & Shift Arrears)**:
+    - ปรับปรุง `CsvImportParser` ให้ตรวจจับคอลัมน์ `Monthly Overview` ของ Notion: หากรายการรายรับ (เช่น P4P, ค่าเวร) ได้รับเงินในเดือนหนึ่ง (เช่น 25 กันยายน 2026) แต่งวดผลงานคือเดือนก่อนหน้า (เช่น `August 26`) วันที่ของรายการจะถูกจัดให้อยู่ในเดือนของงวดงาน (`2026-08-25`) ทันที
+    - มีการต่อท้ายหมายเหตุ `(รับเงินจริง: 25/09/2026)` ใน Note อัตโนมัติ เพื่อให้คงประวัติวันที่เงินโอนเข้าบัญชีจริง
+    - ทำให้หน้า **Monthly Overview** ของเดือนสิงหาคมและกันยายนแสดงยอดรายรับตรงตามงวดผลงานจริง 100%
+  - **2. ปรับปรุงข้อมูลรายรับเดิมในฐานข้อมูลอัตโนมัติ (Database Auto-Alignment on Startup)**:
+    - เพิ่มฟังก์ชัน `alignIncomeDatesWithWorkPeriod()` ใน `TransactionsDao`
+    - ผูกเข้ากับ `AppDatabase.beforeOpen`: เมื่อเปิดแอป ระบบจะตรวจสอบรายการรายได้เดิมที่เคยนำเข้าและมีงวดเดือนระบุไว้ หากวันที่ยังไม่ตรงงวด ระบบจะย้ายวันที่ให้ตรงงวดเดือนนั้นให้อัตโนมัติทันที
+  - **3. รองรับการสแกนลายนิ้วมือ/ใบหน้าบน Webapp (WebAuthn / Passkeys)**:
+    - สร้าง `WebBiometricService` รองรับมาตรฐานความปลอดภัยสากล WebAuthn (Passkeys) ผ่านเบราว์เซอร์
+    - เมื่อเปิด Webapp บนมือถือ Android (ผ่าน Chrome), คอมพิวเตอร์ Windows (ผ่าน Windows Hello) หรือ iPhone/Mac (ผ่าน Safari/Touch ID/Face ID) ระบบจะสามารถเรียกตัวสแกนนิ้วของเครื่องเพื่อปลดล็อกเข้าเว็บได้ทันที
+    - มีระบบแยกแพลตฟอร์มแบบ Conditional Export ไม่กระทบ Native และ Unit Tests
+  - **การทดสอบความถูกต้อง**:
+    - เพิ่ม Unit Tests ใน `test/features/notion_income_import_test.dart` และ `test/core/web_biometric_test.dart`
+    - `flutter analyze` ผ่านฉลุย **No issues found! (0 error, 0 warning)**
+    - `flutter test` ผ่านทั้งหมดครบถ้วน **154/154 tests passed** (100%)
+    - `flutter build web --release --base-href /myfinance/` คอมไพล์ผ่านฉลุย 100%
+
+- [x] **Code & Package Cleanup, AES-256 Encrypted Backups, Biometrics/PIN Security, Year-End Run-Rate Fix & Real Cash Income**:
+  - **1. ปรับปรุงสูตรพยากรณ์รายจ่ายสิ้นปี (Year-End Run-Rate Projection Formula)**:
+    - ปรับปรุงการคำนวณใน `RunRateCalculator` ให้คิดยอดประมาณการช่วงที่เหลือของเดือนปัจจุบัน (`remainingCurrentMonthProjection`) ร่วมกับยอดสะสมจริง (`accumulatedMonthExpenseSatang`) ทำให้ตัวเลขพยากรณ์สิ้นปีแม่นยำและสมจริงตลอดทั้งเดือน
+    - มี Unit Tests รองรับครบถ้วนใน `test/features/run_rate_test.dart`
+  - **2. แสดงเฉพาะรายรับจริงใน Monthly Overview (Real Cash Income & Accrued Income Exclusion)**:
+    - ปรับการคำนวณใน `MonthlySummaryScreen`, `FinancialHealthDao` และ `FinancialReportsService` ให้คำนวณเฉพาะรายรับที่ได้รับเงินเข้าบัญชีจริงแล้ว (`isCleared == true`)
+    - ยอดตกเบิกหรือเงินค้างรับ (`isCleared == false`) จะถูกแยกแสดงเป็นป้ายสถานะ "ตกเบิกค้างรับ" อย่างโปร่งใส ไม่นำมาปะปนกับรายรับจริง
+    - มี Unit Tests รองรับใน `test/features/quick_add_accrued_income_test.dart`
+  - **3. ยกระดับความปลอดภัย PIN, สแกนลายนิ้วมือ และ Android (PIN & Biometric Security)**:
+    - เพิ่ม `android:allowBackup="false"` ใน `AndroidManifest.xml` ป้องกันการดูดฐานข้อมูลผ่านคำสั่ง ADB หรือ Google Cloud Backup อัตโนมัติ
+    - ย้ายการเก็บสถานะสวิตช์เปิด/ปิด PIN และสแกนลายนิ้วมือจาก SharedPreferences ไปยัง `FlutterSecureStorage` (เข้ารหัส Keystore บนฮาร์ดแวร์) พร้อม Migration อัตโนมัติ
+    - เพิ่มระบบ Rate Limiting ป้องกันการสุ่มรหัส PIN (Brute-Force Lockout): หากใส่ผิดติดต่อกัน 5 ครั้ง ระบบจะระงับการลอง 30 วินาที
+    - เพิ่มระบบปลดล็อกด้วย **สแกนลายนิ้วมือ (Biometrics)** อัตโนมัติทันทีที่เปิดแอป (Cold Start) และเมื่อสลับกลับมาจากเบื้องหลัง (Resume After Timeout) หากไม่ผ่านสามารถกดสลับไปใส่ PIN สำรองได้
+  - **4. ระบบเข้ารหัสไฟล์สำรองข้อมูล AES-256 (Encrypted Backups with Backward Compatibility)**:
+    - สร้าง `BackupCryptoHelper` รองรับการเข้ารหัสไบนารี SQLite ด้วย AES-256-CBC, PKCS7 Padding, Random Salt 16 ไบต์, Random IV 16 ไบต์ และ Magic Header `MYFINANCE_ENC_V1`
+    - ไฟล์สำรองอัตโนมัติในเครื่อง (Rolling Backups) จะถูกเข้ารหัสด้วย Master Key ประจำเครื่องเสมอ ป้องกันการนำไฟล์ไปเปิดดูด้วย DB Browser หรือโปรแกรมภายนอก
+    - การส่งออกไฟล์สำรอง (Export) มีกล่องให้ผู้ใช้เลือกตั้งรหัสผ่านเพิ่มเติมสำหรับนำไปเปิดที่เครื่องอื่นได้ หรือเว้นว่างเพื่อใช้คีย์ของเครื่องเดิม
+    - หน้ากู้คืนข้อมูล (Restore) จะตรวจจับไฟล์เข้ารหัสอัตโนมัติและแสดงกล่องถามรหัสผ่าน (Password Prompt) พร้อมรองรับไฟล์แบ็กอัป SQLite รุ่นเก่าที่ไม่เข้ารหัสได้แบบ 100% ย้อนหลัง (Backward Compatible)
+  - **5. ทำความสะอาดโค้ด/แพ็กเกจที่ไม่ใช้งาน เพื่อให้แอปเบาลง (Clean up unused code, packages, and assets)**:
+    - ลบไฟล์ระบบ Google Drive Sync เก่า และ Hybrid Backup ที่ไม่ได้ใช้งาน 10 ไฟล์
+    - ถอดแพ็กเกจที่ไม่จำเป็นออกจาก `pubspec.yaml` (อาทิ `go_router`, `googleapis`, `google_sign_in`, `connectivity_plus`, `archive` รวม 15 แพ็กเกจที่เกี่ยวข้อง)
+    - ลบไฟล์ภาพ PNG ที่ไม่ได้ใช้งานออกจาก `assets/images/`
+  - **การทดสอบความถูกต้อง**:
+    - `flutter analyze` ผ่านฉลุย **No issues found! (0 error, 0 warning, 0 info)**
+    - `flutter test` ผ่านทั้งหมดครบถ้วน **151/151 tests passed** (100%)
 
 - [x] **Notion Invest Import (Funds, Gold, Stocks) & 4-Decimal Trade Precision & Medical Tax 40(1) Update**:
   - **1. จัดหมวดหมู่ภาษีรายได้การแพทย์เป็น 40(1) ทั้งหมด**:

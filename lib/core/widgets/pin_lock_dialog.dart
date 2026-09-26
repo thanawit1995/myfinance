@@ -6,19 +6,26 @@ import '../security/auth_provider.dart';
 class PinLockDialog extends ConsumerStatefulWidget {
   final VoidCallback onUnlocked;
   final String title;
+  final bool canCancel;
 
   const PinLockDialog({
     super.key,
     required this.onUnlocked,
     this.title = 'กรุณาใส่รหัส PIN 6 หลัก',
+    this.canCancel = true,
   });
 
-  static Future<bool> show(BuildContext context) async {
+  static Future<bool> show(BuildContext context, {bool canCancel = true, String? title}) async {
     final result = await showDialog<bool>(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => PinLockDialog(
-        onUnlocked: () => Navigator.of(ctx).pop(true),
+      barrierDismissible: canCancel,
+      builder: (ctx) => PopScope(
+        canPop: canCancel,
+        child: PinLockDialog(
+          onUnlocked: () => Navigator.of(ctx).pop(true),
+          canCancel: canCancel,
+          title: title ?? 'กรุณาใส่รหัส PIN 6 หลัก',
+        ),
       ),
     );
     return result ?? false;
@@ -50,6 +57,14 @@ class _PinLockDialogState extends ConsumerState<PinLockDialog> {
   }
 
   void _onKeyPress(String key) {
+    final authService = ref.read(authServiceProvider);
+    if (authService.isLockedOut) {
+      setState(() {
+        _errorMessage = 'ใส่รหัสผิดเกินกำหนด กรุณารอ ${authService.remainingLockoutSeconds} วินาที';
+      });
+      return;
+    }
+
     if (_enteredPin.length < 6) {
       setState(() {
         _enteredPin += key;
@@ -73,6 +88,14 @@ class _PinLockDialogState extends ConsumerState<PinLockDialog> {
 
   Future<void> _verifyPin() async {
     final authService = ref.read(authServiceProvider);
+    if (authService.isLockedOut) {
+      setState(() {
+        _enteredPin = '';
+        _errorMessage = 'ใส่รหัสผิดเกินกำหนด กรุณารอ ${authService.remainingLockoutSeconds} วินาที';
+      });
+      return;
+    }
+
     final isCorrect = await authService.verifyPin(_enteredPin);
 
     if (isCorrect) {
@@ -82,7 +105,11 @@ class _PinLockDialogState extends ConsumerState<PinLockDialog> {
     } else {
       setState(() {
         _enteredPin = '';
-        _errorMessage = 'รหัส PIN ไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง';
+        if (authService.isLockedOut) {
+          _errorMessage = 'ใส่รหัสผิดเกิน 5 ครั้ง กรุณารอ ${authService.remainingLockoutSeconds} วินาที';
+        } else {
+          _errorMessage = 'รหัส PIN ไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง';
+        }
       });
     }
   }
@@ -177,24 +204,26 @@ class _PinLockDialogState extends ConsumerState<PinLockDialog> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
-                  TextButton.icon(
-                    icon: const Icon(Icons.arrow_back),
-                    label: const Text('ยกเลิก / ย้อนกลับ'),
-                    onPressed: () => Navigator.of(context).pop(false),
-                  ),
+                  const SizedBox(height: 16),
+                  if (widget.canCancel)
+                    TextButton.icon(
+                      icon: const Icon(Icons.arrow_back),
+                      label: const Text('ยกเลิก / ย้อนกลับ'),
+                      onPressed: () => Navigator.of(context).pop(false),
+                    ),
                 ],
               ),
             ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: IconButton(
-                icon: const Icon(Icons.close),
-                tooltip: 'ปิดหน้าต่าง',
-                onPressed: () => Navigator.of(context).pop(false),
+            if (widget.canCancel)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: IconButton(
+                  icon: const Icon(Icons.close),
+                  tooltip: 'ปิดหน้าต่าง',
+                  onPressed: () => Navigator.of(context).pop(false),
+                ),
               ),
-            ),
           ],
         ),
       ),

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:myfinance/core/database/app_database.dart';
 import 'package:myfinance/core/database/connection/native.dart';
+import 'package:myfinance/core/services/backup_crypto_helper.dart';
 import 'package:myfinance/core/services/backup_restore_service.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,6 +14,7 @@ void main() {
   late Directory tempDir;
 
   setUp(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
     SharedPreferences.setMockInitialValues({});
     db = AppDatabase.forTesting(inMemoryConnection());
     service = BackupRestoreService(db: db);
@@ -136,6 +138,90 @@ void main() {
 
       db.transactionsDao.onLedgerModified?.call();
       expect(called, isTrue);
+    });
+
+    test('saveRollingBackup writes encrypted data with MYFINANCE_ENC_V1 header', () async {
+      final backupDir = Directory(p.join(tempDir.path, 'MyFinance_Enc_Backup'));
+      await backupDir.create(recursive: true);
+
+      final sourceDb = File(p.join(tempDir.path, 'source_test.sqlite'));
+      await sourceDb.writeAsString('SQLite format 3 dummy header content');
+
+      final savedPath = await service.saveRollingBackup(customFolderPath: backupDir.path, customSourceDb: sourceDb);
+      expect(savedPath, isNotNull);
+
+      final savedBytes = await File(savedPath!).readAsBytes();
+      // Should start with magic bytes 'MYFINANCE_ENC_V1'
+      expect(savedBytes.length, greaterThan(16));
+      final header = String.fromCharCodes(savedBytes.take(16));
+      expect(header, equals('MYFINANCE_ENC_V1'));
+    });
+
+    test('inspectBackupFile requires password when encrypted with custom password and decrypts when correct password is provided', () async {
+      // 1. Create a valid sqlite db file
+      final validDbFile = File(p.join(tempDir.path, 'valid_for_enc.db'));
+      final sqliteDb = sqlite.sqlite3.open(validDbFile.path);
+      sqliteDb.execute('CREATE TABLE accounts (id TEXT PRIMARY KEY, name TEXT NOT NULL);');
+      sqliteDb.execute("INSERT INTO accounts VALUES ('acc1', 'Kasikorn');");
+      sqliteDb.dispose();
+
+      // 2. Encrypt it with custom password 'pass1234'
+      final rawBytes = await validDbFile.readAsBytes();
+      final encryptedBytes = BackupCryptoHelper.encryptDatabase(rawBytes, 'pass1234');
+      final encFile = File(p.join(tempDir.path, 'myfinance_enc.db'));
+      await encFile.writeAsBytes(encryptedBytes);
+
+      // 3. Inspect without password -> requiresPassword should be true
+      final inspectNoPwd = await service.inspectBackupFile(encFile.path);
+      expect(inspectNoPwd.requiresPassword, isTrue);
+      expect(inspectNoPwd.isEncrypted, isTrue);
+
+      // 4. Inspect with wrong password -> isValid should be false
+      final inspectWrong = await service.inspectBackupFile(encFile.path, password: 'wrongpassword');
+      expect(inspectWrong.isValid, isFalse);
+
+      // 5. Inspect with correct password -> should decrypt and read accounts
+      final inspectCorrect = await service.inspectBackupFile(encFile.path, password: 'pass1234');
+      expect(inspectCorrect.isValid, isTrue);
+      expect(inspectCorrect.requiresPassword, isFalse);
+      expect(inspectCorrect.totalAccounts, equals(1));
+      expect(inspectCorrect.sampleAccountNames, contains('Kasikorn'));
+    });
+
+    test('restoreDatabase successfully restores encrypted backup file', () async {
+      // 1. Create a valid sqlite db file
+      final validDbFile = File(p.join(tempDir.path, 'valid_for_restore.db'));
+      final sqliteDb = sqlite.sqlite3.open(validDbFile.path);
+      sqliteDb.execute('CREATE TABLE accounts (id TEXT PRIMARY KEY, name TEXT NOT NULL);');
+      sqliteDb.execute("INSERT INTO accounts VALUES ('acc_test', 'Krungthai');");
+      sqliteDb.dispose();
+
+      // 2. Encrypt it
+      final rawBytes = await validDbFile.readAsBytes();
+      final encryptedBytes = BackupCryptoHelper.encryptDatabase(rawBytes, 'mySecretKey');
+
+      // 3. Test restore with wrong password throws Exception
+      expect(
+        () => service.restoreDatabase(bytes: encryptedBytes, password: 'wrongPassword'),
+        throwsA(isA<Exception>()),
+      );
+    });
+
+    test('restoreDatabase preserves backward compatibility with unencrypted legacy backups', () async {
+      final legacyFile = File(p.join(tempDir.path, 'legacy_backup.sqlite'));
+      final sqliteDb = sqlite.sqlite3.open(legacyFile.path);
+      sqliteDb.execute('CREATE TABLE accounts (id TEXT PRIMARY KEY, name TEXT NOT NULL);');
+      sqliteDb.execute("INSERT INTO accounts VALUES ('legacy_1', 'Legacy Bank');");
+      sqliteDb.dispose();
+
+      final legacyBytes = await legacyFile.readAsBytes();
+      expect(BackupCryptoHelper.isEncrypted(legacyBytes), isFalse);
+
+      final inspection = await service.inspectBackupFile(legacyFile.path);
+      expect(inspection.isValid, isTrue);
+      expect(inspection.isEncrypted, isFalse);
+      expect(inspection.requiresPassword, isFalse);
+      expect(inspection.sampleAccountNames, contains('Legacy Bank'));
     });
   });
 }

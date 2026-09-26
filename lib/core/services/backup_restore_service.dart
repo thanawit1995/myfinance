@@ -8,9 +8,13 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'dart:convert';
+import 'dart:math';
 
 import '../database/app_database.dart';
 import '../database/database_provider.dart';
+import 'backup_crypto_helper.dart';
 import 'backup_inspect/backup_inspector.dart';
 import 'web_db_helper/web_db_helper.dart';
 
@@ -59,9 +63,26 @@ class BackupRestoreService {
   Timer? _autoBackupDebounceTimer;
 
   static const String designatedFolderKey = 'designated_backup_folder';
+  static const String _backupMasterKeyName = 'backup_encryption_master_key';
+  final FlutterSecureStorage _secureStorage;
 
-  BackupRestoreService({required this.db}) {
+  BackupRestoreService({required this.db, FlutterSecureStorage? secureStorage})
+      : _secureStorage = secureStorage ?? const FlutterSecureStorage() {
     _initAutoBackupListener();
+  }
+
+  Future<String> getOrCreateMasterBackupKey() async {
+    try {
+      final existingKey = await _secureStorage.read(key: _backupMasterKeyName);
+      if (existingKey != null && existingKey.isNotEmpty) {
+        return existingKey;
+      }
+      final newKey = base64UrlEncode(List<int>.generate(32, (_) => Random.secure().nextInt(256)));
+      await _secureStorage.write(key: _backupMasterKeyName, value: newKey);
+      return newKey;
+    } catch (_) {
+      return 'MyFinance_Vault_EncKey_Default';
+    }
   }
 
   void _initAutoBackupListener() {
@@ -134,17 +155,36 @@ class BackupRestoreService {
   }
 
   /// ตรวจสอบและดึงข้อมูลสรุปจากไฟล์สำรอง (.db) ก่อนกดยืนยันกู้คืน
-  Future<BackupInspectionResult> inspectBackupFile(String filePath, {Uint8List? bytes, String? name}) async {
-    return inspectSqliteDatabaseFile(filePath, bytes: bytes, name: name);
+  Future<BackupInspectionResult> inspectBackupFile(
+    String filePath, {
+    Uint8List? bytes,
+    String? name,
+    String? password,
+  }) async {
+    // 1. ถ้ามีรหัสผ่านส่งมา ให้ลองถอดด้วยรหัสผ่านนั้น
+    if (password != null && password.isNotEmpty) {
+      return inspectSqliteDatabaseFile(filePath, bytes: bytes, name: name, password: password);
+    }
+
+    // 2. ถ้าไม่ได้ส่งรหัสผ่าน ให้ลองถอดด้วย Master Key ประจำเครื่องก่อน (กรณีไฟล์แบ็กอัปในเครื่องตัวเอง)
+    final masterKey = await getOrCreateMasterBackupKey();
+    final firstTry = await inspectSqliteDatabaseFile(filePath, bytes: bytes, name: name, password: masterKey);
+    if (!firstTry.requiresPassword) {
+      return firstTry;
+    }
+
+    // 3. ถ้า master key ถอดไม่ได้ (เช่น มาจากเครื่องอื่นที่มีรหัสผ่าน) ให้ส่งผลตรวจว่า requiresPassword = true
+    return inspectSqliteDatabaseFile(filePath, bytes: bytes, name: name, password: null);
   }
 
-  /// ส่งออกและเปิดแชร์ไฟล์สำรอง (.db)
+  /// ส่งออกและเปิดแชร์ไฟล์สำรอง (.db) แบบเข้ารหัส AES-256
   /// - บนมือถือ / Webapp บนมือถือ: เปิด Share sheet (บันทึกลง Drive, ส่งเข้า Line, บันทึกลงเครื่อง)
   /// - บน Windows: เปิด FilePicker ให้เลือกที่บันทึก
   /// - บน Web: ถ้าแชร์ไม่ได้ จะดาวน์โหลดไฟล์ .db ลงเบราว์เซอร์อัตโนมัติ
-  Future<String?> exportAndShareBackup({bool isThai = true}) async {
+  Future<String?> exportAndShareBackup({bool isThai = true, String? customPassword}) async {
     final nowStr = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
     final exportFileName = 'myfinance_backup_$nowStr.db';
+    final encPassword = customPassword ?? await getOrCreateMasterBackupKey();
 
     if (kIsWeb) {
       final bytes = await exportWebDatabase();
@@ -152,10 +192,13 @@ class BackupRestoreService {
         throw Exception(isThai ? 'ไม่พบข้อมูลในเบราว์เซอร์' : 'No database in browser storage');
       }
 
+      // เข้ารหัสข้อมูลก่อนส่งออก
+      final encryptedBytes = BackupCryptoHelper.encryptDatabase(bytes, encPassword);
+
       // ใช้ .txt เพื่อให้ระบบความปลอดภัยของ Chromium บน Android ยอมเปิดเมนูแชร์ของระบบ (Share Sheet)
       final shareFileName = 'myfinance_backup_$nowStr.txt';
       final xFile = XFile.fromData(
-        bytes,
+        encryptedBytes,
         name: shareFileName,
         mimeType: 'text/plain',
       );
@@ -167,7 +210,7 @@ class BackupRestoreService {
         );
         return shareFileName;
       } catch (_) {
-        downloadFileWeb(bytes, 'myfinance_backup_$nowStr.db');
+        downloadFileWeb(encryptedBytes, 'myfinance_backup_$nowStr.db');
         return 'myfinance_backup_$nowStr.db';
       }
     }
@@ -182,6 +225,10 @@ class BackupRestoreService {
       throw Exception(isThai ? 'ไม่พบไฟล์ฐานข้อมูลในเครื่อง' : 'Local database file not found');
     }
 
+    // อ่านข้อมูล raw SQLite และทำการเข้ารหัส AES-256 ก่อนส่งออกเสมอ
+    final rawBytes = await localDb.readAsBytes();
+    final encryptedBytes = BackupCryptoHelper.encryptDatabase(rawBytes, encPassword);
+
     if (Platform.isWindows) {
       // Windows Desktop: Save File dialog
       final destinationPath = await FilePicker.platform.saveFile(
@@ -193,15 +240,15 @@ class BackupRestoreService {
 
       if (destinationPath != null && destinationPath.isNotEmpty) {
         final destFile = File(destinationPath);
-        await localDb.copy(destFile.path);
+        await destFile.writeAsBytes(encryptedBytes, flush: true);
         return destFile.path;
       }
       return null;
     } else {
-      // Mobile (Android / iOS): Copy to temp & Share Sheet
+      // Mobile (Android / iOS): Copy encrypted data to temp & Share Sheet
       final tempDir = await getTemporaryDirectory();
       final shareFile = File(p.join(tempDir.path, exportFileName));
-      await localDb.copy(shareFile.path);
+      await shareFile.writeAsBytes(encryptedBytes, flush: true);
 
       final xFile = XFile(
         shareFile.path,
@@ -219,27 +266,53 @@ class BackupRestoreService {
   }
 
   /// ดาวน์โหลดไฟล์สำรอง (.db) ตรงๆ สู่เครื่อง (สำหรับ Web)
-  Future<String?> downloadBackupDirectly({bool isThai = true}) async {
+  Future<String?> downloadBackupDirectly({bool isThai = true, String? customPassword}) async {
     final nowStr = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
     final exportFileName = 'myfinance_backup_$nowStr.db';
+    final encPassword = customPassword ?? await getOrCreateMasterBackupKey();
 
     if (kIsWeb) {
       final bytes = await exportWebDatabase();
       if (bytes == null || bytes.isEmpty) {
         throw Exception(isThai ? 'ไม่พบข้อมูลในเบราว์เซอร์' : 'No database in browser storage');
       }
-      downloadFileWeb(bytes, exportFileName);
+      final encryptedBytes = BackupCryptoHelper.encryptDatabase(bytes, encPassword);
+      downloadFileWeb(encryptedBytes, exportFileName);
       return exportFileName;
     } else {
-      return exportAndShareBackup(isThai: isThai);
+      return exportAndShareBackup(isThai: isThai, customPassword: customPassword);
     }
   }
 
   /// กู้คืนฐานข้อมูลจากไฟล์ พร้อมสร้าง Safety Backup อัตโนมัติก่อนเขียนทับเสมอ
-  Future<bool> restoreDatabase({String? filePath, Uint8List? bytes, bool isThai = true}) async {
+  Future<bool> restoreDatabase({
+    String? filePath,
+    Uint8List? bytes,
+    String? password,
+    bool isThai = true,
+  }) async {
+    Uint8List? rawBytes = bytes;
+    if (rawBytes == null && filePath != null && filePath.isNotEmpty) {
+      final sourceFile = File(filePath);
+      if (!await sourceFile.exists()) return false;
+      rawBytes = await sourceFile.readAsBytes();
+    }
+
+    if (rawBytes == null || rawBytes.isEmpty) return false;
+
+    // ถ้าเป็นไฟล์ที่ถูกเข้ารหัส ให้ถอดรหัสก่อนกู้คืน
+    Uint8List dbBytesToWrite = rawBytes;
+    if (BackupCryptoHelper.isEncrypted(rawBytes)) {
+      final keyToTry = password ?? await getOrCreateMasterBackupKey();
+      try {
+        dbBytesToWrite = BackupCryptoHelper.decryptDatabase(rawBytes, keyToTry);
+      } catch (e) {
+        throw Exception(isThai ? 'รหัสผ่านไฟล์สำรองข้อมูลไม่ถูกต้อง' : 'Invalid backup password');
+      }
+    }
+
     if (kIsWeb) {
-      if (bytes == null || bytes.isEmpty) return false;
-      final ok = await restoreWebDatabase(bytes);
+      final ok = await restoreWebDatabase(dbBytesToWrite);
       if (ok) {
         Future.delayed(const Duration(milliseconds: 1000), reloadWebPage);
       }
@@ -258,16 +331,7 @@ class BackupRestoreService {
     } catch (_) {}
 
     // 3. เขียนทับไฟล์ฐานข้อมูล
-    if (bytes != null && bytes.isNotEmpty) {
-      await localDb.writeAsBytes(bytes, flush: true);
-    } else if (filePath != null && filePath.isNotEmpty) {
-      final sourceFile = File(filePath);
-      if (!await sourceFile.exists()) return false;
-      final readBytes = await sourceFile.readAsBytes();
-      await localDb.writeAsBytes(readBytes, flush: true);
-    } else {
-      return false;
-    }
+    await localDb.writeAsBytes(dbBytesToWrite, flush: true);
 
     // 4. ลบไฟล์ -wal และ -shm เก่าที่อาจค้างอยู่
     try {
@@ -405,7 +469,10 @@ class BackupRestoreService {
       targetFile = File(p.join(targetDir.path, backupFileName));
     }
 
-    await localDb.copy(targetFile.path);
+    final rawBytes = await localDb.readAsBytes();
+    final masterKey = await getOrCreateMasterBackupKey();
+    final encryptedBytes = BackupCryptoHelper.encryptDatabase(rawBytes, masterKey);
+    await targetFile.writeAsBytes(encryptedBytes, flush: true);
 
     // ดูแลรักษาไฟล์สำรองให้มีเพียง 3 เวอร์ชั่นล่าสุด
     await _maintainRollingVersions(targetDir, keepCount: 3);

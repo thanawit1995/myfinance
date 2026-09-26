@@ -7,6 +7,8 @@ class BackupInspectionResult {
   final DateTime? latestTransactionDate;
   final int sizeBytes;
   final String fileName;
+  final bool isEncrypted;
+  final bool requiresPassword;
 
   const BackupInspectionResult({
     required this.isValid,
@@ -17,5 +19,7 @@ class BackupInspectionResult {
     this.latestTransactionDate,
     this.sizeBytes = 0,
     required this.fileName,
+    this.isEncrypted = false,
+    this.requiresPassword = false,
   });
 }

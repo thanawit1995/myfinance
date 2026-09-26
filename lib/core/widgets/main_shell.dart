@@ -36,16 +36,23 @@ class MainShell extends ConsumerStatefulWidget {
   ConsumerState<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends ConsumerState<MainShell> {
+class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserver {
   int _currentIndex = 0;
   int _moneyInitialTabIndex = 0;
   int _moneyActiveSubTab = 0;
+  DateTime? _pausedTime;
+  DateTime? _lastBackPressTime;
+  bool _isPromptingUnlock = false;
 
   @override
   void initState() {
     super.initState();
-    // Process recurring transactions due on app launch in the background
+    WidgetsBinding.instance.addObserver(this);
+
+    // Check PIN / Biometrics on app launch and process recurring rules
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _checkAppLockOnStartup();
+
       try {
         await ref.read(recurringTransactionsDaoProvider).processDueRules();
       } catch (e) {
@@ -54,21 +61,81 @@ class _MainShellState extends ConsumerState<MainShell> {
     });
   }
 
-  Future<void> _onTabSelected(int index, {int moneyTabIndex = 0}) async {
-    // Tab 0 (Home) is accessible; other tabs require PIN if lock is enabled
-    final isProtected = index != 0;
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 
-    if (isProtected) {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _pausedTime = DateTime.now();
+    } else if (state == AppLifecycleState.resumed) {
+      _checkResumeLock();
+    }
+  }
+
+  Future<void> _checkAppLockOnStartup() async {
+    final auth = ref.read(authServiceProvider);
+    final isPinLockOn = await auth.isPinLockEnabled();
+    if (isPinLockOn && !auth.isSessionUnlocked && mounted) {
+      await _promptAppUnlock(canCancel: false);
+    }
+  }
+
+  Future<void> _checkResumeLock() async {
+    final auth = ref.read(authServiceProvider);
+    final isPinLockOn = await auth.isPinLockEnabled();
+    if (!isPinLockOn) return;
+
+    if (_pausedTime != null) {
+      final timeoutMinutes = await auth.getSessionTimeoutMinutes();
+      final elapsed = DateTime.now().difference(_pausedTime!);
+      if (elapsed.inMinutes >= timeoutMinutes) {
+        auth.lockSession();
+      }
+    }
+
+    if (!auth.isSessionUnlocked && mounted) {
+      await _promptAppUnlock(canCancel: false);
+    }
+  }
+
+  Future<void> _promptAppUnlock({bool canCancel = true}) async {
+    if (_isPromptingUnlock) return;
+    _isPromptingUnlock = true;
+    try {
       final auth = ref.read(authServiceProvider);
-      final isPinLockOn = await auth.isPinLockEnabled();
-
-      if (isPinLockOn && !auth.isSessionUnlocked) {
-        if (!mounted) return;
-        final unlocked = await PinLockDialog.show(context);
-        if (!unlocked) {
-          // Did not unlock, stay on current tab
+      // 1. Try Biometrics first if enabled
+      final isBioEnabled = await auth.isBiometricsEnabled();
+      if (isBioEnabled) {
+        final success = await auth.authenticateBiometric();
+        if (success) {
+          if (mounted) setState(() {});
           return;
         }
+      }
+
+      // 2. Fall back to PIN dialog
+      if (!auth.isSessionUnlocked && mounted) {
+        await PinLockDialog.show(context, canCancel: canCancel);
+      }
+    } finally {
+      _isPromptingUnlock = false;
+      if (mounted) setState(() {});
+    }
+  }
+
+  Future<void> _onTabSelected(int index, {int moneyTabIndex = 0}) async {
+    final auth = ref.read(authServiceProvider);
+    final isPinLockOn = await auth.isPinLockEnabled();
+
+    if (isPinLockOn && !auth.isSessionUnlocked) {
+      if (!mounted) return;
+      await _promptAppUnlock(canCancel: false);
+      if (!auth.isSessionUnlocked) {
+        return;
       }
     }
 
@@ -155,9 +222,11 @@ class _MainShellState extends ConsumerState<MainShell> {
       systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
     );
 
+    final Widget shellLayout;
+
     if (isWide) {
       // Desktop layout with NavigationRail
-      return AnnotatedRegion<SystemUiOverlayStyle>(
+      shellLayout = AnnotatedRegion<SystemUiOverlayStyle>(
         value: overlayStyle,
         child: Scaffold(
           backgroundColor: VaultTheme.background(context),
@@ -287,18 +356,38 @@ class _MainShellState extends ConsumerState<MainShell> {
               ],
             ),
             VerticalDivider(thickness: 0.75, width: 1, color: VaultTheme.border(context)),
-            Expanded(child: screens[_currentIndex]),
+            Expanded(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
+                child: KeyedSubtree(
+                  key: ValueKey<int>(_currentIndex),
+                  child: screens[_currentIndex],
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   } else {
     // Mobile layout with 5-destination NavigationBar
-    return AnnotatedRegion<SystemUiOverlayStyle>(
+    shellLayout = AnnotatedRegion<SystemUiOverlayStyle>(
       value: overlayStyle,
       child: Scaffold(
         backgroundColor: VaultTheme.background(context),
-        body: screens[_currentIndex],
+        body: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
+          child: KeyedSubtree(
+            key: ValueKey<int>(_currentIndex),
+            child: screens[_currentIndex],
+          ),
+        ),
         floatingActionButton: fab,
         bottomNavigationBar: Container(
           decoration: BoxDecoration(
@@ -343,5 +432,30 @@ class _MainShellState extends ConsumerState<MainShell> {
       ),
     );
   }
-  }
+
+  final isThai = widget.currentLocale.languageCode == 'th';
+
+  return PopScope(
+    canPop: false,
+    onPopInvokedWithResult: (didPop, result) {
+      if (didPop) return;
+      final now = DateTime.now();
+      if (_lastBackPressTime == null || now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
+        _lastBackPressTime = now;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isThai ? 'ปัดหรือกดย้อนกลับอีกครั้งเพื่อออกจากแอป' : 'Press or swipe back again to exit',
+            ),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        SystemNavigator.pop();
+      }
+    },
+    child: shellLayout,
+  );
+}
 }

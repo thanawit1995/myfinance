@@ -5,6 +5,7 @@ Future<BackupInspectionResult> inspectSqliteDatabaseFile(
   String filePath, {
   List<int>? bytes,
   String? name,
+  String? password,
 }) async {
   final fileName = name ?? filePath;
   final size = bytes?.length ?? 0;

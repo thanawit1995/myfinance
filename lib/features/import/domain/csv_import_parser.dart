@@ -213,6 +213,29 @@ class CsvImportParser {
     return null;
   }
 
+  /// Aligns transaction date to the workPeriod month if specified
+  /// e.g. date: 2026-09-25, workPeriod: '2026-08' -> 2026-08-25
+  static DateTime alignDateToWorkPeriod(DateTime originalDate, String workPeriod) {
+    final parts = workPeriod.split('-');
+    if (parts.length == 2) {
+      final targetYear = int.tryParse(parts[0]);
+      final targetMonth = int.tryParse(parts[1]);
+      if (targetYear != null && targetMonth != null && targetMonth >= 1 && targetMonth <= 12) {
+        final daysInTargetMonth = DateTime(targetYear, targetMonth + 1, 0).day;
+        final targetDay = originalDate.day.clamp(1, daysInTargetMonth);
+        return DateTime(
+          targetYear,
+          targetMonth,
+          targetDay,
+          originalDate.hour,
+          originalDate.minute,
+          originalDate.second,
+        );
+      }
+    }
+    return originalDate;
+  }
+
   /// Detects whether this row is a total/summary row (e.g. "รวมทั้งเดือน ก.ย.", "Total")
   static bool isSummaryRow(String name, String category) {
     final lowerName = name.trim().toLowerCase();
@@ -743,10 +766,28 @@ class CsvImportParser {
       // Income tax classification
       String? taxCategory;
       int withholdingTaxSatang = 0;
+
+      // Align transaction date with workPeriod for income transactions (e.g. P4P of Aug received in Sep)
+      DateTime? effectiveDate = date;
+      String? finalNote = rawNote;
+      if (date != null && effectiveWorkPeriod != null && txType == 'income') {
+        final aligned = alignDateToWorkPeriod(date, effectiveWorkPeriod);
+        if (aligned.year != date.year || aligned.month != date.month) {
+          final payDayStr = '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+          final payNote = 'รับเงินจริง: $payDayStr';
+          if (finalNote != null && finalNote.isNotEmpty) {
+            finalNote = '$finalNote ($payNote)';
+          } else {
+            finalNote = payNote;
+          }
+          effectiveDate = aligned;
+        }
+      }
+
       if (txType == 'income') {
         final classification = classifyIncomeTax(
           name: rawName,
-          date: date ?? DateTime.now(),
+          date: effectiveDate ?? DateTime.now(),
           amountSatang: amountSatang,
           explicitWhtSatang: rawWht,
         );
@@ -757,7 +798,7 @@ class CsvImportParser {
       // Validation
       String? valError;
       if (!isSummary) {
-        if (date == null) {
+        if (effectiveDate == null) {
           valError = 'วันที่ไม่ถูกต้อง ("$rawDate")';
         } else if (amountSatang == 0) {
           valError = 'ยอดเงินเป็น 0 หรืออ่านค่าไม่ได้';
@@ -766,7 +807,7 @@ class CsvImportParser {
 
       results.add(ParsedCsvRow(
         rowIndex: i,
-        date: date,
+        date: effectiveDate,
         rawDateString: rawDate?.toString() ?? '',
         name: rawName.trim(),
         categoryName: canonicalCategory,
@@ -776,7 +817,7 @@ class CsvImportParser {
         tag: rowTag,
         taxCategory: taxCategory,
         withholdingTaxSatang: withholdingTaxSatang,
-        note: rawNote,
+        note: finalNote,
         isSummaryRow: isSummary,
         validationError: valError,
         rawRow: row,

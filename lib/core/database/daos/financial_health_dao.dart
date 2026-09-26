@@ -128,6 +128,7 @@ class FinancialHealthDao extends DatabaseAccessor<AppDatabase> with _$FinancialH
     final incomeRows = await (select(transactions)
           ..where((t) =>
               t.transactionType.equals('income') &
+              t.isCleared.equals(true) &
               t.transactionDate.isBiggerOrEqualValue(startDate) &
               t.transactionDate.isSmallerOrEqualValue(now) &
               t.deletedAt.isNull() &
@@ -162,7 +163,7 @@ class FinancialHealthDao extends DatabaseAccessor<AppDatabase> with _$FinancialH
       final isInvBuy = t.tag != null && t.tag!.startsWith('investment_buy:');
       final isInvSell = t.tag != null && t.tag!.startsWith('investment_sell:');
 
-      if (t.transactionType == 'income' && !isInvSell) {
+      if (t.transactionType == 'income' && !isInvSell && t.isCleared) {
         inc += t.amountThbSatang;
       } else if (t.transactionType == 'expense') {
         if (isInvBuy) {

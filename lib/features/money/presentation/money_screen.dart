@@ -5,8 +5,6 @@ import '../../../../l10n/app_localizations.dart';
 import '../../transactions/presentation/transaction_list_screen.dart';
 import '../../accounts/presentation/accounts_screen.dart';
 import '../../budget/presentation/budget_screen.dart';
-import '../../summary/presentation/monthly_summary_screen.dart';
-import '../../income_tracker/presentation/accrued_income_screen.dart';
 
 class MoneyScreen extends ConsumerStatefulWidget {
   final int initialTabIndex;
@@ -68,7 +66,6 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with SingleTickerProv
     final accentColor = VaultTheme.accent(context);
 
     final l10n = AppLocalizations.of(context);
-    final isThai = Localizations.localeOf(context).languageCode == 'th';
 
     return Scaffold(
       backgroundColor: VaultTheme.background(context),
@@ -84,30 +81,6 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with SingleTickerProv
             color: VaultTheme.primaryText(context),
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.pending_actions_outlined),
-            tooltip: isThai ? 'ติดตามรายได้ค้างรับ & เงินตกเบิก' : 'Accrued Income Tracker',
-            color: VaultTheme.secondaryText(context),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AccruedIncomeScreen()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.analytics_outlined),
-            tooltip: l10n?.monthlyOverview ?? (isThai ? 'สรุปภาพรวมรายเดือน' : 'Monthly overview'),
-            color: VaultTheme.secondaryText(context),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const MonthlySummaryScreen()),
-              );
-            },
-          ),
-        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: accentColor,

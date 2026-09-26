@@ -52,9 +52,13 @@ class RunRateCalculator {
         ? (remainingBudget / remainingDays).round()
         : 0;
 
-    // Year-end projection: accumulated year expense + (current monthly run rate * remaining months)
+    // Year-end projection:
+    // accumulatedYearExpenseSatang covers spending from Jan 1 up to currentDate.
+    // We add the remaining projected expense for the rest of the current month,
+    // plus the projected expense for all remaining full months in the year.
+    final remainingCurrentMonthProjection = (projectedMonthEnd - accumulatedMonthExpenseSatang).clamp(0, projectedMonthEnd);
     final remainingMonthsInYear = 12 - now.month;
-    final projectedYearEnd = accumulatedYearExpenseSatang + (projectedMonthEnd * remainingMonthsInYear);
+    final projectedYearEnd = accumulatedYearExpenseSatang + remainingCurrentMonthProjection + (projectedMonthEnd * remainingMonthsInYear);
 
     return RunRateForecast(
       daysPassed: daysPassed,

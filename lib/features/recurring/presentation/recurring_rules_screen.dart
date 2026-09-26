@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/database/database_provider.dart';
 import '../../../../core/money/money.dart';
+import '../../../../core/theme/vault_theme.dart';
 import 'recurring_rule_dialog.dart';
 
 class RecurringRulesScreen extends ConsumerStatefulWidget {
@@ -465,88 +466,107 @@ class _ProjectionTab extends ConsumerWidget {
           padding: const EdgeInsets.all(16),
           children: [
             // Forecast Summary Card
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            isThai ? 'ประมาณการกระแสเงินสด 30 วันข้างหน้า' : '30-Day Cash Flow Projection',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+            Container(
+              decoration: BoxDecoration(
+                color: VaultTheme.surface(context),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: VaultTheme.border(context), width: 0.8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.insights_rounded, size: 18, color: VaultTheme.accent(context)),
+                          const SizedBox(width: 8),
+                          Text(
+                            isThai ? 'กระแสเงินสด 30 วัน' : '30-Day Cash Flow',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: VaultTheme.primaryText(context),
+                            ),
                           ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: VaultTheme.accent(context).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        const SizedBox(width: 8),
-                        Text(
+                        child: Text(
                           '${items.length} ${isThai ? "รายการ" : "items"}',
-                          style: TextStyle(fontSize: 12, color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
+                          style: TextStyle(fontSize: 11.5, color: VaultTheme.accent(context), fontWeight: FontWeight.bold),
                         ),
-                      ],
-                    ),
-                    const Divider(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            children: [
-                              Text(isThai ? 'คาดว่าจะรับ' : 'Expected In', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                              const SizedBox(height: 2),
-                              Text(
-                                Money(projectedIncomeSatang).format(symbol: '฿'),
-                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.green.shade700),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                  Divider(height: 20, thickness: 0.6, color: VaultTheme.border(context)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          children: [
+                            Text(isThai ? 'คาดว่าจะรับ' : 'Expected In', style: TextStyle(fontSize: 11, color: VaultTheme.secondaryText(context))),
+                            const SizedBox(height: 3),
+                            Text(
+                              Money(projectedIncomeSatang).format(symbol: '฿'),
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: VaultTheme.positive(context)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(height: 30, width: 1, color: VaultTheme.border(context)),
+                      Expanded(
+                        child: Column(
+                          children: [
+                            Text(isThai ? 'คาดว่าจะจ่าย' : 'Expected Out', style: TextStyle(fontSize: 11, color: VaultTheme.secondaryText(context))),
+                            const SizedBox(height: 3),
+                            Text(
+                              Money(projectedExpenseSatang).format(symbol: '฿'),
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: VaultTheme.negative(context)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(height: 30, width: 1, color: VaultTheme.border(context)),
+                      Expanded(
+                        child: Column(
+                          children: [
+                            Text(isThai ? 'สุทธิ' : 'Net', style: TextStyle(fontSize: 11, color: VaultTheme.secondaryText(context))),
+                            const SizedBox(height: 3),
+                            Text(
+                              Money(projectedIncomeSatang - projectedExpenseSatang).format(symbol: '฿'),
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: (projectedIncomeSatang - projectedExpenseSatang) >= 0 ? VaultTheme.positive(context) : VaultTheme.negative(context),
                               ),
-                            ],
-                          ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
-                        Container(height: 30, width: 1, color: Colors.grey.shade300),
-                        Expanded(
-                          child: Column(
-                            children: [
-                              Text(isThai ? 'คาดว่าจะจ่าย' : 'Expected Out', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                              const SizedBox(height: 2),
-                              Text(
-                                Money(projectedExpenseSatang).format(symbol: '฿'),
-                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.red.shade700),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(height: 30, width: 1, color: Colors.grey.shade300),
-                        Expanded(
-                          child: Column(
-                            children: [
-                              Text(isThai ? 'สุทธิ' : 'Net', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                              const SizedBox(height: 2),
-                              Text(
-                                Money(projectedIncomeSatang - projectedExpenseSatang).format(symbol: '฿'),
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: (projectedIncomeSatang - projectedExpenseSatang) >= 0 ? Colors.green.shade800 : Colors.red.shade800,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 16),

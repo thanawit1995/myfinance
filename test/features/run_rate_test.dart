@@ -34,8 +34,12 @@ void main() {
       // Remaining budget = 25,000 - 15,000 = 10,000 THB across 15 days = ~666.67 THB (66,667 satang)
       expect(forecast.recommendedDailySpendSatang, equals(66667));
 
-      // Year-end projection: 120,000 + (30,000 * 3 remaining months Oct, Nov, Dec) = 210,000 THB
-      expect(forecast.projectedYearEndSatang, equals(21000000));
+      // Year-end projection:
+      // YTD so far = 120,000 THB (up to Sept 15)
+      // Remaining for Sept (15-30) = 30,000 - 15,000 = 15,000 THB
+      // Remaining 3 full months (Oct, Nov, Dec) = 30,000 * 3 = 90,000 THB
+      // Total Year-end = 120,000 + 15,000 + 90,000 = 225,000 THB (22,500,000 satang)
+      expect(forecast.projectedYearEndSatang, equals(22500000));
     });
 
     test('First day of month handles 1 day passed without zero division', () {

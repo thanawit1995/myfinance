@@ -7,6 +7,8 @@ import 'package:intl/intl.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/database/database_provider.dart';
 import '../../../../core/services/widget_service.dart';
+import '../../../../core/widgets/category_icon_helper.dart';
+import '../../categories/presentation/category_picker_sheet.dart';
 
 class EditTransactionDialog extends ConsumerStatefulWidget {
   final Transaction transaction;
@@ -399,16 +401,39 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                     future: ref.read(categoriesDaoProvider).getActiveCategories(_transactionType),
                     builder: (context, snapshot) {
                       final categories = snapshot.data ?? [];
-                      return DropdownButtonFormField<String>(
-                        decoration: const InputDecoration(
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          labelText: 'หมวดหมู่',
-                          border: OutlineInputBorder(),
+                      final selectedCat = categories.where((c) => c.id == _selectedCategoryId).firstOrNull;
+                      final name = selectedCat?.nameTh ?? 'เลือกหมวดหมู่';
+
+                      return InkWell(
+                        onTap: () async {
+                          final chosen = await CategoryPickerSheet.show(
+                            context,
+                            categoryType: _transactionType,
+                            selectedCategoryId: _selectedCategoryId,
+                          );
+                          if (chosen != null && mounted) {
+                            setState(() => _selectedCategoryId = chosen.id);
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(4),
+                        child: InputDecorator(
+                          decoration: InputDecoration(
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            labelText: 'หมวดหมู่',
+                            prefixIcon: selectedCat != null
+                                ? Icon(CategoryIconHelper.getIcon(selectedCat.icon), size: 18)
+                                : const Icon(Icons.category_outlined, size: 18),
+                            prefixIconConstraints: const BoxConstraints(minWidth: 36),
+                            suffixIcon: const Icon(Icons.chevron_right_rounded, size: 18),
+                            border: const OutlineInputBorder(),
+                          ),
+                          child: Text(
+                            name,
+                            style: const TextStyle(fontSize: 14),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                        initialValue: categories.any((c) => c.id == _selectedCategoryId) ? _selectedCategoryId : null,
-                        items: categories.map((c) => DropdownMenuItem(value: c.id, child: Text(c.nameTh))).toList(),
-                        onChanged: (val) => setState(() => _selectedCategoryId = val),
                       );
                     },
                   ),

@@ -523,5 +523,56 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
     }
     return cleanedCount;
   }
+
+  /// Align transaction_date with work_period for income transactions imported from Notion
+  /// e.g. P4P received on 2026-09-25 with work_period '2026-08' should be dated 2026-08-25
+  Future<int> alignIncomeDatesWithWorkPeriod() async {
+    final txs = await (select(transactions)
+          ..where((t) =>
+              t.transactionType.equals('income') &
+              t.workPeriod.isNotNull() &
+              t.deletedAt.isNull()))
+        .get();
+
+    int updatedCount = 0;
+    for (final tx in txs) {
+      final period = tx.workPeriod;
+      if (period == null || !period.contains('-')) continue;
+      final parts = period.split('-');
+      if (parts.length != 2) continue;
+      final targetYear = int.tryParse(parts[0]);
+      final targetMonth = int.tryParse(parts[1]);
+      if (targetYear == null || targetMonth == null || targetMonth < 1 || targetMonth > 12) continue;
+
+      if (tx.transactionDate.year != targetYear || tx.transactionDate.month != targetMonth) {
+        final daysInTargetMonth = DateTime(targetYear, targetMonth + 1, 0).day;
+        final targetDay = tx.transactionDate.day.clamp(1, daysInTargetMonth);
+        final newDate = DateTime(
+          targetYear,
+          targetMonth,
+          targetDay,
+          tx.transactionDate.hour,
+          tx.transactionDate.minute,
+          tx.transactionDate.second,
+        );
+
+        final payDayStr = '${tx.transactionDate.day.toString().padLeft(2, '0')}/${tx.transactionDate.month.toString().padLeft(2, '0')}/${tx.transactionDate.year}';
+        var note = tx.note ?? '';
+        if (!note.contains('รับเงินจริง')) {
+          note = note.isEmpty ? 'รับเงินจริง: $payDayStr' : '$note (รับเงินจริง: $payDayStr)';
+        }
+
+        await (update(transactions)..where((t) => t.id.equals(tx.id))).write(
+          TransactionsCompanion(
+            transactionDate: Value(newDate),
+            note: Value(note),
+            updatedAt: Value(DateTime.now()),
+          ),
+        );
+        updatedCount++;
+      }
+    }
+    return updatedCount;
+  }
 }
 

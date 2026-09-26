@@ -514,11 +514,14 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
 
     // 4. Record Transaction in ledger (income proceeds into destinationAccountId)
     final amountOriginalSatang = (quantity * unitSellPrice * Decimal.fromInt(100)).round().toBigInt().toInt();
+    final saleCategory = await attachedDatabase.categoriesDao.getOrCreateAssetSaleCategory();
 
     await into(transactions).insert(
       TransactionsCompanion.insert(
         id: txId,
         transactionType: 'income',
+        categoryId: Value(saleCategory.id),
+        taxCategory: const Value('non_taxable'),
         amountOriginalSatang: amountOriginalSatang,
         currencyCode: currencyCode,
         fxRate: Value(fxRate.toString()),

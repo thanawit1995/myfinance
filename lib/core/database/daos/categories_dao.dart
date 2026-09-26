@@ -85,6 +85,36 @@ class CategoriesDao extends DatabaseAccessor<AppDatabase> with _$CategoriesDaoMi
     }
   }
 
+  /// Returns or creates the system standard "ขายสินทรัพย์" (Asset Sale) category for sell trades.
+  Future<Category> getOrCreateAssetSaleCategory() async {
+    final existing = await (select(categories)
+          ..where((c) =>
+              c.deletedAt.isNull() &
+              c.categoryType.equals('income') &
+              (c.nameTh.equals('ขายสินทรัพย์') | c.nameEn.equals('Asset Sale'))))
+        .getSingleOrNull();
+
+    if (existing != null) return existing;
+
+    final now = DateTime.now();
+    final newCat = CategoriesCompanion.insert(
+      id: 'cat-inc-0000-4000-8000-000000000099',
+      nameTh: 'ขายสินทรัพย์',
+      nameEn: 'Asset Sale',
+      categoryType: 'income',
+      taxIncomeType: const Value('non_taxable'),
+      icon: const Value('sell'),
+      color: const Value('0xFF2E7D32'),
+      isSystem: const Value(true),
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    await into(categories).insert(newCat, mode: InsertMode.insertOrIgnore);
+    return (await getCategoryById(newCat.id.value)) ??
+        (await (select(categories)..where((c) => c.nameTh.equals('ขายสินทรัพย์'))).getSingle());
+  }
+
   Future<List<Category>> getActiveCategoriesOrderedByUsage([String? type]) async {
     if (type == null || type == 'expense') {
       await ensureEssentialTaxCategories();

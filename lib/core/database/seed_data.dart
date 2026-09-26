@@ -156,6 +156,18 @@ class SeedData {
         createdAt: now,
         updatedAt: now,
       ),
+      CategoriesCompanion.insert(
+        id: 'cat-inc-0000-4000-8000-000000000099',
+        nameTh: 'ขายสินทรัพย์',
+        nameEn: 'Asset Sale',
+        categoryType: 'income',
+        taxIncomeType: const Value('non_taxable'),
+        icon: const Value('sell'),
+        color: const Value('0xFF2E7D32'),
+        isSystem: const Value(true),
+        createdAt: now,
+        updatedAt: now,
+      ),
 
       // Expenses
       CategoriesCompanion.insert(

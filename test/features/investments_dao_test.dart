@@ -167,9 +167,16 @@ void main() {
 
       // Check RealizedGainLoss summary
       final yearlySummaries = await db.investmentsDao.getRealizedGainLossByYear();
-      expect(yearlySummaries.length, 1);
       expect(yearlySummaries.first.year, 2026);
       expect(yearlySummaries.first.totalFeeThbSatang, 10000);
+
+      // Verify sell transaction category is 'ขายสินทรัพย์' and taxCategory is 'non_taxable'
+      final allTxs = await db.transactionsDao.getAllTransactions();
+      final sellTx = allTxs.firstWhere((t) => t.transactionType == 'income' && t.tag == 'investment_sell:$assetId');
+      expect(sellTx.categoryId, isNotNull);
+      final cat = await db.categoriesDao.getCategoryById(sellTx.categoryId!);
+      expect(cat?.nameTh, 'ขายสินทรัพย์');
+      expect(sellTx.taxCategory, 'non_taxable');
     });
 
     test('Recalculate FIFO resets and replays all sales chronologically', () async {

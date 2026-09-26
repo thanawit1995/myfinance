@@ -115,6 +115,35 @@ class CategoriesDao extends DatabaseAccessor<AppDatabase> with _$CategoriesDaoMi
         (await (select(categories)..where((c) => c.nameTh.equals('ขายสินทรัพย์'))).getSingle());
   }
 
+  /// Returns or creates the standard "การลงทุน" (Investment) expense category for buy trades.
+  Future<Category> getOrCreateInvestmentExpenseCategory() async {
+    final existing = await (select(categories)
+          ..where((c) =>
+              c.deletedAt.isNull() &
+              c.categoryType.equals('expense') &
+              (c.nameTh.equals('การลงทุน') | c.nameEn.equals('Investment'))))
+        .getSingleOrNull();
+
+    if (existing != null) return existing;
+
+    final now = DateTime.now();
+    final newCat = CategoriesCompanion.insert(
+      id: 'cat-exp-0000-4000-8000-000000000099',
+      nameTh: 'การลงทุน',
+      nameEn: 'Investment',
+      categoryType: 'expense',
+      icon: const Value('show_chart'),
+      color: const Value('0xFF1976D2'),
+      isSystem: const Value(true),
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    await into(categories).insert(newCat, mode: InsertMode.insertOrIgnore);
+    return (await getCategoryById(newCat.id.value)) ??
+        (await (select(categories)..where((c) => c.nameTh.equals('การลงทุน'))).getSingle());
+  }
+
   Future<List<Category>> getActiveCategoriesOrderedByUsage([String? type]) async {
     if (type == null || type == 'expense') {
       await ensureEssentialTaxCategories();

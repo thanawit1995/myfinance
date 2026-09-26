@@ -2,6 +2,20 @@
 
 อัปเดตล่าสุด: 26 กันยายน 2026
 
+- [x] **Auto Investment Category for Buy Trades, Action Button Cleanup & Release Build**:
+  - **1. หมวดหมู่ "การลงทุน" สำหรับการซื้อสินทรัพย์ (Auto Investment Expense Category)**:
+    - เพิ่มฟังก์ชัน `getOrCreateInvestmentExpenseCategory()` ใน `CategoriesDao` เพื่อสร้าง/เรียกใช้หมวดหมู่รายจ่าย "การลงทุน" (Investment)
+    - ปรับปรุง `InvestmentsDao.recordBuyTrade()` ให้กำหนด `categoryId` เป็นหมวดหมู่ "การลงทุน" ลงใน ledger transaction โดยอัตโนมัติ
+    - เพิ่ม Unit Test ครอบคลุมการบันทึกหมวดหมู่นี้ใน `test/features/investments_dao_test.dart`
+  - **2. ตัดปุ่มส่วนเกินออกตามรูปภาพที่ผู้ใช้แจ้ง (UI Cleanup)**:
+    - หน้าพอร์ตการลงทุน (`portfolio_screen.dart`): ตัดปุ่มด่วน 3 ปุ่มในหน้าถือครองออก (`+ เพิ่มสินทรัพย์`, `อัปเดตราคาตลาด`, `บันทึกเงินปันผล`) เพื่อให้หน้าจอสะอาดตา ไม่ซ้ำซ้อนกับเมนูด้านบน
+    - หน้าแรก (`vault_home_screen.dart`): ตัดปุ่มค้นหาและปุ่มตั้งค่าที่มุมขวาบนของ Header ออกตามภาพ
+  - **3. การตรวจสอบ & ผลิตภัณฑ์**:
+    - `flutter analyze`: **0 errors, 0 warnings**
+    - `flutter test`: ผ่านทั้งหมด **158/158 tests passed** (100%)
+    - อัปเดตขึ้น GitHub (`origin main`)
+    - สร้างไฟล์ Android APK (`flutter build apk --release`)
+
 - [x] **UI Overhaul: Portfolio/Investments, Category Management & Budget/Project Dialogs**:
   - **1. เมนูการลงทุน (Investments & Portfolio)**:
     - **ลบปุ่มลอย (FAB) "ซื้อ / ขาย"** ออกจากทุกหน้าและทุกแท็บของเมนูการลงทุน เพื่อไม่ให้บดบังข้อมูล

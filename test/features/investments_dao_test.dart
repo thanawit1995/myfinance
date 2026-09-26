@@ -73,6 +73,10 @@ void main() {
       expect(tx.transactionType, 'expense');
       expect(tx.amountThbSatang, 650000);
       expect(tx.feeThbSatang, 2500);
+      expect(tx.categoryId, isNotNull);
+      final cat = await db.categoriesDao.getCategoryById(tx.categoryId!);
+      expect(cat?.nameTh, 'การลงทุน');
+      expect(cat?.categoryType, 'expense');
     });
 
     test('Sell trade consumes lots with FIFO and splits Price P&L vs FX P&L', () async {

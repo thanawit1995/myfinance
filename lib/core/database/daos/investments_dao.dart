@@ -367,10 +367,13 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
     }
 
     // 2. Record Transaction in ledger (expense from sourceAccountId)
+    final investmentCategory = await attachedDatabase.categoriesDao.getOrCreateInvestmentExpenseCategory();
+
     await into(transactions).insert(
       TransactionsCompanion.insert(
         id: txId,
         transactionType: 'expense',
+        categoryId: Value(investmentCategory.id),
         amountOriginalSatang: amountOriginalSatang,
         currencyCode: currencyCode,
         fxRate: Value(fxRate.toString()),

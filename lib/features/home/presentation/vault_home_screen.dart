@@ -302,31 +302,9 @@ class VaultHomeScreen extends ConsumerWidget {
           ),
         ],
       ),
-        Row(
-          children: [
-            IconButton(
-              icon: Icon(
-                Icons.search_rounded,
-                size: 22,
-                color: VaultTheme.secondaryText(context),
-              ),
-              onPressed: onNavigateToMoney,
-              tooltip: l10n?.searchTransactions ?? 'ค้นหาธุรกรรม',
-            ),
-            IconButton(
-              icon: Icon(
-                Icons.tune_rounded,
-                size: 22,
-                color: VaultTheme.secondaryText(context),
-              ),
-              onPressed: onOpenSettings,
-              tooltip: l10n?.settingsAndSecurity ?? 'การตั้งค่าและระบบความปลอดภัย',
-            ),
-          ],
-        ),
-      ],
-    );
-  }
+    ],
+  );
+}
 
   // --- 2. Master Budget Hero Card ---
   Widget _buildMasterBudgetCard(BuildContext context, _VaultHomeData data, DateTime now) {

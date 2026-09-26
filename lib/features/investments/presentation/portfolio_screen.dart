@@ -438,50 +438,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
           ),
           const SizedBox(height: 16),
 
-          // 2. Quick Action Buttons (เพิ่มสินทรัพย์, อัปเดตราคา, บันทึกปันผล)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  ),
-                  icon: const Icon(Icons.add, size: 18),
-                  label: Text(isThai ? 'เพิ่มสินทรัพย์' : 'Add Asset', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  onPressed: () async {
-                    final ok = await AssetFormDialog.show(context);
-                    if (ok == true && mounted) setState(() {});
-                  },
-                ),
-                FilledButton.tonalIcon(
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  ),
-                  icon: const Icon(Icons.price_change_outlined, size: 18),
-                  label: Text(isThai ? 'อัปเดตราคาตลาด' : 'Update Prices', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  onPressed: () async {
-                    final ok = await MonthlyValuationScreen.show(context);
-                    if (ok == true && mounted) setState(() {});
-                  },
-                ),
-                FilledButton.tonalIcon(
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  ),
-                  icon: const Icon(Icons.savings_outlined, size: 18),
-                  label: Text(isThai ? 'บันทึกเงินปันผล' : 'Record Dividend', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  onPressed: () async {
-                    final ok = await DividendIncomeDialog.show(context);
-                    if (ok == true && mounted) setState(() {});
-                  },
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
+
 
           // 3. Asset Allocation Donut Chart
           _buildAllocationChart(context, holdings, summary.totalValueThbSatang, isThai),

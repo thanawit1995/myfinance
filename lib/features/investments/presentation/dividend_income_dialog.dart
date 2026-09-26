@@ -12,9 +12,11 @@ class DividendIncomeDialog extends ConsumerStatefulWidget {
   const DividendIncomeDialog({super.key, this.initialAsset});
 
   static Future<bool?> show(BuildContext context, {Asset? initialAsset}) {
-    return showDialog<bool>(
-      context: context,
-      builder: (context) => DividendIncomeDialog(initialAsset: initialAsset),
+    return Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DividendIncomeDialog(initialAsset: initialAsset),
+      ),
     );
   }
 
@@ -121,15 +123,17 @@ class _DividendIncomeDialogState extends ConsumerState<DividendIncomeDialog> {
     final isDark = theme.brightness == Brightness.dark;
     final isThai = Localizations.localeOf(context).languageCode == 'th';
 
-    return AlertDialog(
-      title: Text(isThai ? 'บันทึกเงินปันผล' : 'Record Dividend'),
-      content: SizedBox(
-        width: 480,
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(isThai ? 'บันทึกเงินปันผล/ดอกเบี้ย' : 'Record Dividend / Interest'),
+      ),
+      body: SafeArea(
         child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
           child: Form(
             key: _formKey,
             child: Column(
-              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // 1. Asset
                 FutureBuilder<List<Asset>>(
@@ -328,15 +332,27 @@ class _DividendIncomeDialogState extends ConsumerState<DividendIncomeDialog> {
                     border: OutlineInputBorder(),
                   ),
                 ),
+                const SizedBox(height: 24),
               ],
             ),
           ),
         ),
       ),
-      actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('ยกเลิก')),
-        FilledButton(onPressed: _submit, child: Text(isThai ? 'บันทึกเงินปันผล' : 'Record Dividend')),
-      ],
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: FilledButton(
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            onPressed: _submit,
+            child: Text(
+              isThai ? 'บันทึกเงินปันผล' : 'Record Dividend',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

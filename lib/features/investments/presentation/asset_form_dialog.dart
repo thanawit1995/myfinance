@@ -13,9 +13,11 @@ class AssetFormDialog extends ConsumerStatefulWidget {
   const AssetFormDialog({super.key, this.assetToEdit});
 
   static Future<bool?> show(BuildContext context, {Asset? assetToEdit}) {
-    return showDialog<bool>(
-      context: context,
-      builder: (context) => AssetFormDialog(assetToEdit: assetToEdit),
+    return Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AssetFormDialog(assetToEdit: assetToEdit),
+      ),
     );
   }
 
@@ -148,15 +150,18 @@ class _AssetFormDialogState extends ConsumerState<AssetFormDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.assetToEdit == null ? 'เพิ่มสินทรัพย์ใหม่' : 'แก้ไขสินทรัพย์'),
-      content: SizedBox(
-        width: 480,
+    final isEditing = widget.assetToEdit != null;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(isEditing ? 'แก้ไขข้อมูลสินทรัพย์' : 'เพิ่มสินทรัพย์ใหม่'),
+      ),
+      body: SafeArea(
         child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
           child: Form(
             key: _formKey,
             child: Column(
-              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // 1. Symbol & Name
                 TextFormField(
@@ -302,15 +307,27 @@ class _AssetFormDialogState extends ConsumerState<AssetFormDialog> {
                     border: OutlineInputBorder(),
                   ),
                 ),
+                const SizedBox(height: 24),
               ],
             ),
           ),
         ),
       ),
-      actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('ยกเลิก')),
-        FilledButton(onPressed: _submit, child: const Text('บันทึกสินทรัพย์')),
-      ],
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: FilledButton(
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            onPressed: _submit,
+            child: Text(
+              isEditing ? 'บันทึกการแก้ไข' : 'บันทึกสินทรัพย์',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

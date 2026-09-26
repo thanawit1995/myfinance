@@ -236,20 +236,14 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
         ],
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: true,
+          tabAlignment: TabAlignment.center,
           tabs: [
             Tab(text: l10n?.holdings ?? (isThai ? 'สินทรัพย์ที่ถือครอง' : 'Holdings'), icon: const Icon(Icons.pie_chart)),
             Tab(text: l10n?.realizedPnl ?? (isThai ? 'กำไรที่รับรู้แล้ว' : 'Realized P&L'), icon: const Icon(Icons.history)),
             Tab(text: l10n?.history ?? (isThai ? 'ประวัติการซื้อ-ขาย' : 'Trade History'), icon: const Icon(Icons.swap_horiz)),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        icon: const Icon(Icons.swap_horiz),
-        label: Text(isThai ? 'ซื้อ / ขาย' : (l10n?.trade ?? 'Buy / Sell')),
-        onPressed: () async {
-          final ok = await BuySellTradeDialog.show(context);
-          if (ok == true && mounted) setState(() {});
-        },
       ),
       body: FutureBuilder<PortfolioSummary>(
         future: invDao.getPortfolioSummary(),
@@ -447,47 +441,44 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
           // 2. Quick Action Buttons (เพิ่มสินทรัพย์, อัปเดตราคา, บันทึกปันผล)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    ),
-                    icon: const Icon(Icons.add, size: 20),
-                    label: Text(isThai ? 'เพิ่มสินทรัพย์' : 'Add Asset', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    onPressed: () async {
-                      final ok = await AssetFormDialog.show(context);
-                      if (ok == true && mounted) setState(() {});
-                    },
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   ),
-                  const SizedBox(width: 8),
-                  FilledButton.tonalIcon(
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    ),
-                    icon: const Icon(Icons.price_change_outlined, size: 20),
-                    label: Text(isThai ? 'อัปเดตราคาตลาด' : 'Update Prices', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    onPressed: () async {
-                      final ok = await MonthlyValuationScreen.show(context);
-                      if (ok == true && mounted) setState(() {});
-                    },
+                  icon: const Icon(Icons.add, size: 18),
+                  label: Text(isThai ? 'เพิ่มสินทรัพย์' : 'Add Asset', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  onPressed: () async {
+                    final ok = await AssetFormDialog.show(context);
+                    if (ok == true && mounted) setState(() {});
+                  },
+                ),
+                FilledButton.tonalIcon(
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   ),
-                  const SizedBox(width: 8),
-                  FilledButton.tonalIcon(
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    ),
-                    icon: const Icon(Icons.savings_outlined, size: 20),
-                    label: Text(isThai ? 'บันทึกเงินปันผล' : 'Record Dividend', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    onPressed: () async {
-                      final ok = await DividendIncomeDialog.show(context);
-                      if (ok == true && mounted) setState(() {});
-                    },
+                  icon: const Icon(Icons.price_change_outlined, size: 18),
+                  label: Text(isThai ? 'อัปเดตราคาตลาด' : 'Update Prices', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  onPressed: () async {
+                    final ok = await MonthlyValuationScreen.show(context);
+                    if (ok == true && mounted) setState(() {});
+                  },
+                ),
+                FilledButton.tonalIcon(
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   ),
-                ],
-              ),
+                  icon: const Icon(Icons.savings_outlined, size: 18),
+                  label: Text(isThai ? 'บันทึกเงินปันผล' : 'Record Dividend', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  onPressed: () async {
+                    final ok = await DividendIncomeDialog.show(context);
+                    if (ok == true && mounted) setState(() {});
+                  },
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 16),
@@ -498,15 +489,9 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
 
           // 4. Holdings List
           if (holdings.isNotEmpty) ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(isThai ? 'รายการสินทรัพย์ที่ถืออยู่ (${holdings.length})' : 'Holdings (${holdings.length})', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                Text(
-                  isThai ? 'แตะเพื่อจัดการ Lot หรือซื้อขาย' : 'Tap to manage lots or trade',
-                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                ),
-              ],
+            Text(
+              isThai ? 'รายการสินทรัพย์ที่ถืออยู่ (${holdings.length})' : 'Holdings (${holdings.length})',
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
           ] else ...[
@@ -909,16 +894,20 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Year & Net P&L Header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
                       children: [
                         Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.calendar_today_rounded, size: 16, color: Theme.of(context).colorScheme.primary),
                             const SizedBox(width: 8),
                             Text(
                               isThai ? 'ปีภาษี ค.ศ. ${y.year} (พ.ศ. ${y.year + 543})' : 'Tax Year ${y.year}',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                             ),
                           ],
                         ),
@@ -932,7 +921,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                             isProfit ? '+${netMoney.format(symbol: '฿')}' : netMoney.format(symbol: '฿'),
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                              fontSize: 15,
                               color: isProfit ? AppTheme.incomeColor(context) : AppTheme.expenseColor(context),
                             ),
                           ),

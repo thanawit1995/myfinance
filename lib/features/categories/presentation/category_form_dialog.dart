@@ -21,11 +21,13 @@ class CategoryFormDialog extends ConsumerStatefulWidget {
     Category? category,
     String? initialType,
   }) {
-    return showDialog<Category?>(
-      context: context,
-      builder: (_) => CategoryFormDialog(
-        categoryToEdit: category,
-        initialType: initialType,
+    return Navigator.push<Category?>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CategoryFormDialog(
+          categoryToEdit: category,
+          initialType: initialType,
+        ),
       ),
     );
   }
@@ -60,6 +62,96 @@ class _CategoryFormDialogState extends ConsumerState<CategoryFormDialog> {
     _nameThController.dispose();
     _nameEnController.dispose();
     super.dispose();
+  }
+
+  Future<void> _hideCategory() async {
+    final existing = widget.categoryToEdit;
+    if (existing == null) return;
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(existing.isSystem
+            ? (isThai ? 'ซ่อนหมวดหมู่ค่าเริ่มต้น' : 'Hide Default Category')
+            : (isThai ? 'ยืนยันการซ่อนหมวดหมู่' : 'Confirm Hide Category')),
+        content: Text(
+          isThai
+              ? 'ต้องการซ่อนหมวดหมู่ "${existing.nameTh}" ไว้ก่อนหรือไม่?\n\nสามารถกู้คืนได้ตลอดเวลาจากเมนู "หมวดหมู่ที่ถูกซ่อน"'
+              : 'Hide category "${existing.nameTh}"?\n\nYou can restore it anytime from hidden categories.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.orange),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(isThai ? 'ซ่อนหมวดหมู่' : 'Hide'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      final dao = ref.read(categoriesDaoProvider);
+      await dao.deactivateCategory(existing.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isThai
+                ? 'ซ่อนหมวดหมู่ "${existing.nameTh}" แล้ว'
+                : 'Hidden category "${existing.nameTh}"'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.of(context).pop(existing);
+      }
+    }
+  }
+
+  Future<void> _deleteCategory() async {
+    final existing = widget.categoryToEdit;
+    if (existing == null || existing.isSystem) return;
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(isThai ? 'ยืนยันลบหมวดหมู่' : 'Confirm Delete Category'),
+        content: Text(
+          isThai
+              ? 'คุณต้องการลบหมวดหมู่ "${existing.nameTh}" ใช่หรือไม่?\n\n(รายการธุรกรรมเดิมที่เคยบันทึกไว้จะไม่สูญหาย)'
+              : 'Do you want to delete category "${existing.nameTh}"?\n\n(Existing recorded transactions will not be lost)',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(isThai ? 'ลบหมวดหมู่' : 'Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      final dao = ref.read(categoriesDaoProvider);
+      await dao.softDeleteCategory(existing.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isThai
+                ? 'ลบหมวดหมู่ "${existing.nameTh}" แล้ว'
+                : 'Deleted category "${existing.nameTh}"'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.of(context).pop(existing);
+      }
+    }
   }
 
   Future<void> _save() async {
@@ -116,20 +208,22 @@ class _CategoryFormDialogState extends ConsumerState<CategoryFormDialog> {
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.categoryToEdit != null;
+    final isSystem = widget.categoryToEdit?.isSystem ?? false;
     final isThai = Localizations.localeOf(context).languageCode == 'th';
 
-    return AlertDialog(
-      title: Text(isEditing
-          ? (isThai ? 'แก้ไขหมวดหมู่' : 'Edit Category')
-          : (isThai ? 'สร้างหมวดหมู่ใหม่' : 'New Category')),
-      content: SizedBox(
-        width: 420,
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(isEditing
+            ? (isThai ? 'แก้ไขหมวดหมู่' : 'Edit Category')
+            : (isThai ? 'สร้างหมวดหมู่ใหม่' : 'New Category')),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Form(
+            key: _formKey,
             child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 DropdownButtonFormField<String>(
                   initialValue: _categoryType,
@@ -152,7 +246,7 @@ class _CategoryFormDialogState extends ConsumerState<CategoryFormDialog> {
                     if (val != null) setState(() => _categoryType = val);
                   },
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 TextFormField(
                   controller: _nameThController,
                   decoration: InputDecoration(
@@ -164,7 +258,7 @@ class _CategoryFormDialogState extends ConsumerState<CategoryFormDialog> {
                   validator: (v) =>
                       (v == null || v.trim().isEmpty) ? (isThai ? 'กรุณาระบุชื่อ' : 'Please enter name') : null,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 TextFormField(
                   controller: _nameEnController,
                   decoration: InputDecoration(
@@ -174,14 +268,14 @@ class _CategoryFormDialogState extends ConsumerState<CategoryFormDialog> {
                     border: const OutlineInputBorder(),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
                 Text(
                   isThai ? 'เลือกไอคอนสัญลักษณ์:' : 'Choose an icon:',
                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Container(
-                  height: 200,
+                  height: 240,
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.grey.shade300),
                     borderRadius: BorderRadius.circular(10),
@@ -242,23 +336,66 @@ class _CategoryFormDialogState extends ConsumerState<CategoryFormDialog> {
                     }).toList(),
                   ),
                 ),
+                if (isEditing) ...[
+                  const SizedBox(height: 24),
+                  const Divider(),
+                  const SizedBox(height: 12),
+                  Text(
+                    isThai ? 'การจัดการหมวดหมู่' : 'Category Actions',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.orange,
+                          side: const BorderSide(color: Colors.orange),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        ),
+                        icon: const Icon(Icons.visibility_off_outlined, size: 18),
+                        label: Text(isThai ? 'ซ่อนหมวดหมู่นี้' : 'Hide Category'),
+                        onPressed: _hideCategory,
+                      ),
+                      if (!isSystem)
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red,
+                            side: const BorderSide(color: Colors.red),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          ),
+                          icon: const Icon(Icons.delete_outline, size: 18),
+                          label: Text(isThai ? 'ลบหมวดหมู่นี้' : 'Delete Category'),
+                          onPressed: _deleteCategory,
+                        ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 24),
               ],
             ),
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: FilledButton(
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            onPressed: _save,
+            child: Text(
+              isEditing
+                  ? (isThai ? 'บันทึกการแก้ไข' : 'Save Changes')
+                  : (isThai ? 'สร้างหมวดหมู่' : 'Create Category'),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
         ),
-        FilledButton(
-          onPressed: _save,
-          child: Text(isEditing
-              ? (isThai ? 'บันทึกการแก้ไข' : 'Save Changes')
-              : (isThai ? 'สร้างหมวดหมู่' : 'Create Category')),
-        ),
-      ],
+      ),
     );
   }
 }

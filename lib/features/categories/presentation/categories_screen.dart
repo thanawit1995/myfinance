@@ -175,7 +175,6 @@ class _CategoryListViewState extends ConsumerState<_CategoryListView> {
     final isLumi = VaultTheme.isLumi(context);
     final l10n = AppLocalizations.of(context);
     final isThai = Localizations.localeOf(context).languageCode == 'th';
-    final accentColor = VaultTheme.accent(context);
 
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -246,34 +245,9 @@ class _CategoryListViewState extends ConsumerState<_CategoryListView> {
       );
     }
 
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          color: VaultTheme.surface(context).withValues(alpha: 0.6),
-          child: Row(
-            children: [
-              Icon(Icons.swap_vert, size: 18, color: accentColor),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  isThai
-                      ? 'กดค้างแล้วลากเพื่อจัดลำดับ (ลำดับนี้จะแสดงในหน้า Quick Add)'
-                      : 'Press & drag to reorder (used in Quick Add)',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: VaultTheme.secondaryText(context),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: ReorderableListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
-            itemCount: categories.length,
+    return ReorderableListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 90),
+      itemCount: categories.length,
             // ignore: deprecated_member_use
             onReorder: (oldIndex, newIndex) async {
               if (newIndex > oldIndex) {
@@ -297,12 +271,9 @@ class _CategoryListViewState extends ConsumerState<_CategoryListView> {
                 dao,
                 index,
                 key: ValueKey(cat.id),
-              );
-            },
-          ),
-        ),
-      ],
-    );
+          );
+        },
+      );
   }
 
   Widget _buildCategoryCard(
@@ -334,9 +305,21 @@ class _CategoryListViewState extends ConsumerState<_CategoryListView> {
       color: showInactive
           ? VaultTheme.surface(context).withValues(alpha: 0.5)
           : VaultTheme.surface(context),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        child: Row(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(isLumi ? 16 : 12),
+        onTap: showInactive
+            ? null
+            : () async {
+                final updated =
+                    await CategoryFormDialog.show(context, category: cat);
+                if (updated != null) {
+                  widget.onChanged();
+                  await _loadData();
+                }
+              },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
           children: [
             CircleAvatar(
               radius: 20,
@@ -440,151 +423,26 @@ class _CategoryListViewState extends ConsumerState<_CategoryListView> {
                 ),
               )
             else
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.all(4),
-                    constraints: const BoxConstraints(),
-                    icon: Icon(Icons.edit_outlined,
-                        size: 18, color: VaultTheme.secondaryText(context)),
-                    tooltip: l10n?.editCategory ?? 'แก้ไขหมวดหมู่',
-                    onPressed: () async {
-                      final updated =
-                          await CategoryFormDialog.show(context, category: cat);
-                      if (updated != null) {
-                        widget.onChanged();
-                        await _loadData();
-                      }
-                    },
-                  ),
-                  const SizedBox(width: 6),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.all(4),
-                    constraints: const BoxConstraints(),
-                    icon: const Icon(Icons.visibility_off_outlined,
-                        size: 18, color: Colors.orange),
-                    tooltip: cat.isSystem
-                        ? (isThai ? 'ซ่อนหมวดหมู่นี้' : 'Hide default category')
-                        : (isThai ? 'ปิดใช้งานหมวดหมู่' : 'Deactivate category'),
-                    onPressed: () async {
-                      final confirm = await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: Text(cat.isSystem
-                              ? (isThai ? 'ซ่อนหมวดหมู่ค่าเริ่มต้น' : 'Hide Default Category')
-                              : (isThai ? 'ยืนยันปิดใช้งาน' : 'Confirm Deactivation')),
-                          content: Text(
-                            cat.isSystem
-                                ? (isThai
-                                    ? 'ต้องการซ่อนหมวดหมู่ "${cat.nameTh}" ไว้ก่อนหรือไม่?\n\nสามารถกู้คืนได้ตลอดเวลาโดยกดไอคอนตาในหน้านี้'
-                                    : 'Hide default category "$primaryName"?\n\nYou can restore it anytime via the eye icon.')
-                                : (isThai
-                                    ? 'ต้องการปิดใช้งานหมวดหมู่ "${cat.nameTh}" หรือไม่?\n\nสามารถกู้คืนได้ตลอดเวลา'
-                                    : 'Deactivate category "$primaryName"?\n\nYou can restore it anytime.'),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(ctx).pop(false),
-                              child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
-                            ),
-                            FilledButton(
-                              style:
-                                  FilledButton.styleFrom(backgroundColor: Colors.orange),
-                              onPressed: () => Navigator.of(ctx).pop(true),
-                              child: Text(isThai ? 'ซ่อน / ปิดใช้งาน' : 'Hide / Deactivate'),
-                            ),
-                          ],
-                        ),
-                      );
-
-                      if (confirm == true) {
-                        await dao.deactivateCategory(cat.id);
-                        widget.onChanged();
-                        await _loadData();
-                        if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(isThai
-                                ? 'ซ่อน "${cat.nameTh}" แล้ว — กดไอคอนตาเพื่อกู้คืน'
-                                : 'Hidden "$primaryName" — tap eye icon to restore'),
-                            behavior: SnackBarBehavior.floating,
-                            duration: const Duration(seconds: 3),
-                          ),
-                        );
-                      }
-                    },
-                  ),
-                  if (!cat.isSystem) ...[
-                    const SizedBox(width: 6),
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.all(4),
-                      constraints: const BoxConstraints(),
-                      icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                      tooltip: isThai ? 'ลบหมวดหมู่นี้' : 'Delete category',
-                      onPressed: () async {
-                        final confirm = await showDialog<bool>(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            title: Text(isThai ? 'ยืนยันลบหมวดหมู่' : 'Confirm Delete Category'),
-                            content: Text(
-                              isThai
-                                  ? 'คุณต้องการลบหมวดหมู่ "$primaryName" ใช่หรือไม่?\n\n(รายการธุรกรรมเดิมที่เคยบันทึกไว้จะไม่สูญหาย)'
-                                  : 'Do you want to delete category "$primaryName"?\n\n(Existing recorded transactions will not be lost)',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.of(ctx).pop(false),
-                                child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
-                              ),
-                              FilledButton(
-                                style: FilledButton.styleFrom(backgroundColor: Colors.red),
-                                onPressed: () => Navigator.of(ctx).pop(true),
-                                child: Text(isThai ? 'ลบหมวดหมู่' : 'Delete'),
-                              ),
-                            ],
-                          ),
-                        );
-
-                        if (confirm == true) {
-                          await dao.softDeleteCategory(cat.id);
-                          widget.onChanged();
-                          await _loadData();
-                          if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(isThai
-                                  ? 'ลบหมวดหมู่ "$primaryName" แล้ว'
-                                  : 'Deleted category "$primaryName"'),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                      },
-                    ),
-                  ],
-                  if (!showInactive) ...[
-                    const SizedBox(width: 4),
-                    ReorderableDragStartListener(
-                      index: index,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                        child: Icon(
-                          Icons.drag_indicator,
-                          size: 20,
-                          color: VaultTheme.secondaryText(context).withValues(alpha: 0.6),
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(),
+                icon: Icon(Icons.edit_outlined,
+                    size: 20, color: VaultTheme.secondaryText(context)),
+                tooltip: l10n?.editCategory ?? 'แก้ไขหมวดหมู่',
+                onPressed: () async {
+                  final updated =
+                      await CategoryFormDialog.show(context, category: cat);
+                  if (updated != null) {
+                    widget.onChanged();
+                    await _loadData();
+                  }
+                },
               ),
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

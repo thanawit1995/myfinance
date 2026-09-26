@@ -967,69 +967,73 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
         return StatefulBuilder(
           builder: (dialogCtx, setDialogState) {
             return AlertDialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
               title: Text(isThai ? 'ตั้งงบประมาณรายเดือน' : 'Set Monthly Budget'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          decoration: InputDecoration(
-                            labelText: isThai ? 'เลือกหมวดหมู่' : 'Select Category',
-                            border: const OutlineInputBorder(),
-                          ),
-                          isExpanded: true,
-                          initialValue: selectedCatId,
-                          items: categories
-                              .map((c) => DropdownMenuItem(
-                                    value: c.id,
-                                    child: Row(
-                                      children: [
-                                        Icon(CategoryIconHelper.getIcon(c.icon), size: 18),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            c.localizedName(context),
-                                            overflow: TextOverflow.ellipsis,
+              content: SizedBox(
+                width: 440,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            decoration: InputDecoration(
+                              labelText: isThai ? 'เลือกหมวดหมู่' : 'Select Category',
+                              border: const OutlineInputBorder(),
+                            ),
+                            isExpanded: true,
+                            initialValue: selectedCatId,
+                            items: categories
+                                .map((c) => DropdownMenuItem(
+                                      value: c.id,
+                                      child: Row(
+                                        children: [
+                                          Icon(CategoryIconHelper.getIcon(c.icon), size: 18),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              c.localizedName(context),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                  ))
-                              .toList(),
-                          onChanged: (val) => setDialogState(() => selectedCatId = val),
+                                        ],
+                                      ),
+                                    ))
+                                .toList(),
+                            onChanged: (val) => setDialogState(() => selectedCatId = val),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Tooltip(
-                        message: isThai ? 'สร้างหมวดหมู่ใหม่' : 'Create New Category',
-                        child: IconButton.filled(
-                          icon: const Icon(Icons.add, size: 20),
-                          onPressed: () async {
-                            Navigator.of(ctx).pop('_create_new_category_');
-                          },
+                        const SizedBox(width: 8),
+                        Tooltip(
+                          message: isThai ? 'สร้างหมวดหมู่ใหม่' : 'Create New Category',
+                          child: IconButton.filled(
+                            icon: const Icon(Icons.add, size: 20),
+                            onPressed: () async {
+                              Navigator.of(ctx).pop('_create_new_category_');
+                            },
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: amountController,
-                    autofocus: true,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                    ],
-                    decoration: InputDecoration(
-                      labelText: isThai ? 'จำนวนเงินงบประมาณ (บาท)' : 'Budget Amount (THB)',
-                      prefixText: '฿ ',
-                      border: const OutlineInputBorder(),
+                      ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: amountController,
+                      autofocus: true,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                      ],
+                      decoration: InputDecoration(
+                        labelText: isThai ? 'จำนวนเงินงบประมาณ (บาท)' : 'Budget Amount (THB)',
+                        prefixText: '฿ ',
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               actions: [
                 TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(isThai ? 'ยกเลิก' : 'Cancel')),
@@ -1073,30 +1077,34 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
       builder: (ctx) {
         final isThai = Localizations.localeOf(ctx).languageCode == 'th';
         return AlertDialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
           title: Text(isThai ? 'แก้ไขงบประมาณ: $catName' : 'Edit Budget: $catName'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${isThai ? "ใช้ไปแล้วในเดือนนี้" : "Spent this month"}: ${Money(b.spentSatang).format(symbol: "฿")}',
-                style: const TextStyle(fontWeight: FontWeight.w500),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: amountController,
-                keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                ],
-                autofocus: true,
-                decoration: InputDecoration(
-                  labelText: isThai ? 'งบประมาณใหม่ (บาท)' : 'New Budget (THB)',
-                  prefixText: '฿ ',
-                  border: const OutlineInputBorder(),
+          content: SizedBox(
+            width: 440,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${isThai ? "ใช้ไปแล้วในเดือนนี้" : "Spent this month"}: ${Money(b.spentSatang).format(symbol: "฿")}',
+                  style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                TextField(
+                  controller: amountController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                  ],
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    labelText: isThai ? 'งบประมาณใหม่ (บาท)' : 'New Budget (THB)',
+                    prefixText: '฿ ',
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -1166,140 +1174,164 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
         return StatefulBuilder(
           builder: (dialogCtx, setDialogState) {
             return AlertDialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
               title: Text(existing == null
                   ? (isThai ? 'สร้างโครงการพิเศษใหม่' : 'New Special Project')
                   : (isThai ? 'แก้ไขโครงการ' : 'Edit Project')),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: nameController,
-                      decoration: InputDecoration(
-                        labelText: isThai ? 'ชื่อโครงการ *' : 'Project Name *',
-                        hintText: isThai ? 'เช่น เที่ยวญี่ปุ่น, รีโนเวทบ้าน, จัดงานแต่ง' : 'e.g. Japan Trip, Home Renovation, Wedding',
-                        border: const OutlineInputBorder(),
-                        isDense: true,
+              content: SizedBox(
+                width: 440,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: nameController,
+                        decoration: InputDecoration(
+                          labelText: isThai ? 'ชื่อโครงการ *' : 'Project Name *',
+                          hintText: isThai ? 'เช่น เที่ยวญี่ปุ่น, รีโนเวทบ้าน, จัดงานแต่ง' : 'e.g. Japan Trip, Home Renovation, Wedding',
+                          border: const OutlineInputBorder(),
+                          isDense: true,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: budgetController,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                      ],
-                      decoration: InputDecoration(
-                        labelText: isThai ? 'งบประมาณเป้าหมาย (บาท) *' : 'Target Budget (THB) *',
-                        prefixText: '฿ ',
-                        border: const OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: descController,
-                      decoration: InputDecoration(
-                        labelText: isThai ? 'คำอธิบาย / รายละเอียด (ไม่บังคับ)' : 'Description (Optional)',
-                        border: const OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                      maxLines: 2,
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Theme.of(dialogCtx).dividerColor),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            isThai ? 'ระยะเวลาโครงการ' : 'Project Period',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Theme.of(dialogCtx).hintColor,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(6),
-                                  onTap: () async {
-                                    final picked = await showDatePicker(
-                                      context: dialogCtx,
-                                      initialDate: startDate,
-                                      firstDate: DateTime(2020),
-                                      lastDate: DateTime(2050),
-                                    );
-                                    if (picked != null) {
-                                      setDialogState(() => startDate = picked);
-                                    }
-                                  },
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 4),
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.calendar_today, size: 16, color: VaultTheme.accent(dialogCtx)),
-                                        const SizedBox(width: 6),
-                                        Expanded(
-                                          child: Text(
-                                            '${isThai ? "เริ่ม: " : "Start: "}${startDate.day}/${startDate.month}/${startDate.year}',
-                                            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 6),
-                                child: Icon(Icons.arrow_forward, size: 14, color: Theme.of(dialogCtx).hintColor),
-                              ),
-                              Expanded(
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(6),
-                                  onTap: () async {
-                                    final picked = await showDatePicker(
-                                      context: dialogCtx,
-                                      initialDate: endDate,
-                                      firstDate: DateTime(2020),
-                                      lastDate: DateTime(2050),
-                                    );
-                                    if (picked != null) {
-                                      setDialogState(() => endDate = picked);
-                                    }
-                                  },
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 4),
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.event, size: 16, color: VaultTheme.accent(dialogCtx)),
-                                        const SizedBox(width: 6),
-                                        Expanded(
-                                          child: Text(
-                                            '${isThai ? "สิ้นสุด: " : "End: "}${endDate.day}/${endDate.month}/${endDate.year}',
-                                            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: budgetController,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                         ],
+                        decoration: InputDecoration(
+                          labelText: isThai ? 'งบประมาณเป้าหมาย (บาท) *' : 'Target Budget (THB) *',
+                          prefixText: '฿ ',
+                          border: const OutlineInputBorder(),
+                          isDense: true,
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: descController,
+                        decoration: InputDecoration(
+                          labelText: isThai ? 'คำอธิบาย / รายละเอียด (ไม่บังคับ)' : 'Description (Optional)',
+                          border: const OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        maxLines: 2,
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Theme.of(dialogCtx).dividerColor),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isThai ? 'ระยะเวลาโครงการ' : 'Project Period',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(dialogCtx).hintColor,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(8),
+                                    onTap: () async {
+                                      final picked = await showDatePicker(
+                                        context: dialogCtx,
+                                        initialDate: startDate,
+                                        firstDate: DateTime(2020),
+                                        lastDate: DateTime(2050),
+                                      );
+                                      if (picked != null) {
+                                        setDialogState(() => startDate = picked);
+                                      }
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(dialogCtx).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            isThai ? 'วันเริ่มต้น' : 'Start Date',
+                                            style: TextStyle(fontSize: 11, color: Theme.of(dialogCtx).hintColor),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              Icon(Icons.calendar_today, size: 15, color: VaultTheme.accent(dialogCtx)),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                '${startDate.day.toString().padLeft(2, '0')}/${startDate.month.toString().padLeft(2, '0')}/${startDate.year}',
+                                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(8),
+                                    onTap: () async {
+                                      final picked = await showDatePicker(
+                                        context: dialogCtx,
+                                        initialDate: endDate,
+                                        firstDate: DateTime(2020),
+                                        lastDate: DateTime(2050),
+                                      );
+                                      if (picked != null) {
+                                        setDialogState(() => endDate = picked);
+                                      }
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(dialogCtx).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            isThai ? 'วันสิ้นสุด' : 'End Date',
+                                            style: TextStyle(fontSize: 11, color: Theme.of(dialogCtx).hintColor),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              Icon(Icons.event, size: 15, color: VaultTheme.accent(dialogCtx)),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                '${endDate.day.toString().padLeft(2, '0')}/${endDate.month.toString().padLeft(2, '0')}/${endDate.year}',
+                                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               actions: [

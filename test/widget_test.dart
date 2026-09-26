@@ -73,8 +73,9 @@ void main() {
     await tester.tap(find.text('การลงทุน'));
     await tester.pumpAndSettle();
 
-    // In Invest tab, 'ซื้อ / ขาย' button must be visible
-    expect(find.text('ซื้อ / ขาย'), findsOneWidget);
+    // In Invest tab, verify holdings tab is present and floating 'ซื้อ / ขาย' button is removed
+    expect(find.text('สินทรัพย์ที่ถือครอง'), findsOneWidget);
+    expect(find.text('ซื้อ / ขาย'), findsNothing);
 
     // 7. Switch to More/Settings tab
     await tester.tap(find.text('เพิ่มเติม'));

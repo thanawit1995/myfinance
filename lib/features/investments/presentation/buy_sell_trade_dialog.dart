@@ -59,6 +59,7 @@ class _BuySellTradeScreenState extends ConsumerState<BuySellTradeScreen> {
   List<Asset> _assets = [];
   List<Account> _accounts = [];
   bool _isDataLoaded = false;
+  String? _loadError;
 
   @override
   void initState() {
@@ -79,30 +80,41 @@ class _BuySellTradeScreenState extends ConsumerState<BuySellTradeScreen> {
   }
 
   Future<void> _loadData() async {
-    final assets = await ref.read(investmentsDaoProvider).getAssets();
-    final accounts = await ref.read(accountsDaoProvider).getActiveAccounts();
-    if (mounted) {
-      setState(() {
-        _assets = assets;
-        _accounts = accounts;
+    try {
+      final assets = await ref.read(investmentsDaoProvider).getAssets();
+      final accounts = await ref.read(accountsDaoProvider).getActiveAccounts();
+      if (mounted) {
+        setState(() {
+          _assets = assets;
+          _accounts = accounts;
 
-        if (_selectedAssetId == null || !assets.any((a) => a.id == _selectedAssetId)) {
-          _selectedAssetId = assets.isNotEmpty ? assets.first.id : null;
-        }
+          if (_selectedAssetId == null || !assets.any((a) => a.id == _selectedAssetId)) {
+            _selectedAssetId = assets.isNotEmpty ? assets.first.id : null;
+          }
 
-        if (_selectedAssetId != null) {
-          final matchedAsset = assets.firstWhere((a) => a.id == _selectedAssetId);
-          _currency = matchedAsset.currencyCode;
-          _fxRateController.text = _currency == 'USD' ? '35.000000' : '1.000000';
-          _selectedAccountId ??= matchedAsset.defaultAccountId;
-        }
+          if (_selectedAssetId != null) {
+            final matchedAsset = assets.firstWhere((a) => a.id == _selectedAssetId);
+            _currency = matchedAsset.currencyCode;
+            _fxRateController.text = _currency == 'USD' ? '35.000000' : '1.000000';
+            _selectedAccountId ??= matchedAsset.defaultAccountId;
+          }
 
-        if (_selectedAccountId == null || !accounts.any((a) => a.id == _selectedAccountId)) {
-          _selectedAccountId = accounts.isNotEmpty ? accounts.first.id : null;
-        }
+          if (_selectedAccountId == null || !accounts.any((a) => a.id == _selectedAccountId)) {
+            _selectedAccountId = accounts.isNotEmpty ? accounts.first.id : null;
+          }
 
-        _isDataLoaded = true;
-      });
+          _loadError = null;
+          _isDataLoaded = true;
+        });
+      }
+    } catch (e, stack) {
+      debugPrint('Error loading trade screen data: $e\n$stack');
+      if (mounted) {
+        setState(() {
+          _loadError = e.toString();
+          _isDataLoaded = true;
+        });
+      }
     }
   }
 
@@ -263,14 +275,56 @@ class _BuySellTradeScreenState extends ConsumerState<BuySellTradeScreen> {
       ),
       body: !_isDataLoaded
           ? Center(child: CircularProgressIndicator(color: VaultTheme.accent(context)))
-          : SafeArea(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 640),
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    child: Form(
-                      key: _formKey,
+          : _loadError != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                        const SizedBox(height: 12),
+                        Text(
+                          isThai ? 'เกิดข้อผิดพลาดในการโหลดข้อมูล' : 'Error loading data',
+                          style: TextStyle(
+                            fontFamily: VaultTheme.fontFamily,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: VaultTheme.primaryText(context),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _loadError!,
+                          style: TextStyle(
+                            fontFamily: VaultTheme.fontFamily,
+                            fontSize: 12,
+                            color: VaultTheme.secondaryText(context),
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        FilledButton.icon(
+                          onPressed: () {
+                            setState(() => _isDataLoaded = false);
+                            _loadData();
+                          },
+                          icon: const Icon(Icons.refresh),
+                          label: Text(isThai ? 'ลองใหม่อีกครั้ง' : 'Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : SafeArea(
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 640),
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        child: Form(
+                          key: _formKey,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -406,7 +460,11 @@ class _BuySellTradeScreenState extends ConsumerState<BuySellTradeScreen> {
                                 ),
                               );
                             }).toList(),
-                            onChanged: (val) => setState(() => _selectedAccountId = val),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() => _selectedAccountId = val);
+                              }
+                            },
                           );
                         },
                       ),
@@ -602,12 +660,23 @@ class _BuySellTradeScreenState extends ConsumerState<BuySellTradeScreen> {
         ),
       ),
       bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Container(
+          decoration: BoxDecoration(
+            color: VaultTheme.surface(context),
+            border: Border(
+              top: BorderSide(
+                color: VaultTheme.border(context),
+                width: 0.75,
+              ),
+            ),
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
           child: Center(
+            heightFactor: 1.0,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 640),
               child: SizedBox(
+                width: double.infinity,
                 height: 50,
                 child: FilledButton(
                   style: FilledButton.styleFrom(

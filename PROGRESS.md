@@ -2,7 +2,36 @@
 
 อัปเดตล่าสุด: 26 กันยายน 2026
 
-- [x] **UI/UX Overhaul, Spacing Optimization, Category Picker & Chrome Android WebAuthn Fix**:
+- [x] **Major UI Overhaul, Navigation Bar Restructure, Direct Quick Add, Full-Page Invest & Category Drag-to-Reorder**:
+  - **1. ปรับไอคอนแอปและภาพโลโก้ใหม่ทั้งหมด (New Visual Brand & App Icons)**:
+    - ติดตั้งภาพการ์ตูนกราฟิกคู่รักกับน้องแมวและกราฟการเติบโตทางการเงินลงในไอคอนแอปของ Android ทุกขนาด (`mipmap-mdpi` ถึง `mipmap-xxxhdpi`), Favicon และ Web PWA Icons (`Icon-192`, `Icon-512`, maskable)
+    - เพิ่มไอคอนโลโก้ในรูปแบบ Badge Avatar บริเวณมุมบนซ้ายของหน้าจอหลัก (`VaultHomeScreen`) ทั้งในธีม VAULT และธีม LUMI รวมถึงแถบเมนูหลักของเวอร์ชัน Desktop
+  - **2. รื้อถอนปุ่มลอย (FAB) ออกจากทุกหน้า**:
+    - ลบปุ่มลอยบันทึกรายการออกจากหน้า Home และหน้า Money
+    - ลบปุ่มลอย "เพิ่มบัญชี" ออกจากหน้าบัญชี (`AccountsScreen`) โดยยังคงปุ่ม `+` ใน AppBar ให้ใช้งานได้อย่างสะดวก
+    - ลบปุ่มลอย "ตั้งงบหมวดหมู่ / สร้างโครงการใหม่" ออกจากหน้าจอ Budget (`BudgetScreen`)
+  - **3. ปรับโครงสร้างเมนูหลัก (Bottom Navigation Bar) & ปุ่ม Quick Add ตรงกลาง**:
+    - ตัดเมนู `Plan` ออกจากแถบเมนูหลักด้านล่าง (เนื่องจากมีให้เข้าถึงได้ครบถ้วนในเมนู "เพิ่มเติม" / Settings อยู่แล้ว)
+    - เพิ่มปุ่มกดด่วนทรงกลมเครื่องหมาย `+` เด่นชัดอยู่ตรงกึ่งกลางของแถบเมนูหลัก (หน้าแรก, การเงิน, [+], การลงทุน, เพิ่มเติม)
+    - เมื่อแตะปุ่ม `+` ระบบจะเด้งเปิดหน้าบันทึกรายจ่าย (`QuickAddScreen` ในโหมด Expense) ทันทีอย่างรวดเร็ว
+  - **4. ปรับหน้าจอ Budget ให้กะทัดรัดและประหยัดพื้นที่**:
+    - ตัด AppBar ด้านบนใน `BudgetScreen` ที่ซ้อนกับแท็บของ Money ออกจนหมด
+    - ปรับแถบสลับระหว่าง "งบประมาณรายเดือน" กับ "โครงการพิเศษ" ให้เป็นแถบสลับทรงแคปซูลขนาดเล็กกะทัดรัด (สูงเพียง 36px) ประหยัดพื้นที่หน้าจออย่างมาก
+    - ย้ายปุ่มจัดการหมวดหมู่และปุ่ม `+` เพิ่มงบประมาณ/สร้างโครงการมาจัดวางเคียงข้างแถบสลับอย่างสวยงาม
+  - **5. ปรับหน้าจอซื้อ-ขายสินทรัพย์ลงทุน (Add Invest) เป็นแบบเต็มหน้าจอ (Full Page)**:
+    - ยกเลิกการแสดงผลแบบ AlertDialog กรอบลอยเดิมที่คับแคบและตกขอบ
+    - พัฒนาเป็นหน้าจอใหม่เต็มหน้า (`BuySellTradeScreen`) ตามดีไซน์เดียวกับหน้า Quick Add
+    - รองรับการคำนวณและสรุปยอดเงินสุทธิ การกรอกราคา/หน่วย ค่าธรรมเนียม เรต FX พร้อมปุ่มยืนยันขนาดใหญ่ด้านล่าง
+  - **6. จัดลำดับหมวดหมู่แบบลากวาง (Drag-and-Drop Category Reordering) พร้อมอัปเดต Schema v10**:
+    - เพิ่มคอลัมน์ `sort_order` ในตาราง `categories` พร้อม Database Migration สู่ Version 10
+    - ในหน้า "จัดการหมวดหมู่" ผู้ใช้สามารถกดค้างแล้วลาก (Long-press & drag) เพื่อจัดลำดับหมวดหมู่ได้ตามใจชอบ โดยระบบจะบันทึกลง SQLite ทันที
+    - หน้าบันทึกด่วน (`QuickAddScreen`) และหน้าต่างเลือกหมวดหมู่ (`CategoryPickerSheet`) จะเรียงลำดับหมวดหมู่ตามที่ผู้ใช้จัดไว้ 100%
+  - **การทดสอบความถูกต้อง**:
+    - `flutter analyze` ผ่านฉลุย **No issues found! (0 error, 0 warning)**
+    - `flutter test` ผ่านทั้งหมดครบถ้วน **154/154 tests passed** (100%)
+    - `flutter build web --release --base-href /myfinance/` คอมไพล์ผ่านฉลุย 100%
+
+
   - **1. แก้ไขระบบสแกนลายนิ้วมือบน Chrome บน Android (WebAuthn / Passkeys)**:
     - แก้ไข Dart JS Interop annotation จาก `@JS('window.MyFinanceWebAuthn')` เป็น `@JS('MyFinanceWebAuthn')` เพื่อให้ Dart เชื่อมต่อไปยัง global object บนเบราว์เซอร์ได้อย่างถูกต้อง
     - ปรับปรุงการแปลง ArrayBuffer ของ Credential ID ด้วย `bufferToBase64Url` และ `base64UrlToUint8Array` ป้องกันปัญหา Padding error ใน `atob()`

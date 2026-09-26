@@ -15,6 +15,7 @@ class Categories extends Table {
   DateTimeColumn get updatedAt => dateTime()();
   DateTimeColumn get deletedAt => dateTime().nullable()();
   IntColumn get syncVersion => integer().withDefault(const Constant(1))();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
 
   @override
   Set<Column> get primaryKey => {id};

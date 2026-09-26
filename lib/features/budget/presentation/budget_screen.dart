@@ -42,90 +42,139 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
-    final isLumi = VaultTheme.isLumi(context);
     final accentColor = VaultTheme.accent(context);
     final l10n = AppLocalizations.of(context);
     final isThai = Localizations.localeOf(context).languageCode == 'th';
 
     return Scaffold(
       backgroundColor: VaultTheme.background(context),
-      appBar: AppBar(
-        backgroundColor: VaultTheme.surface(context),
-        title: Text(
-          l10n?.budgetAndProjects ?? 'งบประมาณและการวางแผน',
-          style: TextStyle(
-            fontFamily: VaultTheme.fontFamily,
-            fontSize: 17,
-            fontWeight: FontWeight.w700,
-            color: VaultTheme.primaryText(context),
-          ),
-        ),
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: accentColor,
-          labelColor: accentColor,
-          unselectedLabelColor: VaultTheme.secondaryText(context),
-          tabs: [
-            Tab(
-              icon: const Icon(Icons.pie_chart_outline),
-              text: l10n?.monthlyBudgetTab ?? 'งบประมาณรายเดือน',
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 36,
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: VaultTheme.surface(context),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: VaultTheme.border(context)),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(16),
+                              onTap: () {
+                                _tabController.animateTo(0);
+                                setState(() {});
+                              },
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 150),
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: _tabController.index == 0
+                                      ? accentColor.withValues(alpha: 0.16)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Text(
+                                  l10n?.monthlyBudgetTab ?? (isThai ? 'งบประมาณรายเดือน' : 'Monthly Budget'),
+                                  style: TextStyle(
+                                    fontFamily: VaultTheme.fontFamily,
+                                    fontSize: 12,
+                                    fontWeight: _tabController.index == 0
+                                        ? FontWeight.w700
+                                        : FontWeight.normal,
+                                    color: _tabController.index == 0
+                                        ? accentColor
+                                        : VaultTheme.secondaryText(context),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(16),
+                              onTap: () {
+                                _tabController.animateTo(1);
+                                setState(() {});
+                              },
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 150),
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: _tabController.index == 1
+                                      ? accentColor.withValues(alpha: 0.16)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Text(
+                                  l10n?.specialProjectsTab ?? (isThai ? 'โครงการพิเศษ' : 'Projects'),
+                                  style: TextStyle(
+                                    fontFamily: VaultTheme.fontFamily,
+                                    fontSize: 12,
+                                    fontWeight: _tabController.index == 1
+                                        ? FontWeight.w700
+                                        : FontWeight.normal,
+                                    color: _tabController.index == 1
+                                        ? accentColor
+                                        : VaultTheme.secondaryText(context),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (_tabController.index == 0)
+                    IconButton(
+                      icon: const Icon(Icons.category_outlined, size: 20),
+                      tooltip: l10n?.manageCategories ?? 'จัดการหมวดหมู่',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const CategoriesScreen()),
+                        );
+                        if (mounted) setState(() {});
+                      },
+                    ),
+                  IconButton.filledTonal(
+                    icon: const Icon(Icons.add, size: 18),
+                    tooltip: _tabController.index == 0
+                        ? (isThai ? 'ตั้งงบหมวดหมู่' : 'Set Category Budget')
+                        : (isThai ? 'สร้างโครงการใหม่' : 'New Project'),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () {
+                      if (_tabController.index == 0) {
+                        _showAddBudgetDialog(context);
+                      } else {
+                        _showProjectFormDialog(context);
+                      }
+                    },
+                  ),
+                ],
+              ),
             ),
-            Tab(
-              icon: const Icon(Icons.folder_special_outlined),
-              text: l10n?.specialProjectsTab ?? 'โครงการพิเศษ',
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildMonthlyBudgetsTab(context),
+                  _buildProjectsTab(context),
+                ],
+              ),
             ),
           ],
         ),
-        actions: [
-          if (_tabController.index == 0)
-            IconButton(
-              icon: const Icon(Icons.category_outlined),
-              tooltip: l10n?.manageCategories ?? 'จัดการหมวดหมู่',
-              onPressed: () async {
-                await Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const CategoriesScreen()),
-                );
-                if (mounted) setState(() {});
-              },
-            ),
-          IconButton(
-            icon: const Icon(Icons.add),
-            tooltip: _tabController.index == 0
-                ? (isThai ? 'ตั้งงบหมวดหมู่' : 'Set Category Budget')
-                : (isThai ? 'สร้างโครงการใหม่' : 'New Project'),
-            onPressed: () {
-              if (_tabController.index == 0) {
-                _showAddBudgetDialog(context);
-              } else {
-                _showProjectFormDialog(context);
-              }
-            },
-          ),
-        ],
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildMonthlyBudgetsTab(context),
-          _buildProjectsTab(context),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: accentColor,
-        foregroundColor: Colors.white,
-        elevation: isLumi ? 3 : 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(isLumi ? 24 : 14)),
-        icon: const Icon(Icons.add),
-        label: Text(_tabController.index == 0
-            ? (isThai ? 'ตั้งงบหมวดหมู่' : 'Set Category Budget')
-            : (isThai ? 'สร้างโครงการใหม่' : 'New Project')),
-        onPressed: () {
-          if (_tabController.index == 0) {
-            _showAddBudgetDialog(context);
-          } else {
-            _showProjectFormDialog(context);
-          }
-        },
       ),
     );
   }

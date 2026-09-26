@@ -8,11 +8,13 @@ import '../../../../core/database/database_provider.dart';
 import '../../../../core/money/money.dart';
 import '../../../../features/investments/domain/fifo_engine.dart';
 
-class BuySellTradeDialog extends ConsumerStatefulWidget {
+import '../../../../core/theme/vault_theme.dart';
+
+class BuySellTradeScreen extends ConsumerStatefulWidget {
   final Asset? initialAsset;
   final bool initialIsBuy;
 
-  const BuySellTradeDialog({
+  const BuySellTradeScreen({
     super.key,
     this.initialAsset,
     this.initialIsBuy = true,
@@ -23,20 +25,23 @@ class BuySellTradeDialog extends ConsumerStatefulWidget {
     Asset? initialAsset,
     bool initialIsBuy = true,
   }) {
-    return showDialog<bool>(
-      context: context,
-      builder: (context) => BuySellTradeDialog(
-        initialAsset: initialAsset,
-        initialIsBuy: initialIsBuy,
+    return Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (context) => BuySellTradeScreen(
+          initialAsset: initialAsset,
+          initialIsBuy: initialIsBuy,
+        ),
       ),
     );
   }
 
   @override
-  ConsumerState<BuySellTradeDialog> createState() => _BuySellTradeDialogState();
+  ConsumerState<BuySellTradeScreen> createState() => _BuySellTradeScreenState();
 }
 
-class _BuySellTradeDialogState extends ConsumerState<BuySellTradeDialog> {
+typedef BuySellTradeDialog = BuySellTradeScreen;
+
+class _BuySellTradeScreenState extends ConsumerState<BuySellTradeScreen> {
   final _formKey = GlobalKey<FormState>();
 
   late bool _isBuy;
@@ -187,20 +192,38 @@ class _BuySellTradeDialogState extends ConsumerState<BuySellTradeDialog> {
     final theme = Theme.of(context);
     final isThai = Localizations.localeOf(context).languageCode == 'th';
 
-    return AlertDialog(
-      title: Text(
-        _isBuy
-            ? (isThai ? 'บันทึกการซื้อสินทรัพย์ (Buy)' : 'Record Asset Purchase (Buy)')
-            : (isThai ? 'บันทึกการขายสินทรัพย์ (Sell)' : 'Record Asset Sale (Sell)'),
+    return Scaffold(
+      backgroundColor: VaultTheme.background(context),
+      appBar: AppBar(
+        backgroundColor: VaultTheme.surface(context),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.of(context).pop(false),
+        ),
+        title: Text(
+          _isBuy
+              ? (isThai ? 'บันทึกการซื้อสินทรัพย์ (Buy)' : 'Buy Asset')
+              : (isThai ? 'บันทึกการขายสินทรัพย์ (Sell)' : 'Sell Asset'),
+          style: TextStyle(
+            fontFamily: VaultTheme.fontFamily,
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            color: VaultTheme.primaryText(context),
+          ),
+        ),
       ),
-      content: SizedBox(
-        width: 480,
-        child: SingleChildScrollView(
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                 // 1. Toggle Buy / Sell
                 SegmentedButton<bool>(
                   segments: [
@@ -469,23 +492,41 @@ class _BuySellTradeDialogState extends ConsumerState<BuySellTradeDialog> {
                     border: const OutlineInputBorder(),
                   ),
                 ),
-              ],
+                  ],
+                ),
+              ),
             ),
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: SizedBox(
+                height: 50,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _isBuy ? const Color(0xFF1E88E5) : const Color(0xFFE53935),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  onPressed: _isLoading ? null : _submit,
+                  child: _isLoading
+                      ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                      : Text(
+                          _isBuy
+                              ? (isThai ? 'ยืนยันการซื้อสินทรัพย์' : 'Confirm Buy')
+                              : (isThai ? 'ยืนยันการขายสินทรัพย์' : 'Confirm Sell'),
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                ),
+              ),
+            ),
+          ),
         ),
-        FilledButton(
-          onPressed: _isLoading ? null : _submit,
-          child: _isLoading
-              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-              : Text(_isBuy ? (isThai ? 'ยืนยันการซื้อ' : 'Confirm Buy') : (isThai ? 'ยืนยันการขาย' : 'Confirm Sell')),
-        ),
-      ],
+      ),
     );
   }
 }

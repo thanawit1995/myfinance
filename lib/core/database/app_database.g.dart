@@ -1968,6 +1968,18 @@ class $CategoriesTable extends Categories
     requiredDuringInsert: false,
     defaultValue: const Constant(1),
   );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1984,6 +1996,7 @@ class $CategoriesTable extends Categories
     updatedAt,
     deletedAt,
     syncVersion,
+    sortOrder,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2099,6 +2112,12 @@ class $CategoriesTable extends Categories
         ),
       );
     }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
     return context;
   }
 
@@ -2164,6 +2183,10 @@ class $CategoriesTable extends Categories
         DriftSqlType.int,
         data['${effectivePrefix}sync_version'],
       )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
     );
   }
 
@@ -2188,6 +2211,7 @@ class Category extends DataClass implements Insertable<Category> {
   final DateTime updatedAt;
   final DateTime? deletedAt;
   final int syncVersion;
+  final int sortOrder;
   const Category({
     required this.id,
     required this.nameTh,
@@ -2203,6 +2227,7 @@ class Category extends DataClass implements Insertable<Category> {
     required this.updatedAt,
     this.deletedAt,
     required this.syncVersion,
+    required this.sortOrder,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2231,6 +2256,7 @@ class Category extends DataClass implements Insertable<Category> {
       map['deleted_at'] = Variable<DateTime>(deletedAt);
     }
     map['sync_version'] = Variable<int>(syncVersion);
+    map['sort_order'] = Variable<int>(sortOrder);
     return map;
   }
 
@@ -2258,6 +2284,7 @@ class Category extends DataClass implements Insertable<Category> {
           ? const Value.absent()
           : Value(deletedAt),
       syncVersion: Value(syncVersion),
+      sortOrder: Value(sortOrder),
     );
   }
 
@@ -2281,6 +2308,7 @@ class Category extends DataClass implements Insertable<Category> {
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
       syncVersion: serializer.fromJson<int>(json['syncVersion']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
     );
   }
   @override
@@ -2301,6 +2329,7 @@ class Category extends DataClass implements Insertable<Category> {
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
       'syncVersion': serializer.toJson<int>(syncVersion),
+      'sortOrder': serializer.toJson<int>(sortOrder),
     };
   }
 
@@ -2319,6 +2348,7 @@ class Category extends DataClass implements Insertable<Category> {
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
     int? syncVersion,
+    int? sortOrder,
   }) => Category(
     id: id ?? this.id,
     nameTh: nameTh ?? this.nameTh,
@@ -2336,6 +2366,7 @@ class Category extends DataClass implements Insertable<Category> {
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
     syncVersion: syncVersion ?? this.syncVersion,
+    sortOrder: sortOrder ?? this.sortOrder,
   );
   Category copyWithCompanion(CategoriesCompanion data) {
     return Category(
@@ -2359,6 +2390,7 @@ class Category extends DataClass implements Insertable<Category> {
       syncVersion: data.syncVersion.present
           ? data.syncVersion.value
           : this.syncVersion,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
     );
   }
 
@@ -2378,7 +2410,8 @@ class Category extends DataClass implements Insertable<Category> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
-          ..write('syncVersion: $syncVersion')
+          ..write('syncVersion: $syncVersion, ')
+          ..write('sortOrder: $sortOrder')
           ..write(')'))
         .toString();
   }
@@ -2399,6 +2432,7 @@ class Category extends DataClass implements Insertable<Category> {
     updatedAt,
     deletedAt,
     syncVersion,
+    sortOrder,
   );
   @override
   bool operator ==(Object other) =>
@@ -2417,7 +2451,8 @@ class Category extends DataClass implements Insertable<Category> {
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
-          other.syncVersion == this.syncVersion);
+          other.syncVersion == this.syncVersion &&
+          other.sortOrder == this.sortOrder);
 }
 
 class CategoriesCompanion extends UpdateCompanion<Category> {
@@ -2435,6 +2470,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
   final Value<int> syncVersion;
+  final Value<int> sortOrder;
   final Value<int> rowid;
   const CategoriesCompanion({
     this.id = const Value.absent(),
@@ -2451,6 +2487,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
     this.syncVersion = const Value.absent(),
+    this.sortOrder = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   CategoriesCompanion.insert({
@@ -2468,6 +2505,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
     this.syncVersion = const Value.absent(),
+    this.sortOrder = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        nameTh = Value(nameTh),
@@ -2490,6 +2528,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
     Expression<int>? syncVersion,
+    Expression<int>? sortOrder,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2507,6 +2546,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
       if (syncVersion != null) 'sync_version': syncVersion,
+      if (sortOrder != null) 'sort_order': sortOrder,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2526,6 +2566,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
     Value<int>? syncVersion,
+    Value<int>? sortOrder,
     Value<int>? rowid,
   }) {
     return CategoriesCompanion(
@@ -2543,6 +2584,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
       syncVersion: syncVersion ?? this.syncVersion,
+      sortOrder: sortOrder ?? this.sortOrder,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2592,6 +2634,9 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     if (syncVersion.present) {
       map['sync_version'] = Variable<int>(syncVersion.value);
     }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2615,6 +2660,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
           ..write('syncVersion: $syncVersion, ')
+          ..write('sortOrder: $sortOrder, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -20507,6 +20553,7 @@ typedef $$CategoriesTableCreateCompanionBuilder =
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
       Value<int> syncVersion,
+      Value<int> sortOrder,
       Value<int> rowid,
     });
 typedef $$CategoriesTableUpdateCompanionBuilder =
@@ -20525,6 +20572,7 @@ typedef $$CategoriesTableUpdateCompanionBuilder =
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
       Value<int> syncVersion,
+      Value<int> sortOrder,
       Value<int> rowid,
     });
 
@@ -20604,6 +20652,11 @@ class $$CategoriesTableFilterComposer
 
   ColumnFilters<int> get syncVersion => $composableBuilder(
     column: $table.syncVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -20686,6 +20739,11 @@ class $$CategoriesTableOrderingComposer
     column: $table.syncVersion,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$CategoriesTableAnnotationComposer
@@ -20744,6 +20802,9 @@ class $$CategoriesTableAnnotationComposer
     column: $table.syncVersion,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
 }
 
 class $$CategoriesTableTableManager
@@ -20788,6 +20849,7 @@ class $$CategoriesTableTableManager
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> syncVersion = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CategoriesCompanion(
                 id: id,
@@ -20804,6 +20866,7 @@ class $$CategoriesTableTableManager
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 syncVersion: syncVersion,
+                sortOrder: sortOrder,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -20822,6 +20885,7 @@ class $$CategoriesTableTableManager
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> syncVersion = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CategoriesCompanion.insert(
                 id: id,
@@ -20838,6 +20902,7 @@ class $$CategoriesTableTableManager
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 syncVersion: syncVersion,
+                sortOrder: sortOrder,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

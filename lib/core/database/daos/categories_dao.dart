@@ -8,20 +8,40 @@ part 'categories_dao.g.dart';
 class CategoriesDao extends DatabaseAccessor<AppDatabase> with _$CategoriesDaoMixin {
   CategoriesDao(super.db);
 
-  Stream<List<Category>> watchActiveCategories() {
-    return (select(categories)
-          ..where((c) => c.isActive.equals(true) & c.deletedAt.isNull())
-          ..orderBy([(c) => OrderingTerm(expression: c.nameTh)]))
-        .watch();
+  Stream<List<Category>> watchActiveCategories([String? type]) {
+    final query = select(categories)
+      ..where((c) => c.isActive.equals(true) & c.deletedAt.isNull());
+    if (type != null) {
+      query.where((c) => c.categoryType.equals(type));
+    }
+    return (query..orderBy([(c) => OrderingTerm(expression: c.sortOrder), (c) => OrderingTerm(expression: c.nameTh)])).watch();
   }
 
-  Future<List<Category>> getActiveCategories([String? type]) {
+  Future<List<Category>> getActiveCategories([String? type]) async {
+    if (type == null || type == 'expense') {
+      await ensureEssentialTaxCategories();
+    }
     final query = select(categories)..where((c) => c.isActive.equals(true) & c.deletedAt.isNull());
     if (type != null) {
       query.where((c) => c.categoryType.equals(type));
     }
-    query.orderBy([(c) => OrderingTerm(expression: c.nameTh)]);
+    query.orderBy([(c) => OrderingTerm(expression: c.sortOrder), (c) => OrderingTerm(expression: c.nameTh)]);
     return query.get();
+  }
+
+  Future<void> updateCategorySortOrders(List<String> orderedCategoryIds) async {
+    await batch((b) {
+      for (var i = 0; i < orderedCategoryIds.length; i++) {
+        b.update(
+          categories,
+          CategoriesCompanion(
+            sortOrder: Value(i),
+            updatedAt: Value(DateTime.now()),
+          ),
+          where: (c) => c.id.equals(orderedCategoryIds[i]),
+        );
+      }
+    });
   }
 
   Future<void> ensureEssentialTaxCategories() async {

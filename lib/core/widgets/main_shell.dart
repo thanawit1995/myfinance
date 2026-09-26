@@ -6,12 +6,12 @@ import '../security/auth_provider.dart';
 import '../theme/app_theme_style.dart';
 import '../theme/vault_theme.dart';
 import 'pin_lock_dialog.dart';
-import 'vault_add_sheet.dart';
 import '../../features/home/presentation/vault_home_screen.dart';
 import '../../features/money/presentation/money_screen.dart';
 import '../../features/investments/presentation/portfolio_screen.dart';
 import '../../features/plan/presentation/plan_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
+import '../../features/transactions/presentation/quick_add_screen.dart';
 import '../../l10n/app_localizations.dart';
 
 class MainShell extends ConsumerStatefulWidget {
@@ -156,14 +156,20 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
     final accentCol = VaultTheme.accent(context);
     final isDark = VaultTheme.isDark(context);
 
+    final isLumi = VaultTheme.isLumi(context);
+
     final screens = [
       VaultHomeScreen(
         onNavigateToMoney: () => _onTabSelected(1, moneyTabIndex: 0),
         onNavigateToInvest: () => _onTabSelected(2),
         onNavigateToBudget: () => _onTabSelected(1, moneyTabIndex: 2),
         onNavigateToCreditCards: () => _onTabSelected(1, moneyTabIndex: 1),
-        onNavigateToPlan: () => _onTabSelected(3),
-        onOpenSettings: () => _onTabSelected(4),
+        onNavigateToPlan: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const PlanScreen()),
+          );
+        },
+        onOpenSettings: () => _onTabSelected(3),
       ),
       MoneyScreen(
         initialTabIndex: _moneyInitialTabIndex,
@@ -176,7 +182,6 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
         },
       ),
       const PortfolioScreen(),
-      const PlanScreen(),
       SettingsScreen(
         currentLocale: widget.currentLocale,
         onLocaleChanged: widget.onLocaleChanged,
@@ -186,32 +191,6 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
         onThemeStyleChanged: widget.onThemeStyleChanged,
       ),
     ];
-
-    // ซ่อนปุ่มบันทึกรายรับ-จ่ายออกจากทุกด้าน ให้แสดงเฉพาะในหน้า Home และ Money-Transactions (2 หน้าเท่านั้น)
-    final showFab = _currentIndex == 0 || (_currentIndex == 1 && _moneyActiveSubTab == 0);
-    final isLumi = VaultTheme.isLumi(context);
-
-    final fab = showFab
-        ? FloatingActionButton.extended(
-            onPressed: () => VaultAddSheet.show(
-              context,
-              onNavigateToTransactions: () => _onTabSelected(1, moneyTabIndex: 0),
-            ),
-            backgroundColor: isLumi ? const Color(0xFFFF5B9A) : accentCol,
-            foregroundColor: isLumi ? Colors.white : (isDark ? const Color(0xFF111315) : Colors.white),
-            elevation: isLumi ? 3 : 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(isLumi ? 20 : 14)),
-            icon: const Icon(Icons.add, size: 20),
-            label: Text(
-              l10n?.add ?? 'Add',
-              style: TextStyle(
-                fontFamily: VaultTheme.fontFamily,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.8,
-              ),
-            ),
-          )
-        : null;
 
     final bgCol = VaultTheme.background(context);
     final overlayStyle = SystemUiOverlayStyle(
@@ -230,7 +209,6 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
         value: overlayStyle,
         child: Scaffold(
           backgroundColor: VaultTheme.background(context),
-          floatingActionButton: fab,
           body: Row(
             children: [
               NavigationRail(
@@ -324,114 +302,169 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
                           ),
                         ),
                       ),
+                      const SizedBox(height: 12),
+                      IconButton.filled(
+                        style: IconButton.styleFrom(
+                          backgroundColor: isLumi ? const Color(0xFFFF5B9A) : accentCol,
+                          foregroundColor: Colors.white,
+                        ),
+                        tooltip: l10n?.quickAddKeypad ?? 'Quick Add',
+                        icon: const Icon(Icons.add, size: 20),
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const QuickAddScreen(initialType: 'expense'),
+                            ),
+                          );
+                        },
+                      ),
                     ],
                   ),
                 ),
-              destinations: [
-                NavigationRailDestination(
-                  icon: const Icon(Icons.home_outlined),
-                  selectedIcon: const Icon(Icons.home_rounded),
-                  label: Text(l10n?.home ?? 'Home'),
-                ),
-                NavigationRailDestination(
-                  icon: const Icon(Icons.account_balance_wallet_outlined),
-                  selectedIcon: const Icon(Icons.account_balance_wallet_rounded),
-                  label: Text(l10n?.money ?? 'Money'),
-                ),
-                NavigationRailDestination(
-                  icon: const Icon(Icons.show_chart_rounded),
-                  selectedIcon: const Icon(Icons.show_chart_rounded),
-                  label: Text(l10n?.invest ?? 'Invest'),
-                ),
-                NavigationRailDestination(
-                  icon: const Icon(Icons.architecture_rounded),
-                  selectedIcon: const Icon(Icons.architecture_rounded),
-                  label: Text(l10n?.plan ?? 'Plan'),
-                ),
-                NavigationRailDestination(
-                  icon: const Icon(Icons.more_horiz_rounded),
-                  selectedIcon: const Icon(Icons.more_horiz_rounded),
-                  label: Text(l10n?.more ?? 'More'),
-                ),
-              ],
-            ),
-            VerticalDivider(thickness: 0.75, width: 1, color: VaultTheme.border(context)),
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                switchInCurve: Curves.easeOutCubic,
-                switchOutCurve: Curves.easeInCubic,
-                transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
-                child: KeyedSubtree(
-                  key: ValueKey<int>(_currentIndex),
-                  child: screens[_currentIndex],
-                ),
+                destinations: [
+                  NavigationRailDestination(
+                    icon: const Icon(Icons.home_outlined),
+                    selectedIcon: const Icon(Icons.home_rounded),
+                    label: Text(l10n?.home ?? 'Home'),
+                  ),
+                  NavigationRailDestination(
+                    icon: const Icon(Icons.account_balance_wallet_outlined),
+                    selectedIcon: const Icon(Icons.account_balance_wallet_rounded),
+                    label: Text(l10n?.money ?? 'Money'),
+                  ),
+                  NavigationRailDestination(
+                    icon: const Icon(Icons.show_chart_rounded),
+                    selectedIcon: const Icon(Icons.show_chart_rounded),
+                    label: Text(l10n?.invest ?? 'Invest'),
+                  ),
+                  NavigationRailDestination(
+                    icon: const Icon(Icons.more_horiz_rounded),
+                    selectedIcon: const Icon(Icons.more_horiz_rounded),
+                    label: Text(l10n?.more ?? 'More'),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  } else {
-    // Mobile layout with 5-destination NavigationBar
-    shellLayout = AnnotatedRegion<SystemUiOverlayStyle>(
-      value: overlayStyle,
-      child: Scaffold(
-        backgroundColor: VaultTheme.background(context),
-        body: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 200),
-          switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeInCubic,
-          transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
-          child: KeyedSubtree(
-            key: ValueKey<int>(_currentIndex),
-            child: screens[_currentIndex],
-          ),
-        ),
-        floatingActionButton: fab,
-        bottomNavigationBar: Container(
-          decoration: BoxDecoration(
-            border: Border(top: BorderSide(color: VaultTheme.border(context), width: 0.75)),
-          ),
-          child: NavigationBar(
-            backgroundColor: VaultTheme.surface(context),
-            surfaceTintColor: Colors.transparent,
-            selectedIndex: _currentIndex,
-            onDestinationSelected: _onTabSelected,
-            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-            indicatorColor: accentCol.withValues(alpha: 0.15),
-            destinations: [
-              NavigationDestination(
-                icon: const Icon(Icons.home_outlined),
-                selectedIcon: Icon(Icons.home_rounded, color: accentCol),
-                label: l10n?.home ?? 'Home',
-              ),
-              NavigationDestination(
-                icon: const Icon(Icons.account_balance_wallet_outlined),
-                selectedIcon: Icon(Icons.account_balance_wallet_rounded, color: accentCol),
-                label: l10n?.money ?? 'Money',
-              ),
-              NavigationDestination(
-                icon: const Icon(Icons.show_chart_rounded),
-                selectedIcon: Icon(Icons.show_chart_rounded, color: accentCol),
-                label: l10n?.invest ?? 'Invest',
-              ),
-              NavigationDestination(
-                icon: const Icon(Icons.architecture_rounded),
-                selectedIcon: Icon(Icons.architecture_rounded, color: accentCol),
-                label: l10n?.plan ?? 'Plan',
-              ),
-              NavigationDestination(
-                icon: const Icon(Icons.more_horiz_rounded),
-                selectedIcon: Icon(Icons.more_horiz_rounded, color: accentCol),
-                label: l10n?.more ?? 'More',
+              VerticalDivider(thickness: 0.75, width: 1, color: VaultTheme.border(context)),
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
+                  child: KeyedSubtree(
+                    key: ValueKey<int>(_currentIndex),
+                    child: screens[_currentIndex],
+                  ),
+                ),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
+      );
+    } else {
+      // Mobile layout with Center Quick Add Button
+      shellLayout = AnnotatedRegion<SystemUiOverlayStyle>(
+        value: overlayStyle,
+        child: Scaffold(
+          backgroundColor: VaultTheme.background(context),
+          body: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
+            child: KeyedSubtree(
+              key: ValueKey<int>(_currentIndex),
+              child: screens[_currentIndex],
+            ),
+          ),
+          bottomNavigationBar: Container(
+            decoration: BoxDecoration(
+              color: VaultTheme.surface(context),
+              border: Border(top: BorderSide(color: VaultTheme.border(context), width: 0.75)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: SizedBox(
+                height: 60,
+                child: Row(
+                  children: [
+                    _buildNavItem(
+                      context,
+                      icon: Icons.home_outlined,
+                      selectedIcon: Icons.home_rounded,
+                      label: l10n?.home ?? 'Home',
+                      isSelected: _currentIndex == 0,
+                      onTap: () => _onTabSelected(0),
+                    ),
+                    _buildNavItem(
+                      context,
+                      icon: Icons.account_balance_wallet_outlined,
+                      selectedIcon: Icons.account_balance_wallet_rounded,
+                      label: l10n?.money ?? 'Money',
+                      isSelected: _currentIndex == 1,
+                      onTap: () => _onTabSelected(1),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const QuickAddScreen(initialType: 'expense'),
+                                ),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(24),
+                            child: Container(
+                              width: 46,
+                              height: 46,
+                              decoration: BoxDecoration(
+                                color: isLumi ? const Color(0xFFFF5B9A) : accentCol,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: (isLumi ? const Color(0xFFFF5B9A) : accentCol).withValues(alpha: 0.35),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.add,
+                                color: Colors.white,
+                                size: 26,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    _buildNavItem(
+                      context,
+                      icon: Icons.show_chart_rounded,
+                      selectedIcon: Icons.show_chart_rounded,
+                      label: l10n?.invest ?? 'Invest',
+                      isSelected: _currentIndex == 2,
+                      onTap: () => _onTabSelected(2),
+                    ),
+                    _buildNavItem(
+                      context,
+                      icon: Icons.more_horiz_rounded,
+                      selectedIcon: Icons.more_horiz_rounded,
+                      label: l10n?.more ?? 'More',
+                      isSelected: _currentIndex == 3,
+                      onTap: () => _onTabSelected(3),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
   final isThai = widget.currentLocale.languageCode == 'th';
 
@@ -458,4 +491,56 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
     child: shellLayout,
   );
 }
+
+  Widget _buildNavItem(
+    BuildContext context, {
+    required IconData icon,
+    required IconData selectedIcon,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    final accentCol = VaultTheme.accent(context);
+    final isLumi = VaultTheme.isLumi(context);
+    final activeColor = isLumi ? const Color(0xFFFF5B9A) : accentCol;
+    final inactiveColor = VaultTheme.secondaryText(context);
+
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        splashColor: activeColor.withValues(alpha: 0.1),
+        highlightColor: Colors.transparent,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
+              decoration: BoxDecoration(
+                color: isSelected ? activeColor.withValues(alpha: 0.15) : Colors.transparent,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(
+                isSelected ? selectedIcon : icon,
+                size: 22,
+                color: isSelected ? activeColor : inactiveColor,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: VaultTheme.fontFamily,
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
+                color: isSelected ? activeColor : inactiveColor,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

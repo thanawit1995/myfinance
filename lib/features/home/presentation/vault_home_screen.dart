@@ -227,22 +227,46 @@ class VaultHomeScreen extends ConsumerWidget {
             ),
           )
         else
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
             children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'OURS',
-                    style: TextStyle(
-                      fontFamily: VaultTheme.fontFamily,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 2.0,
-                      color: VaultTheme.primaryText(context),
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: VaultTheme.accent(context).withValues(alpha: 0.35), width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
                     ),
+                  ],
+                ),
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/images/app_logo.png',
+                    fit: BoxFit.cover,
                   ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'OURS',
+                        style: TextStyle(
+                          fontFamily: VaultTheme.fontFamily,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 2.0,
+                          color: VaultTheme.primaryText(context),
+                        ),
+                      ),
                   const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -275,6 +299,8 @@ class VaultHomeScreen extends ConsumerWidget {
               ),
             ],
           ),
+        ],
+      ),
         Row(
           children: [
             IconButton(

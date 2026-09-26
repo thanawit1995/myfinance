@@ -98,7 +98,7 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
 
   Future<void> _loadInitialData() async {
     final accounts = await ref.read(accountsDaoProvider).getActiveAccounts();
-    final categories = await ref.read(categoriesDaoProvider).getActiveCategoriesOrderedByUsage(_transactionType);
+    final categories = await ref.read(categoriesDaoProvider).getActiveCategories(_transactionType);
     final projects = await ref.read(projectsDaoProvider).getActiveProjects();
 
     if (mounted) {
@@ -650,7 +650,7 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
                 selected: {_transactionType},
                 onSelectionChanged: (newVal) async {
                   final newType = newVal.first;
-                  final cats = await ref.read(categoriesDaoProvider).getActiveCategoriesOrderedByUsage(newType);
+                  final cats = await ref.read(categoriesDaoProvider).getActiveCategories(newType);
                   if (mounted) {
                     setState(() {
                       _transactionType = newType;
@@ -864,7 +864,7 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
           selectedCategoryId: _selectedCategoryId,
         );
         if (chosen != null && mounted) {
-          final updatedCats = await ref.read(categoriesDaoProvider).getActiveCategoriesOrderedByUsage(_transactionType);
+          final updatedCats = await ref.read(categoriesDaoProvider).getActiveCategories(_transactionType);
           setState(() {
             _currentCategories = updatedCats;
             _selectedCategoryId = chosen.id;

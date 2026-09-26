@@ -39,16 +39,6 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final added = await AddAccountDialog.show(context);
-          if (added == true && mounted) {
-            setState(() {});
-          }
-        },
-        icon: const Icon(Icons.add),
-        label: Text(isThai ? 'เพิ่มบัญชี' : 'Add Account'),
-      ),
       body: FutureBuilder(
         future: Future.wait([
           accDao.getAllAccounts(),

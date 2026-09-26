@@ -36,78 +36,53 @@ void main() {
     expect(find.text('VAULT'), findsAtLeastNWidgets(1));
     expect(find.text('MASTER BUDGET'), findsOneWidget);
 
-    // 2. Verify 5 Bottom Navigation Destinations exist
+    // 2. Verify Bottom Navigation Destinations exist (Home, Money, Invest, More)
     expect(find.text('หน้าแรก'), findsOneWidget);
     expect(find.text('การเงิน'), findsOneWidget);
     expect(find.text('การลงทุน'), findsOneWidget);
-    expect(find.text('แผนการเงิน'), findsOneWidget);
     expect(find.text('เพิ่มเติม'), findsOneWidget);
 
-    // 3. Verify FAB "+ Add" exists
-    final addFab = find.text('เพิ่ม');
-    expect(addFab, findsOneWidget);
+    // 3. Verify Center Quick Add button (+) exists in bottom bar
+    final addCenterBtn = find.byIcon(Icons.add);
+    expect(addCenterBtn, findsAtLeastNWidgets(1));
 
-    // Tap FAB "+ Add"
-    await tester.tap(addFab);
+    // Tap center Quick Add button (+)
+    await tester.tap(addCenterBtn.first);
     await tester.pumpAndSettle();
 
-    // 4. Verify Bottom Sheet opens with 4 core options
-    expect(find.text('รายจ่าย'), findsOneWidget);
-    expect(find.text('รายรับ'), findsOneWidget);
-    expect(find.text('โอนเงิน'), findsOneWidget);
-    expect(find.text('ซื้อขายหุ้น'), findsOneWidget);
-
-    // 5. Tap 'รายจ่าย' to open Quick Add
-    await tester.tap(find.text('รายจ่าย'));
-    await tester.pumpAndSettle();
-
+    // 4. Verify Quick Add screen opens directly (with expense mode)
     expect(find.text('บันทึกด่วน'), findsOneWidget);
 
-    // Close quick add sheet
+    // Close quick add screen
     Navigator.of(tester.element(find.text('บันทึกด่วน'))).pop();
     await tester.pumpAndSettle();
 
-    // 6. Switch to Money tab (default subtab: Transactions)
+    // 5. Switch to Money tab (default subtab: Transactions)
     await tester.tap(find.text('การเงิน'));
     await tester.pumpAndSettle();
-    // In Money -> Transactions, FAB '+ Add' should be visible
-    expect(find.text('เพิ่ม'), findsOneWidget);
 
     // Switch to Money -> Accounts subtab
     await tester.tap(find.text('บัญชี'));
     await tester.pumpAndSettle();
-    // In Accounts, Main FAB must be hidden (Accounts has its own button)
-    expect(find.text('เพิ่ม'), findsNothing);
 
     // Switch to Money -> Budget subtab
     await tester.tap(find.text('งบประมาณ'));
     await tester.pumpAndSettle();
-    // In Budget, Main FAB must be hidden
-    expect(find.text('เพิ่ม'), findsNothing);
 
-    // 7. Switch to Invest tab
+    // 6. Switch to Invest tab
     await tester.tap(find.text('การลงทุน'));
     await tester.pumpAndSettle();
 
-    // In Invest tab, MainShell's Add FAB must be hidden
-    expect(find.text('เพิ่ม'), findsNothing);
-    // And PortfolioScreen's 'ซื้อ / ขาย' button must be visible
+    // In Invest tab, 'ซื้อ / ขาย' button must be visible
     expect(find.text('ซื้อ / ขาย'), findsOneWidget);
 
-    // 8. Switch to Plan tab
-    await tester.tap(find.text('แผนการเงิน'));
-    await tester.pumpAndSettle();
-    expect(find.text('เพิ่ม'), findsNothing);
-
-    // 9. Switch to More/Settings tab
+    // 7. Switch to More/Settings tab
     await tester.tap(find.text('เพิ่มเติม'));
     await tester.pumpAndSettle();
-    expect(find.text('เพิ่ม'), findsNothing);
 
-    // 10. Switch back to Home tab
+    // 8. Switch back to Home tab
     await tester.tap(find.text('หน้าแรก'));
     await tester.pumpAndSettle();
-    expect(find.text('เพิ่ม'), findsOneWidget);
 
     await db.close();
   });
@@ -136,7 +111,9 @@ void main() {
     final expectedGreeting = hour < 12 ? 'สวัสดีตอนเช้า ☀️' : (hour < 18 ? 'สวัสดีตอนบ่าย 🌤️' : 'สวัสดีตอนเย็น 🌙');
     expect(find.text(expectedGreeting), findsOneWidget);
     expect(find.text('เงินที่ใช้ได้ในเดือนนี้ 🌸'), findsOneWidget);
-    expect(find.text('เพิ่ม'), findsOneWidget);
+
+    // Verify center Quick Add button exists in Lumi theme
+    expect(find.byIcon(Icons.add), findsAtLeastNWidgets(1));
 
     await db.close();
   });

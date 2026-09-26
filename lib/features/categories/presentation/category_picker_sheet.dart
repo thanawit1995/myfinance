@@ -59,7 +59,7 @@ class _CategoryPickerSheetState extends ConsumerState<CategoryPickerSheet> {
     try {
       final list = await ref
           .read(categoriesDaoProvider)
-          .getActiveCategoriesOrderedByUsage(widget.categoryType);
+          .getActiveCategories(widget.categoryType);
       if (mounted) {
         setState(() {
           _allCategories = list;

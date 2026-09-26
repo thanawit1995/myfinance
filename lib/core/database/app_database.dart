@@ -72,7 +72,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.connection);
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration {
@@ -140,6 +140,9 @@ class AppDatabase extends _$AppDatabase {
           await m.addColumn(investmentLots, investmentLots.pricePerUnitThb);
           await m.addColumn(assetPrices, assetPrices.marketPriceOriginal);
           await m.addColumn(assetPrices, assetPrices.marketPriceThb);
+        }
+        if (from < 10) {
+          await m.addColumn(categories, categories.sortOrder);
         }
       },
       beforeOpen: (details) async {

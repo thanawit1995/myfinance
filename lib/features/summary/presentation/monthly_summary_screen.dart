@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -39,6 +40,7 @@ class _PeriodReportData {
   final int incomeSatang;
   final int accruedIncomeSatang;
   final int expenseSatang;
+  final int investmentSatang;
   final int savingsSatang;
   final double savingsRatePercent;
   final int? savingsMoMPercent;
@@ -53,6 +55,7 @@ class _PeriodReportData {
     required this.incomeSatang,
     required this.accruedIncomeSatang,
     required this.expenseSatang,
+    this.investmentSatang = 0,
     required this.savingsSatang,
     required this.savingsRatePercent,
     required this.savingsMoMPercent,
@@ -246,6 +249,7 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
     int incomeSatang = 0;
     int accruedIncomeSatang = 0;
     int expenseSatang = 0;
+    int investmentSatang = 0;
 
     final Map<String, int> expenseByCat = {};
     final Map<String, int> incomeByCat = {};
@@ -259,15 +263,21 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
         } else {
           accruedIncomeSatang += t.amountThbSatang;
         }
-      } else if (t.transactionType == 'expense') {
+      } else if (t.transactionType == 'expense' || t.transactionType == 'invest_buy') {
+        final isInvest = t.transactionType == 'invest_buy' ||
+            (t.tag != null && t.tag!.startsWith('investment_buy'));
         final cost = t.amountThbSatang + t.feeThbSatang;
-        expenseSatang += cost;
-        final catId = t.categoryId ?? 'uncategorized';
-        expenseByCat[catId] = (expenseByCat[catId] ?? 0) + cost;
+        if (isInvest) {
+          investmentSatang += cost;
+        } else {
+          expenseSatang += cost;
+          final catId = t.categoryId ?? 'uncategorized';
+          expenseByCat[catId] = (expenseByCat[catId] ?? 0) + cost;
+        }
       }
     }
 
-    final savingsSatang = incomeSatang - expenseSatang;
+    final savingsSatang = incomeSatang - expenseSatang - investmentSatang;
     final savingsRatePercent = incomeSatang > 0
         ? ((savingsSatang / incomeSatang) * 100.0).clamp(-100.0, 100.0)
         : 0.0;
@@ -284,14 +294,22 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
       final prevTxs = await txsDao.searchTransactions(startDate: prevStart, endDate: prevEnd);
       int prevIncome = 0;
       int prevExpense = 0;
+      int prevInvest = 0;
       for (final t in prevTxs) {
         if (t.transactionType == 'income' && t.isCleared) {
           prevIncome += t.amountThbSatang;
-        } else if (t.transactionType == 'expense') {
-          prevExpense += (t.amountThbSatang + t.feeThbSatang);
+        } else if (t.transactionType == 'expense' || t.transactionType == 'invest_buy') {
+          final isInvest = t.transactionType == 'invest_buy' ||
+              (t.tag != null && t.tag!.startsWith('investment_buy'));
+          final cost = t.amountThbSatang + t.feeThbSatang;
+          if (isInvest) {
+            prevInvest += cost;
+          } else {
+            prevExpense += cost;
+          }
         }
       }
-      final prevSavings = prevIncome - prevExpense;
+      final prevSavings = prevIncome - prevExpense - prevInvest;
       if (prevSavings > 0) {
         savingsMoMPercent = (((savingsSatang - prevSavings) / prevSavings) * 100).round();
       }
@@ -306,6 +324,7 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
     for (final cp in checkpoints) {
       final cpTxs = currentTxs.where((t) =>
           t.transactionType == 'expense' &&
+          !(t.tag != null && t.tag!.startsWith('investment_buy')) &&
           t.transactionDate.day <= cp);
       int sumSatang = 0;
       for (final t in cpTxs) {
@@ -359,6 +378,7 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
       incomeSatang: incomeSatang,
       accruedIncomeSatang: accruedIncomeSatang,
       expenseSatang: expenseSatang,
+      investmentSatang: investmentSatang,
       savingsSatang: savingsSatang,
       savingsRatePercent: savingsRatePercent,
       savingsMoMPercent: savingsMoMPercent,
@@ -371,6 +391,7 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(transactionsVersionProvider);
     final isLumi = VaultTheme.isLumi(context);
     final isThai = Localizations.localeOf(context).languageCode == 'th';
 
@@ -427,6 +448,7 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
                   incomeSatang: 0,
                   accruedIncomeSatang: 0,
                   expenseSatang: 0,
+                  investmentSatang: 0,
                   savingsSatang: 0,
                   savingsRatePercent: 0.0,
                   savingsMoMPercent: null,
@@ -443,29 +465,21 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
                 _buildGranularitySelector(context, isThai),
                 const SizedBox(height: 12),
 
-                // 2. Navigation Header with Swipe Hint & Date Title
+                // 2. Navigation Header with Date Title (clean, no swipe instruction)
                 _buildNavigationHeader(context, isLumi, isThai),
                 const SizedBox(height: 14),
 
-                // 3. Dual Cards: Income & Expense
-                _buildDualIncomeExpenseCards(context, data, isLumi),
-                const SizedBox(height: 12),
-
-                // 4. Net Savings Card
-                _buildSavingsCard(context, data, isLumi),
+                // 3. Unified Financial Summary Card (Income, Expense, Investment, Net Savings, Savings Rate + Horizontal Bar Chart)
+                _buildUnifiedSummaryCard(context, data, isLumi, isThai),
                 const SizedBox(height: 16),
 
-                // 5. Income vs Expense Bar Chart
-                _buildIncomeExpenseBarChart(context, data, isThai),
-                const SizedBox(height: 16),
-
-                // 6. Cumulative Expense Trend Chart (if Monthly)
+                // 4. Cumulative Expense Trend Chart (if Monthly)
                 if (_granularity == ReportGranularity.monthly) ...[
                   _buildExpenseTrendCard(context, data, isLumi, isThai),
                   const SizedBox(height: 16),
                 ],
 
-                // 7. Category Breakdown Section
+                // 5. Category Breakdown Section
                 _buildCategoryBreakdownCard(context, data, isThai),
                 const SizedBox(height: 36),
               ],
@@ -552,321 +566,113 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
     final isNavDisabled = _granularity == ReportGranularity.all;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: border, width: 0.75),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.swipe_outlined, size: 16, color: accent),
-                  const SizedBox(width: 6),
-                  Text(
-                    isThai ? 'ปัดจอซ้าย-ขวา เพื่อเปลี่ยนช่วงเวลา' : 'Swipe left/right to change period',
-                    style: TextStyle(
-                      fontFamily: VaultTheme.fontFamily,
-                      fontSize: 11.5,
-                      color: secondaryText,
-                    ),
-                  ),
-                ],
-              ),
-              if (_granularity == ReportGranularity.custom)
-                InkWell(
-                  onTap: () async {
-                    final picked = await showDateRangePicker(
-                      context: context,
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime(2050),
-                      initialDateRange: _customRange,
-                    );
-                    if (picked != null) {
-                      setState(() => _customRange = picked);
-                    }
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Text(
-                      isThai ? 'เปลี่ยนวันที่' : 'Change',
-                      style: TextStyle(
-                        fontFamily: VaultTheme.fontFamily,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: accent,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.chevron_left_rounded, size: 26),
-                color: isNavDisabled ? secondaryText.withValues(alpha: 0.3) : primaryText,
-                onPressed: isNavDisabled ? null : _previousPeriod,
-              ),
-              Expanded(
-                child: Text(
-                  _formatPeriodTitle(isThai),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontFamily: VaultTheme.fontFamily,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: primaryText,
-                  ),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.chevron_right_rounded, size: 26),
-                color: isNavDisabled ? secondaryText.withValues(alpha: 0.3) : primaryText,
-                onPressed: isNavDisabled ? null : _nextPeriod,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDualIncomeExpenseCards(BuildContext context, _PeriodReportData data, bool isLumi) {
-    return Row(
-      children: [
-        // Left: Income Card
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: isLumi ? const Color(0xFFEDF9EC) : VaultTheme.surface(context),
-              borderRadius: BorderRadius.circular(isLumi ? 20 : 14),
-              border: Border.all(
-                color: isLumi ? const Color(0xFFC3EBC0) : VaultTheme.border(context),
-                width: 0.75,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'รายรับ',
-                  style: TextStyle(
-                    fontFamily: VaultTheme.fontFamily,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: isLumi ? const Color(0xFF286E24) : VaultTheme.secondaryText(context),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Container(
-                      width: 26,
-                      height: 26,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF38A130),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.arrow_downward_rounded, size: 16, color: Colors.white),
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        Money(data.incomeSatang).format(symbol: '฿'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: VaultTheme.tabular(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                          color: isLumi ? const Color(0xFF1E561A) : VaultTheme.positive(context),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                if (data.accruedIncomeSatang > 0) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    '+ค้างรับ ฿${Money(data.accruedIncomeSatang).format(symbol: '')}',
-                    style: TextStyle(
-                      fontFamily: VaultTheme.fontFamily,
-                      fontSize: 11,
-                      color: isLumi ? const Color(0xFF286E24) : VaultTheme.accent(context),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-
-        // Right: Expense Card
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: isLumi ? const Color(0xFFFDF2F4) : VaultTheme.surface(context),
-              borderRadius: BorderRadius.circular(isLumi ? 20 : 14),
-              border: Border.all(
-                color: isLumi ? const Color(0xFFFFD5DE) : VaultTheme.border(context),
-                width: 0.75,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'รายจ่าย',
-                  style: TextStyle(
-                    fontFamily: VaultTheme.fontFamily,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: isLumi ? const Color(0xFF912B43) : VaultTheme.secondaryText(context),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Container(
-                      width: 26,
-                      height: 26,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFE84368),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.arrow_upward_rounded, size: 16, color: Colors.white),
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        Money(data.expenseSatang).format(symbol: '฿'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: VaultTheme.tabular(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                          color: isLumi ? const Color(0xFF751C33) : VaultTheme.negative(context),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSavingsCard(BuildContext context, _PeriodReportData data, bool isLumi) {
-    final momText = data.savingsMoMPercent != null
-        ? (data.savingsMoMPercent! >= 0
-            ? '↑ ${data.savingsMoMPercent}% จากเดือนที่แล้ว'
-            : '↓ ${data.savingsMoMPercent!.abs()}% จากเดือนที่แล้ว')
-        : 'อัตราการออม ${data.savingsRatePercent.toStringAsFixed(1)}%';
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isLumi ? const Color(0xFFEBF5FC) : VaultTheme.surface(context),
-        borderRadius: BorderRadius.circular(isLumi ? 20 : 14),
-        border: Border.all(
-          color: isLumi ? const Color(0xFFBFE9FF) : VaultTheme.border(context),
-          width: 0.75,
-        ),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left_rounded, size: 26),
+            color: isNavDisabled ? secondaryText.withValues(alpha: 0.3) : primaryText,
+            onPressed: isNavDisabled ? null : _previousPeriod,
+          ),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'เงินออมสุทธิ',
-                  style: TextStyle(
-                    fontFamily: VaultTheme.fontFamily,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: isLumi ? const Color(0xFF1F4E6E) : VaultTheme.secondaryText(context),
-                  ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: _granularity == ReportGranularity.custom
+                  ? () async {
+                      final picked = await showDateRangePicker(
+                        context: context,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2050),
+                        initialDateRange: _customRange,
+                      );
+                      if (picked != null) {
+                        setState(() => _customRange = picked);
+                      }
+                    }
+                  : null,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        _formatPeriodTitle(isThai),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: VaultTheme.fontFamily,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: primaryText,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (_granularity == ReportGranularity.custom) ...[
+                      const SizedBox(width: 6),
+                      Icon(Icons.edit_calendar_outlined, size: 16, color: accent),
+                    ],
+                  ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  Money(data.savingsSatang).format(symbol: '฿'),
-                  style: VaultTheme.tabular(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    color: data.savingsSatang >= 0
-                        ? (isLumi ? const Color(0xFF13364C) : VaultTheme.positive(context))
-                        : VaultTheme.negative(context),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  momText,
-                  style: TextStyle(
-                    fontFamily: VaultTheme.fontFamily,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: isLumi ? const Color(0xFF2A84BC) : VaultTheme.accent(context),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: data.savingsSatang >= 0
-                  ? VaultTheme.positive(context).withValues(alpha: 0.15)
-                  : VaultTheme.negative(context).withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Column(
-              children: [
-                Text(
-                  '${data.savingsRatePercent.toStringAsFixed(1)}%',
-                  style: TextStyle(
-                    fontFamily: VaultTheme.fontFamily,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: data.savingsSatang >= 0 ? VaultTheme.positive(context) : VaultTheme.negative(context),
-                  ),
-                ),
-                Text(
-                  'Savings Rate',
-                  style: TextStyle(fontSize: 10, color: VaultTheme.secondaryText(context)),
-                ),
-              ],
-            ),
+          IconButton(
+            icon: const Icon(Icons.chevron_right_rounded, size: 26),
+            color: isNavDisabled ? secondaryText.withValues(alpha: 0.3) : primaryText,
+            onPressed: isNavDisabled ? null : _nextPeriod,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildIncomeExpenseBarChart(BuildContext context, _PeriodReportData data, bool isThai) {
+  Widget _buildUnifiedSummaryCard(
+    BuildContext context,
+    _PeriodReportData data,
+    bool isLumi,
+    bool isThai,
+  ) {
     final surface = VaultTheme.surface(context);
     final border = VaultTheme.border(context);
     final primaryText = VaultTheme.primaryText(context);
     final secondaryText = VaultTheme.secondaryText(context);
+    final negative = VaultTheme.negative(context);
 
-    final incomeThb = data.incomeSatang / 100.0;
-    final expenseThb = data.expenseSatang / 100.0;
-    final maxVal = (incomeThb > expenseThb ? incomeThb : expenseThb);
-    final maxY = maxVal > 0 ? (maxVal * 1.25) : 1000.0;
+    // Color theme
+    const incomeColor = Color(0xFF16A34A);
+    const expenseColor = Color(0xFFE11D48);
+    const investColor = Color(0xFF6366F1);
+    const savingsColor = Color(0xFF0D9488);
+
+    final momText = data.savingsMoMPercent != null
+        ? (data.savingsMoMPercent! >= 0
+            ? '↑ ${data.savingsMoMPercent}% vs เดือนก่อน'
+            : '↓ ${data.savingsMoMPercent!.abs()}% vs เดือนก่อน')
+        : null;
+
+    final isSavingsPositive = data.savingsSatang >= 0;
+
+    // Ratios for horizontal bars
+    final maxFlow = [
+      data.incomeSatang,
+      data.expenseSatang,
+      data.investmentSatang,
+      data.savingsSatang > 0 ? data.savingsSatang : 0,
+    ].reduce(max);
+    final safeMax = maxFlow > 0 ? maxFlow : 1;
+
+    final incomeRatio = (data.incomeSatang / safeMax).clamp(0.0, 1.0);
+    final expenseRatio = (data.expenseSatang / safeMax).clamp(0.0, 1.0);
+    final investRatio = (data.investmentSatang / safeMax).clamp(0.0, 1.0);
+    final savingsRatio = (isSavingsPositive ? data.savingsSatang / safeMax : 0.0).clamp(0.0, 1.0);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -878,124 +684,322 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 1. Header with Title & Savings Rate Badge
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.pie_chart_outline_rounded, size: 20, color: VaultTheme.accent(context)),
+                  const SizedBox(width: 8),
+                  Text(
+                    isThai ? 'สรุปภาพรวมการเงิน' : 'Financial Summary',
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: primaryText,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: (isSavingsPositive ? incomeColor : negative).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: (isSavingsPositive ? incomeColor : negative).withValues(alpha: 0.3),
+                    width: 0.75,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isSavingsPositive ? Icons.savings_outlined : Icons.warning_amber_rounded,
+                      size: 14,
+                      color: isSavingsPositive ? incomeColor : negative,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      '${isThai ? "ออมได้" : "Savings"} ${data.savingsRatePercent.toStringAsFixed(1)}%',
+                      style: TextStyle(
+                        fontFamily: VaultTheme.fontFamily,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: isSavingsPositive ? incomeColor : negative,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // 2. Metrics in 2x2 Grid (Income, Expense, Investment, Net Savings)
+          Row(
+            children: [
+              // Income
+              Expanded(
+                child: _buildMetricTile(
+                  label: isThai ? 'รายรับ' : 'Income',
+                  amountSatang: data.incomeSatang,
+                  color: incomeColor,
+                  icon: Icons.arrow_downward_rounded,
+                  badgeText: data.accruedIncomeSatang > 0
+                      ? '+ค้างรับ ฿${Money(data.accruedIncomeSatang).format(symbol: "")}'
+                      : null,
+                  context: context,
+                ),
+              ),
+              const SizedBox(width: 10),
+              // Expense
+              Expanded(
+                child: _buildMetricTile(
+                  label: isThai ? 'รายจ่าย' : 'Expense',
+                  amountSatang: data.expenseSatang,
+                  color: expenseColor,
+                  icon: Icons.arrow_upward_rounded,
+                  context: context,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              // Investment
+              Expanded(
+                child: _buildMetricTile(
+                  label: isThai ? 'เงินลงทุน' : 'Investments',
+                  amountSatang: data.investmentSatang,
+                  color: investColor,
+                  icon: Icons.trending_up_rounded,
+                  context: context,
+                ),
+              ),
+              const SizedBox(width: 10),
+              // Net Savings
+              Expanded(
+                child: _buildMetricTile(
+                  label: isThai ? 'เงินออมสุทธิ' : 'Net Savings',
+                  amountSatang: data.savingsSatang,
+                  color: isSavingsPositive ? savingsColor : negative,
+                  icon: Icons.savings_outlined,
+                  badgeText: momText,
+                  context: context,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Divider(color: border.withValues(alpha: 0.6), height: 1, thickness: 0.75),
+          const SizedBox(height: 14),
+
+          // 3. Horizontal Bar Chart Section (Compact and saves vertical space)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                isThai ? 'เปรียบเทียบ รายรับ vs รายจ่าย' : 'Income vs Expense',
+                isThai ? 'แผนภูมิเปรียบเทียบสัดส่วน' : 'Comparison Chart',
                 style: TextStyle(
                   fontFamily: VaultTheme.fontFamily,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: primaryText,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: secondaryText,
                 ),
               ),
-              Row(
-                children: [
-                  Container(width: 10, height: 10, decoration: const BoxDecoration(color: Color(0xFF38A130), shape: BoxShape.circle)),
-                  const SizedBox(width: 4),
-                  Text(isThai ? 'รับ' : 'Income', style: TextStyle(fontSize: 11, color: secondaryText)),
-                  const SizedBox(width: 10),
-                  Container(width: 10, height: 10, decoration: const BoxDecoration(color: Color(0xFFE84368), shape: BoxShape.circle)),
-                  const SizedBox(width: 4),
-                  Text(isThai ? 'จ่าย' : 'Expense', style: TextStyle(fontSize: 11, color: secondaryText)),
-                ],
+              Text(
+                isThai ? 'สัดส่วนกระแสเงินสด' : 'Cash Flow Ratio',
+                style: TextStyle(fontSize: 11, color: secondaryText),
               ),
             ],
           ),
-          const SizedBox(height: 18),
-          SizedBox(
-            height: 160,
-            child: BarChart(
-              BarChartData(
-                maxY: maxY,
-                barTouchData: BarTouchData(
-                  touchTooltipData: BarTouchTooltipData(
-                    getTooltipColor: (_) => surface,
-                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                      final isInc = rodIndex == 0;
-                      final label = isInc ? (isThai ? 'รายรับ' : 'Income') : (isThai ? 'รายจ่าย' : 'Expense');
-                      return BarTooltipItem(
-                        '$label\n฿${NumberFormat("#,##0").format(rod.toY)}',
-                        TextStyle(
-                          color: isInc ? const Color(0xFF38A130) : const Color(0xFFE84368),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                titlesData: FlTitlesData(
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 46,
-                      getTitlesWidget: (val, meta) {
-                        if (val == 0) return const SizedBox.shrink();
-                        String formatted;
-                        if (val >= 1000000) {
-                          formatted = '${(val / 1000000).toStringAsFixed(1)}M';
-                        } else if (val >= 1000) {
-                          formatted = '${(val / 1000).toStringAsFixed(0)}k';
-                        } else {
-                          formatted = val.toStringAsFixed(0);
-                        }
-                        return Text(formatted, style: TextStyle(fontSize: 10, color: secondaryText));
-                      },
-                    ),
-                  ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (val, meta) {
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 6),
-                          child: Text(
-                            isThai ? 'ยอดรวมช่วงเวลานี้' : 'Total Period',
-                            style: TextStyle(fontSize: 11, color: secondaryText, fontWeight: FontWeight.w600),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                  getDrawingHorizontalLine: (val) => FlLine(
-                    color: border.withValues(alpha: 0.5),
-                    strokeWidth: 0.75,
-                  ),
-                ),
-                borderData: FlBorderData(show: false),
-                barGroups: [
-                  BarChartGroupData(
-                    x: 0,
-                    barsSpace: 12,
-                    barRods: [
-                      BarChartRodData(
-                        toY: incomeThb,
-                        color: const Color(0xFF38A130),
-                        width: 32,
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
-                      ),
-                      BarChartRodData(
-                        toY: expenseThb,
-                        color: const Color(0xFFE84368),
-                        width: 32,
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+          const SizedBox(height: 12),
+
+          // Horizontal Bars
+          _buildHorizontalBar(
+            label: isThai ? 'รายรับ' : 'Income',
+            amountSatang: data.incomeSatang,
+            color: incomeColor,
+            ratio: incomeRatio,
+            context: context,
+          ),
+          const SizedBox(height: 8),
+          _buildHorizontalBar(
+            label: isThai ? 'รายจ่าย' : 'Expense',
+            amountSatang: data.expenseSatang,
+            color: expenseColor,
+            ratio: expenseRatio,
+            context: context,
+          ),
+          const SizedBox(height: 8),
+          _buildHorizontalBar(
+            label: isThai ? 'เงินลงทุน' : 'Invest',
+            amountSatang: data.investmentSatang,
+            color: investColor,
+            ratio: investRatio,
+            context: context,
+          ),
+          const SizedBox(height: 8),
+          _buildHorizontalBar(
+            label: isThai ? 'เงินออม' : 'Savings',
+            amountSatang: data.savingsSatang,
+            color: isSavingsPositive ? savingsColor : negative,
+            ratio: savingsRatio,
+            context: context,
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildMetricTile({
+    required String label,
+    required int amountSatang,
+    required Color color,
+    required IconData icon,
+    String? badgeText,
+    required BuildContext context,
+  }) {
+    final surfaceSubtle = VaultTheme.surfaceSubtle(context);
+    final border = VaultTheme.border(context);
+    final secondaryText = VaultTheme.secondaryText(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: surfaceSubtle,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: border, width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 13, color: color),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontFamily: VaultTheme.fontFamily,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: secondaryText,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            Money(amountSatang).format(symbol: '฿'),
+            style: VaultTheme.tabular(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (badgeText != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              badgeText,
+              style: TextStyle(
+                fontFamily: VaultTheme.fontFamily,
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+                color: color,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHorizontalBar({
+    required String label,
+    required int amountSatang,
+    required Color color,
+    required double ratio,
+    required BuildContext context,
+  }) {
+    final secondaryText = VaultTheme.secondaryText(context);
+    final primaryText = VaultTheme.primaryText(context);
+
+    return Row(
+      children: [
+        SizedBox(
+          width: 58,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontFamily: VaultTheme.fontFamily,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: secondaryText,
+            ),
+          ),
+        ),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final barWidth = constraints.maxWidth * ratio.clamp(0.02, 1.0);
+              return Stack(
+                children: [
+                  Container(
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                  Container(
+                    width: barWidth,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 82,
+          child: Text(
+            Money(amountSatang).format(symbol: '฿'),
+            textAlign: TextAlign.end,
+            style: VaultTheme.tabular(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: primaryText,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 

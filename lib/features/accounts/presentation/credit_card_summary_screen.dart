@@ -22,6 +22,7 @@ class _CreditCardSummaryScreenState extends ConsumerState<CreditCardSummaryScree
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(transactionsVersionProvider);
     final isThai = Localizations.localeOf(context).languageCode == 'th';
     final ccDao = ref.watch(creditCardDaoProvider);
     final dateFormat = DateFormat('d MMM yyyy');
@@ -699,6 +700,8 @@ class _CreditCardSummaryScreenState extends ConsumerState<CreditCardSummaryScree
         amountSatang: satang,
         paymentDate: paymentDate,
       );
+
+      ref.read(transactionsVersionProvider.notifier).state++;
 
       if (mounted) {
         setState(() {});

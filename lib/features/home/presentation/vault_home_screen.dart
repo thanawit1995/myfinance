@@ -31,6 +31,7 @@ class VaultHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(transactionsVersionProvider);
     final now = DateTime.now();
 
     return Scaffold(
@@ -1200,11 +1201,23 @@ class VaultHomeScreen extends ConsumerWidget {
     final invDao = ref.read(investmentsDaoProvider);
     final healthDao = ref.read(financialHealthDaoProvider);
 
-    // 1. Net worth & accounts
-    final netWorth = await accDao.getTotalNetWorthSatang();
+    // 1. Portfolio (Unrealized profit/loss)
+    PortfolioSummary? portSummary;
+    try {
+      portSummary = await invDao.getPortfolioSummary();
+    } catch (_) {}
+
+    final portValue = portSummary?.totalValueThbSatang ?? 0;
+    final portCost = portSummary?.totalCostThbSatang ?? 0;
+    final portReturnPercent = portCost > 0
+        ? ((portValue - portCost) / portCost * 100.0)
+        : 0.0;
+
+    // 2. Net worth (Cash + Portfolio with unrealized profit/loss) & accounts
+    final netWorth = await accDao.getTotalNetWorthSatang(portfolioValueSatang: portValue);
     final activeAccounts = await accDao.getActiveAccounts();
 
-    // 2. Month transactions
+    // 3. Month transactions
     final startOfMonth = DateTime(now.year, now.month, 1);
     final endOfMonth = DateTime(now.month == 12 ? now.year + 1 : now.year, now.month == 12 ? 1 : now.month + 1, 1);
     final monthTx = await txDao.searchTransactions(startDate: startOfMonth, endDate: endOfMonth);
@@ -1221,7 +1234,7 @@ class VaultHomeScreen extends ConsumerWidget {
     }
     final cashFlow = totalIncome - totalExpense;
 
-    // 3. Budgets (no fake default limit!)
+    // 4. Budgets (no fake default limit!)
     final budgets = await bgDao.getBudgetStatusForMonth(now.year, now.month);
     int totalBudget = 0;
     for (final b in budgets) {
@@ -1229,19 +1242,7 @@ class VaultHomeScreen extends ConsumerWidget {
     }
     final remainingBudget = totalBudget > 0 ? (totalBudget - totalExpense).clamp(0, totalBudget) : 0;
 
-    // 4. Portfolio
-    PortfolioSummary? portSummary;
-    try {
-      portSummary = await invDao.getPortfolioSummary();
-    } catch (_) {}
-
-    final portValue = portSummary?.totalValueThbSatang ?? 0;
-    final portCost = portSummary?.totalCostThbSatang ?? 0;
-    final portReturnPercent = portCost > 0
-        ? ((portValue - portCost) / portCost * 100.0)
-        : 0.0;
-
-    // 5. Credit Cards
+    // 5. Credit Cards (Total outstanding debt across all cycles)
     int ccDebt = 0;
     String ccNextClose = isThai ? 'ไม่มีหนี้ค้างชำระ' : 'No balance due';
     bool ccHasWarning = false;
@@ -1249,7 +1250,7 @@ class VaultHomeScreen extends ConsumerWidget {
       if (a.accountType == 'credit_card') {
         final summary = await ccDao.getSummary(a.id, now);
         if (summary != null) {
-          ccDebt += summary.currentCycleDebtSatang;
+          ccDebt += summary.totalDebtSatang;
           final daysToClose = summary.cycle.daysRemaining;
           if (daysToClose <= 7 && daysToClose >= 0) {
             ccNextClose = isThai ? 'ตัดรอบในอีก $daysToClose วัน' : 'Due in $daysToClose days';

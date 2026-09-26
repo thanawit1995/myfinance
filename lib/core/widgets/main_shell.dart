@@ -310,12 +310,13 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
                         ),
                         tooltip: l10n?.quickAddKeypad ?? 'Quick Add',
                         icon: const Icon(Icons.add, size: 20),
-                        onPressed: () {
-                          Navigator.of(context).push(
+                        onPressed: () async {
+                          await Navigator.of(context).push(
                             MaterialPageRoute(
                               builder: (_) => const QuickAddScreen(initialType: 'expense'),
                             ),
                           );
+                          if (mounted) setState(() {});
                         },
                       ),
                     ],
@@ -409,12 +410,13 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
                         child: Material(
                           color: Colors.transparent,
                           child: InkWell(
-                            onTap: () {
-                              Navigator.of(context).push(
+                            onTap: () async {
+                              await Navigator.of(context).push(
                                 MaterialPageRoute(
                                   builder: (_) => const QuickAddScreen(initialType: 'expense'),
                                 ),
                               );
+                              if (mounted) setState(() {});
                             },
                             borderRadius: BorderRadius.circular(24),
                             child: Container(

@@ -500,6 +500,9 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
     // Update Widget
     _updateWidget();
 
+    // Notify listeners across app of transaction change
+    ref.read(transactionsVersionProvider.notifier).state++;
+
     if (mounted) {
       final isThai = Localizations.localeOf(context).languageCode == 'th';
       final srcAcc = _currentSourceAccount;
@@ -512,7 +515,9 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
           ? 'บันทึกรายการ $typeText $srcSymbol$_amountString สำเร็จ$recurringMsg$accruedMsg'
           : 'Successfully saved $typeText $srcSymbol$_amountString$recurringMsg$accruedMsg';
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.clearSnackBars();
+      messenger.showSnackBar(
         SnackBar(
           duration: const Duration(seconds: 5),
           content: Text(successMsg),
@@ -524,6 +529,13 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
           ),
         ),
       );
+
+      // Explicitly guarantee dismiss after 5 seconds
+      Future.delayed(const Duration(seconds: 5), () {
+        try {
+          messenger.hideCurrentSnackBar();
+        } catch (_) {}
+      });
 
       widget.onTransactionSaved?.call();
       if (Navigator.of(context).canPop()) {

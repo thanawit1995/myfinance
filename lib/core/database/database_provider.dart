@@ -82,3 +82,7 @@ final syncDaoProvider = Provider<SyncDao>((ref) {
   return ref.watch(databaseProvider).syncDao;
 });
 
+/// Incremented whenever transactions or payments are recorded, updated, or deleted
+/// to trigger immediate reactive rebuilds of home, accounts, and summary dashboards.
+final transactionsVersionProvider = StateProvider<int>((ref) => 0);
+

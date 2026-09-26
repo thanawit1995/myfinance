@@ -149,8 +149,8 @@ class CreditCardDao extends DatabaseAccessor<AppDatabase> with _$CreditCardDaoMi
     final currentCycleTrans = <Transaction>[];
 
     for (final t in allTrans) {
-      final isCharge = t.sourceAccountId == accountId && t.transactionType == 'expense';
-      final isPayment = t.destinationAccountId == accountId && t.transactionType == 'transfer';
+      final isCharge = t.sourceAccountId == accountId && (t.transactionType == 'expense' || t.transactionType == 'transfer');
+      final isPayment = t.destinationAccountId == accountId && (t.transactionType == 'transfer' || t.transactionType == 'income');
 
       final cost = t.amountThbSatang + t.feeThbSatang;
 
@@ -189,9 +189,9 @@ class CreditCardDao extends DatabaseAccessor<AppDatabase> with _$CreditCardDaoMi
       int cPayments = 0;
       for (final t in cycleTxs) {
         final cost = t.amountThbSatang + t.feeThbSatang;
-        if (t.sourceAccountId == accountId && t.transactionType == 'expense') {
+        if (t.sourceAccountId == accountId && (t.transactionType == 'expense' || t.transactionType == 'transfer')) {
           cCharges += cost;
-        } else if (t.destinationAccountId == accountId && t.transactionType == 'transfer') {
+        } else if (t.destinationAccountId == accountId && (t.transactionType == 'transfer' || t.transactionType == 'income')) {
           cPayments += t.amountThbSatang;
         }
       }

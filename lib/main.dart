@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/database/platform_workaround/sqlite_workaround.dart';
 import 'core/theme/app_theme_style.dart';
@@ -15,6 +16,12 @@ import 'l10n/app_localizations.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize date formatting for Thai and English
+  try {
+    await initializeDateFormatting('th', null);
+    await initializeDateFormatting('en', null);
+  } catch (_) {}
 
   // Lock orientation to portrait for phones
   await SystemChrome.setPreferredOrientations([

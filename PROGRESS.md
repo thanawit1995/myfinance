@@ -2,6 +2,31 @@
 
 อัปเดตล่าสุด: 26 กันยายน 2026
 
+- [x] **Bug Fixes & Financial Reporting Enhancements (Web & Mobile)**:
+  - **1. ป๊อปอัปแจ้งเตือนปิดอัตโนมัติใน 5 วินาที (Auto-dismiss SnackBar)**:
+    - เพิ่มตัวจับเวลา `Future.delayed(Duration(seconds: 5))` เพื่อสั่งปิด `hideCurrentSnackBar()` โดยตรง ป้องกันปัญหา SnackBar ค้างบนเบราว์เซอร์
+  - **2. แก้ไขหน้าต่างซื้อ-ขายสินทรัพย์ลงทุนไม่โหลด (Invest Trade Screen Fix)**:
+    - แก้ไขสาเหตุ Error จากการจัดรูปแบบวันที่ด้วยภาษาไทยที่ยังไม่ได้โหลดข้อมูล Locale บน Flutter Web โดยเพิ่ม `initializeDateFormatting()` ใน `main.dart` และ fallback รายชื่อเดือนภาษาไทย
+    - เพิ่ม Unit / Widget Test ครอบคลุมการแสดงผลฟอร์มซื้อขายสินทรัพย์ลงทุน (`test/features/buy_sell_trade_test.dart`)
+  - **3. แก้ไขยอดบัตรเครดิตให้อัปเดตทันทีแบบเรียลไทม์ (Credit Card Realtime Balance)**:
+    - เชื่อมต่อ `transactionsVersionProvider` เข้ากับ `VaultHomeScreen`, `AccountsScreen`, และ `CreditCardSummaryScreen` เพื่อให้หน้าจอรับรู้ทุกการบันทึกรายการใหม่ทันที
+    - ปรับปรุงการคำนวณยอดหนี้บัตรเครดิตบนหน้าหลักให้รวมยอดค้างชำระทั้งหมด (`totalDebtSatang`) ไม่ตกหล่นแม้รายการจะอยู่ต่างรอบบิล
+    - ปรับปรุงการตรวจจับธุรกรรมของบัตรเครดิตให้ครอบคลุมทั้งค่าใช้จ่าย, การโอน, และเงินคืน
+  - **4. คำนวณสินทรัพย์สุทธิ (Net Worth) รวมมูลค่าพอร์ตการลงทุน (Unrealized Profit/Loss)**:
+    - ปรับปรุง `getTotalNetWorthSatang` ใน `AccountsDao` ให้รองรับมูลค่าพอร์ตการลงทุน (`portfolioValueSatang`)
+    - คำนวณความมั่งคั่งสุทธิ = เงินในบัญชีทั้งหมด + มูลค่าตลาดของพอร์ตลงทุน (ราคาปัจจุบัน x จำนวนหน่วยที่ถือครอง) ทำให้เมื่อซื้อหุ้น/กองทุน ยอดสินทรัพย์สุทธิจะไม่ลดลง แต่สะท้อนกำไรขาดทุนที่ยังไม่เกิดขึ้นจริง (Unrealized P/L)
+    - แสดงข้อความรายละเอียดระบุมูลค่าพอร์ตลงทุนในการ์ดสินทรัพย์สุทธิของหน้ารวมบัญชีอย่างชัดเจน
+  - **5. ยกเครื่องหน้ารายงานสรุปรายเดือน (Monthly Summary Screen Overhaul)**:
+    - ลบข้อความและไอคอนคำแนะนำการปัดซ้ายขวา (`ปัดจอซ้าย-ขวา เพื่อเปลี่ยนช่วงเวลา`) ออก
+    - รวมยอดสรุป รายรับ, รายจ่าย, เงินลงทุน, เงินออมสุทธิ และ อัตราการออม เข้าไว้ด้วยกันในการ์ดสรุปการเงินเดียว (`_buildUnifiedSummaryCard`)
+    - แทนที่กราฟแท่งแนวตั้งเดิมด้วย กราฟแผนภูมิแท่งแนวนอน (Horizontal Bar Chart) ที่ประหยัดพื้นที่แนวตั้ง และแสดงสัดส่วนกระแสเงินสดชัดเจน
+  - **6. นำกล่องคำแนะนำ Chrome ในหน้า Backup & Restore ออก**:
+    - ลบกล่องคำแนะนำ `ทำไม Chrome ในมือถือถึงเปลี่ยนโฟลเดอร์ไม่ได้?...` ออกตามคำขอ ทำให้หน้าสำรองข้อมูลกระชับ สะอาดตา
+  - **การทดสอบความถูกต้อง**:
+    - `flutter analyze`: **No issues found! (0 error, 0 warning)**
+    - `flutter test`: ผ่านทั้งหมด **157/157 tests passed** (100%)
+    - `flutter build web --release --base-href /myfinance/`: ผ่านสมบูรณ์ 100%
+
 - [x] **Comprehensive UI/UX Enhancements, Credit Card Statement Cycles, Account Renaming & Advanced Financial Reports**:
   - **1. ปิดหน้าบันทึกด่วนอัตโนมัติ (Quick Add Auto-Close) & ปรับเวลาแจ้งเตือน 5 วินาที**:
     - ปรับปรุง `QuickAddScreen` ให้ปิดหน้าจอลงทันทีหลังกดบันทึกสำเร็จ (Auto-dismiss / Pop) กลับไปยังหน้าที่ผู้ใช้เปิดค้างไว้

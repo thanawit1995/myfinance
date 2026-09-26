@@ -19,6 +19,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
   @override
   @override
   Widget build(BuildContext context) {
+    ref.watch(transactionsVersionProvider);
     final theme = Theme.of(context);
     final accDao = ref.watch(accountsDaoProvider);
     final isThai = Localizations.localeOf(context).languageCode == 'th';
@@ -40,11 +41,17 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
         ],
       ),
       body: FutureBuilder(
-        future: Future.wait([
-          accDao.getAllAccounts(),
-          accDao.getTotalNetWorthSatang(),
-        ]),
-        builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
+        future: () async {
+          final accounts = await accDao.getAllAccounts();
+          int portValue = 0;
+          try {
+            final portSummary = await ref.read(investmentsDaoProvider).getPortfolioSummary();
+            portValue = portSummary.totalValueThbSatang;
+          } catch (_) {}
+          final totalNetWorth = await accDao.getTotalNetWorthSatang(portfolioValueSatang: portValue);
+          return (accounts: accounts, totalNetWorth: totalNetWorth, portValue: portValue);
+        }(),
+        builder: (context, AsyncSnapshot<({List<Account> accounts, int totalNetWorth, int portValue})> snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -53,8 +60,10 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
             return Center(child: Text('${isThai ? "เกิดข้อผิดพลาด" : "Error"}: ${snapshot.error}'));
           }
 
-          final accounts = snapshot.data![0] as List<Account>;
-          final totalNetWorth = snapshot.data![1] as int;
+          final data = snapshot.data!;
+          final accounts = data.accounts;
+          final totalNetWorth = data.totalNetWorth;
+          final portValue = data.portValue;
 
           // Group accounts
           final domesticThb = accounts.where((a) => a.isDomestic && a.accountType == 'bank').toList();
@@ -76,8 +85,8 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                     children: [
                       Text(
                         isThai
-                            ? 'ความมั่งคั่งสุทธิรวม (เฉพาะบัญชีที่เปิดใช้งาน)'
-                            : 'Total Net Worth (Active Accounts Only)',
+                            ? 'ความมั่งคั่งสุทธิรวม (เงินฝาก + พอร์ตลงทุน)'
+                            : 'Total Net Worth (Cash + Investments)',
                         style: theme.textTheme.titleSmall,
                       ),
                       const SizedBox(height: 6),
@@ -88,6 +97,19 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                           color: theme.colorScheme.onPrimaryContainer,
                         ),
                       ),
+                      if (portValue > 0) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          isThai
+                              ? 'รวมมูลค่าพอร์ตการลงทุนปัจจุบัน ${Money(portValue).format(symbol: "฿")}'
+                              : 'Includes current portfolio value ${Money(portValue).format(symbol: "฿")}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: theme.colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

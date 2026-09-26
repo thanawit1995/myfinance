@@ -1000,40 +1000,6 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                               onPressed: _isLoading ? null : _handlePickAndRestore,
                             ),
                           ),
-                          const SizedBox(height: 12),
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Icon(Icons.help_outline_rounded, size: 18, color: Colors.blue),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      isThai ? 'ทำไม Chrome ในมือถือถึงเปลี่ยนโฟลเดอร์ไม่ได้?' : 'Why can\'t I change folder in Chrome?',
-                                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Colors.blue),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  isThai
-                                      ? 'เบราว์เซอร์ Chrome บนมือถือ Android ถูกระบบล็อกไว้ให้ดาวน์โหลดลงโฟลเดอร์ "ดาวน์โหลด" (Downloads) เท่านั้น ไม่ยอมให้เลือกโฟลเดอร์อื่นในเครื่องครับ\n\n'
-                                        '💡 วิธีเลือกโฟลเดอร์หรือบันทึกลง Google Drive:\n'
-                                        'ให้แตะปุ่มสีเขียว "แชร์เข้า Google Drive / LINE / เลือกโฟลเดอร์" ด้านบน หน้าต่างของมือถือจะเด้งขึ้นมา ให้เลือก "บันทึกลงไดรฟ์" (เลือกโฟลเดอร์ใน Google Drive ได้ตามใจชอบ) หรือส่งเข้า LINE / จัดการไฟล์ ได้ทันทีครับ!'
-                                      : 'Chrome on Android restricts downloads strictly to the Downloads folder.\n\n'
-                                        'To select a custom folder or Google Drive, tap "Share to Google Drive / LINE / Files" above!',
-                                  style: const TextStyle(fontSize: 11.5, color: Colors.grey, height: 1.4),
-                                ),
-                              ],
-                            ),
-                          ),
                         ],
                       ),
                     ),

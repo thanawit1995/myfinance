@@ -2,7 +2,6 @@ import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/database/database_provider.dart';
 import '../../../../core/money/money.dart';
@@ -86,15 +85,22 @@ class _BuySellTradeScreenState extends ConsumerState<BuySellTradeScreen> {
       setState(() {
         _assets = assets;
         _accounts = accounts;
-        if (_selectedAssetId == null && assets.isNotEmpty) {
-          _selectedAssetId = assets.first.id;
-          _currency = assets.first.currencyCode;
-          _selectedAccountId = assets.first.defaultAccountId;
+
+        if (_selectedAssetId == null || !assets.any((a) => a.id == _selectedAssetId)) {
+          _selectedAssetId = assets.isNotEmpty ? assets.first.id : null;
+        }
+
+        if (_selectedAssetId != null) {
+          final matchedAsset = assets.firstWhere((a) => a.id == _selectedAssetId);
+          _currency = matchedAsset.currencyCode;
           _fxRateController.text = _currency == 'USD' ? '35.000000' : '1.000000';
+          _selectedAccountId ??= matchedAsset.defaultAccountId;
         }
-        if (_selectedAccountId == null && accounts.isNotEmpty) {
-          _selectedAccountId = accounts.first.id;
+
+        if (_selectedAccountId == null || !accounts.any((a) => a.id == _selectedAccountId)) {
+          _selectedAccountId = accounts.isNotEmpty ? accounts.first.id : null;
         }
+
         _isDataLoaded = true;
       });
     }
@@ -108,6 +114,20 @@ class _BuySellTradeScreenState extends ConsumerState<BuySellTradeScreen> {
     _feeController.dispose();
     _noteController.dispose();
     super.dispose();
+  }
+
+  static const _thaiFullMonths = [
+    'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+    'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+  ];
+  static const _enMonths = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  String _formatTradeDate(DateTime d, bool isThai) {
+    final m = isThai ? _thaiFullMonths[d.month - 1] : _enMonths[d.month - 1];
+    return '${d.day} $m ${d.year}';
   }
 
   Future<void> _submit() async {
@@ -193,6 +213,8 @@ class _BuySellTradeScreenState extends ConsumerState<BuySellTradeScreen> {
           note: _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),
         );
       }
+
+      ref.read(transactionsVersionProvider.notifier).state++;
 
       if (mounted) {
         Navigator.of(context).pop(true);
@@ -305,74 +327,88 @@ class _BuySellTradeScreenState extends ConsumerState<BuySellTradeScreen> {
                         ),
                         const SizedBox(height: 14),
                       ] else ...[
-                        Row(
-                          children: [
-                            Expanded(
-                              child: DropdownButtonFormField<String>(
-                                decoration: InputDecoration(
-                                  labelText: isThai ? 'สินทรัพย์ *' : 'Asset *',
-                                  border: const OutlineInputBorder(),
-                                ),
-                                isExpanded: true,
-                                initialValue: _selectedAssetId,
-                                items: _assets.map((a) {
-                                  return DropdownMenuItem(
-                                    value: a.id,
-                                    child: Text(
-                                      '${a.symbol} - ${a.name}',
-                                      overflow: TextOverflow.ellipsis,
+                        Builder(
+                          builder: (context) {
+                            final effectiveAssetId = _assets.any((a) => a.id == _selectedAssetId)
+                                ? _selectedAssetId
+                                : (_assets.isNotEmpty ? _assets.first.id : null);
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: DropdownButtonFormField<String>(
+                                    decoration: InputDecoration(
+                                      labelText: isThai ? 'สินทรัพย์ *' : 'Asset *',
+                                      border: const OutlineInputBorder(),
                                     ),
-                                  );
-                                }).toList(),
-                                onChanged: (val) {
-                                  if (val != null) {
-                                    final match = _assets.firstWhere((a) => a.id == val);
-                                    setState(() {
-                                      _selectedAssetId = val;
-                                      _currency = match.currencyCode;
-                                      _selectedAccountId = match.defaultAccountId;
-                                      _fxRateController.text = _currency == 'USD' ? '35.000000' : '1.000000';
-                                    });
-                                  }
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Tooltip(
-                              message: isThai ? 'สร้างสินทรัพย์ใหม่' : 'Create New Asset',
-                              child: IconButton.filled(
-                                icon: const Icon(Icons.add, size: 20),
-                                onPressed: () async {
-                                  final ok = await AssetFormDialog.show(context);
-                                  if (ok == true) _loadData();
-                                },
-                              ),
-                            ),
-                          ],
+                                    isExpanded: true,
+                                    initialValue: effectiveAssetId,
+                                    items: _assets.map((a) {
+                                      return DropdownMenuItem(
+                                        value: a.id,
+                                        child: Text(
+                                          '${a.symbol} - ${a.name}',
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      );
+                                    }).toList(),
+                                    onChanged: (val) {
+                                      if (val != null) {
+                                        final match = _assets.firstWhere((a) => a.id == val);
+                                        setState(() {
+                                          _selectedAssetId = val;
+                                          _currency = match.currencyCode;
+                                          _selectedAccountId = match.defaultAccountId;
+                                          _fxRateController.text = _currency == 'USD' ? '35.000000' : '1.000000';
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Tooltip(
+                                  message: isThai ? 'สร้างสินทรัพย์ใหม่' : 'Create New Asset',
+                                  child: IconButton.filled(
+                                    icon: const Icon(Icons.add, size: 20),
+                                    onPressed: () async {
+                                      final ok = await AssetFormDialog.show(context);
+                                      if (ok == true) _loadData();
+                                    },
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
                         ),
                         const SizedBox(height: 12),
                       ],
 
                       // 3. Account Selector
-                      DropdownButtonFormField<String>(
-                        decoration: InputDecoration(
-                          labelText: _isBuy
-                              ? (isThai ? 'หักเงินจากบัญชี *' : 'Deduct from Account *')
-                              : (isThai ? 'รับเงินเข้าบัญชี *' : 'Deposit to Account *'),
-                          border: const OutlineInputBorder(),
-                        ),
-                        isExpanded: true,
-                        initialValue: _selectedAccountId,
-                        items: _accounts.map((a) {
-                          return DropdownMenuItem(
-                            value: a.id,
-                            child: Text(
-                              '${a.name} (${a.currencyCode})',
-                              overflow: TextOverflow.ellipsis,
+                      Builder(
+                        builder: (context) {
+                          final effectiveAccountId = _accounts.any((a) => a.id == _selectedAccountId)
+                              ? _selectedAccountId
+                              : (_accounts.isNotEmpty ? _accounts.first.id : null);
+                          return DropdownButtonFormField<String>(
+                            decoration: InputDecoration(
+                              labelText: _isBuy
+                                  ? (isThai ? 'หักเงินจากบัญชี *' : 'Deduct from Account *')
+                                  : (isThai ? 'รับเงินเข้าบัญชี *' : 'Deposit to Account *'),
+                              border: const OutlineInputBorder(),
                             ),
+                            isExpanded: true,
+                            initialValue: effectiveAccountId,
+                            items: _accounts.map((a) {
+                              return DropdownMenuItem(
+                                value: a.id,
+                                child: Text(
+                                  '${a.name} (${a.currencyCode})',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (val) => setState(() => _selectedAccountId = val),
                           );
-                        }).toList(),
-                        onChanged: (val) => setState(() => _selectedAccountId = val),
+                        },
                       ),
                       const SizedBox(height: 12),
 
@@ -494,7 +530,7 @@ class _BuySellTradeScreenState extends ConsumerState<BuySellTradeScreen> {
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.calendar_today),
-                  title: Text(DateFormat('d MMMM yyyy', isThai ? 'th' : 'en').format(_tradeDate)),
+                  title: Text(_formatTradeDate(_tradeDate, isThai)),
                   trailing: const Icon(Icons.edit_calendar),
                   onTap: () async {
                     final picked = await showDatePicker(

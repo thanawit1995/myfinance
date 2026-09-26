@@ -215,9 +215,9 @@ class AccountsDao extends DatabaseAccessor<AppDatabase> with _$AccountsDaoMixin 
       for (final t in transList) {
         final amount = isForeign ? t.amountOriginalSatang : t.amountThbSatang;
         final fee = isForeign ? 0 : t.feeThbSatang;
-        if (t.sourceAccountId == accountId && t.transactionType == 'expense') {
+        if (t.sourceAccountId == accountId && (t.transactionType == 'expense' || t.transactionType == 'transfer')) {
           balance -= (amount + fee);
-        } else if (t.destinationAccountId == accountId && t.transactionType == 'transfer') {
+        } else if (t.destinationAccountId == accountId && (t.transactionType == 'transfer' || t.transactionType == 'income')) {
           balance += amount;
         }
       }
@@ -275,14 +275,14 @@ class AccountsDao extends DatabaseAccessor<AppDatabase> with _$AccountsDaoMixin 
     return (nativeBalanceSatang: nativeBalance, thbEquivalentSatang: thbEquivalent, fxRate: fxRate);
   }
 
-  /// Returns total net worth in THB satang across all active accounts only.
-  Future<int> getTotalNetWorthSatang() async {
+  /// Returns total net worth in THB satang across all active accounts and investments.
+  Future<int> getTotalNetWorthSatang({int portfolioValueSatang = 0}) async {
     final active = await getActiveAccounts();
     int totalThb = 0;
     for (final acc in active) {
       final breakdown = await getAccountBalanceBreakdown(acc.id);
       totalThb += breakdown.thbEquivalentSatang;
     }
-    return totalThb;
+    return totalThb + portfolioValueSatang;
   }
 }

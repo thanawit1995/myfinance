@@ -13,6 +13,7 @@ import '../../../../core/theme/vault_theme.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../core/widgets/category_icon_helper.dart';
 import '../../categories/presentation/category_picker_sheet.dart';
+import '../../insurance/presentation/insurance_policy_form_dialog.dart';
 import '../../recurring/domain/recurring_engine.dart';
 import '../../import/domain/csv_import_parser.dart';
 
@@ -20,12 +21,20 @@ class QuickAddScreen extends ConsumerStatefulWidget {
   final String? initialType;
   final bool isModal;
   final VoidCallback? onTransactionSaved;
+  final String? initialCategoryId;
+  final String? initialPolicyId;
+  final int? initialAmountSatang;
+  final String? initialNote;
 
   const QuickAddScreen({
     super.key,
     this.initialType,
     this.isModal = false,
     this.onTransactionSaved,
+    this.initialCategoryId,
+    this.initialPolicyId,
+    this.initialAmountSatang,
+    this.initialNote,
   });
 
   @override
@@ -40,6 +49,8 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
   String? _selectedAccountId;
   String? _selectedDestinationAccountId;
   String? _selectedCategoryId;
+  String? _selectedPolicyId;
+  String? _selectedPolicyName;
   String _usdAmountString = '0'; // For cross-currency transfer
   String _note = '';
   String? _tag;
@@ -93,6 +104,18 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
     if (widget.initialType != null) {
       _transactionType = widget.initialType!.toLowerCase();
     }
+    if (widget.initialPolicyId != null) {
+      _selectedPolicyId = widget.initialPolicyId;
+      _tag = 'policy:${widget.initialPolicyId},deduction:life_insurance';
+    }
+    if (widget.initialAmountSatang != null && widget.initialAmountSatang! > 0) {
+      _amountString = (widget.initialAmountSatang! / 100.0).toStringAsFixed(0);
+      _amountController.text = _amountString;
+    }
+    if (widget.initialNote != null && widget.initialNote!.isNotEmpty) {
+      _note = widget.initialNote!;
+      _noteController.text = _note;
+    }
     _loadInitialData();
   }
 
@@ -101,18 +124,29 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
     final categories = await ref.read(categoriesDaoProvider).getActiveCategories(_transactionType);
     final projects = await ref.read(projectsDaoProvider).getActiveProjects();
 
+    String? policyName;
+    if (_selectedPolicyId != null) {
+      final p = await ref.read(insuranceDaoProvider).getPolicyById(_selectedPolicyId!);
+      policyName = p?.policyName;
+    }
+
     if (mounted) {
       setState(() {
         _accounts = accounts;
         _currentCategories = categories;
         _projects = projects;
+        if (policyName != null) {
+          _selectedPolicyName = policyName;
+        }
         if (accounts.isNotEmpty) {
           _selectedAccountId = accounts.first.id;
           if (accounts.length > 1) {
             _selectedDestinationAccountId = accounts[1].id;
           }
         }
-        if (categories.isNotEmpty) {
+        if (widget.initialCategoryId != null && categories.any((c) => c.id == widget.initialCategoryId)) {
+          _selectedCategoryId = widget.initialCategoryId;
+        } else if (categories.isNotEmpty) {
           _selectedCategoryId = categories.first.id;
         }
         _inferTaxCategory();
@@ -380,7 +414,13 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
         }
       }
 
-      if (noteLower.contains('ประกันออมทรัพย์') || (catName.contains('ประกัน') && noteLower.contains('ออมทรัพย์'))) {
+      if (_selectedPolicyId != null) {
+        tagsList.removeWhere((t) => t.startsWith('policy:'));
+        tagsList.add('policy:$_selectedPolicyId');
+        if (!tagsList.contains('deduction:life_insurance')) {
+          tagsList.add('deduction:life_insurance');
+        }
+      } else if (noteLower.contains('ประกัน') || catName.contains('ประกัน')) {
         if (!tagsList.any((t) => t.contains('deduction:life_insurance'))) {
           tagsList.add('deduction:life_insurance');
         }
@@ -790,6 +830,10 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
             ] else ...[
               // Expense & Income: Category Dropdown (with + Add New inside)
               _buildCategoryDropdown(theme, isThai),
+              if (_selectedPolicyId != null) ...[
+                const SizedBox(height: 8),
+                _buildSelectedPolicyBanner(theme, isThai),
+              ],
               const SizedBox(height: 12),
               // Row: Note (flex 3) + Account (flex 2)
               Row(
@@ -886,6 +930,13 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
               _inferTaxCategory(_noteController.text, chosen.id);
             }
           });
+
+          final isInsuranceCat = chosen.id == 'cat-exp-0000-4000-8000-000000000015' ||
+              chosen.nameTh.contains('ประกัน') ||
+              chosen.nameEn.toLowerCase().contains('insurance');
+          if (isInsuranceCat && _transactionType == 'expense') {
+            await _selectInsurancePolicy();
+          }
         }
       },
       borderRadius: const BorderRadius.all(Radius.circular(10)),
@@ -912,6 +963,270 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildSelectedPolicyBanner(ThemeData theme, bool isThai) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.green.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.verified_user_rounded, color: Colors.green, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _selectedPolicyName ?? 'กรมธรรม์ประกันภัย',
+                  style: TextStyle(
+                    fontFamily: VaultTheme.fontFamily,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.bold,
+                    color: VaultTheme.primaryText(context),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  isThai ? 'ผูกกับกรมธรรม์นี้ (นับเป็นเงินสะสมใน Net Worth)' : 'Linked to policy (counted in Net Worth)',
+                  style: TextStyle(
+                    fontFamily: VaultTheme.fontFamily,
+                    fontSize: 11,
+                    color: VaultTheme.secondaryText(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+            ),
+            onPressed: _selectInsurancePolicy,
+            child: Text(isThai ? 'เปลี่ยน' : 'Change', style: const TextStyle(fontSize: 12)),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 16),
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+            tooltip: 'ยกเลิกการผูกกรมธรรม์',
+            onPressed: () {
+              setState(() {
+                _selectedPolicyId = null;
+                _selectedPolicyName = null;
+                if (_tag != null) {
+                  final tagsList = _tag!.split(',').where((t) => !t.startsWith('policy:')).toList();
+                  _tag = tagsList.isNotEmpty ? tagsList.join(',') : null;
+                }
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _selectInsurancePolicy() async {
+    final insuranceDao = ref.read(insuranceDaoProvider);
+    var policies = await insuranceDao.getAllPolicies();
+    if (policies.isEmpty) {
+      final defaultPolicy = await insuranceDao.getOrCreateDefaultSavingsPolicy();
+      policies = [defaultPolicy];
+    }
+    if (!mounted) return;
+
+    final chosen = await showModalBottomSheet<InsurancePolicy>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          decoration: BoxDecoration(
+            color: VaultTheme.surface(ctx),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.shield_outlined, color: Colors.green, size: 20),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'เลือกกรมธรรม์ที่ต้องการชำระ',
+                            style: TextStyle(
+                              fontFamily: VaultTheme.fontFamily,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: VaultTheme.primaryText(ctx),
+                            ),
+                          ),
+                          Text(
+                            'ระบบจะดึงยอดเบี้ยประกันให้อัตโนมัติ',
+                            style: TextStyle(
+                              fontFamily: VaultTheme.fontFamily,
+                              fontSize: 12,
+                              color: VaultTheme.secondaryText(ctx),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: policies.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) {
+                      final policy = policies[index];
+                      final premiumText = Money(policy.annualPremiumSatang).format(symbol: '฿');
+                      final isSelected = policy.id == _selectedPolicyId;
+
+                      return InkWell(
+                        onTap: () => Navigator.of(ctx).pop(policy),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? VaultTheme.accent(ctx).withValues(alpha: 0.1)
+                                : VaultTheme.surface(ctx),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isSelected
+                                  ? VaultTheme.accent(ctx)
+                                  : VaultTheme.border(ctx),
+                              width: isSelected ? 1.5 : 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                policy.insuranceType == 'savings' || policy.insuranceType == 'endowment'
+                                    ? Icons.savings_outlined
+                                    : Icons.verified_user_outlined,
+                                color: isSelected ? VaultTheme.accent(ctx) : Colors.green,
+                                size: 24,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      policy.policyName,
+                                      style: TextStyle(
+                                        fontFamily: VaultTheme.fontFamily,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: VaultTheme.primaryText(ctx),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'เบี้ยต่อปี: $premiumText',
+                                      style: TextStyle(
+                                        fontFamily: VaultTheme.fontFamily,
+                                        fontSize: 12,
+                                        color: VaultTheme.secondaryText(ctx),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (isSelected)
+                                Icon(Icons.check_circle, color: VaultTheme.accent(ctx), size: 20),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    Navigator.of(ctx).pop();
+                    final changed = await InsurancePolicyFormDialog.show(context);
+                    if (changed == true && mounted) {
+                      final updated = await insuranceDao.getAllPolicies();
+                      if (updated.isNotEmpty) {
+                        _applySelectedPolicy(updated.last);
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('เพิ่มกรมธรรม์ใหม่'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (chosen != null && mounted) {
+      _applySelectedPolicy(chosen);
+    }
+  }
+
+  void _applySelectedPolicy(InsurancePolicy policy) {
+    setState(() {
+      _selectedPolicyId = policy.id;
+      _selectedPolicyName = policy.policyName;
+      final amountThb = policy.annualPremiumSatang / 100.0;
+      _amountString = amountThb.toStringAsFixed(0);
+      _amountController.text = _amountString;
+      if (_noteController.text.trim().isEmpty || _noteController.text.startsWith('ชำระเบี้ย')) {
+        _noteController.text = 'ชำระเบี้ย ${policy.policyName}';
+        _note = _noteController.text;
+      }
+      _tag = 'policy:${policy.id},deduction:life_insurance';
+    });
   }
 
   Widget _buildAccountDropdownCompact(ThemeData theme, bool isThai) {

@@ -7,6 +7,7 @@ mixin _$InsuranceDaoMixin on DatabaseAccessor<AppDatabase> {
   $InsurancePoliciesTable get insurancePolicies =>
       attachedDatabase.insurancePolicies;
   $AuditLogsTable get auditLogs => attachedDatabase.auditLogs;
+  $TransactionsTable get transactions => attachedDatabase.transactions;
   InsuranceDaoManager get managers => InsuranceDaoManager(this);
 }
 
@@ -20,4 +21,6 @@ class InsuranceDaoManager {
       );
   $$AuditLogsTableTableManager get auditLogs =>
       $$AuditLogsTableTableManager(_db.attachedDatabase, _db.auditLogs);
+  $$TransactionsTableTableManager get transactions =>
+      $$TransactionsTableTableManager(_db.attachedDatabase, _db.transactions);
 }

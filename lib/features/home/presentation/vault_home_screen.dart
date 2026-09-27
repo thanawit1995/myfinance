@@ -9,6 +9,9 @@ import '../../../../core/database/daos/investments_dao.dart';
 import '../../../../core/widgets/vault_add_sheet.dart';
 import '../../summary/presentation/monthly_summary_screen.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../../core/database/daos/insurance_dao.dart';
+import '../../insurance/presentation/insurance_policies_screen.dart';
+import '../../transactions/presentation/quick_add_screen.dart';
 import 'widgets/lumi/lumi_desktop_layout.dart';
 
 class VaultHomeScreen extends ConsumerWidget {
@@ -119,6 +122,12 @@ class VaultHomeScreen extends ConsumerWidget {
                   // 2. Master Budget — Hero card เดียวของหน้า
                   _buildMasterBudgetCard(context, data, now),
                   const SizedBox(height: 16),
+
+                  // 2.5 Insurance Due Alert Banner (แจ้งเตือนล่วงหน้า 1 เดือน)
+                  if (data.upcomingDuePolicies.isNotEmpty) ...[
+                    _buildInsuranceDueAlert(context, data),
+                    const SizedBox(height: 16),
+                  ],
 
                   // 3. Today / Attention — แสดงเฉพาะสิ่งที่ต้องตัดสินใจหรือควรรู้
                   _buildAttentionCard(context, data),
@@ -584,6 +593,106 @@ class VaultHomeScreen extends ConsumerWidget {
     );
   }
 
+  // --- 2.5 Insurance Due Alert Banner ---
+  Widget _buildInsuranceDueAlert(BuildContext context, _VaultHomeData data) {
+    final policyProg = data.upcomingDuePolicies.first;
+    final policy = policyProg.policy;
+    final isOverdue = (policyProg.daysUntilDue ?? 0) < 0;
+    final daysText = isOverdue
+        ? 'เลยกำหนดชำระ ${policyProg.daysUntilDue!.abs()} วัน'
+        : (policyProg.daysUntilDue == 0
+            ? 'ครบกำหนดชำระวันนี้'
+            : 'ครบกำหนดชำระในอีก ${policyProg.daysUntilDue} วัน');
+
+    final color = isOverdue ? Colors.red : Colors.orange.shade800;
+    final bgColor = isOverdue ? Colors.red.withValues(alpha: 0.08) : Colors.orange.withValues(alpha: 0.08);
+    final borderColor = isOverdue ? Colors.red.withValues(alpha: 0.3) : Colors.orange.withValues(alpha: 0.3);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor, width: 1),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(Icons.notification_important_rounded, color: color, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  daysText,
+                  style: TextStyle(
+                    fontFamily: VaultTheme.fontFamily,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  policy.policyName,
+                  style: TextStyle(
+                    fontFamily: VaultTheme.fontFamily,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: VaultTheme.primaryText(context),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'เบี้ย: ${Money(policy.annualPremiumSatang).format(symbol: '฿')}',
+                  style: TextStyle(
+                    fontFamily: VaultTheme.fontFamily,
+                    fontSize: 12,
+                    color: VaultTheme.secondaryText(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: color,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              visualDensity: VisualDensity.compact,
+            ),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => QuickAddScreen(
+                    initialType: 'expense',
+                    initialCategoryId: 'cat-exp-0000-4000-8000-000000000015',
+                    initialPolicyId: policy.id,
+                    initialAmountSatang: policy.annualPremiumSatang,
+                    initialNote: 'ชำระเบี้ย ${policy.policyName}',
+                    isModal: true,
+                  ),
+                ),
+              );
+            },
+            child: const Text('ชำระเบี้ย', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   // --- 3. Today / Attention Box ---
   Widget _buildAttentionCard(BuildContext context, _VaultHomeData data) {
     final isLumi = VaultTheme.isLumi(context);
@@ -808,6 +917,38 @@ class VaultHomeScreen extends ConsumerWidget {
               ),
             ],
           ),
+          if (data.insuranceSavingsSatang > 0) ...[
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '${isThai ? 'เงินสะสมในประกัน' : 'Insurance Savings'}: ${Money(data.insuranceSavingsSatang).format(symbol: '฿')}',
+                  style: VaultTheme.tabular(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.green,
+                  ),
+                ),
+                InkWell(
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const InsurancePoliciesScreen()),
+                    );
+                  },
+                  child: Text(
+                    '${isThai ? 'ดูกรมธรรม์' : 'View Policies'} ›',
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: VaultTheme.accent(context),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
           if (!isLumi) ...[
             const SizedBox(height: 10),
             Divider(color: VaultTheme.border(context), height: 1),
@@ -1272,9 +1413,15 @@ class VaultHomeScreen extends ConsumerWidget {
         ? (cashFlow / priorNetWorth * 100.0)
         : 0.0;
 
+    // 8. Insurance Savings & Upcoming Due Policies
+    final insDao = ref.read(insuranceDaoProvider);
+    final upcomingPolicies = await insDao.getUpcomingDuePolicies(daysThreshold: 30);
+    final insSavings = await insDao.getTotalInsuranceSavingsSatang();
+
     return _VaultHomeData(
       netWorthSatang: netWorth,
       totalCashSatang: totalCash,
+      insuranceSavingsSatang: insSavings,
       momChangePercent: momPercent,
       cashFlowMonthSatang: cashFlow,
       totalIncomeMonthSatang: totalIncome,
@@ -1288,6 +1435,7 @@ class VaultHomeScreen extends ConsumerWidget {
       recentTransactions: recent,
       attentionMessage: attentionMsg,
       attentionIsWarning: attentionWarn,
+      upcomingDuePolicies: upcomingPolicies,
     );
   }
 
@@ -1303,6 +1451,7 @@ class VaultHomeScreen extends ConsumerWidget {
 class _VaultHomeData {
   final int netWorthSatang;
   final int totalCashSatang;
+  final int insuranceSavingsSatang;
   final double momChangePercent;
   final int cashFlowMonthSatang;
   final int totalIncomeMonthSatang;
@@ -1316,10 +1465,12 @@ class _VaultHomeData {
   final List<Transaction> recentTransactions;
   final String attentionMessage;
   final bool attentionIsWarning;
+  final List<PolicyProgress> upcomingDuePolicies;
 
   const _VaultHomeData({
     required this.netWorthSatang,
     required this.totalCashSatang,
+    required this.insuranceSavingsSatang,
     required this.momChangePercent,
     required this.cashFlowMonthSatang,
     required this.totalIncomeMonthSatang,
@@ -1333,5 +1484,6 @@ class _VaultHomeData {
     required this.recentTransactions,
     required this.attentionMessage,
     required this.attentionIsWarning,
+    required this.upcomingDuePolicies,
   });
 }

@@ -15135,6 +15135,40 @@ class $InsurancePoliciesTable extends InsurancePolicies
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _totalPeriodsMeta = const VerificationMeta(
+    'totalPeriods',
+  );
+  @override
+  late final GeneratedColumn<int> totalPeriods = GeneratedColumn<int>(
+    'total_periods',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _paymentDueDayMeta = const VerificationMeta(
+    'paymentDueDay',
+  );
+  @override
+  late final GeneratedColumn<int> paymentDueDay = GeneratedColumn<int>(
+    'payment_due_day',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _paymentDueMonthMeta = const VerificationMeta(
+    'paymentDueMonth',
+  );
+  @override
+  late final GeneratedColumn<int> paymentDueMonth = GeneratedColumn<int>(
+    'payment_due_month',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _noteMeta = const VerificationMeta('note');
   @override
   late final GeneratedColumn<String> note = GeneratedColumn<String>(
@@ -15198,6 +15232,9 @@ class $InsurancePoliciesTable extends InsurancePolicies
     medicalCoverageSatang,
     annualPremiumSatang,
     dueDate,
+    totalPeriods,
+    paymentDueDay,
+    paymentDueMonth,
     note,
     createdAt,
     updatedAt,
@@ -15279,6 +15316,33 @@ class $InsurancePoliciesTable extends InsurancePolicies
         dueDate.isAcceptableOrUnknown(data['due_date']!, _dueDateMeta),
       );
     }
+    if (data.containsKey('total_periods')) {
+      context.handle(
+        _totalPeriodsMeta,
+        totalPeriods.isAcceptableOrUnknown(
+          data['total_periods']!,
+          _totalPeriodsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('payment_due_day')) {
+      context.handle(
+        _paymentDueDayMeta,
+        paymentDueDay.isAcceptableOrUnknown(
+          data['payment_due_day']!,
+          _paymentDueDayMeta,
+        ),
+      );
+    }
+    if (data.containsKey('payment_due_month')) {
+      context.handle(
+        _paymentDueMonthMeta,
+        paymentDueMonth.isAcceptableOrUnknown(
+          data['payment_due_month']!,
+          _paymentDueMonthMeta,
+        ),
+      );
+    }
     if (data.containsKey('note')) {
       context.handle(
         _noteMeta,
@@ -15353,6 +15417,18 @@ class $InsurancePoliciesTable extends InsurancePolicies
         DriftSqlType.dateTime,
         data['${effectivePrefix}due_date'],
       ),
+      totalPeriods: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}total_periods'],
+      )!,
+      paymentDueDay: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}payment_due_day'],
+      ),
+      paymentDueMonth: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}payment_due_month'],
+      ),
       note: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}note'],
@@ -15390,6 +15466,9 @@ class InsurancePolicy extends DataClass implements Insertable<InsurancePolicy> {
   final int medicalCoverageSatang;
   final int annualPremiumSatang;
   final DateTime? dueDate;
+  final int totalPeriods;
+  final int? paymentDueDay;
+  final int? paymentDueMonth;
   final String? note;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -15403,6 +15482,9 @@ class InsurancePolicy extends DataClass implements Insertable<InsurancePolicy> {
     required this.medicalCoverageSatang,
     required this.annualPremiumSatang,
     this.dueDate,
+    required this.totalPeriods,
+    this.paymentDueDay,
+    this.paymentDueMonth,
     this.note,
     required this.createdAt,
     required this.updatedAt,
@@ -15420,6 +15502,13 @@ class InsurancePolicy extends DataClass implements Insertable<InsurancePolicy> {
     map['annual_premium_satang'] = Variable<int>(annualPremiumSatang);
     if (!nullToAbsent || dueDate != null) {
       map['due_date'] = Variable<DateTime>(dueDate);
+    }
+    map['total_periods'] = Variable<int>(totalPeriods);
+    if (!nullToAbsent || paymentDueDay != null) {
+      map['payment_due_day'] = Variable<int>(paymentDueDay);
+    }
+    if (!nullToAbsent || paymentDueMonth != null) {
+      map['payment_due_month'] = Variable<int>(paymentDueMonth);
     }
     if (!nullToAbsent || note != null) {
       map['note'] = Variable<String>(note);
@@ -15444,6 +15533,13 @@ class InsurancePolicy extends DataClass implements Insertable<InsurancePolicy> {
       dueDate: dueDate == null && nullToAbsent
           ? const Value.absent()
           : Value(dueDate),
+      totalPeriods: Value(totalPeriods),
+      paymentDueDay: paymentDueDay == null && nullToAbsent
+          ? const Value.absent()
+          : Value(paymentDueDay),
+      paymentDueMonth: paymentDueMonth == null && nullToAbsent
+          ? const Value.absent()
+          : Value(paymentDueMonth),
       note: note == null && nullToAbsent ? const Value.absent() : Value(note),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
@@ -15471,6 +15567,9 @@ class InsurancePolicy extends DataClass implements Insertable<InsurancePolicy> {
         json['annualPremiumSatang'],
       ),
       dueDate: serializer.fromJson<DateTime?>(json['dueDate']),
+      totalPeriods: serializer.fromJson<int>(json['totalPeriods']),
+      paymentDueDay: serializer.fromJson<int?>(json['paymentDueDay']),
+      paymentDueMonth: serializer.fromJson<int?>(json['paymentDueMonth']),
       note: serializer.fromJson<String?>(json['note']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -15489,6 +15588,9 @@ class InsurancePolicy extends DataClass implements Insertable<InsurancePolicy> {
       'medicalCoverageSatang': serializer.toJson<int>(medicalCoverageSatang),
       'annualPremiumSatang': serializer.toJson<int>(annualPremiumSatang),
       'dueDate': serializer.toJson<DateTime?>(dueDate),
+      'totalPeriods': serializer.toJson<int>(totalPeriods),
+      'paymentDueDay': serializer.toJson<int?>(paymentDueDay),
+      'paymentDueMonth': serializer.toJson<int?>(paymentDueMonth),
       'note': serializer.toJson<String?>(note),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -15505,6 +15607,9 @@ class InsurancePolicy extends DataClass implements Insertable<InsurancePolicy> {
     int? medicalCoverageSatang,
     int? annualPremiumSatang,
     Value<DateTime?> dueDate = const Value.absent(),
+    int? totalPeriods,
+    Value<int?> paymentDueDay = const Value.absent(),
+    Value<int?> paymentDueMonth = const Value.absent(),
     Value<String?> note = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -15518,6 +15623,13 @@ class InsurancePolicy extends DataClass implements Insertable<InsurancePolicy> {
     medicalCoverageSatang: medicalCoverageSatang ?? this.medicalCoverageSatang,
     annualPremiumSatang: annualPremiumSatang ?? this.annualPremiumSatang,
     dueDate: dueDate.present ? dueDate.value : this.dueDate,
+    totalPeriods: totalPeriods ?? this.totalPeriods,
+    paymentDueDay: paymentDueDay.present
+        ? paymentDueDay.value
+        : this.paymentDueDay,
+    paymentDueMonth: paymentDueMonth.present
+        ? paymentDueMonth.value
+        : this.paymentDueMonth,
     note: note.present ? note.value : this.note,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -15543,6 +15655,15 @@ class InsurancePolicy extends DataClass implements Insertable<InsurancePolicy> {
           ? data.annualPremiumSatang.value
           : this.annualPremiumSatang,
       dueDate: data.dueDate.present ? data.dueDate.value : this.dueDate,
+      totalPeriods: data.totalPeriods.present
+          ? data.totalPeriods.value
+          : this.totalPeriods,
+      paymentDueDay: data.paymentDueDay.present
+          ? data.paymentDueDay.value
+          : this.paymentDueDay,
+      paymentDueMonth: data.paymentDueMonth.present
+          ? data.paymentDueMonth.value
+          : this.paymentDueMonth,
       note: data.note.present ? data.note.value : this.note,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -15563,6 +15684,9 @@ class InsurancePolicy extends DataClass implements Insertable<InsurancePolicy> {
           ..write('medicalCoverageSatang: $medicalCoverageSatang, ')
           ..write('annualPremiumSatang: $annualPremiumSatang, ')
           ..write('dueDate: $dueDate, ')
+          ..write('totalPeriods: $totalPeriods, ')
+          ..write('paymentDueDay: $paymentDueDay, ')
+          ..write('paymentDueMonth: $paymentDueMonth, ')
           ..write('note: $note, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -15581,6 +15705,9 @@ class InsurancePolicy extends DataClass implements Insertable<InsurancePolicy> {
     medicalCoverageSatang,
     annualPremiumSatang,
     dueDate,
+    totalPeriods,
+    paymentDueDay,
+    paymentDueMonth,
     note,
     createdAt,
     updatedAt,
@@ -15598,6 +15725,9 @@ class InsurancePolicy extends DataClass implements Insertable<InsurancePolicy> {
           other.medicalCoverageSatang == this.medicalCoverageSatang &&
           other.annualPremiumSatang == this.annualPremiumSatang &&
           other.dueDate == this.dueDate &&
+          other.totalPeriods == this.totalPeriods &&
+          other.paymentDueDay == this.paymentDueDay &&
+          other.paymentDueMonth == this.paymentDueMonth &&
           other.note == this.note &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
@@ -15613,6 +15743,9 @@ class InsurancePoliciesCompanion extends UpdateCompanion<InsurancePolicy> {
   final Value<int> medicalCoverageSatang;
   final Value<int> annualPremiumSatang;
   final Value<DateTime?> dueDate;
+  final Value<int> totalPeriods;
+  final Value<int?> paymentDueDay;
+  final Value<int?> paymentDueMonth;
   final Value<String?> note;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -15627,6 +15760,9 @@ class InsurancePoliciesCompanion extends UpdateCompanion<InsurancePolicy> {
     this.medicalCoverageSatang = const Value.absent(),
     this.annualPremiumSatang = const Value.absent(),
     this.dueDate = const Value.absent(),
+    this.totalPeriods = const Value.absent(),
+    this.paymentDueDay = const Value.absent(),
+    this.paymentDueMonth = const Value.absent(),
     this.note = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -15642,6 +15778,9 @@ class InsurancePoliciesCompanion extends UpdateCompanion<InsurancePolicy> {
     required int medicalCoverageSatang,
     required int annualPremiumSatang,
     this.dueDate = const Value.absent(),
+    this.totalPeriods = const Value.absent(),
+    this.paymentDueDay = const Value.absent(),
+    this.paymentDueMonth = const Value.absent(),
     this.note = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
@@ -15664,6 +15803,9 @@ class InsurancePoliciesCompanion extends UpdateCompanion<InsurancePolicy> {
     Expression<int>? medicalCoverageSatang,
     Expression<int>? annualPremiumSatang,
     Expression<DateTime>? dueDate,
+    Expression<int>? totalPeriods,
+    Expression<int>? paymentDueDay,
+    Expression<int>? paymentDueMonth,
     Expression<String>? note,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -15681,6 +15823,9 @@ class InsurancePoliciesCompanion extends UpdateCompanion<InsurancePolicy> {
       if (annualPremiumSatang != null)
         'annual_premium_satang': annualPremiumSatang,
       if (dueDate != null) 'due_date': dueDate,
+      if (totalPeriods != null) 'total_periods': totalPeriods,
+      if (paymentDueDay != null) 'payment_due_day': paymentDueDay,
+      if (paymentDueMonth != null) 'payment_due_month': paymentDueMonth,
       if (note != null) 'note': note,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -15698,6 +15843,9 @@ class InsurancePoliciesCompanion extends UpdateCompanion<InsurancePolicy> {
     Value<int>? medicalCoverageSatang,
     Value<int>? annualPremiumSatang,
     Value<DateTime?>? dueDate,
+    Value<int>? totalPeriods,
+    Value<int?>? paymentDueDay,
+    Value<int?>? paymentDueMonth,
     Value<String?>? note,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -15714,6 +15862,9 @@ class InsurancePoliciesCompanion extends UpdateCompanion<InsurancePolicy> {
           medicalCoverageSatang ?? this.medicalCoverageSatang,
       annualPremiumSatang: annualPremiumSatang ?? this.annualPremiumSatang,
       dueDate: dueDate ?? this.dueDate,
+      totalPeriods: totalPeriods ?? this.totalPeriods,
+      paymentDueDay: paymentDueDay ?? this.paymentDueDay,
+      paymentDueMonth: paymentDueMonth ?? this.paymentDueMonth,
       note: note ?? this.note,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -15749,6 +15900,15 @@ class InsurancePoliciesCompanion extends UpdateCompanion<InsurancePolicy> {
     if (dueDate.present) {
       map['due_date'] = Variable<DateTime>(dueDate.value);
     }
+    if (totalPeriods.present) {
+      map['total_periods'] = Variable<int>(totalPeriods.value);
+    }
+    if (paymentDueDay.present) {
+      map['payment_due_day'] = Variable<int>(paymentDueDay.value);
+    }
+    if (paymentDueMonth.present) {
+      map['payment_due_month'] = Variable<int>(paymentDueMonth.value);
+    }
     if (note.present) {
       map['note'] = Variable<String>(note.value);
     }
@@ -15780,6 +15940,9 @@ class InsurancePoliciesCompanion extends UpdateCompanion<InsurancePolicy> {
           ..write('medicalCoverageSatang: $medicalCoverageSatang, ')
           ..write('annualPremiumSatang: $annualPremiumSatang, ')
           ..write('dueDate: $dueDate, ')
+          ..write('totalPeriods: $totalPeriods, ')
+          ..write('paymentDueDay: $paymentDueDay, ')
+          ..write('paymentDueMonth: $paymentDueMonth, ')
           ..write('note: $note, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -26650,6 +26813,9 @@ typedef $$InsurancePoliciesTableCreateCompanionBuilder =
       required int medicalCoverageSatang,
       required int annualPremiumSatang,
       Value<DateTime?> dueDate,
+      Value<int> totalPeriods,
+      Value<int?> paymentDueDay,
+      Value<int?> paymentDueMonth,
       Value<String?> note,
       required DateTime createdAt,
       required DateTime updatedAt,
@@ -26666,6 +26832,9 @@ typedef $$InsurancePoliciesTableUpdateCompanionBuilder =
       Value<int> medicalCoverageSatang,
       Value<int> annualPremiumSatang,
       Value<DateTime?> dueDate,
+      Value<int> totalPeriods,
+      Value<int?> paymentDueDay,
+      Value<int?> paymentDueMonth,
       Value<String?> note,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -26715,6 +26884,21 @@ class $$InsurancePoliciesTableFilterComposer
 
   ColumnFilters<DateTime> get dueDate => $composableBuilder(
     column: $table.dueDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get totalPeriods => $composableBuilder(
+    column: $table.totalPeriods,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get paymentDueDay => $composableBuilder(
+    column: $table.paymentDueDay,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get paymentDueMonth => $composableBuilder(
+    column: $table.paymentDueMonth,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -26788,6 +26972,21 @@ class $$InsurancePoliciesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get totalPeriods => $composableBuilder(
+    column: $table.totalPeriods,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get paymentDueDay => $composableBuilder(
+    column: $table.paymentDueDay,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get paymentDueMonth => $composableBuilder(
+    column: $table.paymentDueMonth,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get note => $composableBuilder(
     column: $table.note,
     builder: (column) => ColumnOrderings(column),
@@ -26854,6 +27053,21 @@ class $$InsurancePoliciesTableAnnotationComposer
   GeneratedColumn<DateTime> get dueDate =>
       $composableBuilder(column: $table.dueDate, builder: (column) => column);
 
+  GeneratedColumn<int> get totalPeriods => $composableBuilder(
+    column: $table.totalPeriods,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get paymentDueDay => $composableBuilder(
+    column: $table.paymentDueDay,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get paymentDueMonth => $composableBuilder(
+    column: $table.paymentDueMonth,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get note =>
       $composableBuilder(column: $table.note, builder: (column) => column);
 
@@ -26919,6 +27133,9 @@ class $$InsurancePoliciesTableTableManager
                 Value<int> medicalCoverageSatang = const Value.absent(),
                 Value<int> annualPremiumSatang = const Value.absent(),
                 Value<DateTime?> dueDate = const Value.absent(),
+                Value<int> totalPeriods = const Value.absent(),
+                Value<int?> paymentDueDay = const Value.absent(),
+                Value<int?> paymentDueMonth = const Value.absent(),
                 Value<String?> note = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -26933,6 +27150,9 @@ class $$InsurancePoliciesTableTableManager
                 medicalCoverageSatang: medicalCoverageSatang,
                 annualPremiumSatang: annualPremiumSatang,
                 dueDate: dueDate,
+                totalPeriods: totalPeriods,
+                paymentDueDay: paymentDueDay,
+                paymentDueMonth: paymentDueMonth,
                 note: note,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -26949,6 +27169,9 @@ class $$InsurancePoliciesTableTableManager
                 required int medicalCoverageSatang,
                 required int annualPremiumSatang,
                 Value<DateTime?> dueDate = const Value.absent(),
+                Value<int> totalPeriods = const Value.absent(),
+                Value<int?> paymentDueDay = const Value.absent(),
+                Value<int?> paymentDueMonth = const Value.absent(),
                 Value<String?> note = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
@@ -26963,6 +27186,9 @@ class $$InsurancePoliciesTableTableManager
                 medicalCoverageSatang: medicalCoverageSatang,
                 annualPremiumSatang: annualPremiumSatang,
                 dueDate: dueDate,
+                totalPeriods: totalPeriods,
+                paymentDueDay: paymentDueDay,
+                paymentDueMonth: paymentDueMonth,
                 note: note,
                 createdAt: createdAt,
                 updatedAt: updatedAt,

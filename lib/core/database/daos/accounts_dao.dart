@@ -70,28 +70,42 @@ class AccountsDao extends DatabaseAccessor<AppDatabase> with _$AccountsDaoMixin 
     );
   }
 
-  /// Returns or creates the standard "ประกันออมทรัพย์ (เมืองไทยประกันชีวิต)" asset account.
-  Future<Account> getOrCreateInsuranceSavingsAccount() async {
+  /// Cleans up any legacy insurance savings account if previously created.
+  Future<void> removeLegacyInsuranceSavingsAccount() async {
     const accId = '00000000-0000-4000-8000-000000000007';
-    final existing = await (select(accounts)
+    final legacyAccs = await (select(accounts)
           ..where((a) =>
-              a.deletedAt.isNull() &
-              (a.id.equals(accId) | a.name.equals('ประกันออมทรัพย์ (เมืองไทยประกันชีวิต)'))))
-        .getSingleOrNull();
-    if (existing != null) return existing;
+              a.id.equals(accId) |
+              a.name.equals('ประกันออมทรัพย์ (เมืองไทยประกันชีวิต)')))
+        .get();
 
-    final now = DateTime.now();
-    final companion = AccountsCompanion.insert(
-      id: accId,
-      name: 'ประกันออมทรัพย์ (เมืองไทยประกันชีวิต)',
-      accountType: 'asset',
-      currencyCode: 'THB',
-      isDomestic: true,
-      createdAt: now,
-      updatedAt: now,
-    );
-    await into(accounts).insert(companion, mode: InsertMode.insertOrIgnore);
-    return (await getAccountById(accId))!;
+    for (final acc in legacyAccs) {
+      final defaultPolicy = await attachedDatabase.insuranceDao.getOrCreateDefaultSavingsPolicy();
+      final legacyTxs = await (select(transactions)
+            ..where((t) => t.destinationAccountId.equals(acc.id)))
+          .get();
+
+      for (final tx in legacyTxs) {
+        final tagsList = (tx.tag ?? '').split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+        if (!tagsList.any((t) => t.startsWith('policy:'))) {
+          tagsList.add('policy:${defaultPolicy.id}');
+        }
+        if (!tagsList.contains('deduction:life_insurance')) {
+          tagsList.add('deduction:life_insurance');
+        }
+
+        await (update(transactions)..where((t) => t.id.equals(tx.id))).write(
+          TransactionsCompanion(
+            transactionType: const Value('expense'),
+            destinationAccountId: const Value(null),
+            categoryId: const Value('cat-exp-0000-4000-8000-000000000015'),
+            tag: Value(tagsList.join(',')),
+          ),
+        );
+      }
+
+      await (delete(accounts)..where((a) => a.id.equals(acc.id))).go();
+    }
   }
 
   /// Soft deletes an account and cascades soft-delete to all related transactions.
@@ -310,7 +324,7 @@ class AccountsDao extends DatabaseAccessor<AppDatabase> with _$AccountsDaoMixin 
     return totalThb;
   }
 
-  /// Returns total net worth in THB satang across all active accounts and investments.
+  /// Returns total net worth in THB satang across all active accounts, investments, and insurance savings.
   /// If [portfolioValueSatang] is null, it automatically computes current portfolio value
   /// via [investmentsDao.getPortfolioSummary()].
   Future<int> getTotalNetWorthSatang({int? portfolioValueSatang}) async {
@@ -324,6 +338,11 @@ class AccountsDao extends DatabaseAccessor<AppDatabase> with _$AccountsDaoMixin 
       } catch (_) {}
     }
 
-    return totalCash + portVal;
+    int insuranceSavings = 0;
+    try {
+      insuranceSavings = await attachedDatabase.insuranceDao.getTotalInsuranceSavingsSatang();
+    } catch (_) {}
+
+    return totalCash + portVal + insuranceSavings;
   }
 }

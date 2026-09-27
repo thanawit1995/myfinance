@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 import '../app_database.dart';
@@ -5,11 +6,42 @@ import '../tables/all_tables.dart';
 
 part 'insurance_dao.g.dart';
 
-@DriftAccessor(tables: [InsurancePolicies, AuditLogs])
+class PolicyProgress {
+  final InsurancePolicy policy;
+  final int paidPeriods;
+  final int totalPeriods;
+  final int totalPaidSatang;
+  final int remainingSatang;
+  final bool isPaidForCurrentYear;
+  final DateTime? nextDueDate;
+  final int? daysUntilDue;
+
+  const PolicyProgress({
+    required this.policy,
+    required this.paidPeriods,
+    required this.totalPeriods,
+    required this.totalPaidSatang,
+    required this.remainingSatang,
+    required this.isPaidForCurrentYear,
+    this.nextDueDate,
+    this.daysUntilDue,
+  });
+}
+
+@DriftAccessor(tables: [InsurancePolicies, AuditLogs, Transactions])
 class InsuranceDao extends DatabaseAccessor<AppDatabase> with _$InsuranceDaoMixin {
   InsuranceDao(super.db);
 
+  static const String defaultSavingsPolicyId = 'policy-mtl-savings-15-20';
+
   final _uuid = const Uuid();
+
+  Stream<List<InsurancePolicy>> watchActivePolicies() {
+    return (select(insurancePolicies)
+          ..where((p) => p.deletedAt.isNull())
+          ..orderBy([(p) => OrderingTerm.asc(p.policyName)]))
+        .watch();
+  }
 
   Future<List<InsurancePolicy>> getActivePolicies() {
     return (select(insurancePolicies)
@@ -18,8 +50,60 @@ class InsuranceDao extends DatabaseAccessor<AppDatabase> with _$InsuranceDaoMixi
         .get();
   }
 
+  Future<List<InsurancePolicy>> getAllPolicies() => getActivePolicies();
+
   Future<InsurancePolicy?> getPolicyById(String id) {
     return (select(insurancePolicies)..where((p) => p.id.equals(id) & p.deletedAt.isNull())).getSingleOrNull();
+  }
+
+  /// Ensures default policy "เมืองไทยประกันชีวิต ออมมั่งคั่ง 15/20" exists
+  Future<InsurancePolicy> getOrCreateDefaultSavingsPolicy() async {
+    final existing = await getPolicyById(defaultSavingsPolicyId);
+    if (existing != null) return existing;
+
+    final byName = await (select(insurancePolicies)
+          ..where((p) =>
+              p.policyName.equals('เมืองไทยประกันชีวิต ออมมั่งคั่ง 15/20') &
+              p.deletedAt.isNull()))
+        .getSingleOrNull();
+    if (byName != null) return byName;
+
+    final now = DateTime.now();
+    await into(insurancePolicies).insert(
+      InsurancePoliciesCompanion.insert(
+        id: defaultSavingsPolicyId,
+        policyName: 'เมืองไทยประกันชีวิต ออมมั่งคั่ง 15/20',
+        insuranceType: 'savings',
+        annualPremiumSatang: 4500000, // 45,000 THB
+        sumInsuredSatang: 10000000, // 100,000 THB
+        medicalCoverageSatang: 0,
+        totalPeriods: const Value(15),
+        paymentDueDay: const Value(5),
+        paymentDueMonth: const Value(10),
+        note: const Value('ประกันชีวิตและออมทรัพย์ เมืองไทยประกันชีวิต 15/20'),
+        createdAt: now,
+        updatedAt: now,
+      ),
+      mode: InsertMode.insertOrIgnore,
+    );
+
+    final created = await getPolicyById(defaultSavingsPolicyId);
+    return created ??
+        InsurancePolicy(
+          id: defaultSavingsPolicyId,
+          policyName: 'เมืองไทยประกันชีวิต ออมมั่งคั่ง 15/20',
+          insuranceType: 'savings',
+          sumInsuredSatang: 10000000,
+          medicalCoverageSatang: 0,
+          annualPremiumSatang: 4500000,
+          totalPeriods: 15,
+          paymentDueDay: 5,
+          paymentDueMonth: 10,
+          note: 'ประกันชีวิตและออมทรัพย์ เมืองไทยประกันชีวิต 15/20',
+          createdAt: now,
+          updatedAt: now,
+          syncVersion: 1,
+        );
   }
 
   Future<void> createPolicy(InsurancePoliciesCompanion entry) async {
@@ -86,6 +170,100 @@ class InsuranceDao extends DatabaseAccessor<AppDatabase> with _$InsuranceDaoMixi
     );
   }
 
+  /// Calculates payment progress for a single policy
+  Future<PolicyProgress> getPolicyProgress(InsurancePolicy policy) async {
+    final now = DateTime.now();
+
+    // Query transactions linked to this policy via tag or note
+    final txs = await (select(transactions)
+          ..where((t) =>
+              t.deletedAt.isNull() &
+              (t.tag.like('%policy:${policy.id}%') |
+               t.note.like('%${policy.policyName}%'))))
+        .get();
+
+    final paidPeriods = txs.length;
+    int totalPaidSatang = 0;
+    bool isPaidThisYear = false;
+
+    for (final t in txs) {
+      totalPaidSatang += t.amountThbSatang;
+      if (t.transactionDate.year == now.year) {
+        isPaidThisYear = true;
+      }
+    }
+
+    final totalTargetSatang = policy.annualPremiumSatang * policy.totalPeriods;
+    final remainingSatang = max(0, totalTargetSatang - totalPaidSatang);
+
+    DateTime? nextDue;
+    int? daysUntil;
+
+    if (policy.paymentDueMonth != null && policy.paymentDueDay != null) {
+      final dueMonth = policy.paymentDueMonth!;
+      final dueDay = min(policy.paymentDueDay!, DateTime(now.year, dueMonth + 1, 0).day);
+
+      var dueThisYear = DateTime(now.year, dueMonth, dueDay);
+      if (isPaidThisYear) {
+        // Already paid this year -> next due is next year
+        nextDue = DateTime(now.year + 1, dueMonth, min(policy.paymentDueDay!, DateTime(now.year + 1, dueMonth + 1, 0).day));
+      } else {
+        nextDue = dueThisYear;
+      }
+      daysUntil = nextDue.difference(DateTime(now.year, now.month, now.day)).inDays;
+    } else if (policy.dueDate != null) {
+      nextDue = policy.dueDate;
+      daysUntil = nextDue!.difference(DateTime(now.year, now.month, now.day)).inDays;
+    }
+
+    return PolicyProgress(
+      policy: policy,
+      paidPeriods: paidPeriods,
+      totalPeriods: policy.totalPeriods,
+      totalPaidSatang: totalPaidSatang,
+      remainingSatang: remainingSatang,
+      isPaidForCurrentYear: isPaidThisYear,
+      nextDueDate: nextDue,
+      daysUntilDue: daysUntil,
+    );
+  }
+
+  /// Returns progress for all active policies
+  Future<List<PolicyProgress>> getAllPolicyProgresses() async {
+    final policies = await getActivePolicies();
+    final results = <PolicyProgress>[];
+    for (final p in policies) {
+      results.add(await getPolicyProgress(p));
+    }
+    return results;
+  }
+
+  /// Returns policies due within [daysThreshold] days (or overdue) that haven't been paid this year
+  Future<List<PolicyProgress>> getUpcomingDuePolicies({int daysThreshold = 30}) async {
+    final all = await getAllPolicyProgresses();
+    return all.where((p) {
+      if (p.isPaidForCurrentYear) return false;
+      if (p.daysUntilDue == null) return false;
+      // Due within threshold days (or up to 60 days overdue)
+      return p.daysUntilDue! <= daysThreshold && p.daysUntilDue! >= -60;
+    }).toList();
+  }
+
+  /// Total accumulated cash/savings from all payments made to savings insurance policies
+  /// This is added to Net Worth so Net Worth remains unchanged when paying savings insurance.
+  Future<int> getTotalInsuranceSavingsSatang() async {
+    final policies = await getActivePolicies();
+    final savingsPolicies = policies.where((p) => p.insuranceType == 'savings' || p.insuranceType == 'endowment').toList();
+    if (savingsPolicies.isEmpty) return 0;
+
+    int totalSavings = 0;
+    for (final p in savingsPolicies) {
+      final progress = await getPolicyProgress(p);
+      totalSavings += progress.totalPaidSatang;
+    }
+    return totalSavings;
+  }
+
   /// Total sum insured (Life / Disability / Total Coverage) in satang
   Future<int> getTotalSumInsuredSatang() async {
     final active = await getActivePolicies();
@@ -116,3 +294,4 @@ class InsuranceDao extends DatabaseAccessor<AppDatabase> with _$InsuranceDaoMixi
     return total;
   }
 }
+

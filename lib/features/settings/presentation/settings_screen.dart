@@ -8,6 +8,7 @@ import '../../../../l10n/app_localizations.dart';
 import '../../categories/presentation/categories_screen.dart';
 import '../../financial_health/presentation/financial_health_screen.dart';
 import '../../financial_health/presentation/liabilities_insurance_screen.dart';
+import '../../insurance/presentation/insurance_policies_screen.dart';
 import '../../recurring/presentation/recurring_rules_screen.dart';
 import '../../tax/presentation/tax_screen.dart';
 import '../../remittance/presentation/foreign_remittance_screen.dart';
@@ -271,11 +272,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _buildTile(
               icon: Icons.credit_card_off_rounded,
               iconColor: Colors.deepOrange,
-              title: l10n?.liabilitiesInsurance ?? 'ทะเบียนหนี้สินและประกันภัย',
-              subtitle: l10n?.liabilitiesInsuranceDesc ?? 'จัดการภาระหนี้สิน ดอกเบี้ย และความคุ้มครองประกันภัย',
+              title: isThai ? 'ทะเบียนหนี้สิน' : 'Liabilities',
+              subtitle: isThai ? 'จัดการภาระหนี้สิน ดอกเบี้ย และแผนการผ่อนชำระ' : 'Manage debts, loans, and repayment plans',
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const LiabilitiesInsuranceScreen()),
+                );
+              },
+            ),
+            _buildDivider(),
+            _buildTile(
+              icon: Icons.shield_outlined,
+              iconColor: Colors.teal,
+              title: isThai ? 'กรมธรรม์ประกันภัย' : 'Insurance Policies',
+              subtitle: isThai ? 'จัดการประกันชีวิต/ออมทรัพย์/สุขภาพ ติดตามงวดชำระ และเงินสะสม' : 'Manage life, savings, and health policies and premium tracking',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const InsurancePoliciesScreen()),
                 );
               },
             ),

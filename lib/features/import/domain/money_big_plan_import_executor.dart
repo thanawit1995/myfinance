@@ -62,23 +62,22 @@ class MoneyBigPlanImportExecutor {
         ),
       );
 
-      // 2. Ensure Insurance Asset Account exists
-      final insuranceAccount = await db.accountsDao.getOrCreateInsuranceSavingsAccount();
+      // 2. Ensure default insurance policy exists and remove legacy insurance account
+      final defaultPolicy = await db.insuranceDao.getOrCreateDefaultSavingsPolicy();
+      await db.accountsDao.removeLegacyInsuranceSavingsAccount();
 
       // 3. Insert transactions
       for (final row in toImport) {
         try {
           final txId = _uuid.v4();
 
-          if (row.tag == 'deduction:life_insurance') {
-            // Record as Transfer to Insurance Asset Account (Asset growth)
+          if (row.tag == 'deduction:life_insurance' || row.categoryId == 'cat-exp-0000-4000-8000-000000000015') {
             await db.into(db.transactions).insert(
               TransactionsCompanion.insert(
                 id: txId,
-                transactionType: 'transfer',
+                transactionType: 'expense',
                 sourceAccountId: Value(row.sourceAccountId),
-                destinationAccountId: Value(insuranceAccount.id),
-                categoryId: Value(row.categoryId),
+                categoryId: const Value('cat-exp-0000-4000-8000-000000000015'),
                 amountOriginalSatang: row.amountSatang,
                 currencyCode: 'THB',
                 fxRate: const Value('1.000000'),
@@ -86,15 +85,15 @@ class MoneyBigPlanImportExecutor {
                 feeThbSatang: const Value(0),
                 transactionDate: row.date,
                 isCleared: const Value(true),
-                tag: Value(row.tag),
-                note: Value(row.note),
+                tag: Value('policy:${defaultPolicy.id},deduction:life_insurance'),
+                note: Value(row.note.isNotEmpty ? row.note : 'เบี้ยประกัน ${defaultPolicy.policyName}'),
                 workPeriod: Value(row.workPeriod),
                 importBatchId: Value(batchId),
                 createdAt: now,
                 updatedAt: now,
               ),
             );
-            totalTransfer++;
+            totalExpense++;
           } else if (row.transactionType == 'income') {
             await db.into(db.transactions).insert(
               TransactionsCompanion.insert(

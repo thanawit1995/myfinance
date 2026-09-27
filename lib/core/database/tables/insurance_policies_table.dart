@@ -8,6 +8,9 @@ class InsurancePolicies extends Table {
   IntColumn get medicalCoverageSatang => integer()(); // วงเงินค่ารักษาพยาบาล (สตางค์)
   IntColumn get annualPremiumSatang => integer()(); // เบี้ยประกันต่อปี (สตางค์)
   DateTimeColumn get dueDate => dateTime().nullable()(); // วันครบกำหนดชำระเบี้ย / สิ้นสุดสัญญา
+  IntColumn get totalPeriods => integer().withDefault(const Constant(1))(); // จำนวนงวดที่ต้องจ่ายทั้งหมด (เช่น 15)
+  IntColumn get paymentDueDay => integer().nullable()(); // วันที่ของเดือนที่ครบกำหนดชำระ (1-31)
+  IntColumn get paymentDueMonth => integer().nullable()(); // เดือนที่ครบกำหนดชำระ (1-12)
   TextColumn get note => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();

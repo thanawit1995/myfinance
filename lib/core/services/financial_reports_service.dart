@@ -796,7 +796,7 @@ class FinancialReportsService {
           amountThbSatang: gross,
           withholdingTaxSatang: wht,
         ));
-      } else if (tx.transactionType == 'expense') {
+      } else if (tx.transactionType == 'expense' || tx.transactionType == 'transfer') {
         final tag = tx.tag ?? '';
         final note = (tx.note ?? '').toLowerCase();
         final isGpfCat = tx.categoryId != null && gpfCatIds.contains(tx.categoryId);

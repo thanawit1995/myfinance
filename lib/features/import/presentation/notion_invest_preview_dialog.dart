@@ -72,6 +72,7 @@ class _NotionInvestPreviewDialogState
       final result = await executor.executeImport(
         widget.rows,
         selectedRowIndices: _selectedIndices,
+        fileName: widget.fileName,
       );
 
       if (mounted) {
@@ -99,29 +100,55 @@ class _NotionInvestPreviewDialogState
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('dd/MM/yyyy');
     final numberFormat = NumberFormat('#,##0.00');
+    final allSelected = widget.rows.isNotEmpty &&
+        _selectedIndices.length == widget.rows.length;
 
-    return AlertDialog(
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Dialog.fullscreen(
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.close),
+            tooltip: 'ปิด',
+            onPressed: _isImporting ? null : () => Navigator.of(context).pop(),
+          ),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.show_chart, color: VaultTheme.accent(context)),
-              const SizedBox(width: 8),
-              const Text('ตรวจสอบรายการซื้อหุ้น'),
+              Row(
+                children: [
+                  Icon(Icons.show_chart, color: VaultTheme.accent(context), size: 22),
+                  const SizedBox(width: 8),
+                  const Text('ตรวจสอบรายการซื้อหุ้น (US Stocks)'),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'ไฟล์: ${widget.fileName} (ทั้งหมด ${widget.rows.length} รายการ, เลือก ${_selectedIndices.length})',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            'ไฟล์: ${widget.fileName} (ทั้งหมด ${widget.rows.length} รายการ, เลือก ${_selectedIndices.length})',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-          ),
-        ],
-      ),
-      content: SizedBox(
-        width: 680,
-        height: 420,
-        child: _isImporting
+          actions: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: VaultTheme.accent(context),
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                ),
+                onPressed: _isImporting || _selectedIndices.isEmpty
+                    ? null
+                    : _executeImport,
+                icon: const Icon(Icons.cloud_upload_outlined),
+                label: Text('ยืนยันนำเข้า (${_selectedIndices.length} รายการ)'),
+              ),
+            ),
+          ],
+        ),
+        body: _isImporting
             ? const Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -133,111 +160,131 @@ class _NotionInvestPreviewDialogState
                 ),
               )
             : Scrollbar(
+                thumbVisibility: true,
                 child: SingleChildScrollView(
                   scrollDirection: Axis.vertical,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      columns: const [
-                        DataColumn(label: Text('เลือก')),
-                        DataColumn(label: Text('วันที่')),
-                        DataColumn(label: Text('Ticker')),
-                        DataColumn(label: Text('จำนวนหุ้น')),
-                        DataColumn(label: Text('ต้นทุน USD')),
-                        DataColumn(label: Text('ต้นทุน THB')),
-                        DataColumn(label: Text('ประเภทชำระ')),
-                      ],
-                      rows: widget.rows.map((row) {
-                        final isSelected = _selectedIndices.contains(row.rowIndex);
-
-                        return DataRow(
-                          selected: isSelected,
-                          onSelectChanged: (selected) {
-                            setState(() {
-                              if (selected ?? false) {
-                                _selectedIndices.add(row.rowIndex);
-                              } else {
-                                _selectedIndices.remove(row.rowIndex);
-                              }
-                            });
-                          },
-                          cells: [
-                            DataCell(
-                              Checkbox(
-                                value: isSelected,
-                                onChanged: (val) {
-                                  setState(() {
-                                    if (val ?? false) {
-                                      _selectedIndices.add(row.rowIndex);
-                                    } else {
-                                      _selectedIndices.remove(row.rowIndex);
-                                    }
-                                  });
-                                },
-                              ),
-                            ),
-                            DataCell(Text(dateFormat.format(row.buyDate))),
-                            DataCell(
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: VaultTheme.accent(context)
-                                      .withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(4),
+                  child: Scrollbar(
+                    thumbVisibility: true,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: DataTable(
+                        headingRowColor: WidgetStateProperty.all(
+                          Theme.of(context).colorScheme.surfaceContainerHighest,
+                        ),
+                        columns: [
+                          DataColumn(
+                            label: Row(
+                              children: [
+                                Checkbox(
+                                  value: allSelected,
+                                  onChanged: (val) {
+                                    setState(() {
+                                      if (val ?? false) {
+                                        _selectedIndices =
+                                            widget.rows.map((r) => r.rowIndex).toSet();
+                                      } else {
+                                        _selectedIndices.clear();
+                                      }
+                                    });
+                                  },
                                 ),
-                                child: Text(
-                                  row.ticker,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: VaultTheme.accent(context),
+                                const Text('เลือก'),
+                              ],
+                            ),
+                          ),
+                          const DataColumn(label: Text('วันที่')),
+                          const DataColumn(label: Text('Ticker')),
+                          const DataColumn(label: Text('จำนวนหุ้น')),
+                          const DataColumn(label: Text('ต้นทุน USD')),
+                          const DataColumn(label: Text('เรต USD/THB')),
+                          const DataColumn(label: Text('ต้นทุน THB')),
+                          const DataColumn(label: Text('บัญชีที่ตัดเงิน / ชำระ')),
+                        ],
+                        rows: widget.rows.map((row) {
+                          final isSelected = _selectedIndices.contains(row.rowIndex);
+
+                          return DataRow(
+                            selected: isSelected,
+                            onSelectChanged: (selected) {
+                              setState(() {
+                                if (selected ?? false) {
+                                  _selectedIndices.add(row.rowIndex);
+                                } else {
+                                  _selectedIndices.remove(row.rowIndex);
+                                }
+                              });
+                            },
+                            cells: [
+                              DataCell(
+                                Checkbox(
+                                  value: isSelected,
+                                  onChanged: (val) {
+                                    setState(() {
+                                      if (val ?? false) {
+                                        _selectedIndices.add(row.rowIndex);
+                                      } else {
+                                        _selectedIndices.remove(row.rowIndex);
+                                      }
+                                    });
+                                  },
+                                ),
+                              ),
+                              DataCell(Text(dateFormat.format(row.buyDate))),
+                              DataCell(
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: VaultTheme.accent(context)
+                                        .withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    row.ticker,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: VaultTheme.accent(context),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                            DataCell(Text(row.quantity.toString())),
-                            DataCell(
-                              Text(row.amountUsdSatang > 0
-                                  ? '\$${numberFormat.format(row.amountUsdSatang / 100.0)}'
-                                  : '-'),
-                            ),
-                            DataCell(
-                              Text('฿${numberFormat.format(row.amountThbSatang / 100.0)}'),
-                            ),
-                            DataCell(
-                              Text(
-                                switch (row.paymentType) {
-                                  PaymentType.dividend => 'ปันผล (Dime! USD)',
-                                  PaymentType.thb => 'THB (Dime! Save)',
-                                  PaymentType.fcd => 'FCD (Dime! FCD)',
-                                  PaymentType.usd => 'USD (Dime! USD)',
-                                },
+                              DataCell(Text(row.quantity.toString())),
+                              DataCell(
+                                Text(row.amountUsdSatang > 0
+                                    ? '\$${numberFormat.format(row.amountUsdSatang / 100.0)}'
+                                    : '-'),
                               ),
-                            ),
-                          ],
-                        );
-                      }).toList(),
+                              DataCell(
+                                Text(
+                                  row.fxRate.toString(),
+                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                              DataCell(
+                                Text(
+                                  '฿${numberFormat.format(row.amountThbSatang / 100.0)}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              DataCell(
+                                Text(
+                                  switch (row.paymentType) {
+                                    PaymentType.dividend => 'ปันผล (Dime! USD)',
+                                    PaymentType.thb => 'THB (Dime! Save)',
+                                    PaymentType.fcd => 'FCD (Dime! FCD)',
+                                    PaymentType.usd => 'USD (Dime! USD)',
+                                  },
+                                ),
+                              ),
+                            ],
+                          );
+                        }).toList(),
+                      ),
                     ),
                   ),
                 ),
               ),
       ),
-      actions: [
-        TextButton(
-          onPressed: _isImporting ? null : () => Navigator.of(context).pop(),
-          child: const Text('ยกเลิก'),
-        ),
-        FilledButton.icon(
-          style: FilledButton.styleFrom(
-            backgroundColor: VaultTheme.accent(context),
-          ),
-          onPressed: _isImporting || _selectedIndices.isEmpty
-              ? null
-              : _executeImport,
-          icon: const Icon(Icons.cloud_upload_outlined),
-          label: Text('ยืนยันนำเข้า (${_selectedIndices.length} รายการ)'),
-        ),
-      ],
     );
   }
 }

@@ -793,7 +793,7 @@ class VaultHomeScreen extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '${l10n?.cashFlow ?? 'กระแสเงินสด'}: ${Money(data.cashFlowMonthSatang).format(symbol: '฿')}',
+                '${isThai ? 'เงินสด/เงินฝาก' : 'Cash & Bank'}: ${Money(data.totalCashSatang).format(symbol: '฿')}',
                 style: VaultTheme.tabular(
                   fontSize: 12,
                   color: VaultTheme.secondaryText(context),
@@ -1192,6 +1192,7 @@ class VaultHomeScreen extends ConsumerWidget {
         : 0.0;
 
     // 2. Net worth (Cash + Portfolio with unrealized profit/loss) & accounts
+    final totalCash = await accDao.getTotalCashSatang();
     final netWorth = await accDao.getTotalNetWorthSatang(portfolioValueSatang: portValue);
     final activeAccounts = await accDao.getActiveAccounts();
 
@@ -1273,6 +1274,7 @@ class VaultHomeScreen extends ConsumerWidget {
 
     return _VaultHomeData(
       netWorthSatang: netWorth,
+      totalCashSatang: totalCash,
       momChangePercent: momPercent,
       cashFlowMonthSatang: cashFlow,
       totalIncomeMonthSatang: totalIncome,
@@ -1300,6 +1302,7 @@ class VaultHomeScreen extends ConsumerWidget {
 
 class _VaultHomeData {
   final int netWorthSatang;
+  final int totalCashSatang;
   final double momChangePercent;
   final int cashFlowMonthSatang;
   final int totalIncomeMonthSatang;
@@ -1316,6 +1319,7 @@ class _VaultHomeData {
 
   const _VaultHomeData({
     required this.netWorthSatang,
+    required this.totalCashSatang,
     required this.momChangePercent,
     required this.cashFlowMonthSatang,
     required this.totalIncomeMonthSatang,

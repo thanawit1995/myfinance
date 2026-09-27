@@ -1,10 +1,14 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/vault_theme.dart';
 import '../domain/csv_import_models.dart';
 import '../domain/csv_import_parser.dart';
+import '../domain/money_big_plan_import_executor.dart';
+import '../domain/money_big_plan_parser.dart';
 import '../domain/notion_funds_import_executor.dart';
 import '../domain/notion_funds_parser.dart';
 import '../domain/notion_gold_import_executor.dart';
@@ -14,6 +18,7 @@ import '../import_provider.dart';
 import 'column_mapping_dialog.dart';
 import 'import_history_screen.dart';
 import 'import_preview_dialog.dart';
+import 'money_big_plan_preview_dialog.dart';
 import 'notion_funds_preview_dialog.dart';
 import 'notion_gold_preview_dialog.dart';
 import 'notion_invest_preview_dialog.dart';
@@ -27,8 +32,9 @@ class ImportWizardScreen extends ConsumerStatefulWidget {
 }
 
 class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
-  String _selectedTemplate = 'notion_expense'; // 'notion_expense', 'notion_income', 'notion_invest_stocks', 'custom'
+  String _selectedTemplate = 'notion_expense'; // 'notion_expense', 'notion_income', 'notion_invest_stocks', 'money_big_plan', 'custom'
   String? _pickedFileName;
+  Uint8List? _excelBytes;
   List<List<dynamic>> _rawCsvRows = [];
   CsvColumnMapping? _currentMapping;
   bool _isProcessing = false;
@@ -42,12 +48,33 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['csv', 'txt'],
+        allowedExtensions: ['csv', 'txt', 'xlsx', 'xls'],
         withData: true,
       );
 
       if (result != null && result.files.isNotEmpty) {
         final file = result.files.first;
+        final fileNameLower = file.name.toLowerCase();
+
+        Uint8List? fileBytes = file.bytes;
+        if (fileBytes == null && file.path != null) {
+          try {
+            fileBytes = await File(file.path!).readAsBytes();
+          } catch (_) {}
+        }
+
+        // Check if Excel file (.xlsx / .xls)
+        if (fileNameLower.endsWith('.xlsx') || fileNameLower.endsWith('.xls')) {
+          setState(() {
+            _selectedTemplate = 'money_big_plan';
+            _pickedFileName = file.name;
+            _excelBytes = fileBytes;
+            _rawCsvRows = [];
+            _currentMapping = null;
+          });
+          return;
+        }
+
         String content = '';
         if (file.bytes != null) {
           // Decode with UTF-8, fallback to Latin1
@@ -64,13 +91,20 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
             final headers = rows.first.map((e) => e.toString()).toList();
             final headersLower = headers.map((h) => h.trim().toLowerCase()).toList();
             var detectedTemplate = _selectedTemplate;
-            if (headersLower.any((h) => h == 'bill')) {
+            final fileNameLower = file.name.toLowerCase();
+            if (headersLower.any((h) => h == 'bill') || fileNameLower.contains('bill')) {
               detectedTemplate = 'notion_bills';
-            } else if (headersLower.any((h) => h.contains('total gold') || h.contains('usdthb price'))) {
+            } else if (fileNameLower.contains('gold') || headersLower.any((h) => h.contains('total gold') || h.contains('usdthb price'))) {
               detectedTemplate = 'notion_invest_gold';
-            } else if (headersLower.any((h) => h.contains('current nav') || h.contains('invest-funds'))) {
+            } else if (fileNameLower.contains('invest-funds') || headersLower.any((h) => h.contains('current nav') || h.contains('invest-funds'))) {
               detectedTemplate = 'notion_invest_funds';
-            } else if (headersLower.any((h) => h.contains('share price') || h.contains('stock') || (headersLower.contains('shares') && headersLower.contains('invested')))) {
+            } else if (fileNameLower.contains('invest-stocks') ||
+                headersLower.any((h) =>
+                    h.contains('usdthb rate') ||
+                    h.contains('invested (usd)') ||
+                    h.contains('share price') ||
+                    h.contains('stock') ||
+                    (headersLower.contains('shares') && headersLower.contains('invested')))) {
               detectedTemplate = 'notion_invest_stocks';
             } else if (headersLower.any((h) => h.contains('duty') || h.contains('เงินเดือน') || h.contains('รายได้') || h.contains('เวร'))) {
               detectedTemplate = 'notion_income';
@@ -131,6 +165,12 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
     // ─── Invest-Gold path ───────────────────────────────────────────────────
     if (_selectedTemplate == 'notion_invest_gold') {
       await _proceedToGoldPreview();
+      return;
+    }
+
+    // ─── Money BIG PLAN (Excel) path ─────────────────────────────────────────
+    if (_selectedTemplate == 'money_big_plan') {
+      await _proceedToMoneyBigPlanPreview();
       return;
     }
 
@@ -245,11 +285,15 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
               const Text('⚠️ มีข้อผิดพลาด:', style: TextStyle(color: Colors.red)),
               ...result.errors.map((e) => Text('  • $e', style: const TextStyle(fontSize: 12))),
             ],
+            const SizedBox(height: 12),
+            const Text(
+              'หมายเหตุ: หากพบข้อผิดพลาด คุณสามารถกดปุ่ม "ยกเลิกการนำเข้า (Rollback)" ได้ทุกเมื่อในหน้าประวัติ',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
           ],
         ),
         actions: [
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: VaultTheme.accent(context)),
+          TextButton(
             onPressed: () {
               Navigator.of(ctx).pop();
               setState(() {
@@ -259,6 +303,16 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
               });
             },
             child: const Text('เสร็จสิ้น'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: VaultTheme.accent(context)),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ImportHistoryScreen()),
+              );
+            },
+            child: const Text('ดูประวัติการนำเข้า'),
           ),
         ],
       ),
@@ -332,11 +386,15 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
               const Text('⚠️ มีข้อผิดพลาด:', style: TextStyle(color: Colors.red)),
               ...result.errors.map((e) => Text('  • $e', style: const TextStyle(fontSize: 12))),
             ],
+            const SizedBox(height: 12),
+            const Text(
+              'หมายเหตุ: หากพบข้อผิดพลาด คุณสามารถกดปุ่ม "ยกเลิกการนำเข้า (Rollback)" ได้ทุกเมื่อในหน้าประวัติ',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
           ],
         ),
         actions: [
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: VaultTheme.accent(context)),
+          TextButton(
             onPressed: () {
               Navigator.of(ctx).pop();
               setState(() {
@@ -346,6 +404,16 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
               });
             },
             child: const Text('เสร็จสิ้น'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: VaultTheme.accent(context)),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ImportHistoryScreen()),
+              );
+            },
+            child: const Text('ดูประวัติการนำเข้า'),
           ),
         ],
       ),
@@ -419,11 +487,15 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
               const Text('⚠️ มีข้อผิดพลาด:', style: TextStyle(color: Colors.red)),
               ...result.errors.map((e) => Text('  • $e', style: const TextStyle(fontSize: 12))),
             ],
+            const SizedBox(height: 12),
+            const Text(
+              'หมายเหตุ: หากพบข้อผิดพลาด คุณสามารถกดปุ่ม "ยกเลิกการนำเข้า (Rollback)" ได้ทุกเมื่อในหน้าประวัติ',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
           ],
         ),
         actions: [
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: VaultTheme.accent(context)),
+          TextButton(
             onPressed: () {
               Navigator.of(ctx).pop();
               setState(() {
@@ -434,11 +506,122 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
             },
             child: const Text('เสร็จสิ้น'),
           ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: VaultTheme.accent(context)),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ImportHistoryScreen()),
+              );
+            },
+            child: const Text('ดูประวัติการนำเข้า'),
+          ),
         ],
       ),
     );
   }
 
+  /// Handles the Money BIG PLAN Excel import preview flow.
+  Future<void> _proceedToMoneyBigPlanPreview() async {
+    if (_excelBytes == null) return;
+
+    setState(() => _isProcessing = true);
+    try {
+      final rows = MoneyBigPlanParser.parseBytes(_excelBytes!);
+
+      if (!mounted) return;
+      setState(() => _isProcessing = false);
+
+      if (rows.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('ไม่พบข้อมูลรายรับ/รายจ่ายในไฟล์ Excel นี้'),
+            backgroundColor: VaultTheme.negative(context),
+          ),
+        );
+        return;
+      }
+
+      final result = await MoneyBigPlanPreviewDialog.show(
+        context,
+        fileName: _pickedFileName ?? 'Money_BIG_PLAN.xlsx',
+        rows: rows,
+      );
+
+      if (result != null && mounted) {
+        _showBigPlanSuccessDialog(result);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาดในการอ่านไฟล์ Money BIG PLAN: $e'),
+            backgroundColor: VaultTheme.negative(context),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showBigPlanSuccessDialog(MoneyBigPlanImportResult result) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.check_circle, color: VaultTheme.positive(context)),
+            const SizedBox(width: 8),
+            const Text('นำเข้า Money BIG PLAN สำเร็จ!'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('• นำเข้าสำเร็จ: ${result.imported} รายการ'),
+            if (result.skippedDuplicates > 0)
+              Text('• ข้ามรายการซ้ำ: ${result.skippedDuplicates}',
+                  style: const TextStyle(color: Colors.orange)),
+            if (result.errors.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              const Text('⚠️ มีข้อผิดพลาด:', style: TextStyle(color: Colors.red)),
+              ...result.errors.map((e) => Text('  • $e', style: const TextStyle(fontSize: 12))),
+            ],
+            const SizedBox(height: 12),
+            const Text(
+              'หมายเหตุ: ข้อมูลทั้งหมดถูกลงบัญชี SCB และเบี้ยประกันออมทรัพย์จะถูกบันทึกโอนเข้าสินทรัพย์ประกัน สามารถตรวจสอบหรือยกเลิกการนำเข้าได้ในหน้าประวัติ',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              setState(() {
+                _pickedFileName = null;
+                _excelBytes = null;
+                _rawCsvRows = [];
+                _currentMapping = null;
+              });
+            },
+            child: const Text('เสร็จสิ้น'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: VaultTheme.accent(context)),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ImportHistoryScreen()),
+              );
+            },
+            child: const Text('ดูประวัติการนำเข้า'),
+          ),
+        ],
+      ),
+    );
+  }
 
   void _showSuccessDialog(CsvImportBatchResult result) {
     showDialog(
@@ -644,20 +827,28 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
                   children: [
                     Expanded(
                       child: _buildTemplateOption(
+                        id: 'money_big_plan',
+                        title: 'Money BIG PLAN (Excel)',
+                        subtitle: 'สรุปรายเดือน 2020-2023 (.xlsx)',
+                        icon: Icons.table_chart_outlined,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildTemplateOption(
                         id: 'custom',
                         title: 'CSV ทั่วไป',
                         subtitle: 'กำหนดคอลัมน์เอง',
                         icon: Icons.tune_outlined,
                       ),
                     ),
-                    const Expanded(child: SizedBox()),
                   ],
                 ),
                 const SizedBox(height: 24),
 
                 // Step 2: Upload File
                 const Text(
-                  'ขั้นตอนที่ 2: เลือกไฟล์ CSV',
+                  'ขั้นตอนที่ 2: เลือกไฟล์ CSV หรือ Excel',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                 ),
                 const SizedBox(height: 10),
@@ -682,20 +873,28 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            _pickedFileName != null ? Icons.check_circle : Icons.upload_file_outlined,
+                            _pickedFileName != null
+                                ? (_selectedTemplate == 'money_big_plan' ? Icons.table_chart : Icons.check_circle)
+                                : Icons.upload_file_outlined,
                             size: 44,
                             color: _pickedFileName != null ? VaultTheme.accent(context) : Colors.grey,
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            _pickedFileName ?? 'แตะเพื่อเลือกไฟล์ .csv จากคอมพิวเตอร์ของคุณ',
+                            _pickedFileName ?? 'แตะเพื่อเลือกไฟล์ .csv หรือ .xlsx จากคอมพิวเตอร์ของคุณ',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: _pickedFileName != null ? FontWeight.bold : FontWeight.normal,
                               color: _pickedFileName != null ? VaultTheme.primaryText(context) : Colors.grey.shade600,
                             ),
                           ),
-                          if (_rawCsvRows.isNotEmpty) ...[
+                          if (_selectedTemplate == 'money_big_plan' && _excelBytes != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              'พร้อมประมวลผลไฟล์ Excel Money BIG PLAN (${(_excelBytes!.length / 1024).toStringAsFixed(1)} KB)',
+                              style: TextStyle(fontSize: 12, color: VaultTheme.accent(context)),
+                            ),
+                          ] else if (_rawCsvRows.isNotEmpty) ...[
                             const SizedBox(height: 4),
                             Text(
                               'ตรวจพบ ${_rawCsvRows.length} แถว (คอลัมน์: ${_rawCsvRows.first.length})',
@@ -710,7 +909,7 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
                 const SizedBox(height: 24),
 
                 // Step 3: Column Mapping Status & Preview Button
-                if (_pickedFileName != null && (_currentMapping != null || _isInvestTemplate)) ...[
+                if (_pickedFileName != null && (_currentMapping != null || _isInvestTemplate || _selectedTemplate == 'money_big_plan')) ...[
                   const Text(
                     'ขั้นตอนที่ 3: ตรวจสอบและนำเข้า',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
@@ -724,7 +923,20 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (_isInvestTemplate) ...[
+                          if (_selectedTemplate == 'money_big_plan') ...[
+                            const Row(
+                              children: [
+                                Icon(Icons.check, color: Colors.green, size: 20),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'รูปแบบ Money BIG PLAN (สรุปรายเดือน มิ.ย. 2020 – ส.ค. 2023, ข้ามการลงทุน, บันทึกเข้า SCB พร้อมประกันออมทรัพย์)',
+                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ] else if (_isInvestTemplate) ...[
                             Row(
                               children: [
                                 const Icon(Icons.check, color: Colors.green, size: 20),

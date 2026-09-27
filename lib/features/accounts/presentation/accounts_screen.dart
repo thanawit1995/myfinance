@@ -7,6 +7,7 @@ import '../../../../core/money/money.dart';
 import 'account_detail_screen.dart';
 import 'credit_card_summary_screen.dart';
 import 'add_account_dialog.dart';
+import '../../investments/presentation/portfolio_screen.dart';
 
 class AccountsScreen extends ConsumerStatefulWidget {
   const AccountsScreen({super.key});
@@ -48,10 +49,10 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
             final portSummary = await ref.read(investmentsDaoProvider).getPortfolioSummary();
             portValue = portSummary.totalValueThbSatang;
           } catch (_) {}
-          final totalNetWorth = await accDao.getTotalNetWorthSatang(portfolioValueSatang: portValue);
-          return (accounts: accounts, totalNetWorth: totalNetWorth, portValue: portValue);
+          final totalCash = await accDao.getTotalCashSatang();
+          return (accounts: accounts, totalCash: totalCash, portValue: portValue);
         }(),
-        builder: (context, AsyncSnapshot<({List<Account> accounts, int totalNetWorth, int portValue})> snapshot) {
+        builder: (context, AsyncSnapshot<({List<Account> accounts, int totalCash, int portValue})> snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -62,7 +63,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
 
           final data = snapshot.data!;
           final accounts = data.accounts;
-          final totalNetWorth = data.totalNetWorth;
+          final totalCash = data.totalCash;
           final portValue = data.portValue;
 
           // Group accounts
@@ -74,7 +75,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
           return ListView(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             children: [
-              // Total Net Worth Card
+              // Liquid Cash / Cash Flow Card
               Card(
                 color: theme.colorScheme.primaryContainer,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -85,31 +86,18 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                     children: [
                       Text(
                         isThai
-                            ? 'ความมั่งคั่งสุทธิรวม (เงินฝาก + พอร์ตลงทุน)'
-                            : 'Total Net Worth (Cash + Investments)',
+                            ? 'กระแสเงินสด'
+                            : 'Cash Flow / Liquid Cash',
                         style: theme.textTheme.titleSmall,
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        Money(totalNetWorth).format(symbol: '฿'),
+                        Money(totalCash).format(symbol: '฿'),
                         style: theme.textTheme.headlineMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: theme.colorScheme.onPrimaryContainer,
                         ),
                       ),
-                      if (portValue > 0) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          isThai
-                              ? 'รวมมูลค่าพอร์ตการลงทุนปัจจุบัน ${Money(portValue).format(symbol: "฿")}'
-                              : 'Includes current portfolio value ${Money(portValue).format(symbol: "฿")}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: theme.colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),
@@ -131,6 +119,52 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
               if (offshore.isNotEmpty) ...[
                 _buildSectionHeader(isThai ? 'บัญชีต่างประเทศ (Offshore)' : 'Offshore Accounts'),
                 ...offshore.map((a) => _buildAccountTile(context, a, isThai)),
+                const SizedBox(height: 12),
+              ],
+
+              if (portValue > 0) ...[
+                _buildSectionHeader(isThai ? 'พอร์ตการลงทุน' : 'Investment Portfolio'),
+                Card(
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.purple.shade50,
+                      child: Icon(Icons.show_chart, color: Colors.purple.shade700),
+                    ),
+                    title: Text(
+                      isThai ? 'สินทรัพย์การลงทุนรวม' : 'Total Investment Assets',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Text(
+                      isThai ? 'แตะเพื่อดูพอร์ตหุ้น, กองทุน, คริปโต, ทองคำ' : 'Tap to view stocks, funds, crypto, gold',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          Money(portValue).format(symbol: '฿'),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+                      ],
+                    ),
+                    onTap: () async {
+                      await Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const PortfolioScreen(),
+                        ),
+                      );
+                      if (mounted) setState(() {});
+                    },
+                  ),
+                ),
                 const SizedBox(height: 12),
               ],
 

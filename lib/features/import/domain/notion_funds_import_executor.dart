@@ -9,11 +9,13 @@ class NotionFundsImportResult {
   final int imported;
   final int skippedDuplicates;
   final List<String> errors;
+  final String? batchId;
 
   const NotionFundsImportResult({
     required this.imported,
     required this.skippedDuplicates,
     required this.errors,
+    this.batchId,
   });
 }
 
@@ -29,7 +31,24 @@ class NotionFundsImportExecutor {
   Future<NotionFundsImportResult> executeImport(
     List<ParsedFundRow> rows, {
     Set<int>? selectedRowIndices,
+    String? fileName,
   }) async {
+    final batchId = _uuid.v4();
+    final batchNow = DateTime.now();
+
+    await _db.importBatchesDao.createBatch(
+      ImportBatchesCompanion.insert(
+        id: batchId,
+        fileName: fileName ?? 'Notion Mutual Funds.csv',
+        templateType: const Value('notion_invest_funds'),
+        totalImported: 0,
+        importedAt: batchNow,
+        isRolledBack: const Value(false),
+        createdAt: batchNow,
+        updatedAt: batchNow,
+      ),
+    );
+
     int imported = 0;
     int skippedDuplicates = 0;
     final errors = <String>[];
@@ -93,6 +112,7 @@ class NotionFundsImportExecutor {
           fxRate: Decimal.one,
           feeThbSatang: 0,
           note: 'Imported from Notion — ${row.symbol} (${row.platform})',
+          importBatchId: batchId,
         );
 
         // 2. Record latest NAV price if available
@@ -114,10 +134,19 @@ class NotionFundsImportExecutor {
       }
     }
 
+    // Update total imported in the batch
+    await (_db.update(_db.importBatches)..where((t) => t.id.equals(batchId))).write(
+      ImportBatchesCompanion(
+        totalImported: Value(imported),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+
     return NotionFundsImportResult(
       imported: imported,
       skippedDuplicates: skippedDuplicates,
       errors: errors,
+      batchId: batchId,
     );
   }
 

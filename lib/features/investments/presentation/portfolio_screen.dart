@@ -25,6 +25,8 @@ class PortfolioScreen extends ConsumerStatefulWidget {
 
 class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  String _selectedCategoryFilter = 'all';
+  String _selectedSortOption = 'value_desc'; // 'value_desc', 'value_asc', 'pnl_pct_desc', 'pnl_pct_asc', 'name_asc'
 
   @override
   void initState() {
@@ -36,6 +38,46 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  String _getCategoryName(String type, bool isThai) {
+    switch (type) {
+      case 'all':
+        return isThai ? 'ทั้งหมด' : 'All';
+      case 'foreign_stock':
+        return isThai ? 'หุ้นต่างประเทศ' : 'Foreign Stocks';
+      case 'thai_stock':
+        return isThai ? 'หุ้นไทย' : 'Thai Stocks';
+      case 'mutual_fund':
+        return isThai ? 'กองทุนรวม' : 'Mutual Funds';
+      case 'gold':
+        return isThai ? 'ทองคำ' : 'Gold';
+      case 'crypto':
+        return isThai ? 'คริปโต' : 'Crypto';
+      case 'bond':
+        return isThai ? 'พันธบัตร/หุ้นกู้' : 'Bonds';
+      case 'etf':
+        return 'ETF';
+      default:
+        return type.toUpperCase();
+    }
+  }
+
+  String _getSortName(String option, bool isThai) {
+    switch (option) {
+      case 'value_desc':
+        return isThai ? 'มูลค่ามาก → น้อย' : 'Value High → Low';
+      case 'value_asc':
+        return isThai ? 'มูลค่าน้อย → มาก' : 'Value Low → High';
+      case 'pnl_pct_desc':
+        return isThai ? 'กำไร % มากสุด' : 'Gain % High → Low';
+      case 'pnl_pct_asc':
+        return isThai ? 'กำไร % น้อยสุด' : 'Gain % Low → High';
+      case 'name_asc':
+        return isThai ? 'ชื่อสินทรัพย์ A → Z' : 'Name A → Z';
+      default:
+        return option;
+    }
   }
 
   void _showHoldingOptions(BuildContext context, PortfolioAssetHolding holding) {
@@ -298,23 +340,61 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
       );
     }
 
-    final totalValMoney = Money(summary.totalValueThbSatang);
-    final totalCostMoney = Money(summary.totalCostThbSatang);
-    final totalPnlMoney = Money(summary.totalUnrealizedGainLossThbSatang);
-    final isTotalProfit = summary.totalUnrealizedGainLossThbSatang >= 0;
-    final pnlPct = summary.totalCostThbSatang > 0
-        ? (summary.totalUnrealizedGainLossThbSatang / summary.totalCostThbSatang) * 100.0
-        : 0.0;
+    // 1. Gather all unique categories present in holdings
+    final availableCategories = <String>{'all'};
+    for (final h in holdings) {
+      availableCategories.add(h.asset.assetType);
+    }
 
-    final pricePnlMoney = Money(summary.totalUnrealizedPriceGainLossThbSatang);
-    final fxPnlMoney = Money(summary.totalUnrealizedFxGainLossThbSatang);
+    // 2. Filter holdings
+    final filteredHoldings = holdings.where((h) {
+      if (_selectedCategoryFilter == 'all') return true;
+      return h.asset.assetType == _selectedCategoryFilter;
+    }).toList();
+
+    // 3. Sort holdings (Default: value descending)
+    filteredHoldings.sort((a, b) {
+      switch (_selectedSortOption) {
+        case 'value_asc':
+          return a.currentValueThbSatang.compareTo(b.currentValueThbSatang);
+        case 'pnl_pct_desc':
+          final aPct = a.totalCostThbSatang > 0 ? (a.totalUnrealizedGainLossThbSatang / a.totalCostThbSatang) : 0.0;
+          final bPct = b.totalCostThbSatang > 0 ? (b.totalUnrealizedGainLossThbSatang / b.totalCostThbSatang) : 0.0;
+          return bPct.compareTo(aPct);
+        case 'pnl_pct_asc':
+          final aPct = a.totalCostThbSatang > 0 ? (a.totalUnrealizedGainLossThbSatang / a.totalCostThbSatang) : 0.0;
+          final bPct = b.totalCostThbSatang > 0 ? (b.totalUnrealizedGainLossThbSatang / b.totalCostThbSatang) : 0.0;
+          return aPct.compareTo(bPct);
+        case 'name_asc':
+          return a.asset.symbol.toLowerCase().compareTo(b.asset.symbol.toLowerCase());
+        case 'value_desc':
+        default:
+          return b.currentValueThbSatang.compareTo(a.currentValueThbSatang);
+      }
+    });
+
+    // 4. Calculate dynamic summary based on filter
+    final displayValSatang = filteredHoldings.fold<int>(0, (sum, h) => sum + h.currentValueThbSatang);
+    final displayCostSatang = filteredHoldings.fold<int>(0, (sum, h) => sum + h.totalCostThbSatang);
+    final displayPnlSatang = displayValSatang - displayCostSatang;
+    final isTotalProfit = displayPnlSatang >= 0;
+    final pnlPct = displayCostSatang > 0 ? (displayPnlSatang / displayCostSatang) * 100.0 : 0.0;
+
+    final displayPricePnlSatang = filteredHoldings.fold<int>(0, (sum, h) => sum + h.unrealizedPriceGainLossThbSatang);
+    final displayFxPnlSatang = filteredHoldings.fold<int>(0, (sum, h) => sum + h.unrealizedFxGainLossThbSatang);
+
+    final totalValMoney = Money(displayValSatang);
+    final totalCostMoney = Money(displayCostSatang);
+    final totalPnlMoney = Money(displayPnlSatang);
+    final pricePnlMoney = Money(displayPricePnlSatang);
+    final fxPnlMoney = Money(displayFxPnlSatang);
 
     return RefreshIndicator(
       onRefresh: () async => setState(() {}),
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // 1. Overall Portfolio Summary Card
+          // 1. Overall Portfolio Summary Card (Dynamic based on selected filter)
           Card(
             elevation: 0,
             shape: RoundedRectangleBorder(
@@ -333,7 +413,11 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    isThai ? 'มูลค่าพอร์ตปัจจุบันรวม' : 'Total Portfolio Value',
+                    _selectedCategoryFilter == 'all'
+                        ? (isThai ? 'มูลค่าพอร์ตปัจจุบันรวม' : 'Total Portfolio Value')
+                        : (isThai
+                            ? 'มูลค่าพอร์ต (${_getCategoryName(_selectedCategoryFilter, isThai)})'
+                            : 'Portfolio Value (${_getCategoryName(_selectedCategoryFilter, isThai)})'),
                     style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: 4),
@@ -394,11 +478,11 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                               Text(isThai ? 'กำไรจากราคา (Price P&L)' : 'Price P&L', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
                               const SizedBox(height: 2),
                               Text(
-                                '${summary.totalUnrealizedPriceGainLossThbSatang >= 0 ? '+' : ''}${pricePnlMoney.format(symbol: '฿')}',
+                                '${displayPricePnlSatang >= 0 ? '+' : ''}${pricePnlMoney.format(symbol: '฿')}',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 13,
-                                  color: summary.totalUnrealizedPriceGainLossThbSatang >= 0 ? AppTheme.incomeColor(context) : AppTheme.expenseColor(context),
+                                  color: displayPricePnlSatang >= 0 ? AppTheme.incomeColor(context) : AppTheme.expenseColor(context),
                                 ),
                               ),
                             ],
@@ -419,11 +503,11 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                               Text(isThai ? 'กำไรจากอัตราแลกเปลี่ยน (FX)' : 'FX P&L', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
                               const SizedBox(height: 2),
                               Text(
-                                '${summary.totalUnrealizedFxGainLossThbSatang >= 0 ? '+' : ''}${fxPnlMoney.format(symbol: '฿')}',
+                                '${displayFxPnlSatang >= 0 ? '+' : ''}${fxPnlMoney.format(symbol: '฿')}',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 13,
-                                  color: summary.totalUnrealizedFxGainLossThbSatang >= 0 ? AppTheme.incomeColor(context) : AppTheme.expenseColor(context),
+                                  color: displayFxPnlSatang >= 0 ? AppTheme.incomeColor(context) : AppTheme.expenseColor(context),
                                 ),
                               ),
                             ],
@@ -438,16 +522,79 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
           ),
           const SizedBox(height: 16),
 
-
-
           // 3. Asset Allocation Donut Chart
-          _buildAllocationChart(context, holdings, summary.totalValueThbSatang, isThai),
+          _buildAllocationChart(context, filteredHoldings, displayValSatang, isThai),
           const SizedBox(height: 16),
 
-          // 4. Holdings List
-          if (holdings.isNotEmpty) ...[
+          // 4. Compact 2-Button Control Bar: Filter & Sorting
+          Row(
+            children: [
+              // Button 1: Filter
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    side: BorderSide(
+                      color: _selectedCategoryFilter != 'all'
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.outlineVariant,
+                    ),
+                    backgroundColor: _selectedCategoryFilter != 'all'
+                        ? theme.colorScheme.primary.withValues(alpha: 0.08)
+                        : null,
+                  ),
+                  icon: Icon(
+                    Icons.filter_list_rounded,
+                    size: 18,
+                    color: _selectedCategoryFilter != 'all'
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurface,
+                  ),
+                  label: Text(
+                    '${isThai ? "หมวด" : "Category"}: ${_getCategoryName(_selectedCategoryFilter, isThai)}',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: _selectedCategoryFilter != 'all'
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurface,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  onPressed: () => _showFilterDialog(context, availableCategories, isThai),
+                ),
+              ),
+              const SizedBox(width: 10),
+              // Button 2: Sort
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    side: BorderSide(color: theme.colorScheme.outlineVariant),
+                  ),
+                  icon: Icon(Icons.sort_rounded, size: 18, color: theme.colorScheme.onSurface),
+                  label: Text(
+                    '${isThai ? "เรียง" : "Sort"}: ${_getSortName(_selectedSortOption, isThai)}',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  onPressed: () => _showSortDialog(context, isThai),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // 5. Holdings List
+          if (filteredHoldings.isNotEmpty) ...[
             Text(
-              isThai ? 'รายการสินทรัพย์ที่ถืออยู่ (${holdings.length})' : 'Holdings (${holdings.length})',
+              isThai ? 'รายการสินทรัพย์ (${filteredHoldings.length})' : 'Holdings (${filteredHoldings.length})',
               style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
@@ -460,9 +607,10 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                     children: [
                       Icon(Icons.inventory_2_outlined, size: 36, color: theme.colorScheme.primary),
                       const SizedBox(height: 8),
-                      Text(isThai ? 'ยังไม่มีรายการที่ถือครองอยู่ในพอร์ต' : 'No holdings in portfolio', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
-                      const SizedBox(height: 4),
-                      Text(isThai ? 'เลือกกดปุ่ม "ซื้อ" จากรายชื่อสินทรัพย์ด้านล่างเพื่อเริ่มบันทึกการลงทุน' : 'Tap "Buy" on assets below to start investing', style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
+                      Text(
+                        isThai ? 'ไม่พบสินทรัพย์ในหมวดหมู่นี้' : 'No assets found in this category',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
+                      ),
                     ],
                   ),
                 ),
@@ -471,7 +619,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
             const SizedBox(height: 12),
           ],
 
-          ...holdings.map((h) {
+          ...filteredHoldings.map((h) {
             final valMoney = Money(h.currentValueThbSatang);
             final costMoney = Money(h.totalCostThbSatang);
             final pnlMoney = Money(h.totalUnrealizedGainLossThbSatang);
@@ -693,6 +841,103 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
           const SizedBox(height: 80),
         ],
       ),
+    );
+  }
+
+  void _showFilterDialog(BuildContext context, Set<String> categories, bool isThai) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  child: Text(
+                    isThai ? 'กรองตามประเภทสินทรัพย์' : 'Filter by Asset Category',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+                const Divider(),
+                ...categories.map((cat) {
+                  final isSelected = _selectedCategoryFilter == cat;
+                  return ListTile(
+                    leading: Icon(
+                      isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                      color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey,
+                    ),
+                    title: Text(
+                      _getCategoryName(cat, isThai),
+                      style: TextStyle(
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected ? Theme.of(context).colorScheme.primary : null,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      setState(() => _selectedCategoryFilter = cat);
+                    },
+                  );
+                }),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showSortDialog(BuildContext context, bool isThai) {
+    final sortOptions = ['value_desc', 'value_asc', 'pnl_pct_desc', 'pnl_pct_asc', 'name_asc'];
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  child: Text(
+                    isThai ? 'จัดเรียงลำดับรายการ' : 'Sort Holdings',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+                const Divider(),
+                ...sortOptions.map((opt) {
+                  final isSelected = _selectedSortOption == opt;
+                  return ListTile(
+                    leading: Icon(
+                      isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                      color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey,
+                    ),
+                    title: Text(
+                      _getSortName(opt, isThai),
+                      style: TextStyle(
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected ? Theme.of(context).colorScheme.primary : null,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      setState(() => _selectedSortOption = opt);
+                    },
+                  );
+                }),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

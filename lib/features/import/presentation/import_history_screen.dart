@@ -39,6 +39,7 @@ class _ImportHistoryScreenState extends ConsumerState<ImportHistoryScreen> {
     setState(() => _isLoading = true);
     try {
       final deletedCount = await ref.read(importBatchesDaoProvider).rollbackBatch(batchId);
+      ref.read(transactionsVersionProvider.notifier).state++;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -53,6 +54,60 @@ class _ImportHistoryScreenState extends ConsumerState<ImportHistoryScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('เกิดข้อผิดพลาดในการยกเลิก: $e'),
+            backgroundColor: VaultTheme.negative(context),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _resetUnbatchedInvestments() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('ล้างรายการลงทุนเดิมที่ตกค้าง'),
+        content: const Text(
+          'คุณต้องการล้างรายการหุ้น/กองทุน/ทองคำที่เคยนำเข้าไว้ก่อนหน้านี้ (ที่ไม่มีเลข Batch) ออกจากพอร์ตทั้งหมดหรือไม่?\n\n'
+          'การดำเนินการนี้จะช่วยให้คุณสามารถนำเข้าไฟล์ใหม่ด้วยอัตราแลกเปลี่ยนที่ถูกต้องได้อย่างสะอาดหมดจด',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('ยกเลิก'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: VaultTheme.negative(context)),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('ล้างข้อมูลลงทุนเดิม'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isLoading = true);
+    try {
+      final count = await ref.read(importBatchesDaoProvider).resetUnbatchedInvestments();
+      ref.read(transactionsVersionProvider.notifier).state++;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('ล้างรายการลงทุนเดิมเรียบร้อยแล้ว ($count รายการ)'),
+            backgroundColor: VaultTheme.positive(context),
+          ),
+        );
+        setState(() {});
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาดในการล้างข้อมูล: $e'),
             backgroundColor: VaultTheme.negative(context),
           ),
         );
@@ -80,6 +135,13 @@ class _ImportHistoryScreenState extends ConsumerState<ImportHistoryScreen> {
             color: VaultTheme.primaryText(context),
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.cleaning_services_outlined),
+            tooltip: 'ล้างรายการลงทุนเดิมที่ตกค้าง',
+            onPressed: _isLoading ? null : _resetUnbatchedInvestments,
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

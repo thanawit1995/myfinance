@@ -15,6 +15,7 @@ import '../../../core/theme/app_theme_style.dart';
 import '../../reports/presentation/reports_screen.dart';
 import '../../backup/presentation/backup_restore_screen.dart';
 import '../../import/presentation/import_wizard_screen.dart';
+import '../../import/presentation/import_history_screen.dart';
 import 'trash_bin_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -375,6 +376,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const ImportWizardScreen()),
+                );
+              },
+            ),
+            _buildDivider(),
+            _buildTile(
+              icon: Icons.history_rounded,
+              iconColor: Colors.blueAccent,
+              title: isThai ? 'ประวัติการนำเข้าและย้อนกลับ (Rollback)' : 'Import History & Rollback',
+              subtitle: isThai
+                  ? 'ดูรายการไฟล์ CSV ที่เคยนำเข้า และกดยกเลิกการนำเข้าทั้งชุดใน 1 คลิก'
+                  : 'View imported CSV batches and rollback any batch in 1 click',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ImportHistoryScreen()),
                 );
               },
             ),

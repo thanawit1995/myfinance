@@ -300,6 +300,26 @@ void main() {
       expect(msftTx.sourceAccountId, dimeUsd.id);
       expect(jepqTx.sourceAccountId, dimeUsd.id);
       expect(jepqTx.note, contains('ปันผล'));
+
+      // Verify ImportBatch was created
+      final batches = await db.importBatchesDao.getAllBatches();
+      expect(batches.length, 1);
+      expect(batches.first.templateType, 'notion_invest_stocks');
+      expect(batches.first.totalImported, 4);
+      expect(batches.first.isRolledBack, false);
+
+      // Verify Rollback deletes lots and transactions cleanly without FK error
+      final deletedCount = await db.importBatchesDao.rollbackBatch(batches.first.id);
+      expect(deletedCount, 4);
+
+      final lotsAfterRollback = await (db.select(db.investmentLots)).get();
+      expect(lotsAfterRollback, isEmpty);
+
+      final txsAfterRollback = await (db.select(db.transactions)).get();
+      expect(txsAfterRollback, isEmpty);
+
+      final updatedBatch = await db.importBatchesDao.getBatchById(batches.first.id);
+      expect(updatedBatch?.isRolledBack, true);
     });
   });
 }

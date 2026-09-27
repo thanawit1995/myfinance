@@ -323,6 +323,7 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
     required Decimal fxRate,
     required int feeThbSatang,
     String? note,
+    String? importBatchId,
   }) async {
     final now = DateTime.now();
     final txId = _uuid.v4();
@@ -372,6 +373,7 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
     await into(transactions).insert(
       TransactionsCompanion.insert(
         id: txId,
+        importBatchId: Value(importBatchId),
         transactionType: 'expense',
         categoryId: Value(investmentCategory.id),
         amountOriginalSatang: amountOriginalSatang,

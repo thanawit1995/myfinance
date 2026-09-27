@@ -7,6 +7,7 @@ import '../../../../core/database/database_provider.dart';
 import '../../../../core/money/money.dart';
 import '../../../../core/theme/vault_theme.dart';
 import '../../../../core/widgets/category_icon_helper.dart';
+import '../../transactions/presentation/transaction_list_screen.dart';
 
 enum ReportGranularity {
   daily,
@@ -80,6 +81,8 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
   late DateTime _cursorDate;
   DateTimeRange? _customRange;
   bool _showIncomeCategories = false;
+  int _slideDirection = 1; // 1 = Next (สไลด์จากขวา), -1 = Previous (สไลด์จากซ้าย)
+  _PeriodReportData? _cachedData;
 
   @override
   void initState() {
@@ -90,6 +93,7 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
 
   void _previousPeriod() {
     setState(() {
+      _slideDirection = -1;
       switch (_granularity) {
         case ReportGranularity.daily:
           _cursorDate = _cursorDate.subtract(const Duration(days: 1));
@@ -115,6 +119,7 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
 
   void _nextPeriod() {
     setState(() {
+      _slideDirection = 1;
       switch (_granularity) {
         case ReportGranularity.daily:
           _cursorDate = _cursorDate.add(const Duration(days: 1));
@@ -432,59 +437,90 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
             }
           }
         },
-        child: FutureBuilder<_PeriodReportData>(
-          future: _loadData(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return Center(
-                child: CircularProgressIndicator(color: VaultTheme.accent(context)),
-              );
-            }
+        child: ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          children: [
+            // 1. Granularity Selector (Day, Week, Month, Quarter, Year, All, Custom)
+            _buildGranularitySelector(context, isThai),
+            const SizedBox(height: 12),
 
-            final data = snapshot.data ??
-                _PeriodReportData(
-                  startDate: DateTime.now(),
-                  endDate: DateTime.now(),
-                  incomeSatang: 0,
-                  accruedIncomeSatang: 0,
-                  expenseSatang: 0,
-                  investmentSatang: 0,
-                  savingsSatang: 0,
-                  savingsRatePercent: 0.0,
-                  savingsMoMPercent: null,
-                  cumulativeExpensesByDay: {1: 0, 8: 0, 15: 0, 22: 0, 30: 0},
-                  daysInMonth: 30,
-                  expenseCategories: [],
-                  incomeCategories: [],
+            // 2. Navigation Header with Date Title (clean, no swipe instruction)
+            _buildNavigationHeader(context, isLumi, isThai),
+            const SizedBox(height: 14),
+
+            // 3. Smooth Slide Animated Content for current period
+            FutureBuilder<_PeriodReportData>(
+              future: _loadData(),
+              builder: (context, snapshot) {
+                if (snapshot.hasData) {
+                  _cachedData = snapshot.data;
+                }
+
+                final data = _cachedData ??
+                    snapshot.data ??
+                    _PeriodReportData(
+                      startDate: DateTime.now(),
+                      endDate: DateTime.now(),
+                      incomeSatang: 0,
+                      accruedIncomeSatang: 0,
+                      expenseSatang: 0,
+                      investmentSatang: 0,
+                      savingsSatang: 0,
+                      savingsRatePercent: 0.0,
+                      savingsMoMPercent: null,
+                      cumulativeExpensesByDay: {1: 0, 8: 0, 15: 0, 22: 0, 30: 0},
+                      daysInMonth: 30,
+                      expenseCategories: [],
+                      incomeCategories: [],
+                    );
+
+                final contentKey = ValueKey('${_cursorDate.millisecondsSinceEpoch}_$_granularity');
+
+                return AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 280),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (Widget child, Animation<double> animation) {
+                    final inOffset = _slideDirection >= 0 ? const Offset(0.35, 0.0) : const Offset(-0.35, 0.0);
+                    final outOffset = _slideDirection >= 0 ? const Offset(-0.35, 0.0) : const Offset(0.35, 0.0);
+                    final isIncoming = child.key == contentKey;
+
+                    return SlideTransition(
+                      position: Tween<Offset>(
+                        begin: isIncoming ? inOffset : Offset.zero,
+                        end: isIncoming ? Offset.zero : outOffset,
+                      ).animate(animation),
+                      child: FadeTransition(
+                        opacity: animation,
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: KeyedSubtree(
+                    key: contentKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Unified Financial Summary Card
+                        _buildUnifiedSummaryCard(context, data, isLumi, isThai),
+                        const SizedBox(height: 16),
+
+                        // Cumulative Expense Trend Chart (if Monthly)
+                        if (_granularity == ReportGranularity.monthly) ...[
+                          _buildExpenseTrendCard(context, data, isLumi, isThai),
+                          const SizedBox(height: 16),
+                        ],
+
+                        // Category Breakdown Section
+                        _buildCategoryBreakdownCard(context, data, isThai),
+                        const SizedBox(height: 36),
+                      ],
+                    ),
+                  ),
                 );
-
-            return ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              children: [
-                // 1. Granularity Selector (Day, Week, Month, Quarter, Year, All, Custom)
-                _buildGranularitySelector(context, isThai),
-                const SizedBox(height: 12),
-
-                // 2. Navigation Header with Date Title (clean, no swipe instruction)
-                _buildNavigationHeader(context, isLumi, isThai),
-                const SizedBox(height: 14),
-
-                // 3. Unified Financial Summary Card (Income, Expense, Investment, Net Savings, Savings Rate + Horizontal Bar Chart)
-                _buildUnifiedSummaryCard(context, data, isLumi, isThai),
-                const SizedBox(height: 16),
-
-                // 4. Cumulative Expense Trend Chart (if Monthly)
-                if (_granularity == ReportGranularity.monthly) ...[
-                  _buildExpenseTrendCard(context, data, isLumi, isThai),
-                  const SizedBox(height: 16),
-                ],
-
-                // 5. Category Breakdown Section
-                _buildCategoryBreakdownCard(context, data, isThai),
-                const SizedBox(height: 36),
-              ],
-            );
-          },
+              },
+            ),
+          ],
         ),
       ),
     );
@@ -752,6 +788,17 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
                       ? '+ค้างรับ ฿${Money(data.accruedIncomeSatang).format(symbol: "")}'
                       : null,
                   context: context,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => TransactionListScreen(
+                          initialTransactionType: 'income',
+                          initialDateRange: DateTimeRange(start: data.startDate, end: data.endDate),
+                          title: isThai ? 'รายรับ (${_formatPeriodTitle(isThai)})' : 'Income (${_formatPeriodTitle(isThai)})',
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
               const SizedBox(width: 10),
@@ -763,6 +810,17 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
                   color: expenseColor,
                   icon: Icons.arrow_upward_rounded,
                   context: context,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => TransactionListScreen(
+                          initialTransactionType: 'expense',
+                          initialDateRange: DateTimeRange(start: data.startDate, end: data.endDate),
+                          title: isThai ? 'รายจ่าย (${_formatPeriodTitle(isThai)})' : 'Expense (${_formatPeriodTitle(isThai)})',
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
@@ -863,73 +921,83 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
     required IconData icon,
     String? badgeText,
     required BuildContext context,
+    VoidCallback? onTap,
   }) {
     final surfaceSubtle = VaultTheme.surfaceSubtle(context);
     final border = VaultTheme.border(context);
     final secondaryText = VaultTheme.secondaryText(context);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: surfaceSubtle,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: border, width: 0.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: surfaceSubtle,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: border, width: 0.5),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 20,
-                height: 20,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, size: 13, color: color),
+              Row(
+                children: [
+                  Container(
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, size: 13, color: color),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontFamily: VaultTheme.fontFamily,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: secondaryText,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (onTap != null)
+                    Icon(Icons.chevron_right_rounded, size: 14, color: secondaryText.withValues(alpha: 0.6)),
+                ],
               ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  label,
+              const SizedBox(height: 6),
+              Text(
+                Money(amountSatang).format(symbol: '฿'),
+                style: VaultTheme.tabular(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (badgeText != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  badgeText,
                   style: TextStyle(
                     fontFamily: VaultTheme.fontFamily,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: secondaryText,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                    color: color,
                   ),
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-              ),
+              ],
             ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            Money(amountSatang).format(symbol: '฿'),
-            style: VaultTheme.tabular(
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-              color: color,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          if (badgeText != null) ...[
-            const SizedBox(height: 2),
-            Text(
-              badgeText,
-              style: TextStyle(
-                fontFamily: VaultTheme.fontFamily,
-                fontSize: 10,
-                fontWeight: FontWeight.w500,
-                color: color,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }
@@ -1173,83 +1241,119 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
           ),
           const SizedBox(height: 14),
 
-          if (list.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: Text(
-                  isThai ? 'ไม่มีรายการในหมวดหมู่นี้' : 'No transactions found for this period',
-                  style: TextStyle(fontSize: 13, color: secondaryText),
-                ),
-              ),
-            )
-          else
-            ...list.map((item) {
-              final color = _showIncomeCategories
-                  ? const Color(0xFF38A130)
-                  : const Color(0xFFE84368);
-
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 14,
-                          backgroundColor: color.withValues(alpha: 0.12),
-                          child: Icon(
-                            CategoryIconHelper.getIcon(item.icon),
-                            size: 15,
-                            color: color,
-                          ),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            child: KeyedSubtree(
+              key: ValueKey<bool>(_showIncomeCategories),
+              child: Column(
+                children: [
+                  if (list.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Center(
+                        child: Text(
+                          isThai ? 'ไม่มีรายการในหมวดหมู่นี้' : 'No transactions found for this period',
+                          style: TextStyle(fontSize: 13, color: secondaryText),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            item.name,
-                            style: TextStyle(
-                              fontFamily: VaultTheme.fontFamily,
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w600,
-                              color: primaryText,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        Text(
-                          '${item.percentage.toStringAsFixed(1)}%',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: secondaryText,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          Money(item.totalSatang).format(symbol: '฿'),
-                          style: VaultTheme.tabular(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: primaryText,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: (item.percentage / 100.0).clamp(0.0, 1.0),
-                        backgroundColor: border.withValues(alpha: 0.4),
-                        color: color,
-                        minHeight: 5,
                       ),
-                    ),
-                  ],
-                ),
-              );
-            }),
+                    )
+                  else
+                    ...list.map((item) {
+                      final color = _showIncomeCategories
+                          ? const Color(0xFF38A130)
+                          : const Color(0xFFE84368);
+
+                      return Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(10),
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => TransactionListScreen(
+                                  initialTransactionType: _showIncomeCategories ? 'income' : 'expense',
+                                  initialCategoryId: item.categoryId,
+                                  initialDateRange: DateTimeRange(start: data.startDate, end: data.endDate),
+                                  title: '${item.name} (${_formatPeriodTitle(isThai)})',
+                                ),
+                              ),
+                            );
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                            child: Column(
+                              children: [
+                                Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 14,
+                                      backgroundColor: color.withValues(alpha: 0.12),
+                                      child: Icon(
+                                        CategoryIconHelper.getIcon(item.icon),
+                                        size: 15,
+                                        color: color,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        item.name,
+                                        style: TextStyle(
+                                          fontFamily: VaultTheme.fontFamily,
+                                          fontSize: 13.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: primaryText,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    Text(
+                                      '${item.percentage.toStringAsFixed(1)}%',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: secondaryText,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      Money(item.totalSatang).format(symbol: '฿'),
+                                      style: VaultTheme.tabular(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: primaryText,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Icon(
+                                      Icons.chevron_right_rounded,
+                                      size: 16,
+                                      color: secondaryText.withValues(alpha: 0.5),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: LinearProgressIndicator(
+                                    value: (item.percentage / 100.0).clamp(0.0, 1.0),
+                                    backgroundColor: border.withValues(alpha: 0.4),
+                                    color: color,
+                                    minHeight: 5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );

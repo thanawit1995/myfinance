@@ -10,7 +10,18 @@ import '../../../../core/widgets/category_name_helper.dart';
 import 'edit_transaction_dialog.dart';
 
 class TransactionListScreen extends ConsumerStatefulWidget {
-  const TransactionListScreen({super.key});
+  final String? initialTransactionType; // 'income', 'expense', 'transfer'
+  final DateTimeRange? initialDateRange;
+  final String? initialCategoryId;
+  final String? title;
+
+  const TransactionListScreen({
+    super.key,
+    this.initialTransactionType,
+    this.initialDateRange,
+    this.initialCategoryId,
+    this.title,
+  });
 
   @override
   ConsumerState<TransactionListScreen> createState() => _TransactionListScreenState();
@@ -35,6 +46,9 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
   @override
   void initState() {
     super.initState();
+    _selectedType = widget.initialTransactionType;
+    _selectedDateRange = widget.initialDateRange;
+    _selectedCategoryId = widget.initialCategoryId;
     _loadTransactions();
     // Silent background sync with database updates
     _dbSubscription = ref.read(transactionsDaoProvider).watchRecentTransactions(limit: 1).listen((_) {
@@ -99,8 +113,17 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
   Widget build(BuildContext context) {
     super.build(context);
     final isThai = Localizations.localeOf(context).languageCode == 'th';
+    final canPop = ModalRoute.of(context)?.canPop ?? false;
 
     return Scaffold(
+      appBar: (widget.title != null || canPop)
+          ? AppBar(
+              title: Text(
+                widget.title ?? (isThai ? 'รายการธุรกรรม' : 'Transactions'),
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+            )
+          : null,
       body: Column(
         children: [
           // Filter Chips + Search & Filter Action Buttons

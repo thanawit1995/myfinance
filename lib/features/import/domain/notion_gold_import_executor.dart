@@ -9,11 +9,13 @@ class NotionGoldImportResult {
   final int imported;
   final int skippedDuplicates;
   final List<String> errors;
+  final String? batchId;
 
   const NotionGoldImportResult({
     required this.imported,
     required this.skippedDuplicates,
     required this.errors,
+    this.batchId,
   });
 }
 
@@ -29,7 +31,24 @@ class NotionGoldImportExecutor {
   Future<NotionGoldImportResult> executeImport(
     List<ParsedGoldRow> rows, {
     Set<int>? selectedRowIndices,
+    String? fileName,
   }) async {
+    final batchId = _uuid.v4();
+    final batchNow = DateTime.now();
+
+    await _db.importBatchesDao.createBatch(
+      ImportBatchesCompanion.insert(
+        id: batchId,
+        fileName: fileName ?? 'Notion Gold.csv',
+        templateType: const Value('notion_invest_gold'),
+        totalImported: 0,
+        importedAt: batchNow,
+        isRolledBack: const Value(false),
+        createdAt: batchNow,
+        updatedAt: batchNow,
+      ),
+    );
+
     int imported = 0;
     int skippedDuplicates = 0;
     final errors = <String>[];
@@ -94,6 +113,7 @@ class NotionGoldImportExecutor {
           fxRate: row.fxRate,
           feeThbSatang: 0,
           note: 'Imported from Notion — ${row.symbol}',
+          importBatchId: batchId,
         );
 
         // 2. Record latest market price if available
@@ -115,10 +135,19 @@ class NotionGoldImportExecutor {
       }
     }
 
+    // Update total imported in the batch
+    await (_db.update(_db.importBatches)..where((t) => t.id.equals(batchId))).write(
+      ImportBatchesCompanion(
+        totalImported: Value(imported),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+
     return NotionGoldImportResult(
       imported: imported,
       skippedDuplicates: skippedDuplicates,
       errors: errors,
+      batchId: batchId,
     );
   }
 

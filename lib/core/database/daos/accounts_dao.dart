@@ -70,6 +70,30 @@ class AccountsDao extends DatabaseAccessor<AppDatabase> with _$AccountsDaoMixin 
     );
   }
 
+  /// Returns or creates the standard "ประกันออมทรัพย์ (เมืองไทยประกันชีวิต)" asset account.
+  Future<Account> getOrCreateInsuranceSavingsAccount() async {
+    const accId = '00000000-0000-4000-8000-000000000007';
+    final existing = await (select(accounts)
+          ..where((a) =>
+              a.deletedAt.isNull() &
+              (a.id.equals(accId) | a.name.equals('ประกันออมทรัพย์ (เมืองไทยประกันชีวิต)'))))
+        .getSingleOrNull();
+    if (existing != null) return existing;
+
+    final now = DateTime.now();
+    final companion = AccountsCompanion.insert(
+      id: accId,
+      name: 'ประกันออมทรัพย์ (เมืองไทยประกันชีวิต)',
+      accountType: 'asset',
+      currencyCode: 'THB',
+      isDomestic: true,
+      createdAt: now,
+      updatedAt: now,
+    );
+    await into(accounts).insert(companion, mode: InsertMode.insertOrIgnore);
+    return (await getAccountById(accId))!;
+  }
+
   /// Soft deletes an account and cascades soft-delete to all related transactions.
   /// Transactions are marked with tag 'account_deleted:{accountId}' so they can be restored accurately.
   Future<bool> softDeleteAccount(String accountId) async {
@@ -275,14 +299,31 @@ class AccountsDao extends DatabaseAccessor<AppDatabase> with _$AccountsDaoMixin 
     return (nativeBalanceSatang: nativeBalance, thbEquivalentSatang: thbEquivalent, fxRate: fxRate);
   }
 
-  /// Returns total net worth in THB satang across all active accounts and investments.
-  Future<int> getTotalNetWorthSatang({int portfolioValueSatang = 0}) async {
+  /// Returns total liquid cash balance across all active bank, cash, fcd, and credit card accounts (excluding portfolio).
+  Future<int> getTotalCashSatang() async {
     final active = await getActiveAccounts();
     int totalThb = 0;
     for (final acc in active) {
       final breakdown = await getAccountBalanceBreakdown(acc.id);
       totalThb += breakdown.thbEquivalentSatang;
     }
-    return totalThb + portfolioValueSatang;
+    return totalThb;
+  }
+
+  /// Returns total net worth in THB satang across all active accounts and investments.
+  /// If [portfolioValueSatang] is null, it automatically computes current portfolio value
+  /// via [investmentsDao.getPortfolioSummary()].
+  Future<int> getTotalNetWorthSatang({int? portfolioValueSatang}) async {
+    final totalCash = await getTotalCashSatang();
+
+    int portVal = portfolioValueSatang ?? 0;
+    if (portfolioValueSatang == null) {
+      try {
+        final portSummary = await attachedDatabase.investmentsDao.getPortfolioSummary();
+        portVal = portSummary.totalValueThbSatang;
+      } catch (_) {}
+    }
+
+    return totalCash + portVal;
   }
 }

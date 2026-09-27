@@ -11,12 +11,14 @@ class NotionInvestImportResult {
   final int skippedDuplicates;
   final int skippedDividends;
   final List<String> errors;
+  final String? batchId;
 
   const NotionInvestImportResult({
     required this.imported,
     required this.skippedDuplicates,
     required this.skippedDividends,
     required this.errors,
+    this.batchId,
   });
 }
 
@@ -46,7 +48,24 @@ class NotionInvestImportExecutor {
   Future<NotionInvestImportResult> executeImport(
     List<ParsedInvestRow> rows, {
     Set<int>? selectedRowIndices, // if null → import all non-duplicate
+    String? fileName,
   }) async {
+    final batchId = _uuid.v4();
+    final batchNow = DateTime.now();
+
+    await _db.importBatchesDao.createBatch(
+      ImportBatchesCompanion.insert(
+        id: batchId,
+        fileName: fileName ?? 'Notion Invest Stocks.csv',
+        templateType: const Value('notion_invest_stocks'),
+        totalImported: 0,
+        importedAt: batchNow,
+        isRolledBack: const Value(false),
+        createdAt: batchNow,
+        updatedAt: batchNow,
+      ),
+    );
+
     int imported = 0;
     int skippedDuplicates = 0;
     int skippedDividends = 0;
@@ -166,6 +185,7 @@ class NotionInvestImportExecutor {
           fxRate: fxRate,
           feeThbSatang: 0,
           note: 'Imported from Notion — ${row.ticker} ($paymentLabel)',
+          importBatchId: batchId,
         );
 
         // 7. Add to in-memory duplicate set so subsequent rows with same key are skipped
@@ -176,11 +196,20 @@ class NotionInvestImportExecutor {
       }
     }
 
+    // Update total imported in the batch
+    await (_db.update(_db.importBatches)..where((t) => t.id.equals(batchId))).write(
+      ImportBatchesCompanion(
+        totalImported: Value(imported),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+
     return NotionInvestImportResult(
       imported: imported,
       skippedDuplicates: skippedDuplicates,
       skippedDividends: skippedDividends,
       errors: errors,
+      batchId: batchId,
     );
   }
 

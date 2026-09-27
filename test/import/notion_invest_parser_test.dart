@@ -90,12 +90,12 @@ void main() {
 
       expect(results.length, 5);
 
-      // Row 1: O
+      // Row 1: O (matched via historical rate from Invest-Stocks_USDTHB_Historical_Rates.csv: 36.6)
       expect(results[0].ticker, 'O');
       expect(results[0].buyDate, DateTime(2024, 6, 24));
       expect(results[0].amountUsdSatang, 27144);
-      expect(results[0].amountThbSatang, 913396);
-      expect(results[0].fxRate, Decimal.parse('33.650000'));
+      expect(results[0].amountThbSatang, 993470);
+      expect(results[0].fxRate, Decimal.parse('36.600000'));
       expect(results[0].quantity, Decimal.parse('5.1070555'));
       expect(results[0].paymentType, PaymentType.thb);
 
@@ -116,6 +116,27 @@ void main() {
       // Row 5: THB + ปันผล
       expect(results[4].ticker, 'QQQM');
       expect(results[4].paymentType, PaymentType.thb);
+    });
+
+    test('parses USDTHB Rate column dynamically when present in CSV', () {
+      final rawRows = [
+        ['Transaction No', 'Day', 'Date', 'Stock', 'Invested (USD)', 'USDTHB Rate', 'THB Invested (Calculated)', 'Payment Type / Source'],
+        ['1', '24/06/2024', '24-Jun-24', 'O', '271.44', '36.6', '9934.7', 'THB'],
+        ['2', '1-Jul-24', '1-Jul-24', 'JEPQ', '542.29', '36.72', '19912.89', 'THB'],
+      ];
+
+      final results = NotionInvestParser.parseRows(rawRows);
+      expect(results.length, 2);
+
+      expect(results[0].ticker, 'O');
+      expect(results[0].amountUsdSatang, 27144);
+      expect(results[0].fxRate, Decimal.parse('36.6'));
+      expect(results[0].amountThbSatang, 993470);
+
+      expect(results[1].ticker, 'JEPQ');
+      expect(results[1].amountUsdSatang, 54229);
+      expect(results[1].fxRate, Decimal.parse('36.72'));
+      expect(results[1].amountThbSatang, 1991289);
     });
 
     test('ignores header repetitions and blank rows', () {

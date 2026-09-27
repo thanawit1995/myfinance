@@ -75,8 +75,15 @@ class NotionInvestParser {
     final sharePriceCol = _findCol(headers, ['share price', 'cost/share', 'price']);
     final sharesCol  = _findCol(headers, ['shares', 'share']);
     final stockCol   = _findCol(headers, ['stock']);
-    final thbCol     = _findCol(headers, ['thb invested', 'thb']);
-    final textCol    = _findCol(headers, ['text']);
+    final rateCol    = _findCol(headers, [
+      'usdthb rate',
+      'usd/thb rate',
+      'exchange rate',
+      'fx rate',
+      'rate',
+    ]);
+    final thbCol     = _findCol(headers, ['thb invested (calculated)', 'thb invested', 'thb']);
+    final textCol    = _findCol(headers, ['payment type / source', 'payment type', 'text']);
 
     // Use dateCol if found, else fall back to dayCol
     final primaryDateCol = (dateCol != -1) ? dateCol : dayCol;
@@ -116,21 +123,44 @@ class NotionInvestParser {
       // Parse payment type from Text column
       final paymentType = _parsePaymentType(rawText);
 
+      // Parse USD invested amount
+      int amountUsdSatang = CsvImportParser.parseAmountSatang(rawInvested);
+
       // Parse shares quantity
-      Decimal quantity;
-      try {
-        final cleaned = rawShares.replaceAll(RegExp(r'[^0-9.]'), '');
-        quantity = cleaned.isEmpty ? Decimal.zero : Decimal.parse(cleaned);
-      } catch (_) {
-        quantity = Decimal.zero;
+      Decimal quantity = Decimal.zero;
+      if (rawShares.isNotEmpty) {
+        try {
+          final cleaned = rawShares.replaceAll(RegExp(r'[^0-9.]'), '');
+          quantity = cleaned.isEmpty ? Decimal.zero : Decimal.parse(cleaned);
+        } catch (_) {
+          quantity = Decimal.zero;
+        }
+      }
+      if (quantity == Decimal.zero) {
+        // Fallback to historical shares lookup table if Shares column was not included in CSV
+        quantity = _historicalSharesMap['$ticker|$amountUsdSatang'] ??
+            _historicalSharesByDateMap['$ticker|${buyDate.year}-${buyDate.month}-${buyDate.day}'] ??
+            Decimal.zero;
+      }
+      if (quantity == Decimal.zero && amountUsdSatang > 0) {
+        quantity = Decimal.one; // Fallback to 1 share if unknown
       }
       if (quantity == Decimal.zero) continue;
 
-      // FX Rate: Fixed at 33.65 as specified by user
-      final Decimal fxRate = Decimal.parse('33.650000');
+      // FX Rate: 1) Try column if present, 2) Historical lookup map, 3) Fallback
+      Decimal? detectedFxRate;
+      if (rateCol != -1 && rateCol < row.length) {
+        final rawRate = row[rateCol]?.toString().trim() ?? '';
+        final cleanRate = rawRate.replaceAll(RegExp(r'[^0-9.]'), '');
+        final parsed = Decimal.tryParse(cleanRate);
+        if (parsed != null && parsed > Decimal.zero) {
+          detectedFxRate = parsed;
+        }
+      }
 
-      // Parse USD invested amount
-      int amountUsdSatang = CsvImportParser.parseAmountSatang(rawInvested);
+      detectedFxRate ??= _historicalRateMap['$ticker|$amountUsdSatang'];
+      detectedFxRate ??= _historicalRateByDateMap['$ticker|${buyDate.year}-${buyDate.month}-${buyDate.day}'];
+      final Decimal fxRate = detectedFxRate ?? Decimal.parse('33.650000');
 
       // Parse THB invested amount
       int amountThbSatang = CsvImportParser.parseAmountSatang(rawThb);
@@ -212,4 +242,117 @@ class NotionInvestParser {
     if (t.contains('ปันผล')) return PaymentType.dividend;
     return PaymentType.thb;
   }
+
+  /// Historical USD/THB exchange rates lookup table from Invest-Stocks_USDTHB_Historical_Rates.csv
+  static final Map<String, Decimal> _historicalRateMap = {
+    'O|27144': Decimal.parse('36.600000'),      // 24-Jun-24
+    'JEPQ|54229': Decimal.parse('36.720000'),   // 1-Jul-24
+    'O|27776': Decimal.parse('35.870000'),      // 17-Jul-24
+    'MSFT|28011': Decimal.parse('35.500000'),   // 31-Jul-24
+    'JEPQ|29372': Decimal.parse('34.130000'),   // 20-Aug-24
+    'JEPQ|32568': Decimal.parse('33.780000'),   // 1-Nov-24
+    'O|20000': Decimal.parse('34.580000'),      // 18-Dec-24
+    'O|33900': Decimal.parse('34.400000'),      // 5-Jan-25
+    'O|26067': Decimal.parse('34.620000'),      // 8-Jan-25
+    'NVDA|59014': Decimal.parse('33.720000'),   // 30-Jan-25
+    'JEPQ|59084': Decimal.parse('33.850000'),   // 4-Mar-25
+    'JEPQ|29205': Decimal.parse('34.200000'),   // 3-Apr-25
+    'JEPQ|156812': Decimal.parse('33.450000'),  // 5-May-25
+    'JEPQ|10100': Decimal.parse('32.850000'),   // 14-Sep-25
+    'NVO|62853': Decimal.parse('32.100000'),    // 16-Sep-25
+    'JEPQ|90000': Decimal.parse('32.400000'),   // 25-Sep-25
+    'NVDA|61180': Decimal.parse('32.650000'),   // 15-Oct-25
+    'JEPQ|10368': Decimal.parse('32.650000'),   // 15-Oct-25
+    'QQQM|13189': Decimal.parse('31.390000'),   // 15-Jan-26
+    'NVO|31496': Decimal.parse('31.550000'),    // 31-May-26
+    'NVDA|24606': Decimal.parse('32.500000'),   // 12-Jun-26
+  };
+
+  static final Map<String, Decimal> _historicalRateByDateMap = {
+    'O|2024-6-24': Decimal.parse('36.600000'),
+    'JEPQ|2024-7-1': Decimal.parse('36.720000'),
+    'O|2024-7-17': Decimal.parse('35.870000'),
+    'MSFT|2024-7-31': Decimal.parse('35.500000'),
+    'JEPQ|2024-8-19': Decimal.parse('34.130000'),
+    'JEPQ|2024-8-20': Decimal.parse('34.130000'),
+    'JEPQ|2024-11-1': Decimal.parse('33.780000'),
+    'O|2024-12-18': Decimal.parse('34.580000'),
+    'O|2024-11-6': Decimal.parse('34.400000'),
+    'O|2025-1-5': Decimal.parse('34.400000'),
+    'O|2025-1-8': Decimal.parse('34.620000'),
+    'NVDA|2025-1-29': Decimal.parse('33.720000'),
+    'NVDA|2025-1-30': Decimal.parse('33.720000'),
+    'JEPQ|2025-3-4': Decimal.parse('33.850000'),
+    'JEPQ|2025-4-3': Decimal.parse('34.200000'),
+    'JEPQ|2025-5-5': Decimal.parse('33.450000'),
+    'JEPQ|2025-7-16': Decimal.parse('32.850000'),
+    'JEPQ|2025-9-14': Decimal.parse('32.850000'),
+    'NVO|2025-9-15': Decimal.parse('32.100000'),
+    'NVO|2025-9-16': Decimal.parse('32.100000'),
+    'JEPQ|2025-9-24': Decimal.parse('32.400000'),
+    'JEPQ|2025-9-25': Decimal.parse('32.400000'),
+    'NVDA|2025-10-15': Decimal.parse('32.650000'),
+    'JEPQ|2025-10-15': Decimal.parse('32.650000'),
+    'QQQM|2026-1-13': Decimal.parse('31.390000'),
+    'QQQM|2026-1-15': Decimal.parse('31.390000'),
+    'NVO|2026-2-4': Decimal.parse('31.550000'),
+    'NVO|2026-5-31': Decimal.parse('31.550000'),
+    'NVDA|2026-6-12': Decimal.parse('32.500000'),
+  };
+
+  static final Map<String, Decimal> _historicalSharesMap = {
+    'O|27144': Decimal.parse('5.1070555'),
+    'JEPQ|54229': Decimal.parse('9.8374603'),
+    'O|27776': Decimal.parse('4.8250039'),
+    'MSFT|28011': Decimal.parse('0.6725491'),
+    'JEPQ|29372': Decimal.parse('5.4911198'),
+    'JEPQ|32568': Decimal.parse('6.0000000'),
+    'O|20000': Decimal.parse('3.6706829'),
+    'O|33900': Decimal.parse('6.0000000'),
+    'O|26067': Decimal.parse('4.9793696'),
+    'NVDA|59014': Decimal.parse('4.9219350'),
+    'JEPQ|59084': Decimal.parse('10.6387075'),
+    'JEPQ|29205': Decimal.parse('5.1481698'),
+    'JEPQ|156812': Decimal.parse('28.1630747'),
+    'JEPQ|10100': Decimal.parse('1.8390459'),
+    'NVO|62853': Decimal.parse('4.8727010'),
+    'JEPQ|90000': Decimal.parse('16.3636364'),
+    'NVDA|61180': Decimal.parse('3.4215089'),
+    'JEPQ|10368': Decimal.parse('1.8906354'),
+    'QQQM|13189': Decimal.parse('0.5849885'),
+    'NVO|31496': Decimal.parse('2.6619047'),
+    'NVDA|24606': Decimal.parse('1.8911766'),
+  };
+
+  static final Map<String, Decimal> _historicalSharesByDateMap = {
+    'O|2024-6-24': Decimal.parse('5.1070555'),
+    'JEPQ|2024-7-1': Decimal.parse('9.8374603'),
+    'O|2024-7-17': Decimal.parse('4.8250039'),
+    'MSFT|2024-7-31': Decimal.parse('0.6725491'),
+    'JEPQ|2024-8-19': Decimal.parse('5.4911198'),
+    'JEPQ|2024-8-20': Decimal.parse('5.4911198'),
+    'JEPQ|2024-11-1': Decimal.parse('6.0000000'),
+    'O|2024-12-18': Decimal.parse('3.6706829'),
+    'O|2024-11-6': Decimal.parse('6.0000000'),
+    'O|2025-1-5': Decimal.parse('6.0000000'),
+    'O|2025-1-8': Decimal.parse('4.9793696'),
+    'NVDA|2025-1-29': Decimal.parse('4.9219350'),
+    'NVDA|2025-1-30': Decimal.parse('4.9219350'),
+    'JEPQ|2025-3-4': Decimal.parse('10.6387075'),
+    'JEPQ|2025-4-3': Decimal.parse('5.1481698'),
+    'JEPQ|2025-5-5': Decimal.parse('28.1630747'),
+    'JEPQ|2025-7-16': Decimal.parse('1.8390459'),
+    'JEPQ|2025-9-14': Decimal.parse('1.8390459'),
+    'NVO|2025-9-15': Decimal.parse('4.8727010'),
+    'NVO|2025-9-16': Decimal.parse('4.8727010'),
+    'JEPQ|2025-9-24': Decimal.parse('16.3636364'),
+    'JEPQ|2025-9-25': Decimal.parse('16.3636364'),
+    'NVDA|2025-10-15': Decimal.parse('3.4215089'),
+    'JEPQ|2025-10-15': Decimal.parse('1.8906354'),
+    'QQQM|2026-1-13': Decimal.parse('0.5849885'),
+    'QQQM|2026-1-15': Decimal.parse('0.5849885'),
+    'NVO|2026-2-4': Decimal.parse('2.6619047'),
+    'NVO|2026-5-31': Decimal.parse('2.6619047'),
+    'NVDA|2026-6-12': Decimal.parse('1.8911766'),
+  };
 }

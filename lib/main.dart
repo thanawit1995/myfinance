@@ -6,12 +6,15 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/database/platform_workaround/sqlite_workaround.dart';
+import 'core/sync/supabase_config.dart';
 import 'core/theme/app_theme_style.dart';
 import 'core/theme/lumi_theme.dart';
 import 'core/theme/vault_theme.dart';
 import 'core/services/web_theme_helper/web_theme_helper.dart';
 import 'core/widgets/main_shell.dart';
+import 'features/auth/login_screen.dart';
 import 'l10n/app_localizations.dart';
 
 void main() async {
@@ -42,6 +45,12 @@ void main() async {
 
   // Workaround for older Android versions to load sqlite3 cleanly (no-op on Web)
   await applySqliteWorkaround();
+
+  // Initialize Supabase (safe to call even when offline — will retry on connect)
+  await Supabase.initialize(
+    url: SupabaseConfig.projectUrl,
+    anonKey: SupabaseConfig.anonKey,
+  );
 
   runApp(
     const ProviderScope(
@@ -145,6 +154,9 @@ class _MyFinanceAppState extends State<MyFinanceApp> {
         Locale('th'),
         Locale('en'),
       ],
+      routes: {
+        '/login': (context) => const LoginScreen(),
+      },
       home: MainShell(
         currentLocale: _locale,
         onLocaleChanged: _setLocale,

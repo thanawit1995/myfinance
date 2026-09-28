@@ -5,6 +5,8 @@ import '../../../../core/database/app_database.dart';
 import '../../../../core/database/database_provider.dart';
 import '../../../../core/database/daos/accounts_dao.dart';
 import '../../../../core/database/daos/investments_dao.dart';
+import '../../../../core/database/daos/transactions_dao.dart';
+import '../../../../core/money/money.dart';
 
 class TrashBinScreen extends ConsumerStatefulWidget {
   final int initialTab;
@@ -24,8 +26,8 @@ class _TrashBinScreenState extends ConsumerState<TrashBinScreen> with SingleTick
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this, initialIndex: widget.initialTab);
-    // Auto cleanup accounts & assets in trash > 30 days
+    _tabController = TabController(length: 3, vsync: this, initialIndex: widget.initialTab);
+    // Auto cleanup accounts, assets & transactions in trash > 30 days
     _cleanupExpired();
   }
 
@@ -38,8 +40,10 @@ class _TrashBinScreenState extends ConsumerState<TrashBinScreen> with SingleTick
   Future<void> _cleanupExpired() async {
     final accDao = ref.read(accountsDaoProvider);
     final invDao = ref.read(investmentsDaoProvider);
+    final txDao = ref.read(transactionsDaoProvider);
     await accDao.cleanupExpiredDeletedAccounts();
     await invDao.cleanupExpiredDeletedAssets();
+    await txDao.cleanupExpiredDeletedTransactions();
   }
 
   Future<void> _confirmRestore(Account account) async {
@@ -193,6 +197,7 @@ class _TrashBinScreenState extends ConsumerState<TrashBinScreen> with SingleTick
     final isThai = Localizations.localeOf(context).languageCode == 'th';
     final accDao = ref.watch(accountsDaoProvider);
     final invDao = ref.watch(investmentsDaoProvider);
+    final txDao = ref.watch(transactionsDaoProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -200,6 +205,7 @@ class _TrashBinScreenState extends ConsumerState<TrashBinScreen> with SingleTick
         bottom: TabBar(
           controller: _tabController,
           tabs: [
+            Tab(icon: const Icon(Icons.receipt_long_outlined), text: isThai ? 'รายการ' : 'Transactions'),
             Tab(icon: const Icon(Icons.account_balance), text: isThai ? 'บัญชี' : 'Accounts'),
             Tab(icon: const Icon(Icons.pie_chart), text: isThai ? 'หุ้น / สินทรัพย์' : 'Assets'),
           ],
@@ -208,10 +214,250 @@ class _TrashBinScreenState extends ConsumerState<TrashBinScreen> with SingleTick
       body: TabBarView(
         controller: _tabController,
         children: [
+          _buildTransactionsTab(txDao, isThai),
           _buildAccountsTab(accDao, isThai),
           _buildAssetsTab(invDao, isThai),
         ],
       ),
+    );
+  }
+
+  Widget _buildTransactionsTab(TransactionsDao txDao, bool isThai) {
+    final dateFormat = DateFormat('d MMM yyyy', isThai ? 'th' : 'en_US');
+
+    return FutureBuilder<List<Transaction>>(
+      future: txDao.getDeletedTransactions(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final deletedTxs = snapshot.data ?? [];
+
+        if (deletedTxs.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.delete_outline, size: 64, color: Colors.grey.shade400),
+                const SizedBox(height: 12),
+                Text(
+                  isThai ? 'ไม่มีรายการในถังขยะ' : 'No transactions in trash',
+                  style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  isThai
+                      ? 'รายการที่ถูกลบจะถูกเก็บไว้ที่นี่ 30 วันก่อนลบถาวร'
+                      : 'Deleted transactions are kept here for 30 days',
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          );
+        }
+
+        final now = DateTime.now();
+
+        return Column(
+          children: [
+            // Header with clear all button
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    isThai ? '${deletedTxs.length} รายการในถังขยะ' : '${deletedTxs.length} items in trash',
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                  ),
+                  TextButton.icon(
+                    style: TextButton.styleFrom(foregroundColor: Colors.red.shade700),
+                    icon: const Icon(Icons.delete_sweep, size: 18),
+                    label: Text(isThai ? 'ล้างถังขยะ' : 'Empty Trash'),
+                    onPressed: () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: Text(isThai ? 'ล้างถังขยะ' : 'Empty Trash'),
+                          content: Text(isThai
+                              ? 'คุณต้องการลบรายการทั้งหมด ${deletedTxs.length} รายการในถังขยะอย่างถาวรใช่หรือไม่? ไม่สามารถกู้คืนได้อีก'
+                              : 'Permanently delete all ${deletedTxs.length} transactions in trash? This cannot be undone.'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(false),
+                              child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+                            ),
+                            FilledButton(
+                              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                              onPressed: () => Navigator.of(ctx).pop(true),
+                              child: Text(isThai ? 'ลบถาวรทั้งหมด' : 'Delete All'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm == true && mounted) {
+                        for (final tx in deletedTxs) {
+                          await txDao.permanentlyDeleteTransaction(tx.id);
+                        }
+                        if (mounted) setState(() {});
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                itemCount: deletedTxs.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (context, index) {
+                  final tx = deletedTxs[index];
+                  final deletedDate = tx.deletedAt ?? now;
+                  final daysInTrash = now.difference(deletedDate).inDays;
+                  final daysRemaining = (30 - daysInTrash).clamp(0, 30);
+                  final isExpense = tx.transactionType == 'expense';
+                  final amountColor = isExpense ? Colors.red.shade700 : Colors.green.shade700;
+                  final amountPrefix = isExpense ? '−' : '+';
+
+                  return Card(
+                    elevation: 1,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      tx.note ?? (isThai ? '(ไม่มีหมายเหตุ)' : '(no note)'),
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      dateFormat.format(tx.transactionDate),
+                                      style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    '$amountPrefix${Money(tx.amountThbSatang).format(symbol: '฿')}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                      color: amountColor,
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: daysRemaining <= 7 ? Colors.red.shade50 : Colors.amber.shade50,
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: daysRemaining <= 7 ? Colors.red.shade300 : Colors.amber.shade300,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      isThai ? 'เหลือ $daysRemaining วัน' : '$daysRemaining days left',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: daysRemaining <= 7 ? Colors.red.shade800 : Colors.amber.shade900,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.red.shade700,
+                                  side: BorderSide(color: Colors.red.shade200),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                icon: const Icon(Icons.delete_forever, size: 15),
+                                label: Text(isThai ? 'ลบถาวร' : 'Delete', style: const TextStyle(fontSize: 12)),
+                                onPressed: () async {
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title: Text(isThai ? 'ลบรายการถาวร' : 'Permanently Delete'),
+                                      content: Text(isThai
+                                          ? 'รายการนี้จะถูกลบถาวรและไม่สามารถกู้คืนได้อีก'
+                                          : 'This transaction will be permanently deleted and cannot be recovered.'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.of(ctx).pop(false),
+                                          child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+                                        ),
+                                        FilledButton(
+                                          style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                                          onPressed: () => Navigator.of(ctx).pop(true),
+                                          child: Text(isThai ? 'ลบถาวร' : 'Delete'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirm == true && mounted) {
+                                    await txDao.permanentlyDeleteTransaction(tx.id);
+                                    setState(() {});
+                                  }
+                                },
+                              ),
+                              const SizedBox(width: 8),
+                              FilledButton.icon(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: Colors.green.shade700,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                icon: const Icon(Icons.restore, size: 15),
+                                label: Text(isThai ? 'กู้คืน' : 'Restore', style: const TextStyle(fontSize: 12)),
+                                onPressed: () async {
+                                  await txDao.restoreTransaction(tx.id);
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(isThai ? 'กู้คืนรายการเรียบร้อยแล้ว' : 'Transaction restored'),
+                                        backgroundColor: Colors.green.shade700,
+                                      ),
+                                    );
+                                    setState(() {});
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 

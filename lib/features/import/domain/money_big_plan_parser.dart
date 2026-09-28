@@ -346,14 +346,12 @@ class MoneyBigPlanParser {
       );
     }
 
-    if (lower.contains('ประกันชีวิต') || lower.contains('i-shield')) {
-      return (
-        id: catInsurance,
-        name: 'เบี้ยประกันชีวิตและออมทรัพย์',
-        type: 'expense',
-        tag: 'deduction:life_insurance',
-        taxCategory: null,
-      );
+    // Insurance transactions are intentionally excluded from Money BIG PLAN import.
+    // The user has already recorded all insurance payments via Notion Bills import,
+    // which is the canonical source for insurance data. Returning null causes the
+    // parser to skip these rows entirely.
+    if (lower.contains('ประกันชีวิต') || lower.contains('i-shield') || lower.contains('ประกันออมทรัพย์')) {
+      return null;
     }
 
     // Default for personal expenses

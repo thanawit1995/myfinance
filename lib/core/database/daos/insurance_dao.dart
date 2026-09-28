@@ -174,12 +174,14 @@ class InsuranceDao extends DatabaseAccessor<AppDatabase> with _$InsuranceDaoMixi
   Future<PolicyProgress> getPolicyProgress(InsurancePolicy policy) async {
     final now = DateTime.now();
 
-    // Query transactions linked to this policy via tag or note
+    // Query transactions linked to this policy via tag only.
+    // Note matching is intentionally excluded to avoid false positives from
+    // Notion Bill transactions whose note text may contain the policy name
+    // but are not actual premium payments (e.g. recurring bill descriptions).
     final txs = await (select(transactions)
           ..where((t) =>
               t.deletedAt.isNull() &
-              (t.tag.like('%policy:${policy.id}%') |
-               t.note.like('%${policy.policyName}%'))))
+              t.tag.like('%policy:${policy.id}%')))
         .get();
 
     final paidPeriods = txs.length;
@@ -292,6 +294,44 @@ class InsuranceDao extends DatabaseAccessor<AppDatabase> with _$InsuranceDaoMixi
       total += p.annualPremiumSatang;
     }
     return total;
+  }
+
+  /// One-time migration: fixes legacy insurance transactions that were imported
+  /// before the policy-tag fix. Patches all expense transactions with
+  /// `deduction:life_insurance` tag (but missing `policy:` prefix) and
+  /// category id = healthcare or life&savings insurance to include the correct
+  /// policy tag so that [getPolicyProgress] counts them correctly.
+  ///
+  /// Safe to call multiple times — already-correct rows are skipped.
+  Future<int> patchLegacyInsuranceTransactions() async {
+    final now = DateTime.now();
+    int patchedCount = 0;
+
+    // Find all expense transactions that have deduction:life_insurance tag
+    // but do NOT yet have policy:policy-mtl-savings-15-20 in the tag.
+    final legacyTxs = await (select(transactions)
+          ..where((t) =>
+              t.deletedAt.isNull() &
+              t.transactionType.equals('expense') &
+              t.tag.like('%deduction:life_insurance%') &
+              t.tag.like('%policy:policy-mtl-savings-15-20%').not()))
+        .get();
+
+    for (final tx in legacyTxs) {
+      final newTag = tx.tag != null && tx.tag!.isNotEmpty
+          ? 'policy:$defaultSavingsPolicyId,${tx.tag}'
+          : 'policy:$defaultSavingsPolicyId,deduction:life_insurance';
+
+      await (update(transactions)..where((t) => t.id.equals(tx.id))).write(
+        TransactionsCompanion(
+          tag: Value(newTag),
+          categoryId: const Value('cat-exp-0000-4000-8000-000000000015'),
+          updatedAt: Value(now),
+        ),
+      );
+      patchedCount++;
+    }
+    return patchedCount;
   }
 }
 

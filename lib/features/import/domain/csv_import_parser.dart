@@ -690,8 +690,8 @@ class CsvImportParser {
         else if (lowerName.contains('ประกัน') ||
             lowerNote.contains('ประกัน') ||
             lowerCat.contains('insurance')) {
-          canonicalCategory = 'Healthcare';
-          rowTag = 'deduction:life_insurance';
+          canonicalCategory = 'Life & Savings Insurance';
+          rowTag = 'policy:policy-mtl-savings-15-20,deduction:life_insurance';
         }
         // 3. Housing / ที่พัก
         else if (lowerName.contains('rental') ||

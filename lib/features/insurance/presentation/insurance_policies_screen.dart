@@ -421,11 +421,6 @@ class _InsurancePoliciesScreenState extends ConsumerState<InsurancePoliciesScree
                       ],
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.edit_outlined, size: 20),
-                    tooltip: 'แก้ไขกรมธรรม์',
-                    onPressed: () => _openEditPolicy(policy),
-                  ),
                 ],
               ),
               const SizedBox(height: 14),
@@ -530,16 +525,6 @@ class _InsurancePoliciesScreenState extends ConsumerState<InsurancePoliciesScree
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                    ),
-                    icon: const Icon(Icons.edit_outlined, size: 16),
-                    label: const Text('แก้ไขข้อมูล'),
-                    onPressed: () => _openEditPolicy(policy),
-                  ),
-                  const SizedBox(width: 8),
                   FilledButton.icon(
                     style: FilledButton.styleFrom(
                       backgroundColor: VaultTheme.accent(context),

@@ -6,6 +6,8 @@ import '../security/auth_provider.dart';
 import '../theme/app_theme_style.dart';
 import '../theme/vault_theme.dart';
 import 'pin_lock_dialog.dart';
+import '../../features/auth/login_screen.dart';
+import '../../features/auth/sync_status_widget.dart';
 import '../../features/home/presentation/vault_home_screen.dart';
 import '../../features/money/presentation/money_screen.dart';
 import '../../features/investments/presentation/portfolio_screen.dart';
@@ -344,6 +346,15 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
                     label: Text(l10n?.more ?? 'More'),
                   ),
                 ],
+                trailing: const Expanded(
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Padding(
+                      padding: EdgeInsets.only(bottom: 16),
+                      child: SyncStatusWidget(),
+                    ),
+                  ),
+                ),
               ),
               VerticalDivider(thickness: 0.75, width: 1, color: VaultTheme.border(context)),
               Expanded(

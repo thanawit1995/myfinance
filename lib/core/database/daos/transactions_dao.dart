@@ -574,5 +574,41 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
     }
     return updatedCount;
   }
+
+  // ─── Trash Bin ──────────────────────────────────────────────────────────────
+
+  /// Returns all soft-deleted transactions currently in the trash bin,
+  /// ordered by deleted_at descending (most recently deleted first).
+  Future<List<Transaction>> getDeletedTransactions() {
+    return (select(transactions)
+          ..where((t) => t.deletedAt.isNotNull())
+          ..orderBy([(t) => OrderingTerm.desc(t.deletedAt)]))
+        .get();
+  }
+
+  /// Restores a soft-deleted transaction from the trash bin.
+  Future<bool> restoreTransaction(String id) async {
+    final now = DateTime.now();
+    final count = await (update(transactions)..where((t) => t.id.equals(id))).write(
+      TransactionsCompanion(
+        deletedAt: const Value(null),
+        updatedAt: Value(now),
+      ),
+    );
+    return count > 0;
+  }
+
+  /// Permanently deletes a transaction (hard delete, cannot be undone).
+  Future<void> permanentlyDeleteTransaction(String id) async {
+    await (delete(transactions)..where((t) => t.id.equals(id))).go();
+  }
+
+  /// Auto-purges transactions that have been in the trash for more than 30 days.
+  Future<int> cleanupExpiredDeletedTransactions() async {
+    final cutoff = DateTime.now().subtract(const Duration(days: 30));
+    return (delete(transactions)
+          ..where((t) => t.deletedAt.isNotNull() & t.deletedAt.isSmallerThanValue(cutoff)))
+        .go();
+  }
 }
 

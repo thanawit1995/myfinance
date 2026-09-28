@@ -153,6 +153,8 @@ class AppDatabase extends _$AppDatabase {
         );
         await transactionsDao.cleanDistortedNotionNotes();
         await transactionsDao.alignIncomeDatesWithWorkPeriod();
+        await insuranceDao.patchLegacyInsuranceTransactions();
+        await transactionsDao.cleanupExpiredDeletedTransactions();
       },
     );
   }

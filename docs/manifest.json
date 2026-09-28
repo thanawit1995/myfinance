@@ -1,0 +1,55 @@
+{
+    "name": "OURS — Our money, our journey.",
+    "short_name": "OURS",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#FFF9F5",
+    "theme_color": "#FFF9F5",
+    "description": "OURS — สมุดบันทึกการเงินส่วนบุคคลและพอร์ตการลงทุน สำหรับคุณและคนที่คุณรัก",
+    "orientation": "portrait",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "icons/Icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "+ บันทึกรายจ่าย",
+            "short_name": "รายจ่าย",
+            "description": "บันทึกรายจ่ายใหม่อย่างรวดเร็ว",
+            "url": "./"
+        },
+        {
+            "name": "+ บันทึกรายรับ",
+            "short_name": "รายรับ",
+            "description": "บันทึกรายรับใหม่",
+            "url": "./"
+        },
+        {
+            "name": "สรุปภาพรวมรายเดือน",
+            "short_name": "สรุปเดือนนี้",
+            "description": "ดูสรุปภาพรวมรายรับ-รายจ่ายและเงินออม",
+            "url": "./"
+        }
+    ]
+}

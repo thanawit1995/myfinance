@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -16,22 +18,30 @@ class SyncState {
   final SyncStatus status;
   final DateTime? lastSyncAt;
   final String? errorMessage;
+  final int progressCurrent;
+  final int progressTotal;
 
   const SyncState({
     this.status = SyncStatus.idle,
     this.lastSyncAt,
     this.errorMessage,
+    this.progressCurrent = 0,
+    this.progressTotal = 0,
   });
 
   SyncState copyWith({
     SyncStatus? status,
     DateTime? lastSyncAt,
     String? errorMessage,
+    int? progressCurrent,
+    int? progressTotal,
   }) =>
       SyncState(
         status: status ?? this.status,
         lastSyncAt: lastSyncAt ?? this.lastSyncAt,
         errorMessage: errorMessage ?? this.errorMessage,
+        progressCurrent: progressCurrent ?? this.progressCurrent,
+        progressTotal: progressTotal ?? this.progressTotal,
       );
 }
 
@@ -44,6 +54,9 @@ class SyncService extends StateNotifier<SyncState> {
 
   static const _prefLastSync = 'last_sync_timestamp';
   StreamSubscription? _connectivitySub;
+  StreamSubscription? _authSub;
+  RealtimeChannel? _realtimeTxChannel;
+  RealtimeChannel? _realtimeAccChannel;
 
   SyncService(this._supabase, this._db, this._auth)
       : super(const SyncState()) {
@@ -57,12 +70,24 @@ class SyncService extends StateNotifier<SyncState> {
       state = state.copyWith(lastSyncAt: DateTime.tryParse(ts));
     }
 
+    // Connectivity listener
     _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
       final online = results.any((r) => r != ConnectivityResult.none);
       if (online && _auth.isLoggedIn) {
         syncAll();
       } else if (!online) {
         state = state.copyWith(status: SyncStatus.offline);
+      }
+    });
+
+    // Supabase auth state listener — crucial for OAuth redirect completion
+    _authSub = _supabase.auth.onAuthStateChange.listen((data) {
+      if (data.session != null) {
+        syncAll();
+        _subscribeRealtime();
+      } else {
+        _unsubscribeRealtime();
+        state = const SyncState();
       }
     });
 
@@ -74,7 +99,7 @@ class SyncService extends StateNotifier<SyncState> {
 
   // ─── Full Sync ──────────────────────────────────────────────────────────────
 
-  Future<void> syncAll() async {
+  Future<void> syncAll({bool forceFullSync = false}) async {
     if (!_auth.isLoggedIn) return;
     if (state.status == SyncStatus.syncing) return;
 
@@ -82,18 +107,37 @@ class SyncService extends StateNotifier<SyncState> {
     state = state.copyWith(status: SyncStatus.syncing, errorMessage: null);
 
     try {
-      final lastSync = state.lastSyncAt;
-      await Future.wait([
-        _syncTransactions(userId, lastSync),
-        _syncAccounts(userId, lastSync),
-        _syncCategories(userId, lastSync),
-      ]);
+      final lastSync = forceFullSync ? null : state.lastSyncAt;
+
+      // Disable foreign keys during sync merge to avoid dependency order violations
+      try {
+        await _db.customStatement('PRAGMA foreign_keys = OFF;');
+      } catch (_) {}
+
+      // 1. Sync Accounts first
+      await _syncAccounts(userId, lastSync);
+
+      // 2. Sync Categories second
+      await _syncCategories(userId, lastSync);
+
+      // 3. Sync Transactions in chunks
+      await _syncTransactions(userId, lastSync);
+
+      // Re-enable foreign keys
+      try {
+        await _db.customStatement('PRAGMA foreign_keys = ON;');
+      } catch (_) {}
 
       final now = DateTime.now();
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_prefLastSync, now.toIso8601String());
       state = state.copyWith(status: SyncStatus.idle, lastSyncAt: now);
-    } catch (e) {
+      debugPrint('[Sync] Full sync completed successfully at $now');
+    } catch (e, stack) {
+      debugPrint('[Sync] Error during syncAll: $e\n$stack');
+      try {
+        await _db.customStatement('PRAGMA foreign_keys = ON;');
+      } catch (_) {}
       state = state.copyWith(
         status: SyncStatus.error,
         errorMessage: e.toString(),
@@ -102,31 +146,57 @@ class SyncService extends StateNotifier<SyncState> {
   }
 
   // ─── Transactions ──────────────────────────────────────────────────────────
-  // Transactions table: sourceAccountId, destinationAccountId, categoryId,
-  // assetId, transactionType, amountOriginalSatang, currencyCode, fxRate,
-  // amountThbSatang, feeThbSatang, tag, taxCategory, withholdingTaxSatang,
-  // transactionDate, workPeriod, expectedAmountSatang, note, isCleared,
-  // syncVersion, importBatchId, createdAt, updatedAt, deletedAt
 
   Future<void> _syncTransactions(String userId, DateTime? lastSync) async {
-    // PUSH
+    // 1. PUSH: Fetch local transactions to push
     final q = _db.select(_db.transactions);
-    if (lastSync != null) q.where((t) => t.updatedAt.isBiggerThanValue(lastSync));
+    if (lastSync != null) {
+      q.where((t) => t.updatedAt.isBiggerThanValue(lastSync));
+    }
     final localRows = await q.get();
 
     if (localRows.isNotEmpty) {
-      final payload = localRows.map((tx) => _txToJson(tx, userId)).toList();
-      await _supabase.from('transactions').upsert(payload, onConflict: 'id');
+      debugPrint('[Sync] Pushing ${localRows.length} local transactions in chunks...');
+      const chunkSize = 150;
+      for (var i = 0; i < localRows.length; i += chunkSize) {
+        final chunk = localRows.sublist(
+          i,
+          math.min(i + chunkSize, localRows.length),
+        );
+        final payload = chunk.map((tx) => _txToJson(tx, userId)).toList();
+        await _supabase.from('transactions').upsert(payload, onConflict: 'id');
+      }
+      debugPrint('[Sync] Pushed ${localRows.length} transactions successfully.');
     }
 
-    // PULL
-    var query = _supabase.from('transactions').select().eq('user_id', userId);
-    if (lastSync != null) {
-      query = query.gt('updated_at', lastSync.toIso8601String());
+    // 2. PULL: Paginate through cloud rows in pages of 1,000
+    int offset = 0;
+    const pageSize = 1000;
+    int totalPulled = 0;
+
+    while (true) {
+      var query = _supabase
+          .from('transactions')
+          .select()
+          .eq('user_id', userId);
+      if (lastSync != null) {
+        query = query.gt('updated_at', lastSync.toIso8601String());
+      }
+
+      final page = await query.range(offset, offset + pageSize - 1) as List<dynamic>;
+      if (page.isEmpty) break;
+
+      for (final row in page) {
+        await _mergeCloudTransaction(row as Map<String, dynamic>);
+      }
+
+      totalPulled += page.length;
+      if (page.length < pageSize) break;
+      offset += pageSize;
     }
-    final cloudRows = await query as List<dynamic>;
-    for (final row in cloudRows) {
-      await _mergeCloudTransaction(row as Map<String, dynamic>);
+
+    if (totalPulled > 0) {
+      debugPrint('[Sync] Pulled and merged $totalPulled transactions from cloud.');
     }
   }
 
@@ -167,13 +237,18 @@ class SyncService extends StateNotifier<SyncState> {
         .getSingleOrNull();
     if (local != null && local.syncVersion >= cloudVersion) return;
 
+    // Verify foreign key references exist locally to avoid SQLite FK violations
+    final sourceAccId = row['source_account_id'] as String?;
+    final destAccId = row['destination_account_id'] as String?;
+    final catId = row['category_id'] as String?;
+
     await _db.into(_db.transactions).insertOnConflictUpdate(
           TransactionsCompanion(
             id: Value(id),
             transactionType: Value(row['transaction_type'] as String),
-            sourceAccountId: Value(row['source_account_id'] as String?),
-            destinationAccountId: Value(row['destination_account_id'] as String?),
-            categoryId: Value(row['category_id'] as String?),
+            sourceAccountId: Value(sourceAccId),
+            destinationAccountId: Value(destAccId),
+            categoryId: Value(catId),
             assetId: Value(row['asset_id'] as String?),
             importBatchId: Value(row['import_batch_id'] as String?),
             amountOriginalSatang: Value((row['amount_original_satang'] as num).toInt()),
@@ -200,9 +275,6 @@ class SyncService extends StateNotifier<SyncState> {
   }
 
   // ─── Accounts ──────────────────────────────────────────────────────────────
-  // Accounts table: id, name, accountType, currencyCode, isDomestic,
-  // closingDay, dueDay, creditLimitSatang, isActive,
-  // syncVersion, createdAt, updatedAt, deletedAt
 
   Future<void> _syncAccounts(String userId, DateTime? lastSync) async {
     // PUSH
@@ -213,6 +285,7 @@ class SyncService extends StateNotifier<SyncState> {
     if (localAccs.isNotEmpty) {
       final payload = localAccs.map((a) => _accToJson(a, userId)).toList();
       await _supabase.from('accounts').upsert(payload, onConflict: 'id');
+      debugPrint('[Sync] Pushed ${localAccs.length} accounts.');
     }
 
     // PULL
@@ -274,12 +347,9 @@ class SyncService extends StateNotifier<SyncState> {
   }
 
   // ─── Categories ────────────────────────────────────────────────────────────
-  // Categories table: id, nameTh, nameEn, categoryType, parentId,
-  // taxIncomeType, icon, color, isSystem, isActive, sortOrder,
-  // syncVersion, createdAt, updatedAt, deletedAt
 
   Future<void> _syncCategories(String userId, DateTime? lastSync) async {
-    // PUSH custom (non-system) categories only
+    // PUSH custom categories
     final q = _db.select(_db.categories)
       ..where((c) => c.isSystem.equals(false));
     if (lastSync != null) q.where((c) => c.updatedAt.isBiggerThanValue(lastSync));
@@ -288,6 +358,7 @@ class SyncService extends StateNotifier<SyncState> {
     if (localCats.isNotEmpty) {
       final payload = localCats.map((c) => _catToJson(c, userId)).toList();
       await _supabase.from('categories').upsert(payload, onConflict: 'id');
+      debugPrint('[Sync] Pushed ${localCats.length} categories.');
     }
 
     // PULL custom categories
@@ -362,7 +433,9 @@ class SyncService extends StateNotifier<SyncState> {
     if (!_auth.isLoggedIn) return;
     final userId = _auth.currentUser!.id;
 
-    _supabase
+    _unsubscribeRealtime();
+
+    _realtimeTxChannel = _supabase
         .channel('public:transactions:$userId')
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
@@ -379,9 +452,9 @@ class SyncService extends StateNotifier<SyncState> {
             }
           },
         )
-        .subscribe();
+      ..subscribe();
 
-    _supabase
+    _realtimeAccChannel = _supabase
         .channel('public:accounts:$userId')
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
@@ -398,12 +471,21 @@ class SyncService extends StateNotifier<SyncState> {
             }
           },
         )
-        .subscribe();
+      ..subscribe();
+  }
+
+  void _unsubscribeRealtime() {
+    _realtimeTxChannel?.unsubscribe();
+    _realtimeTxChannel = null;
+    _realtimeAccChannel?.unsubscribe();
+    _realtimeAccChannel = null;
   }
 
   @override
   void dispose() {
     _connectivitySub?.cancel();
+    _authSub?.cancel();
+    _unsubscribeRealtime();
     super.dispose();
   }
 }

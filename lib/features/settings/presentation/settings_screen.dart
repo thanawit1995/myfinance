@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/security/auth_provider.dart';
+import '../../../../core/sync/auth_service.dart' show currentUserProvider;
+import '../../../../core/sync/sync_service.dart' show syncServiceProvider, SyncStatus;
 import '../../../../core/theme/vault_theme.dart';
 import '../../../../core/widgets/pin_lock_dialog.dart';
 import '../../../../core/widgets/pin_setup_dialog.dart';
@@ -78,6 +80,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final isThai = widget.currentLocale.languageCode == 'th';
+    final syncUser = ref.watch(currentUserProvider);
+    final syncState = ref.watch(syncServiceProvider);
 
     return Scaffold(
       backgroundColor: VaultTheme.background(context),
@@ -366,12 +370,65 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _buildSectionHeader(isThai ? 'ข้อมูลและการสำรองข้อมูล' : 'Data & Backup'),
           _buildSectionCard([
             _buildTile(
-              icon: Icons.backup_rounded,
+              icon: Icons.cloud_sync_rounded,
               iconColor: Colors.teal,
-              title: isThai ? 'สำรองและกู้คืนข้อมูล (Backup & Restore)' : 'Backup & Restore',
-              subtitle: isThai
-                  ? 'ส่งออกไฟล์สำรอง, กู้คืนข้อมูลจากไฟล์ (.db) พร้อมพรีวิวสรุปข้อมูลก่อนกู้คืน'
-                  : 'Export & share backup, restore from file (.db) with preview summary',
+              title: isThai ? 'ซิงค์คลาวด์ สำรองและกู้คืนข้อมูล' : 'Cloud Sync, Backup & Restore',
+              subtitle: syncUser != null
+                  ? (isThai
+                      ? 'เชื่อมต่อ: ${syncUser.email ?? "Google Account"}'
+                      : 'Connected: ${syncUser.email ?? "Google Account"}')
+                  : (isThai
+                      ? 'ยังไม่ได้เชื่อมต่อ Google (แตะเพื่อเริ่มซิงค์)'
+                      : 'Not connected to Google (Tap to start sync)'),
+              trailing: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: (syncUser != null
+                          ? (syncState.status == SyncStatus.error ? Colors.redAccent : Colors.green)
+                          : Colors.grey)
+                      .withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: (syncUser != null
+                            ? (syncState.status == SyncStatus.error ? Colors.redAccent : Colors.green)
+                            : Colors.grey)
+                        .withValues(alpha: 0.35),
+                    width: 0.8,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6.5,
+                      height: 6.5,
+                      decoration: BoxDecoration(
+                        color: syncUser != null
+                            ? (syncState.status == SyncStatus.error ? Colors.redAccent : Colors.green)
+                            : Colors.grey,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      syncUser != null
+                          ? (syncState.status == SyncStatus.syncing
+                              ? (isThai ? 'กำลังซิงค์' : 'Syncing')
+                              : syncState.status == SyncStatus.error
+                                  ? (isThai ? 'ซิงค์ผิดพลาด' : 'Error')
+                                  : (isThai ? 'ซิงค์อยู่' : 'In Sync'))
+                          : (isThai ? 'ออฟไลน์' : 'Offline'),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: syncUser != null
+                            ? (syncState.status == SyncStatus.error ? Colors.redAccent : Colors.green)
+                            : Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const BackupRestoreScreen()),

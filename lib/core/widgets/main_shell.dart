@@ -358,15 +358,26 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
               ),
               VerticalDivider(thickness: 0.75, width: 1, color: VaultTheme.border(context)),
               Expanded(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeInCubic,
-                  transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
-                  child: KeyedSubtree(
-                    key: ValueKey<int>(_currentIndex),
-                    child: screens[_currentIndex],
-                  ),
+                child: Stack(
+                  children: [
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      switchInCurve: Curves.easeOutCubic,
+                      switchOutCurve: Curves.easeInCubic,
+                      transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
+                      child: KeyedSubtree(
+                        key: ValueKey<int>(_currentIndex),
+                        child: screens[_currentIndex],
+                      ),
+                    ),
+                    const Positioned(
+                      top: 14,
+                      right: 18,
+                      child: SafeArea(
+                        child: SyncStatusWidget(),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -379,15 +390,26 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
         value: overlayStyle,
         child: Scaffold(
           backgroundColor: VaultTheme.background(context),
-          body: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
-            transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
-            child: KeyedSubtree(
-              key: ValueKey<int>(_currentIndex),
-              child: screens[_currentIndex],
-            ),
+          body: Stack(
+            children: [
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
+                child: KeyedSubtree(
+                  key: ValueKey<int>(_currentIndex),
+                  child: screens[_currentIndex],
+                ),
+              ),
+              const Positioned(
+                top: 10,
+                right: 14,
+                child: SafeArea(
+                  child: SyncStatusWidget(),
+                ),
+              ),
+            ],
           ),
           bottomNavigationBar: Container(
             decoration: BoxDecoration(

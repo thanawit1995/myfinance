@@ -6,7 +6,10 @@ import 'package:intl/intl.dart';
 
 import '../../../core/database/database_provider.dart';
 import '../../../core/services/backup_restore_service.dart';
+import '../../../core/sync/auth_service.dart';
+import '../../../core/sync/sync_service.dart';
 import '../../../core/theme/vault_theme.dart';
+import '../../auth/login_screen.dart';
 
 class BackupRestoreScreen extends ConsumerStatefulWidget {
   const BackupRestoreScreen({super.key});
@@ -811,6 +814,11 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
           : ListView(
               padding: const EdgeInsets.all(20),
               children: [
+                // 0. Cloud Sync Card
+                _buildCloudSyncCard(context, isThai),
+
+                const SizedBox(height: 18),
+
                 // 1. Current Database Status Card
                 Card(
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -884,10 +892,13 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                             Container(height: 24, width: 1, color: Colors.grey.withValues(alpha: 0.3)),
                             Column(
                               children: [
-                                Text(isThai ? 'ขนาดไฟล์' : 'File Size', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                Text(
+                                  isThai ? (kIsWeb ? 'แหล่งจัดเก็บ' : 'ขนาดไฟล์') : (kIsWeb ? 'Storage' : 'File Size'),
+                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  '$sizeKb KB',
+                                  kIsWeb ? (isThai ? 'เบราว์เซอร์' : 'Web Storage') : '$sizeKb KB',
                                   style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                                 ),
                               ],
@@ -901,7 +912,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
 
                 const SizedBox(height: 18),
 
-                // 2. Web Backup Card (if Webapp) OR Designated Backup Folder Card (if Native Desktop/Mobile)
+                // 2. Offline / Manual File Backup Card
                 if (kIsWeb) ...[
                   Card(
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -917,10 +928,10 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                               Container(
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color: Colors.blue.withValues(alpha: 0.15),
+                                  color: Colors.indigo.withValues(alpha: 0.15),
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(Icons.cloud_done_rounded, size: 24, color: Colors.blue),
+                                child: const Icon(Icons.inventory_2_outlined, size: 24, color: Colors.indigo),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -928,7 +939,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      isThai ? 'การสำรองข้อมูลสำหรับ Webapp' : 'Webapp Backup & Restore',
+                                      isThai ? 'การสำรองและกู้คืนด้วยไฟล์ (Offline Backup)' : 'File Backup & Restore (Offline)',
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 15,
@@ -938,8 +949,8 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                                     const SizedBox(height: 2),
                                     Text(
                                       isThai
-                                          ? 'ข้อมูลถูกเก็บในเบราว์เซอร์อย่างปลอดภัย สามารถดาวน์โหลดเก็บไว้หรือนำเข้าได้'
-                                          : 'Data stored in browser storage. Download or restore anytime.',
+                                          ? 'ดาวน์โหลดไฟล์ .db เพื่อเก็บสำรองไว้เอง หรือนำไฟล์สำรองมากู้คืนฉุกเฉิน'
+                                          : 'Export .db file for safe keeping or restore manually.',
                                       style: const TextStyle(fontSize: 12, color: Colors.grey),
                                     ),
                                   ],
@@ -956,27 +967,9 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                                 padding: const EdgeInsets.symmetric(vertical: 13),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               ),
-                              icon: const Icon(Icons.share_rounded, size: 20),
-                              label: Text(
-                                isThai ? 'แชร์เข้า Google Drive / LINE / เลือกโฟลเดอร์' : 'Share to Google Drive / LINE / Files',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
-                              ),
-                              onPressed: _isLoading ? null : _handleExport,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.blue.shade700,
-                                side: BorderSide(color: Colors.blue.shade400, width: 1.2),
-                                padding: const EdgeInsets.symmetric(vertical: 13),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
                               icon: const Icon(Icons.file_download_outlined, size: 20),
                               label: Text(
-                                isThai ? 'ดาวน์โหลดไฟล์ .db ลง Downloads ทันที' : 'Download .db to Downloads Directly',
+                                isThai ? 'ดาวน์โหลดไฟล์สำรอง .db เก็บไว้ในเครื่อง' : 'Download .db Backup File',
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                               ),
                               onPressed: _isLoading ? null : _handleDirectDownload,
@@ -1428,5 +1421,339 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
               ],
             ),
     );
+  }
+
+  Widget _buildCloudSyncCard(BuildContext context, bool isThai) {
+    final user = ref.watch(currentUserProvider);
+    final syncState = ref.watch(syncServiceProvider);
+    final isLoggedIn = user != null;
+
+    final dateFormat = DateFormat('dd MMM yyyy, HH:mm:ss', isThai ? 'th' : 'en_US');
+
+    Color statusColor;
+    String statusLabel;
+    IconData statusIcon;
+
+    if (!isLoggedIn) {
+      statusColor = Colors.grey;
+      statusLabel = isThai ? 'โหมดออฟไลน์ (ไม่ได้เชื่อมต่อ)' : 'Offline (Not connected)';
+      statusIcon = Icons.cloud_off_rounded;
+    } else {
+      switch (syncState.status) {
+        case SyncStatus.syncing:
+          statusColor = Colors.blue;
+          statusLabel = isThai ? 'กำลังซิงค์ข้อมูล...' : 'Syncing data...';
+          statusIcon = Icons.sync_rounded;
+          break;
+        case SyncStatus.offline:
+          statusColor = Colors.orange;
+          statusLabel = isThai ? 'ออฟไลน์ (รอเชื่อมต่ออินเทอร์เน็ต)' : 'Offline (Waiting for connection)';
+          statusIcon = Icons.wifi_off_rounded;
+          break;
+        case SyncStatus.error:
+          statusColor = Colors.redAccent;
+          statusLabel = isThai ? 'พบข้อผิดพลาดในการซิงค์' : 'Sync error';
+          statusIcon = Icons.error_outline_rounded;
+          break;
+        case SyncStatus.idle:
+          statusColor = Colors.green;
+          statusLabel = isThai ? 'เชื่อมต่อคลาวด์แล้ว ข้อมูลตรงกัน' : 'Connected & in sync';
+          statusIcon = Icons.cloud_done_rounded;
+          break;
+      }
+    }
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: VaultTheme.surface(context),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header Row
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: syncState.status == SyncStatus.syncing
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2.5),
+                        )
+                      : Icon(statusIcon, size: 24, color: statusColor),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              isThai ? 'ระบบซิงค์คลาวด์ (Cloud Sync)' : 'Cloud Sync (Supabase)',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                                color: VaultTheme.primaryText(context),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: statusColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              isLoggedIn ? (isThai ? 'เชื่อมต่อแล้ว' : 'ACTIVE') : (isThai ? 'ออฟไลน์' : 'OFFLINE'),
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: statusColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        isLoggedIn
+                            ? (user.email ?? (isThai ? 'เข้าสู่ระบบแล้ว' : 'Logged in'))
+                            : (isThai
+                                ? 'ซิงค์ข้อมูลอัตโนมัติระหว่างอุปกรณ์ (คอมพิวเตอร์, แท็บเล็ต, มือถือ)'
+                                : 'Sync automatically between PC, Tablet, and Mobile'),
+                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            const Divider(height: 24),
+
+            // Sync Status Details
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: VaultTheme.background(context),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: VaultTheme.border(context).withValues(alpha: 0.5)),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        isThai ? 'สถานะการเชื่อมต่อ:' : 'Connection Status:',
+                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                      Row(
+                        children: [
+                          Icon(statusIcon, size: 14, color: statusColor),
+                          const SizedBox(width: 4),
+                          Text(
+                            statusLabel,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: statusColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        isThai ? 'ซิงค์ล่าสุดเมื่อ:' : 'Last Synced:',
+                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                      Text(
+                        syncState.lastSyncAt != null
+                            ? dateFormat.format(syncState.lastSyncAt!)
+                            : (isThai ? 'ยังไม่เคยซิงค์' : 'Never'),
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                  if (syncState.errorMessage != null) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.warning_amber_rounded, size: 14, color: Colors.redAccent),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            syncState.errorMessage!,
+                            style: const TextStyle(fontSize: 11, color: Colors.redAccent),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Action Buttons
+            if (isLoggedIn) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.teal.shade700,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: syncState.status == SyncStatus.syncing
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Icon(Icons.sync_rounded, size: 18),
+                      label: Text(
+                        isThai ? 'ซิงค์ทันที' : 'Sync Now',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      onPressed: syncState.status == SyncStatus.syncing
+                          ? null
+                          : () async {
+                              await ref.read(syncServiceProvider.notifier).syncAll();
+                              await _loadStats();
+                            },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: syncState.status == SyncStatus.syncing
+                        ? null
+                        : () async {
+                            await ref.read(syncServiceProvider.notifier).syncAll(forceFullSync: true);
+                            await _loadStats();
+                          },
+                    child: Text(
+                      isThai ? 'ซิงค์ทั้งหมดใหม่' : 'Full Sync',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.redAccent,
+                      side: const BorderSide(color: Colors.redAccent, width: 1.2),
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.logout_rounded, size: 16),
+                    label: Text(
+                      isThai ? 'ออกจากระบบ' : 'Sign Out',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                    ),
+                    onPressed: () => _confirmSignOut(context, isThai),
+                  ),
+                ],
+              ),
+            ] else ...[
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black87,
+                    side: const BorderSide(color: Color(0xFFDDDDDD)),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    elevation: 1,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: Image.asset(
+                    'assets/images/google_logo.png',
+                    width: 18,
+                    height: 18,
+                    errorBuilder: (_, __, ___) => const Icon(Icons.login_rounded, size: 18, color: Colors.black87),
+                  ),
+                  label: Text(
+                    isThai ? 'เข้าสู่ระบบด้วย Google เพื่อเริ่มซิงค์' : 'Sign In with Google to Sync',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                  ),
+                  onPressed: () async {
+                    try {
+                      await ref.read(authServiceProvider).signInWithGoogle();
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                        );
+                      }
+                    }
+                  },
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmSignOut(BuildContext context, bool isThai) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.logout_rounded, color: Colors.redAccent),
+            const SizedBox(width: 8),
+            Text(isThai ? 'ยืนยันออกจากระบบ' : 'Confirm Sign Out'),
+          ],
+        ),
+        content: Text(
+          isThai
+              ? 'คุณต้องการออกจากระบบคลาวด์ใช่หรือไม่? (ข้อมูลในเครื่องจะไม่หาย แต่จะไม่ซิงค์กับอุปกรณ์อื่นจนกว่าจะเข้าสู่ระบบใหม่)'
+              : 'Are you sure you want to sign out? (Local data will remain, but won\'t sync until you sign in again.)',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(isThai ? 'ออกจากระบบ' : 'Sign Out'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await ref.read(authServiceProvider).signOut();
+    }
   }
 }

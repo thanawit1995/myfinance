@@ -153,10 +153,15 @@ class DividendExcelParser {
     if (val == null) return null;
     if (val is DateTime) return val;
     if (val is DateCellValue) {
-      return DateTime(val.year, val.month, val.day);
+      // In Thai spreadsheets, users enter dates as Day/Month/Year (d/M/yyyy).
+      // On systems with US locale defaults, Excel parses d/M/yyyy as M/d/yyyy whenever day <= 12,
+      // resulting in DateCellValue having month = user's day, and day = user's month.
+      // (Whenever day > 12, Excel leaves the cell as TextCellValue '16/6/2026').
+      // Therefore, we swap val.day (real month) and val.month (real day).
+      return DateTime(val.year, val.day, val.month);
     }
     if (val is DateTimeCellValue) {
-      return DateTime(val.year, val.month, val.day, val.hour, val.minute, val.second);
+      return DateTime(val.year, val.day, val.month, val.hour, val.minute, val.second);
     }
     if (val is IntCellValue) {
       return _parseExcelSerialDate(val.value);

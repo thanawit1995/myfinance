@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:decimal/decimal.dart';
+import 'package:excel/excel.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:myfinance/core/database/app_database.dart';
 import 'package:myfinance/core/database/connection/connection.dart';
@@ -48,6 +49,29 @@ void main() {
       final exempt = exemptRows.first;
       expect(exempt.grossSatang, greaterThan(0));
       expect(exempt.taxSatang, 0);
+
+      // Verify all rows are strictly in chronological order
+      DateTime? prevDate;
+      for (final r in rows) {
+        if (prevDate != null) {
+          expect(r.date.isAfter(prevDate) || r.date.isAtSameMomentAs(prevDate), isTrue,
+              reason: 'Row ${r.rowIndex} with date ${r.date} must be on or after prev $prevDate');
+        }
+        prevDate = r.date;
+      }
+
+      // Verify specific rows from screenshot:
+      // Row 62 in Excel (rowIndex 61 in sheet): MSFT on 12/6/2026 must be 12 June 2026 (not 6 Dec)
+      final msftJune = rows.firstWhere((r) => r.rowIndex == 61 && r.symbol == 'MSFT');
+      expect(msftJune.date, DateTime(2026, 6, 12));
+
+      // Row 73 in Excel (rowIndex 72): MSFT on 10/9/2026 must be 10 Sep 2026 (not 9 Oct)
+      final msftSep = rows.firstWhere((r) => r.rowIndex == 72 && r.symbol == 'MSFT');
+      expect(msftSep.date, DateTime(2026, 9, 10));
+
+      // Row 61 in Excel (rowIndex 60): JEPQ on 4/6/2026 must be 4 June 2026 (not 6 April)
+      final jepqJune = rows.firstWhere((r) => r.rowIndex == 60 && r.symbol == 'JEPQ');
+      expect(jepqJune.date, DateTime(2026, 6, 4));
     });
 
     test('Parses mock excel or generated data accurately', () {

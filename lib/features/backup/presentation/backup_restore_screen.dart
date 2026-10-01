@@ -185,8 +185,8 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
             children: [
               Text(
                 isThai
-                    ? 'ไฟล์สำรองนี้ได้รับการเข้ารหัสเพื่อความปลอดภัย กรุณากรอกรหัสผ่านเพื่อถอดรหัสและกู้คืน:'
-                    : 'This backup is encrypted for security. Please enter the password to decrypt:',
+                    ? 'ไฟล์สำรองนี้ได้รับการตั้งรหัสผ่านไว้ กรุณากรอกรหัสผ่านเพื่อถอดรหัสและกู้คืน (หากดาวน์โหลดมาจากเครื่องเดิมโดยไม่ได้ตั้งรหัสผ่าน ให้เปิดแอปในเครื่องเดิมเพื่อนำเข้า):'
+                    : 'This backup is encrypted. Please enter the password to decrypt:',
                 style: const TextStyle(fontSize: 13),
               ),
               const SizedBox(height: 16),
@@ -241,8 +241,8 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
             children: [
               Text(
                 isThai
-                    ? 'ไฟล์จะถูกเข้ารหัสระดับ AES-256 เสมอ คุณสามารถเว้นว่างไว้เพื่อใช้คีย์ความปลอดภัยของเครื่องนี้ หรือตั้งรหัสผ่านเองหากต้องการนำไปเปิดที่เครื่องอื่น'
-                    : 'The backup is encrypted with AES-256. Leave blank to use this device key, or enter a custom password to restore on other devices.',
+                    ? 'เว้นว่างไว้เพื่อส่งออกเป็น "ไฟล์มาตรฐาน" (แนะนำ: นำไปเปิดหรือกู้คืนบนมือถือและคอมเครื่องอื่นได้ทันทีโดยไม่ต้องใส่รหัสผ่าน) หรือกรอกรหัสผ่านหากต้องการล็อกไฟล์ด้วย AES-256'
+                    : 'Leave blank for standard SQLite backup (Recommended: works seamlessly across PC and Mobile), or set a custom password to encrypt with AES-256.',
                 style: const TextStyle(fontSize: 13),
               ),
               const SizedBox(height: 16),
@@ -250,7 +250,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                 controller: controller,
                 obscureText: obscure,
                 decoration: InputDecoration(
-                  labelText: isThai ? 'รหัสผ่านเพิ่มเติม (ไม่บังคับ)' : 'Custom Password (Optional)',
+                  labelText: isThai ? 'รหัสผ่านเพิ่มเติม (เว้นว่าง = ไฟล์มาตรฐาน)' : 'Password (Leave blank = Standard SQLite)',
                   border: const OutlineInputBorder(),
                   prefixIcon: const Icon(Icons.lock_outline),
                   suffixIcon: IconButton(
@@ -499,7 +499,21 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
         if (!mounted) return;
         setState(() => _isLoading = false);
         final pwd = await _promptBackupPassword(context, isThai);
-        if (pwd == null || pwd.isEmpty) return;
+        if (pwd == null || pwd.isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  isThai
+                      ? 'ยกเลิกการกู้คืน: ไฟล์สำรองนี้ถูกล็อกรหัสผ่านไว้ กรุณาระบุรหัสผ่านเพื่อเปิดดู หรือเปิดนำเข้าในเครื่องเดิมที่ส่งออกไฟล์'
+                      : 'Restore cancelled: This backup is password-protected.',
+                ),
+                backgroundColor: VaultTheme.negative(context),
+              ),
+            );
+          }
+          return;
+        }
         setState(() => _isLoading = true);
         backupPassword = pwd;
         inspection = await service.inspectBackupFile(

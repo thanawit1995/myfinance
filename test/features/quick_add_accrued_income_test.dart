@@ -274,7 +274,7 @@ void main() {
       );
 
       // Test FinancialHealthDao
-      final cashFlow = await db.financialHealthDao.getCurrentMonthCashFlow();
+      final cashFlow = await db.financialHealthDao.getCurrentMonthCashFlow(nowOverride: now);
       expect(cashFlow.incomeSatang, equals(5000000)); // only 50k, NOT 70k!
       expect(cashFlow.expenseSatang, equals(1500000));
     });

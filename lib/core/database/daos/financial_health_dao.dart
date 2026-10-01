@@ -144,14 +144,15 @@ class FinancialHealthDao extends DatabaseAccessor<AppDatabase> with _$FinancialH
   }
 
   /// Current month income, expense, and investment additions
-  Future<({int incomeSatang, int expenseSatang, int investmentSatang})> getCurrentMonthCashFlow() async {
-    final now = DateTime.now();
+  Future<({int incomeSatang, int expenseSatang, int investmentSatang})> getCurrentMonthCashFlow({DateTime? nowOverride}) async {
+    final now = nowOverride ?? DateTime.now();
     final startOfMonth = DateTime(now.year, now.month, 1);
+    final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
 
     final monthTxs = await (select(transactions)
           ..where((t) =>
               t.transactionDate.isBiggerOrEqualValue(startOfMonth) &
-              t.transactionDate.isSmallerOrEqualValue(now) &
+              t.transactionDate.isSmallerOrEqualValue(endOfMonth) &
               t.deletedAt.isNull()))
         .get();
 

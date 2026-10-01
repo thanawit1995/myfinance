@@ -10,11 +10,19 @@ final supabaseClientProvider = Provider<SupabaseClient>((ref) {
 });
 
 final authStateProvider = StreamProvider<AuthState>((ref) {
-  return Supabase.instance.client.auth.onAuthStateChange;
+  try {
+    return Supabase.instance.client.auth.onAuthStateChange;
+  } catch (_) {
+    return const Stream.empty();
+  }
 });
 
 final currentUserProvider = Provider<User?>((ref) {
-  return Supabase.instance.client.auth.currentUser;
+  try {
+    return Supabase.instance.client.auth.currentUser;
+  } catch (_) {
+    return null;
+  }
 });
 
 // ─── AuthService ─────────────────────────────────────────────────────────────

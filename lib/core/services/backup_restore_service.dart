@@ -17,6 +17,7 @@ import '../database/database_provider.dart';
 import 'backup_crypto_helper.dart';
 import 'backup_inspect/backup_inspector.dart';
 import 'web_db_helper/web_db_helper.dart';
+import 'sqlite_reader/sqlite_reader.dart';
 
 export 'backup_inspect/backup_inspector.dart';
 
@@ -181,10 +182,13 @@ class BackupRestoreService {
   /// - บนมือถือ / Webapp บนมือถือ: เปิด Share sheet (บันทึกลง Drive, ส่งเข้า Line, บันทึกลงเครื่อง)
   /// - บน Windows: เปิด FilePicker ให้เลือกที่บันทึก
   /// - บน Web: ถ้าแชร์ไม่ได้ จะดาวน์โหลดไฟล์ .db ลงเบราว์เซอร์อัตโนมัติ
+  /// ส่งออกและเปิดแชร์ไฟล์สำรอง (.db)
+  /// - หากไม่ระบุรหัสผ่าน: ส่งออกเป็น SQLite ไบนารีมาตรฐาน เปิดบนมือถือ/คอมเครื่องอื่นได้ทันที 100%
+  /// - หากระบุรหัสผ่าน: เข้ารหัสระดับ AES-256 (MYFINANCE_ENC_V1)
   Future<String?> exportAndShareBackup({bool isThai = true, String? customPassword}) async {
     final nowStr = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
     final exportFileName = 'myfinance_backup_$nowStr.db';
-    final encPassword = customPassword ?? await getOrCreateMasterBackupKey();
+    final hasPassword = customPassword != null && customPassword.trim().isNotEmpty;
 
     if (kIsWeb) {
       final bytes = await exportWebDatabase();
@@ -192,15 +196,16 @@ class BackupRestoreService {
         throw Exception(isThai ? 'ไม่พบข้อมูลในเบราว์เซอร์' : 'No database in browser storage');
       }
 
-      // เข้ารหัสข้อมูลก่อนส่งออก
-      final encryptedBytes = BackupCryptoHelper.encryptDatabase(bytes, encPassword);
+      // เข้ารหัสเฉพาะเมื่อผู้ใช้ตั้งรหัสผ่านเอง หากไม่ตั้งรหัสให้ส่งออกเป็น SQLite แท้
+      final bytesToExport = hasPassword
+          ? BackupCryptoHelper.encryptDatabase(bytes, customPassword!.trim())
+          : bytes;
 
-      // ใช้ .txt เพื่อให้ระบบความปลอดภัยของ Chromium บน Android ยอมเปิดเมนูแชร์ของระบบ (Share Sheet)
-      final shareFileName = 'myfinance_backup_$nowStr.txt';
+      final shareFileName = hasPassword ? 'myfinance_backup_$nowStr.txt' : exportFileName;
       final xFile = XFile.fromData(
-        encryptedBytes,
+        bytesToExport,
         name: shareFileName,
-        mimeType: 'text/plain',
+        mimeType: hasPassword ? 'text/plain' : 'application/octet-stream',
       );
 
       try {
@@ -210,8 +215,8 @@ class BackupRestoreService {
         );
         return shareFileName;
       } catch (_) {
-        downloadFileWeb(encryptedBytes, 'myfinance_backup_$nowStr.db');
-        return 'myfinance_backup_$nowStr.db';
+        downloadFileWeb(bytesToExport, exportFileName);
+        return exportFileName;
       }
     }
 
@@ -225,9 +230,10 @@ class BackupRestoreService {
       throw Exception(isThai ? 'ไม่พบไฟล์ฐานข้อมูลในเครื่อง' : 'Local database file not found');
     }
 
-    // อ่านข้อมูล raw SQLite และทำการเข้ารหัส AES-256 ก่อนส่งออกเสมอ
     final rawBytes = await localDb.readAsBytes();
-    final encryptedBytes = BackupCryptoHelper.encryptDatabase(rawBytes, encPassword);
+    final bytesToExport = hasPassword
+        ? BackupCryptoHelper.encryptDatabase(rawBytes, customPassword!.trim())
+        : rawBytes;
 
     if (Platform.isWindows) {
       // Windows Desktop: Save File dialog
@@ -240,7 +246,7 @@ class BackupRestoreService {
 
       if (destinationPath != null && destinationPath.isNotEmpty) {
         final destFile = File(destinationPath);
-        await destFile.writeAsBytes(encryptedBytes, flush: true);
+        await destFile.writeAsBytes(bytesToExport, flush: true);
         return destFile.path;
       }
       return null;
@@ -248,7 +254,7 @@ class BackupRestoreService {
       // Mobile (Android / iOS): Copy encrypted data to temp & Share Sheet
       final tempDir = await getTemporaryDirectory();
       final shareFile = File(p.join(tempDir.path, exportFileName));
-      await shareFile.writeAsBytes(encryptedBytes, flush: true);
+      await shareFile.writeAsBytes(bytesToExport, flush: true);
 
       final xFile = XFile(
         shareFile.path,
@@ -269,22 +275,24 @@ class BackupRestoreService {
   Future<String?> downloadBackupDirectly({bool isThai = true, String? customPassword}) async {
     final nowStr = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
     final exportFileName = 'myfinance_backup_$nowStr.db';
-    final encPassword = customPassword ?? await getOrCreateMasterBackupKey();
+    final hasPassword = customPassword != null && customPassword.trim().isNotEmpty;
 
     if (kIsWeb) {
       final bytes = await exportWebDatabase();
       if (bytes == null || bytes.isEmpty) {
         throw Exception(isThai ? 'ไม่พบข้อมูลในเบราว์เซอร์' : 'No database in browser storage');
       }
-      final encryptedBytes = BackupCryptoHelper.encryptDatabase(bytes, encPassword);
-      downloadFileWeb(encryptedBytes, exportFileName);
+      final bytesToExport = hasPassword
+          ? BackupCryptoHelper.encryptDatabase(bytes, customPassword!.trim())
+          : bytes;
+      downloadFileWeb(bytesToExport, exportFileName);
       return exportFileName;
     } else {
       return exportAndShareBackup(isThai: isThai, customPassword: customPassword);
     }
   }
 
-  /// กู้คืนฐานข้อมูลจากไฟล์ พร้อมสร้าง Safety Backup อัตโนมัติก่อนเขียนทับเสมอ
+  /// กู้คืนฐานข้อมูลจากไฟล์ พร้อม Live Drift Table Injection
   Future<bool> restoreDatabase({
     String? filePath,
     Uint8List? bytes,
@@ -303,24 +311,44 @@ class BackupRestoreService {
     // ถ้าเป็นไฟล์ที่ถูกเข้ารหัส ให้ถอดรหัสก่อนกู้คืน
     Uint8List dbBytesToWrite = rawBytes;
     if (BackupCryptoHelper.isEncrypted(rawBytes)) {
-      final keyToTry = password ?? await getOrCreateMasterBackupKey();
-      try {
-        dbBytesToWrite = BackupCryptoHelper.decryptDatabase(rawBytes, keyToTry);
-      } catch (e) {
-        throw Exception(isThai ? 'รหัสผ่านไฟล์สำรองข้อมูลไม่ถูกต้อง' : 'Invalid backup password');
+      bool decrypted = false;
+      if (password != null && password.isNotEmpty) {
+        try {
+          dbBytesToWrite = BackupCryptoHelper.decryptDatabase(rawBytes, password);
+          decrypted = true;
+        } catch (_) {}
+      }
+      if (!decrypted) {
+        try {
+          final masterKey = await getOrCreateMasterBackupKey();
+          dbBytesToWrite = BackupCryptoHelper.decryptDatabase(rawBytes, masterKey);
+          decrypted = true;
+        } catch (_) {}
+      }
+
+      if (!decrypted) {
+        throw Exception(isThai
+            ? 'รหัสผ่านไฟล์สำรองข้อมูลไม่ถูกต้อง หรือไฟล์ถูกล็อกเฉพาะเครื่องเดิม'
+            : 'Invalid backup password or file locked to another device');
       }
     }
 
+    // 1. Live Data Injection: นำข้อมูลทุกตารางเข้า Drift Database สดๆ ทันที
+    try {
+      final backupData = await readSqliteBackupData(dbBytesToWrite);
+      await _applyBackupDataToDrift(backupData);
+    } catch (e) {
+      debugPrint('Live injection note: $e');
+    }
+
+    // 2. Persist to storage
     if (kIsWeb) {
-      try {
-        await db.close();
-      } catch (_) {}
       final ok = await restoreWebDatabase(dbBytesToWrite);
       return ok;
     }
 
     final localDb = await getLocalDatabaseFile();
-    if (localDb == null) return false;
+    if (localDb == null) return true;
 
     // 1. สร้าง Safety Backup อัตโนมัติกันเหนียว
     await _createSafetyBackup(localDb);
@@ -342,6 +370,70 @@ class BackupRestoreService {
     } catch (_) {}
 
     return true;
+  }
+
+  /// เขียนทับข้อมูลทุกตารางลง Drift DB ที่กำลังรันอยู่สดๆ เพื่อให้อัปเดตทันที
+  Future<void> _applyBackupDataToDrift(SqliteBackupData data) async {
+    try {
+      await db.customStatement('PRAGMA foreign_keys = OFF;');
+      Future<void> insertTableRows(String table, List<Map<String, dynamic>> rows) async {
+        if (rows.isEmpty) return;
+        for (final row in rows) {
+          final cols = row.keys.map((c) => '"$c"').join(', ');
+          final placeholders = row.keys.map((_) => '?').join(', ');
+          final values = row.values.toList();
+          await db.customStatement(
+            'INSERT OR REPLACE INTO "$table" ($cols) VALUES ($placeholders);',
+            values,
+          );
+        }
+      }
+
+      await db.transaction(() async {
+        if (data.accounts.isNotEmpty) {
+          await db.customStatement('DELETE FROM accounts;');
+          await insertTableRows('accounts', data.accounts);
+        }
+        if (data.categories.isNotEmpty) {
+          await db.customStatement('DELETE FROM categories;');
+          await insertTableRows('categories', data.categories);
+        }
+        if (data.transactions.isNotEmpty) {
+          await db.customStatement('DELETE FROM transactions;');
+          await insertTableRows('transactions', data.transactions);
+        }
+        if (data.assets.isNotEmpty) {
+          await db.customStatement('DELETE FROM assets;');
+          await insertTableRows('assets', data.assets);
+        }
+        if (data.insurancePolicies.isNotEmpty) {
+          await db.customStatement('DELETE FROM insurance_policies;');
+          await insertTableRows('insurance_policies', data.insurancePolicies);
+        }
+        if (data.liabilities.isNotEmpty) {
+          await db.customStatement('DELETE FROM liabilities;');
+          await insertTableRows('liabilities', data.liabilities);
+        }
+        if (data.budgets.isNotEmpty) {
+          await db.customStatement('DELETE FROM budgets;');
+          await insertTableRows('budgets', data.budgets);
+        }
+        if (data.recurringRules.isNotEmpty) {
+          await db.customStatement('DELETE FROM recurring_rules;');
+          await insertTableRows('recurring_rules', data.recurringRules);
+        }
+      });
+    } catch (e) {
+      debugPrint('Error applying backup data to drift: $e');
+    } finally {
+      try {
+        await db.customStatement('PRAGMA foreign_keys = ON;');
+      } catch (_) {}
+    }
+
+    try {
+      db.transactionsDao.onLedgerModified?.call();
+    } catch (_) {}
   }
 
   /// สร้างไฟล์สำรองฉุกเฉิน (Safety Backup) ก่อนเขียนทับ

@@ -12,7 +12,6 @@ class SyncStatusWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final syncState = ref.watch(syncServiceProvider);
     final user = ref.watch(currentUserProvider);
     final isThai = Localizations.localeOf(context).languageCode == 'th';
 
@@ -53,6 +52,7 @@ class SyncStatusWidget extends ConsumerWidget {
       );
     }
 
+    final syncState = ref.watch(syncServiceProvider);
     final Color statusColor;
     switch (syncState.status) {
       case SyncStatus.syncing:

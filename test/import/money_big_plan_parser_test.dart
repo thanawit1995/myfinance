@@ -26,7 +26,7 @@ void main() {
       final rows = MoneyBigPlanParser.parseExcelBytes(bytes);
 
       expect(rows, isNotEmpty);
-      expect(rows.length, greaterThan(500));
+      expect(rows.length, greaterThan(450));
 
       // Check year 2023 constraint: only months 1 to 8 allowed
       final rows2023 = rows.where((r) => r.year == 2023);

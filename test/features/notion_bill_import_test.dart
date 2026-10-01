@@ -85,12 +85,12 @@ void main() {
       expect(parsed[3].transactionType, 'expense');
       expect(parsed[3].tag, 'deduction:gpf');
 
-      // 5. ประกันออมทรัพย์ -> Healthcare with tag 'deduction:life_insurance'
+      // 5. ประกันออมทรัพย์ -> Life & Savings Insurance with tag 'policy:policy-mtl-savings-15-20,deduction:life_insurance'
       expect(parsed[4].name, 'ประกันออมทรัพย์');
-      expect(parsed[4].categoryName, 'Healthcare');
+      expect(parsed[4].categoryName, 'Life & Savings Insurance');
       expect(parsed[4].amountSatang, 4500000);
       expect(parsed[4].transactionType, 'expense');
-      expect(parsed[4].tag, 'deduction:life_insurance');
+      expect(parsed[4].tag, 'policy:policy-mtl-savings-15-20,deduction:life_insurance');
 
       // 6. Electronic bill -> Utilities
       expect(parsed[5].name, 'Electronic bill');
@@ -173,7 +173,7 @@ void main() {
 
       // Verify Life Insurance tag
       final insTx = allTx.firstWhere((tx) => tx.note?.contains('ประกันออมทรัพย์') == true);
-      expect(insTx.tag, 'deduction:life_insurance');
+      expect(insTx.tag, 'policy:policy-mtl-savings-15-20,deduction:life_insurance');
       expect(insTx.amountThbSatang, 4500000);
 
       // Crucial: Verify 0 recurring rules created!

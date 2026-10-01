@@ -346,14 +346,9 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
                     label: Text(l10n?.more ?? 'More'),
                   ),
                 ],
-                trailing: const Expanded(
-                  child: Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Padding(
-                      padding: EdgeInsets.only(bottom: 16),
-                      child: SyncStatusWidget(),
-                    ),
-                  ),
+                trailing: const Padding(
+                  padding: EdgeInsets.only(top: 24, bottom: 16),
+                  child: SyncStatusWidget(),
                 ),
               ),
               VerticalDivider(thickness: 0.75, width: 1, color: VaultTheme.border(context)),

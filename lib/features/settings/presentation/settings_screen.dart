@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/security/auth_provider.dart';
 import '../../../../core/sync/auth_service.dart' show currentUserProvider;
-import '../../../../core/sync/sync_service.dart' show syncServiceProvider, SyncStatus;
+import '../../../../core/sync/sync_service.dart' show syncServiceProvider, SyncStatus, SyncState;
 import '../../../../core/theme/vault_theme.dart';
 import '../../../../core/widgets/pin_lock_dialog.dart';
 import '../../../../core/widgets/pin_setup_dialog.dart';
@@ -81,7 +81,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final l10n = AppLocalizations.of(context);
     final isThai = widget.currentLocale.languageCode == 'th';
     final syncUser = ref.watch(currentUserProvider);
-    final syncState = ref.watch(syncServiceProvider);
+    final syncState = syncUser != null ? ref.watch(syncServiceProvider) : const SyncState();
 
     return Scaffold(
       backgroundColor: VaultTheme.background(context),

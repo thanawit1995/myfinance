@@ -98,13 +98,16 @@ class BudgetHeroCard extends StatelessWidget {
                             children: [
                               const Text('✨', style: TextStyle(fontSize: 12)),
                               const SizedBox(width: 4),
-                              Text(
-                                l10n?.availableToSpendLumi ?? 'เงินที่ใช้ได้ในเดือนนี้ 🌸',
-                                style: TextStyle(
-                                  fontFamily: VaultTheme.fontFamily,
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: isDark ? const Color(0xFFD3C5D0) : const Color(0xFF87767F),
+                              Flexible(
+                                child: Text(
+                                  l10n?.availableToSpendLumi ?? 'เงินที่ใช้ได้ในเดือนนี้ 🌸',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontFamily: VaultTheme.fontFamily,
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: isDark ? const Color(0xFFD3C5D0) : const Color(0xFF87767F),
+                                  ),
                                 ),
                               ),
                             ],

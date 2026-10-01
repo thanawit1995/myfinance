@@ -46,20 +46,27 @@ class RecentActivityCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  const Text('📝', style: TextStyle(fontSize: 14)),
-                  const SizedBox(width: 6),
-                  Text(
-                    l10n?.recentActivity ?? 'บันทึกรายการล่าสุด',
-                    style: TextStyle(
-                      fontFamily: VaultTheme.fontFamily,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? VaultTheme.primaryText(context) : const Color(0xFF332B32),
+              Flexible(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('📝', style: TextStyle(fontSize: 14)),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        l10n?.recentActivity ?? 'บันทึกรายการล่าสุด',
+                        style: TextStyle(
+                          fontFamily: VaultTheme.fontFamily,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? VaultTheme.primaryText(context) : const Color(0xFF332B32),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               InkWell(
                 onTap: onViewAll,

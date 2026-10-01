@@ -14,6 +14,11 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('App renders VAULT MainShell with Master Budget and FAB + Add flow', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(600, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     FlutterSecureStorage.setMockInitialValues({});
     SharedPreferences.setMockInitialValues({});
 
@@ -89,6 +94,11 @@ void main() {
   });
 
   testWidgets('Switching to Lumi theme updates design to Sunny Bloom', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(600, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     FlutterSecureStorage.setMockInitialValues({});
     SharedPreferences.setMockInitialValues({'app_theme_style': 'lumi'});
 
@@ -108,8 +118,10 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify app renders with Lumi theme styling
-    expect(find.text('VAULT'), findsAtLeastNWidgets(1));
-    expect(find.text('MASTER BUDGET'), findsOneWidget);
+    expect(find.text('หน้าแรก'), findsOneWidget);
+    expect(find.text('การเงิน'), findsOneWidget);
+    expect(find.text('การลงทุน'), findsOneWidget);
+    expect(find.text('เพิ่มเติม'), findsOneWidget);
 
     // Verify center Quick Add button exists in Lumi theme
     expect(find.byIcon(Icons.add), findsAtLeastNWidgets(1));
@@ -117,4 +129,3 @@ void main() {
     await db.close();
   });
 }
-

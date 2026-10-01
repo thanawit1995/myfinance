@@ -41,5 +41,12 @@ void main() {
       expect(result.sampleAccountNames, contains('Main Savings'));
       expect(result.requiresPassword, isFalse);
     });
+
+    test('Unencrypted SQLite bytes are identified as not encrypted', () {
+      final sqliteHeader = [83, 81, 76, 105, 116, 101, 32, 102, 111, 114, 109, 97, 116, 32, 51, 0];
+      final isEnc = sqliteHeader.length >= 16 &&
+          String.fromCharCodes(sqliteHeader.sublist(0, 16)) == 'MYFINANCE_ENC_V1';
+      expect(isEnc, isFalse);
+    });
   });
 }

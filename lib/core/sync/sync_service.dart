@@ -103,13 +103,13 @@ class SyncService extends StateNotifier<SyncState> {
     });
 
     if (_auth.isLoggedIn) {
-      await syncAll(forceFullSync: true);
+      await syncAll(forceFullSync: false);
     }
   }
 
   // ─── Clean Duplicates (Deduplicate) ─────────────────────────────────────────
 
-  /// ค้นหาและล้างรายการที่ซ้ำกัน 510 รายการออกจากทั้งเครื่องและ Supabase
+  /// ค้นหาและล้างรายการที่ซ้ำกันออกจากทั้งเครื่องและ Supabase
   Future<int> cleanDuplicates() async {
     if (state.status == SyncStatus.syncing) return 0;
     state = state.copyWith(status: SyncStatus.syncing, errorMessage: null);
@@ -127,12 +127,88 @@ class SyncService extends StateNotifier<SyncState> {
         debugPrint('[Sync] Cleaned ${deletedIds.length} duplicate rows from Supabase.');
       }
 
-      await syncAll(forceFullSync: true);
+      final now = DateTime.now();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_prefLastSync, now.toIso8601String());
+
+      final txCount = await (_db.selectOnly(_db.transactions)..addColumns([_db.transactions.id.count()]))
+          .map((row) => row.read(_db.transactions.id.count()))
+          .getSingle();
+
+      // บันทึกสถานะว่าเครื่องนี้ได้จัดระเบียบข้อมูลเรียบร้อยแล้ว
+      final deviceId = await _getOrCreateDeviceId();
+      final devName = _getDeviceDisplayName();
+      try {
+        await _supabase.from('sync_device_state').upsert({
+          'user_id': _auth.currentUser?.id,
+          'active_device_id': deviceId,
+          'active_device_name': devName,
+          'total_transactions': txCount ?? 0,
+          'updated_at': now.toIso8601String(),
+        });
+      } catch (_) {}
+
+      state = state.copyWith(
+        status: SyncStatus.idle,
+        lastSyncAt: now,
+        masterDeviceName: devName,
+        totalSynced: txCount ?? 0,
+      );
       return deletedIds.length;
     } catch (e) {
       debugPrint('[Sync] Error cleaning duplicates: $e');
       state = state.copyWith(status: SyncStatus.error, errorMessage: e.toString());
       return 0;
+    }
+  }
+
+  /// เขียนทับคลาวด์ด้วยข้อมูลเครื่องนี้ 100% (Force Push Local to Cloud)
+  /// ลบข้อมูลธุรกรรมเก่าบน Supabase และส่งข้อมูลที่สะอาด 3,881 รายการจากเครื่องขึ้นไปแทนที่
+  Future<bool> forcePushLocalToCloud() async {
+    if (!_auth.isLoggedIn) return false;
+    if (state.status == SyncStatus.syncing) return false;
+
+    final userId = _auth.currentUser!.id;
+    state = state.copyWith(status: SyncStatus.syncing, errorMessage: null);
+
+    try {
+      // 1. ลบรายการธุรกรรมบน Supabase ของผู้ใช้นี้ทั้งหมดเพื่อเคลียร์ความซ้ำซ้อน
+      await _supabase.from('transactions').delete().eq('user_id', userId);
+
+      // 2. ดึงรายการธุรกรรมที่สะอาดจาก SQLite ในเครื่องทั้งหมด
+      final localTx = await (_db.select(_db.transactions)..where((t) => t.deletedAt.isNull())).get();
+      const chunkSize = 200;
+      for (var i = 0; i < localTx.length; i += chunkSize) {
+        final chunk = localTx.sublist(i, math.min(i + chunkSize, localTx.length));
+        final payload = chunk.map((tx) => _txToJson(tx, userId)).toList();
+        await _supabase.from('transactions').insert(payload);
+      }
+
+      // 3. Push โมดูลอื่นๆ ขึ้นคลาวด์
+      await _syncAccounts(userId, null);
+      await _syncCategories(userId, null);
+      await _syncAssets(userId, null);
+      await _syncInsurance(userId, null);
+      await _syncLiabilities(userId, null);
+      await _syncBudgets(userId, null);
+      await _syncRecurring(userId, null);
+
+      final now = DateTime.now();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_prefLastSync, now.toIso8601String());
+
+      final devName = _getDeviceDisplayName();
+      state = state.copyWith(
+        status: SyncStatus.idle,
+        lastSyncAt: now,
+        masterDeviceName: devName,
+        totalSynced: localTx.length,
+      );
+      return true;
+    } catch (e) {
+      debugPrint('[Sync] Error force pushing to cloud: $e');
+      state = state.copyWith(status: SyncStatus.error, errorMessage: e.toString());
+      return false;
     }
   }
 

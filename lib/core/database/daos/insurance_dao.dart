@@ -184,7 +184,13 @@ class InsuranceDao extends DatabaseAccessor<AppDatabase> with _$InsuranceDaoMixi
               t.tag.like('%policy:${policy.id}%')))
         .get();
 
-    final paidPeriods = txs.length;
+    // สำหรับประกันรายปี เช่น 15/20 ให้นับจำนวนงวดตามปีที่มีการชำระจริง (Distinct Years)
+    // เพื่อป้องกันการนับซ้ำกรณีมีรายการธุรกรรมหลายแถวในปีเดียวกัน
+    final distinctYearsPaid = txs.map((t) => t.transactionDate.year).toSet().length;
+    final paidPeriods = policy.totalPeriods > 0
+        ? min(policy.totalPeriods, distinctYearsPaid)
+        : txs.length;
+
     int totalPaidSatang = 0;
     bool isPaidThisYear = false;
 

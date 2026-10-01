@@ -9,7 +9,32 @@ import 'package:web/web.dart' as web;
 Future<bool> restoreWebDatabase(Uint8List bytes) async {
   bool success = false;
 
-  // 1. Restore to OPFS if supported
+  // 1. Restore to IndexedDbFileSystem (Primary storage for GitHub Pages)
+  try {
+    final fs = await IndexedDbFileSystem.open(dbName: 'myfinance_vault');
+    try {
+      if (fs.xAccess('/database-journal', 0) != 0) fs.xDelete('/database-journal', 0);
+    } catch (_) {}
+    try {
+      if (fs.xAccess('/database-wal', 0) != 0) fs.xDelete('/database-wal', 0);
+    } catch (_) {}
+    try {
+      if (fs.xAccess('/database-shm', 0) != 0) fs.xDelete('/database-shm', 0);
+    } catch (_) {}
+
+    final (file: file, outFlags: _) =
+        fs.xOpen(Sqlite3Filename('/database'), 0x00000002 | 0x00000004);
+    file.xTruncate(0);
+    file.xWrite(bytes, 0);
+    file.xClose();
+    await fs.close();
+    success = true;
+    debugPrint('IndexedDB restore succeeded: ${bytes.length} bytes');
+  } catch (e) {
+    debugPrint('IndexedDB restore error: $e');
+  }
+
+  // 2. Also write to OPFS if available for forward compatibility
   try {
     final nav = web.window.navigator;
     final storage = nav.storage;
@@ -27,47 +52,21 @@ Future<bool> restoreWebDatabase(Uint8List bytes) async {
     await writable.write(bytes.toJS).toDart;
     await writable.close().toDart;
 
-    // Clean up temporary journals
+    // Write meta file for SimpleOpfsFileSystem compatibility
     try {
-      await vaultDir.removeEntry('database-journal').toDart;
-    } catch (_) {}
-    try {
-      await vaultDir.removeEntry('database-wal').toDart;
-    } catch (_) {}
-    try {
-      await vaultDir.removeEntry('database-shm').toDart;
+      final metaTarget = await vaultDir.getFileHandle('meta', web.FileSystemGetFileOptions(create: true)).toDart;
+      final metaWriter = await metaTarget.createWritable().toDart;
+      final metaBuffer = Uint8List(2);
+      metaBuffer[0] = 1;
+      metaBuffer[1] = 0;
+      await metaWriter.write(metaBuffer.toJS).toDart;
+      await metaWriter.close().toDart;
     } catch (_) {}
 
     success = true;
     debugPrint('OPFS restore succeeded: ${bytes.length} bytes');
   } catch (e) {
-    debugPrint('OPFS restore not used or failed: $e');
-  }
-
-  // 2. Restore to IndexedDbFileSystem (fallback / primary for GitHub Pages)
-  try {
-    final fs = await IndexedDbFileSystem.open(dbName: 'myfinance_vault');
-    try {
-      if (fs.xAccess('/database-journal', 0) != 0) {
-        fs.xDelete('/database-journal', 0);
-      }
-    } catch (_) {}
-    try {
-      if (fs.xAccess('/database-wal', 0) != 0) {
-        fs.xDelete('/database-wal', 0);
-      }
-    } catch (_) {}
-
-    final (file: file, outFlags: _) =
-        fs.xOpen(Sqlite3Filename('/database'), 0x00000002 | 0x00000004);
-    file.xTruncate(0);
-    file.xWrite(bytes, 0);
-    file.xClose();
-    await fs.close();
-    success = true;
-    debugPrint('IndexedDB restore succeeded: ${bytes.length} bytes');
-  } catch (e) {
-    debugPrint('IndexedDB restore error: $e');
+    debugPrint('OPFS restore note: $e');
   }
 
   return success;

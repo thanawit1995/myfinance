@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 import '../app_database.dart';
@@ -612,7 +613,8 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
   }
 
   /// ค้นหาและล้างรายการธุรกรรมที่ซ้ำกัน (Deduplicate)
-  /// เก็บรายการเก่าสุดไว้ (MIN createdAt) และลบรายการที่ซ้ำออก
+  /// ใช้เกณฑ์: วันที่ (YYYY-MM-DD), จำนวนเงินสตางค์, ประเภทรายการ, และบันทึก
+  /// ตัดปัญหาเรื่องความต่างของ Timezone (UTC vs Local) หรือ Account ID ที่ต่างกันจากการสร้างคนละอุปกรณ์
   Future<List<String>> deduplicateTransactions() async {
     final allTx = await (select(transactions)
           ..where((t) => t.deletedAt.isNull())
@@ -623,8 +625,16 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
     final List<String> duplicateIds = [];
 
     for (final tx in allTx) {
-      final dateKey = '${tx.transactionDate.year}-${tx.transactionDate.month}-${tx.transactionDate.day} ${tx.transactionDate.hour}:${tx.transactionDate.minute}';
-      final sig = '$dateKey|${tx.amountThbSatang}|${tx.transactionType}|${tx.sourceAccountId}|${tx.categoryId}|${tx.note ?? ""}';
+      final d = tx.transactionDate;
+      final dateKey = '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+      final cleanNote = (tx.note ?? '').trim().toLowerCase();
+
+      final String sig;
+      if (cleanNote.isNotEmpty) {
+        sig = '$dateKey|${tx.amountThbSatang}|${tx.transactionType}|$cleanNote';
+      } else {
+        sig = '$dateKey|${tx.amountThbSatang}|${tx.transactionType}|${tx.sourceAccountId ?? ""}|${tx.tag ?? ""}';
+      }
 
       if (seen.containsKey(sig)) {
         duplicateIds.add(tx.id);
@@ -634,8 +644,11 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
     }
 
     if (duplicateIds.isNotEmpty) {
-      // ลบรายการซ้ำออกจาก SQLite
-      await (delete(transactions)..where((t) => t.id.isIn(duplicateIds))).go();
+      const chunkSize = 200;
+      for (var i = 0; i < duplicateIds.length; i += chunkSize) {
+        final chunk = duplicateIds.sublist(i, min(i + chunkSize, duplicateIds.length));
+        await (delete(transactions)..where((t) => t.id.isIn(chunk))).go();
+      }
       onLedgerModified?.call();
     }
 

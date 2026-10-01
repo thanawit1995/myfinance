@@ -312,10 +312,10 @@ class BackupRestoreService {
     }
 
     if (kIsWeb) {
+      try {
+        await db.close();
+      } catch (_) {}
       final ok = await restoreWebDatabase(dbBytesToWrite);
-      if (ok) {
-        Future.delayed(const Duration(milliseconds: 1000), reloadWebPage);
-      }
       return ok;
     }
 

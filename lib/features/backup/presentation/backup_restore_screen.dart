@@ -6,10 +6,12 @@ import 'package:intl/intl.dart';
 
 import '../../../core/database/database_provider.dart';
 import '../../../core/services/backup_restore_service.dart';
+import '../../../core/services/web_db_helper/web_db_helper.dart';
 import '../../../core/sync/auth_service.dart';
 import '../../../core/sync/sync_service.dart';
 import '../../../core/theme/vault_theme.dart';
 import '../../auth/login_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class BackupRestoreScreen extends ConsumerStatefulWidget {
   const BackupRestoreScreen({super.key});
@@ -555,6 +557,8 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       setState(() => _isLoading = false);
 
       if (ok) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('last_sync_timestamp', DateTime.now().toIso8601String());
         await _loadStats();
         if (!mounted) return;
         await showDialog(
@@ -570,13 +574,18 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
             ),
             content: Text(
               isThai
-                  ? 'นำเข้าข้อมูลจากไฟล์สำรองเรียบร้อยแล้ว แนะนำให้ปิดและเปิดแอปใหม่อีกครั้งเพื่อให้ทุกหน้าแสดงผลสมบูรณ์'
-                  : 'Data restored successfully. Please restart the app for all changes to take full effect.',
+                  ? 'นำเข้าข้อมูลจากไฟล์สำรองเรียบร้อยแล้ว กด "ตกลง" เพื่อรีโหลดหน้าเว็บและเริ่มใช้งานข้อมูลที่กู้คืนทันที'
+                  : 'Data restored successfully. Tap "OK" to reload and start using the restored data.',
             ),
             actions: [
               FilledButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(isThai ? 'ตกลง' : 'OK'),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  if (kIsWeb) {
+                    reloadWebPage();
+                  }
+                },
+                child: Text(isThai ? 'ตกลง (รีโหลดหน้าเว็บ)' : 'OK (Reload)'),
               ),
             ],
           ),
@@ -1670,6 +1679,26 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.teal.shade400,
+                    side: BorderSide(color: Colors.teal.shade400, width: 1.2),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.cloud_upload_rounded, size: 18),
+                  label: Text(
+                    isThai ? 'เขียนทับคลาวด์ด้วยข้อมูลเครื่องนี้ (Force Push to Cloud)' : 'Force Push to Cloud',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  onPressed: syncState.status == SyncStatus.syncing
+                      ? null
+                      : () => _handleForcePush(context, isThai),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.redAccent,
                     side: const BorderSide(color: Colors.redAccent, width: 1.2),
                     padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1773,6 +1802,57 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                     : 'No duplicates found.'),
           ),
           backgroundColor: removed > 0 ? VaultTheme.positive(context) : Colors.grey.shade700,
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleForcePush(BuildContext context, bool isThai) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.cloud_upload_rounded, color: Colors.teal),
+            const SizedBox(width: 8),
+            Text(isThai ? 'เขียนทับข้อมูลบนคลาวด์' : 'Overwrite Cloud Data'),
+          ],
+        ),
+        content: Text(
+          isThai
+              ? 'ระบบจะลบข้อมูลธุรกรรมบนคลาวด์ (Supabase) ทั้งหมด แล้วส่งข้อมูลที่สะอาดจากเครื่องนี้ขึ้นไปแทนที่ 100% เพื่อให้อุปกรณ์อื่นๆ ดึงข้อมูลที่ตรงกันได้อย่างสมบูรณ์ ต้องการดำเนินการหรือไม่?'
+              : 'The system will replace all transactions on cloud with the exact data from this device. Do you want to proceed?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.teal.shade700),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(isThai ? 'ยืนยันเขียนทับคลาวด์' : 'Overwrite Cloud'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final success = await ref.read(syncServiceProvider.notifier).forcePushLocalToCloud();
+    await _loadStats();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isThai
+                ? (success
+                    ? 'เขียนทับข้อมูลบนคลาวด์ด้วยข้อมูลจากเครื่องนี้เรียบร้อยแล้ว'
+                    : 'เกิดข้อผิดพลาดในการส่งข้อมูลขึ้นคลาวด์')
+                : (success ? 'Cloud overwritten successfully.' : 'Failed to overwrite cloud.'),
+          ),
+          backgroundColor: success ? VaultTheme.positive(context) : VaultTheme.negative(context),
         ),
       );
     }

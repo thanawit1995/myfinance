@@ -790,16 +790,28 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
     }
 
     // 2. Ledger Transaction
+    final catList = await (db.select(db.categories)
+          ..where((c) =>
+              c.deletedAt.isNull() &
+              (c.id.equals('cat-inc-0000-4000-8000-000000000003') |
+               c.nameTh.equals('ดอกเบี้ยและเงินปันผล'))))
+        .get();
+    final dividendCatId = catList.isNotEmpty ? catList.first.id : 'cat-inc-0000-4000-8000-000000000003';
+
     await into(transactions).insert(
       TransactionsCompanion.insert(
         id: txId,
         transactionType: 'income',
+        categoryId: Value(dividendCatId),
+        taxCategory: Value(isForeignIncome ? '40_4_dividend_foreign' : '40_4_dividend_th'),
         amountOriginalSatang: grossAmountOriginalSatang,
         currencyCode: currencyCode,
         fxRate: Value(fxRate.toString()),
         amountThbSatang: netAmountThbSatang,
         feeThbSatang: Value(withholdingTaxThbSatang),
+        withholdingTaxSatang: Value(withholdingTaxThbSatang),
         destinationAccountId: Value(accountId),
+        assetId: Value(assetId),
         transactionDate: incomeDate,
         note: Value(note ?? 'เงินปันผล/ดอกเบี้ย $symbol'),
         tag: Value('investment_income:$assetId'),

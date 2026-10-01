@@ -412,7 +412,27 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                             selectedCategoryId: _selectedCategoryId,
                           );
                           if (chosen != null && mounted) {
-                            setState(() => _selectedCategoryId = chosen.id);
+                            setState(() {
+                              _selectedCategoryId = chosen.id;
+                              if (_transactionType == 'income') {
+                                if (chosen.taxIncomeType != null && chosen.taxIncomeType!.isNotEmpty) {
+                                  if (chosen.taxIncomeType == '40_4') {
+                                    _selectedTaxCategory = '40_4_interest';
+                                  } else {
+                                    _selectedTaxCategory = chosen.taxIncomeType;
+                                  }
+                                } else {
+                                  final name = '${chosen.nameTh} ${chosen.nameEn}'.toLowerCase();
+                                  if (name.contains('รับจ้าง') || name.contains('เวร') || name.contains('เงินเดือน')) {
+                                    _selectedTaxCategory = '40_1';
+                                  } else if (name.contains('ดอกเบี้ย') || name.contains('ปันผล')) {
+                                    _selectedTaxCategory = '40_4_interest';
+                                  } else if (name.contains('รายรับอื่นๆ')) {
+                                    _selectedTaxCategory = 'non_taxable';
+                                  }
+                                }
+                              }
+                            });
                           }
                         },
                         borderRadius: BorderRadius.circular(4),
@@ -517,7 +537,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                       labelText: 'ประเภทภาษีเงินได้บุคคลธรรมดา (ภ.ง.ด.)',
                       border: OutlineInputBorder(),
                     ),
-                    initialValue: _selectedTaxCategory,
+                    value: _selectedTaxCategory,
                     items: const [
                       DropdownMenuItem(value: '40_1', child: Text('40(1) เงินเดือน / โบนัส')),
                       DropdownMenuItem(value: '40_2', child: Text('40(2) ค่าจ้าง / ฟรีแลนซ์')),

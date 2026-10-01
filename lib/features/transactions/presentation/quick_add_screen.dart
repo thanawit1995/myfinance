@@ -174,12 +174,15 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
           name.contains('เงินเดือน') ||
           name.contains('ค่าจ้าง') ||
           name.contains('พ.ต.ส.') ||
-          name.contains('p4p')) {
+          name.contains('p4p') ||
+          name.contains('รับจ้าง') ||
+          name.contains('ค่าอยู่เวร') ||
+          name.contains('เวร') ||
+          name.contains('shift')) {
         _selectedTaxCategory = '40_1';
         return;
       }
-      if (name.contains('เวร') ||
-          name.contains('df') ||
+      if (name.contains('df') ||
           name.contains('doctor fee') ||
           name.contains('ไม่ทำเวช') ||
           name.contains('เบี้ยเลี้ยง') ||
@@ -188,13 +191,22 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
         _selectedTaxCategory = '40_2';
         return;
       }
+      if (name.contains('ดอกเบี้ย') ||
+          name.contains('ปันผล') ||
+          name.contains('dividend') ||
+          name.contains('interest')) {
+        _selectedTaxCategory = '40_4';
+        return;
+      }
       if (name.contains('แพทย์') ||
           name.contains('วิชาชีพ') ||
           name.contains('คลินิก')) {
         _selectedTaxCategory = '40_6';
         return;
       }
-      if (name.contains('top up') ||
+      if (name.contains('รายรับอื่นๆ') ||
+          name.contains('other income') ||
+          name.contains('top up') ||
           name.contains('โอนเงิน') ||
           name.contains('ยกเว้น') ||
           name.contains('คืนเงิน')) {

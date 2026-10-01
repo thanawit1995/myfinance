@@ -83,6 +83,35 @@ class CategoriesDao extends DatabaseAccessor<AppDatabase> with _$CategoriesDaoMi
         await into(categories).insert(cat, mode: InsertMode.insertOrIgnore);
       }
     }
+
+    // Update standard tax types for existing databases
+    await updateStandardIncomeCategoryTaxTypes();
+  }
+
+  Future<void> updateStandardIncomeCategoryTaxTypes() async {
+    // 1. รับจ้าง / ค่าอยู่เวร -> 40_1
+    await (update(categories)
+          ..where((c) =>
+              c.id.equals('cat-inc-0000-4000-8000-000000000002') |
+              c.nameTh.equals('รับจ้าง / ค่าอยู่เวร') |
+              c.nameEn.equals('Freelance / Shift')))
+        .write(const CategoriesCompanion(taxIncomeType: Value('40_1')));
+
+    // 2. รายรับอื่นๆ -> non_taxable
+    await (update(categories)
+          ..where((c) =>
+              c.id.equals('cat-inc-0000-4000-8000-000000000005') |
+              c.nameTh.equals('รายรับอื่นๆ') |
+              c.nameEn.equals('Other Income')))
+        .write(const CategoriesCompanion(taxIncomeType: Value('non_taxable')));
+
+    // 3. ดอกเบี้ยและเงินปันผล -> 40_4
+    await (update(categories)
+          ..where((c) =>
+              c.id.equals('cat-inc-0000-4000-8000-000000000003') |
+              c.nameTh.equals('ดอกเบี้ยและเงินปันผล') |
+              c.nameEn.equals('Interest & Dividends')))
+        .write(const CategoriesCompanion(taxIncomeType: Value('40_4')));
   }
 
   /// Returns or creates the system standard "ขายสินทรัพย์" (Asset Sale) category for sell trades.

@@ -6,7 +6,6 @@ import '../security/auth_provider.dart';
 import '../theme/app_theme_style.dart';
 import '../theme/vault_theme.dart';
 import 'pin_lock_dialog.dart';
-import '../../features/auth/login_screen.dart';
 import '../../features/auth/sync_status_widget.dart';
 import '../../features/home/presentation/vault_home_screen.dart';
 import '../../features/money/presentation/money_screen.dart';
@@ -353,26 +352,15 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
               ),
               VerticalDivider(thickness: 0.75, width: 1, color: VaultTheme.border(context)),
               Expanded(
-                child: Stack(
-                  children: [
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 200),
-                      switchInCurve: Curves.easeOutCubic,
-                      switchOutCurve: Curves.easeInCubic,
-                      transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
-                      child: KeyedSubtree(
-                        key: ValueKey<int>(_currentIndex),
-                        child: screens[_currentIndex],
-                      ),
-                    ),
-                    const Positioned(
-                      top: 14,
-                      right: 18,
-                      child: SafeArea(
-                        child: SyncStatusWidget(),
-                      ),
-                    ),
-                  ],
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
+                  child: KeyedSubtree(
+                    key: ValueKey<int>(_currentIndex),
+                    child: screens[_currentIndex],
+                  ),
                 ),
               ),
             ],
@@ -397,13 +385,14 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
                   child: screens[_currentIndex],
                 ),
               ),
-              const Positioned(
-                top: 10,
-                right: 14,
-                child: SafeArea(
-                  child: SyncStatusWidget(),
+              if (_currentIndex != 2)
+                const Positioned(
+                  top: 10,
+                  right: 14,
+                  child: SafeArea(
+                    child: SyncStatusWidget(),
+                  ),
                 ),
-              ),
             ],
           ),
           bottomNavigationBar: Container(

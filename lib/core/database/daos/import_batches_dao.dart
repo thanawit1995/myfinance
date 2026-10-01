@@ -45,10 +45,13 @@ class ImportBatchesDao extends DatabaseAccessor<AppDatabase> with _$ImportBatche
         }
       }
 
-      // 3. Delete investment lots referencing these transactions first to avoid FK constraint failures
+      // 3. Delete investment lots and incomes referencing these transactions first to avoid FK constraint failures
       if (txIds.isNotEmpty) {
         await (delete(attachedDatabase.investmentLots)
               ..where((l) => l.buyTransactionId.isIn(txIds)))
+            .go();
+        await (delete(attachedDatabase.investmentIncomes)
+              ..where((i) => i.transactionId.isIn(txIds)))
             .go();
       }
 

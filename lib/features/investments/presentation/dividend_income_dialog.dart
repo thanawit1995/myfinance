@@ -27,6 +27,11 @@ class DividendIncomeDialog extends ConsumerStatefulWidget {
 class _DividendIncomeDialogState extends ConsumerState<DividendIncomeDialog> {
   final _formKey = GlobalKey<FormState>();
 
+  List<Asset> _assets = [];
+  List<Account> _accounts = [];
+  bool _isLoading = true;
+  Decimal _latestUsdFx = Decimal.parse('35.000000');
+
   String? _selectedAssetId;
   String? _selectedAccountId;
   String _incomeType = 'dividend';
@@ -43,16 +48,76 @@ class _DividendIncomeDialogState extends ConsumerState<DividendIncomeDialog> {
   @override
   void initState() {
     super.initState();
-    _selectedAssetId = widget.initialAsset?.id;
-    _selectedAccountId = widget.initialAsset?.defaultAccountId;
-    _currency = widget.initialAsset?.currencyCode ?? 'THB';
-    _isForeignIncome = _currency != 'THB' || widget.initialAsset?.assetType == 'foreign_stock' || widget.initialAsset?.assetType == 'etf';
     _incomeDate = DateTime.now();
 
     _grossAmountController = TextEditingController();
     _taxController = TextEditingController();
-    _fxRateController = TextEditingController(text: _currency == 'USD' ? '35.000000' : '1.000000');
+    _fxRateController = TextEditingController(text: '1.000000');
     _noteController = TextEditingController();
+
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final invDao = ref.read(investmentsDaoProvider);
+    final accDao = ref.read(accountsDaoProvider);
+
+    final assets = await invDao.getAssets();
+    final accounts = await accDao.getActiveAccounts();
+    final latestFx = await invDao.getLatestUsdFxRate();
+
+    if (!mounted) return;
+
+    setState(() {
+      _assets = assets;
+      _accounts = accounts;
+      _latestUsdFx = latestFx;
+      _isLoading = false;
+
+      // Select initial asset
+      Asset? currentAsset = widget.initialAsset;
+      if (currentAsset == null && _assets.isNotEmpty) {
+        currentAsset = _assets.first;
+      }
+
+      if (currentAsset != null) {
+        _applyAsset(currentAsset);
+      }
+    });
+  }
+
+  void _applyAsset(Asset asset) {
+    _selectedAssetId = asset.id;
+    _currency = asset.currencyCode;
+    _isForeignIncome = _currency != 'THB' || asset.assetType == 'foreign_stock' || asset.assetType == 'etf';
+
+    if (_currency == 'USD') {
+      _fxRateController.text = _latestUsdFx.toString();
+    } else if (_currency == 'THB') {
+      _fxRateController.text = '1.000000';
+    }
+
+    // Pick matching account
+    if (asset.defaultAccountId.isNotEmpty && _accounts.any((a) => a.id == asset.defaultAccountId)) {
+      _selectedAccountId = asset.defaultAccountId;
+    } else if (_currency != 'THB') {
+      final foreignAcc = _accounts.where((a) => a.currencyCode == _currency || a.accountType == 'offshore' || a.accountType == 'fcd').firstOrNull;
+      _selectedAccountId = foreignAcc?.id ?? (_accounts.isNotEmpty ? _accounts.first.id : null);
+    } else {
+      final thbAcc = _accounts.where((a) => a.currencyCode == 'THB' && a.accountType == 'bank').firstOrNull;
+      _selectedAccountId = thbAcc?.id ?? (_accounts.isNotEmpty ? _accounts.first.id : null);
+    }
+
+    _recalculateTax();
+  }
+
+  void _recalculateTax() {
+    final gross = double.tryParse(_grossAmountController.text.trim()) ?? 0.0;
+    if (gross > 0) {
+      // 10% for Thai stocks, 15% for Foreign stocks
+      final rate = _isForeignIncome ? 0.15 : 0.10;
+      _taxController.text = (gross * rate).toStringAsFixed(2);
+    }
   }
 
   @override
@@ -65,13 +130,7 @@ class _DividendIncomeDialogState extends ConsumerState<DividendIncomeDialog> {
   }
 
   void _onGrossChanged() {
-    final gross = double.tryParse(_grossAmountController.text.trim()) ?? 0.0;
-    if (gross > 0) {
-      // 10% Withholding tax standard for dividends
-      if (_taxController.text.isEmpty) {
-        _taxController.text = (gross * 0.10).toStringAsFixed(2);
-      }
-    }
+    _recalculateTax();
     setState(() {});
   }
 
@@ -112,6 +171,9 @@ class _DividendIncomeDialogState extends ConsumerState<DividendIncomeDialog> {
       note: _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),
     );
 
+    // Refresh version counter
+    ref.read(transactionsVersionProvider.notifier).state++;
+
     if (mounted) {
       Navigator.of(context).pop(true);
     }
@@ -127,217 +189,202 @@ class _DividendIncomeDialogState extends ConsumerState<DividendIncomeDialog> {
       appBar: AppBar(
         title: Text(isThai ? 'บันทึกเงินปันผล/ดอกเบี้ย' : 'Record Dividend / Interest'),
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // 1. Asset
-                FutureBuilder<List<Asset>>(
-                  future: ref.read(investmentsDaoProvider).getAssets(),
-                  builder: (context, snapshot) {
-                    final assets = snapshot.data ?? [];
-                    if (_selectedAssetId == null && assets.isNotEmpty) {
-                      _selectedAssetId = assets.first.id;
-                      _currency = assets.first.currencyCode;
-                      _selectedAccountId = assets.first.defaultAccountId;
-                      _isForeignIncome = _currency != 'THB' || assets.first.assetType == 'foreign_stock' || assets.first.assetType == 'etf';
-                    }
-                    return DropdownButtonFormField<String>(
-                      decoration: const InputDecoration(labelText: 'สินทรัพย์ *', border: OutlineInputBorder()),
-                      initialValue: _selectedAssetId,
-                      items: assets.map((a) {
-                        return DropdownMenuItem(value: a.id, child: Text(a.symbol));
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          final match = assets.firstWhere((a) => a.id == val);
-                          setState(() {
-                            _selectedAssetId = val;
-                            _currency = match.currencyCode;
-                            _selectedAccountId = match.defaultAccountId;
-                            _isForeignIncome = _currency != 'THB' || match.assetType == 'foreign_stock' || match.assetType == 'etf';
-                            _fxRateController.text = _currency == 'USD' ? '35.000000' : '1.000000';
-                            _onGrossChanged();
-                          });
-                        }
-                      },
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // 1. Asset
+                      DropdownButtonFormField<String>(
+                        decoration: const InputDecoration(labelText: 'สินทรัพย์ *', border: OutlineInputBorder()),
+                        value: _selectedAssetId,
+                        items: _assets.map((a) {
+                          return DropdownMenuItem(value: a.id, child: Text('${a.symbol} - ${a.name} (${a.currencyCode})'));
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            final match = _assets.firstWhere((a) => a.id == val);
+                            setState(() {
+                              _applyAsset(match);
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
 
-                // 2. Account
-                FutureBuilder<List<Account>>(
-                  future: ref.read(accountsDaoProvider).getActiveAccounts(),
-                  builder: (context, snapshot) {
-                    final accounts = snapshot.data ?? [];
-                    if (_selectedAccountId == null && accounts.isNotEmpty) {
-                      _selectedAccountId = accounts.first.id;
-                    }
-                    return DropdownButtonFormField<String>(
-                      decoration: const InputDecoration(labelText: 'รับเงินสุทธิเข้าบัญชี *', border: OutlineInputBorder()),
-                      initialValue: _selectedAccountId,
-                      items: accounts.map((a) {
-                        return DropdownMenuItem(value: a.id, child: Text('${a.name} (${a.currencyCode})'));
-                      }).toList(),
-                      onChanged: (val) => setState(() => _selectedAccountId = val),
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
+                      // 2. Account
+                      DropdownButtonFormField<String>(
+                        decoration: const InputDecoration(labelText: 'รับเงินสุทธิเข้าบัญชี *', border: OutlineInputBorder()),
+                        value: _selectedAccountId,
+                        items: _accounts.map((a) {
+                          return DropdownMenuItem(value: a.id, child: Text('${a.name} (${a.currencyCode})'));
+                        }).toList(),
+                        onChanged: (val) => setState(() => _selectedAccountId = val),
+                      ),
+                      const SizedBox(height: 12),
 
-                // 3. Income Type
-                DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(labelText: 'ประเภทรายได้', border: OutlineInputBorder()),
-                  initialValue: _incomeType,
-                  items: const [
-                    DropdownMenuItem(value: 'dividend', child: Text('เงินปันผล (Dividend)')),
-                    DropdownMenuItem(value: 'interest', child: Text('ดอกเบี้ย (Interest)')),
-                    DropdownMenuItem(value: 'bond_coupon', child: Text('คูปองพันธบัตร / หุ้นกู้')),
-                    DropdownMenuItem(value: 'other', child: Text('อื่นๆ (Other)')),
-                  ],
-                  onChanged: (val) => setState(() => _incomeType = val ?? 'dividend'),
-                ),
-                const SizedBox(height: 12),
+                      // 3. Income Type
+                      DropdownButtonFormField<String>(
+                        decoration: const InputDecoration(labelText: 'ประเภทรายได้', border: OutlineInputBorder()),
+                        value: _incomeType,
+                        items: const [
+                          DropdownMenuItem(value: 'dividend', child: Text('เงินปันผล (Dividend)')),
+                          DropdownMenuItem(value: 'interest', child: Text('ดอกเบี้ย (Interest)')),
+                          DropdownMenuItem(value: 'bond_coupon', child: Text('คูปองพันธบัตร / หุ้นกู้')),
+                          DropdownMenuItem(value: 'other', child: Text('อื่นๆ (Other)')),
+                        ],
+                        onChanged: (val) => setState(() => _incomeType = val ?? 'dividend'),
+                      ),
+                      const SizedBox(height: 12),
 
-                // 4. Gross Amount & FX Rate
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: TextFormField(
-                        controller: _grossAmountController,
+                      // 4. Gross Amount & FX Rate
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: TextFormField(
+                              controller: _grossAmountController,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+                              decoration: InputDecoration(
+                                labelText: 'ยอดรวมก่อนหักภาษี ($_currency) *',
+                                hintText: 'เช่น 1000.00',
+                                border: const OutlineInputBorder(),
+                              ),
+                              validator: (val) {
+                                if (val == null || val.trim().isEmpty) return 'กรุณาระบุยอดรวม';
+                                final n = double.tryParse(val.trim());
+                                if (n == null || n <= 0) return '> 0';
+                                return null;
+                              },
+                              onChanged: (_) => _onGrossChanged(),
+                            ),
+                          ),
+                          if (_currency != 'THB') ...[
+                            const SizedBox(width: 8),
+                            Expanded(
+                              flex: 1,
+                              child: TextFormField(
+                                controller: _fxRateController,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+                                decoration: const InputDecoration(
+                                  labelText: 'เรต FX *',
+                                  helperText: 'อัปเดตล่าสุด',
+                                  border: OutlineInputBorder(),
+                                ),
+                                onChanged: (_) => setState(() {}),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // 5. Withholding Tax
+                      TextFormField(
+                        controller: _taxController,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
                         decoration: InputDecoration(
-                          labelText: 'ยอดรวมก่อนหักภาษี ($_currency) *',
-                          hintText: 'เช่น 1000.00',
+                          labelText: 'ภาษีหัก ณ ที่จ่าย ($_currency)',
+                          hintText: 'เช่น 100.00',
+                          helperText: _isForeignIncome ? 'อัตรา 15% สำหรับหุ้นต่างประเทศ' : 'อัตรา 10% สำหรับหุ้นไทย',
                           border: const OutlineInputBorder(),
                         ),
-                        validator: (val) {
-                          if (val == null || val.trim().isEmpty) return 'กรุณาระบุยอดรวม';
-                          final n = double.tryParse(val.trim());
-                          if (n == null || n <= 0) return '> 0';
-                          return null;
+                        onChanged: (_) => setState(() {}),
+                      ),
+                      const SizedBox(height: 8),
+
+                      // 6. Checkbox: Is Foreign Income
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('เป็นเงินได้จากต่างประเทศ (Foreign Income)'),
+                        subtitle: Text(
+                          _isForeignIncome
+                              ? 'ภาษี 15% หัก ณ ต่างประเทศ (ภาษีไทยจะประเมินเมื่อนำเงินกลับเข้าประเทศ)'
+                              : 'ภาษี 10% หัก ณ ที่จ่ายไทย (สามารถเลือก Final Tax หรือนำไปยื่นรวมปลายปีได้)',
+                          style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+                        ),
+                        value: _isForeignIncome,
+                        onChanged: (val) {
+                          setState(() {
+                            _isForeignIncome = val ?? false;
+                            _recalculateTax();
+                          });
                         },
-                        onChanged: (_) => _onGrossChanged(),
                       ),
-                    ),
-                    if (_currency != 'THB') ...[
-                      const SizedBox(width: 8),
-                      Expanded(
-                        flex: 1,
-                        child: TextFormField(
-                          controller: _fxRateController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
-                          decoration: const InputDecoration(
-                            labelText: 'เรต FX *',
-                            border: OutlineInputBorder(),
-                          ),
-                          onChanged: (_) => setState(() {}),
+                      const SizedBox(height: 8),
+
+                      // 7. Net preview
+                      Builder(
+                        builder: (context) {
+                          final gross = double.tryParse(_grossAmountController.text.trim()) ?? 0.0;
+                          final tax = double.tryParse(_taxController.text.trim()) ?? 0.0;
+                          final fx = Decimal.tryParse(_fxRateController.text.trim()) ?? Decimal.one;
+
+                          final netOrigSatang = ((gross - tax) * 100).round();
+                          final netThbSatang = (Decimal.fromInt(netOrigSatang) * fx).round().toBigInt().toInt();
+                          final moneyPreview = Money(netThbSatang > 0 ? netThbSatang : 0);
+
+                          return Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.8)
+                                  : Colors.green.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isDark
+                                    ? Colors.greenAccent.withValues(alpha: 0.3)
+                                    : Colors.green.shade200,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  isThai ? 'ยอดเงินสุทธิเข้าบัญชี (THB):' : 'Net Received (THB):',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark ? theme.colorScheme.onSurface : Colors.black87,
+                                  ),
+                                ),
+                                Text(
+                                  moneyPreview.format(symbol: '฿'),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: isDark ? Colors.greenAccent : Colors.green.shade800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 10),
+
+                      // 8. Note
+                      TextFormField(
+                        controller: _noteController,
+                        decoration: const InputDecoration(
+                          labelText: 'บันทึกช่วยจำ (Note)',
+                          hintText: 'เช่น เงินปันผลประจำไตรมาส 1/2026',
+                          border: OutlineInputBorder(),
                         ),
                       ),
+                      const SizedBox(height: 24),
                     ],
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // 5. Withholding Tax
-                TextFormField(
-                  controller: _taxController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
-                  decoration: InputDecoration(
-                    labelText: 'ภาษีหัก ณ ที่จ่าย ($_currency)',
-                    hintText: 'เช่น 100.00',
-                    border: const OutlineInputBorder(),
-                  ),
-                  onChanged: (_) => setState(() {}),
-                ),
-                const SizedBox(height: 8),
-
-                // 6. Checkbox: Is Foreign Income
-                CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('เป็นเงินได้จากต่างประเทศ (Foreign Income)'),
-                  value: _isForeignIncome,
-                  onChanged: (val) {
-                    setState(() {
-                      _isForeignIncome = val ?? false;
-                    });
-                  },
-                ),
-                const SizedBox(height: 8),
-
-                // 8. Net preview
-                Builder(
-                  builder: (context) {
-                    final gross = double.tryParse(_grossAmountController.text.trim()) ?? 0.0;
-                    final tax = double.tryParse(_taxController.text.trim()) ?? 0.0;
-                    final fx = Decimal.tryParse(_fxRateController.text.trim()) ?? Decimal.one;
-
-                    final netOrigSatang = ((gross - tax) * 100).round();
-                    final netThbSatang = (Decimal.fromInt(netOrigSatang) * fx).round().toBigInt().toInt();
-                    final moneyPreview = Money(netThbSatang > 0 ? netThbSatang : 0);
-
-                    return Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.8)
-                            : Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: isDark
-                              ? Colors.greenAccent.withValues(alpha: 0.3)
-                              : Colors.green.shade200,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            isThai ? 'ยอดเงินสุทธิเข้าบัญชี (THB):' : 'Net Received (THB):',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? theme.colorScheme.onSurface : Colors.black87,
-                            ),
-                          ),
-                          Text(
-                            moneyPreview.format(symbol: '฿'),
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: isDark ? Colors.greenAccent : Colors.green.shade800,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 10),
-
-                // 9. Note
-                TextFormField(
-                  controller: _noteController,
-                  decoration: const InputDecoration(
-                    labelText: 'บันทึกช่วยจำ (Note)',
-                    hintText: 'เช่น เงินปันผลประจำไตรมาส 1/2026',
-                    border: OutlineInputBorder(),
                   ),
                 ),
-                const SizedBox(height: 24),
-              ],
+              ),
             ),
-          ),
-        ),
-      ),
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -345,7 +392,7 @@ class _DividendIncomeDialogState extends ConsumerState<DividendIncomeDialog> {
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
-            onPressed: _submit,
+            onPressed: _isLoading ? null : _submit,
             child: Text(
               isThai ? 'บันทึกเงินปันผล' : 'Record Dividend',
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),

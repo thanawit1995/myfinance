@@ -14,6 +14,7 @@ import 'dividend_income_dialog.dart';
 import 'monthly_valuation_screen.dart';
 import 'lot_inspection_screen.dart';
 import '../../settings/presentation/trash_bin_screen.dart';
+import '../../auth/sync_status_widget.dart';
 import '../../../../l10n/app_localizations.dart';
 
 class PortfolioScreen extends ConsumerStatefulWidget {
@@ -242,13 +243,9 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
       appBar: AppBar(
         title: Text((l10n?.portfolio ?? (isThai ? 'พอร์ตการลงทุน' : 'PORTFOLIO')).toUpperCase()),
         actions: [
-          IconButton(
-            tooltip: isThai ? 'อัปเดตราคาตลาดสิ้นเดือน' : 'Update Monthly Valuation',
-            icon: const Icon(Icons.price_change_outlined),
-            onPressed: () async {
-              final ok = await MonthlyValuationScreen.show(context);
-              if (ok == true && mounted) setState(() {});
-            },
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            child: SyncStatusWidget(),
           ),
           PopupMenuButton<String>(
             tooltip: isThai ? 'เมนูเพิ่มเติม' : 'More Options',
@@ -258,6 +255,9 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                 if (ok == true && mounted) setState(() {});
               } else if (val == 'income') {
                 final ok = await DividendIncomeDialog.show(context);
+                if (ok == true && mounted) setState(() {});
+              } else if (val == 'valuation') {
+                final ok = await MonthlyValuationScreen.show(context);
                 if (ok == true && mounted) setState(() {});
               } else if (val == 'trash') {
                 await Navigator.push(
@@ -272,6 +272,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
             itemBuilder: (context) => [
               PopupMenuItem(value: 'new_asset', child: Row(children: [const Icon(Icons.add), const SizedBox(width: 8), Text(isThai ? 'เพิ่มสินทรัพย์ใหม่' : 'Add New Asset')])),
               PopupMenuItem(value: 'income', child: Row(children: [const Icon(Icons.attach_money), const SizedBox(width: 8), Text(isThai ? 'บันทึกเงินปันผล/ดอกเบี้ย' : 'Record Dividend / Interest')])),
+              PopupMenuItem(value: 'valuation', child: Row(children: [const Icon(Icons.price_change_outlined), const SizedBox(width: 8), Text(isThai ? 'อัปเดตราคาตลาดสิ้นเดือน' : 'Update Monthly Valuation')])),
               PopupMenuItem(value: 'trash', child: Row(children: [const Icon(Icons.delete_outline), const SizedBox(width: 8), Text(isThai ? 'ถังขยะหุ้น (กู้คืนหุ้นที่ลบ)' : 'Trash Bin (Restore Assets)')])),
             ],
           ),
@@ -524,9 +525,51 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
 
           // 3. Asset Allocation Donut Chart
           _buildAllocationChart(context, filteredHoldings, displayValSatang, isThai),
-          const SizedBox(height: 16),
+          // 4. Quick Actions: Update Valuation & Record Dividend
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.tonalIcon(
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.price_change_outlined, size: 20),
+                  label: Text(
+                    isThai ? 'อัปเดตราคาตลาด' : 'Update Price',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  onPressed: () async {
+                    final ok = await MonthlyValuationScreen.show(context);
+                    if (ok == true && mounted) setState(() {});
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: FilledButton.tonalIcon(
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.payments_outlined, size: 20),
+                  label: Text(
+                    isThai ? 'บันทึกเงินปันผล' : 'Record Dividend',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  onPressed: () async {
+                    final ok = await DividendIncomeDialog.show(context);
+                    if (ok == true && mounted) setState(() {});
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
 
-          // 4. Compact 2-Button Control Bar: Filter & Sorting
+          // 5. Compact 2-Button Control Bar: Filter & Sorting
           Row(
             children: [
               // Button 1: Filter
@@ -838,6 +881,32 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
             }),
           ],
 
+          const SizedBox(height: 12),
+          // 6. Add Asset Button at end of list
+          Center(
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  side: BorderSide(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.5),
+                    width: 1.5,
+                  ),
+                ),
+                icon: const Icon(Icons.add_circle_outline, size: 20),
+                label: Text(
+                  isThai ? '+ เพิ่มสินทรัพย์ใหม่' : '+ Add New Asset',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5),
+                ),
+                onPressed: () async {
+                  final ok = await AssetFormDialog.show(context);
+                  if (ok == true && mounted) setState(() {});
+                },
+              ),
+            ),
+          ),
           const SizedBox(height: 80),
         ],
       ),

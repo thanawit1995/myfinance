@@ -14,8 +14,11 @@ import '../domain/notion_funds_parser.dart';
 import '../domain/notion_gold_import_executor.dart';
 import '../domain/notion_gold_parser.dart';
 import '../domain/notion_invest_parser.dart';
+import '../domain/dividend_excel_parser.dart';
+import '../domain/dividend_excel_import_executor.dart';
 import '../import_provider.dart';
 import 'column_mapping_dialog.dart';
+import 'dividend_excel_preview_dialog.dart';
 import 'import_history_screen.dart';
 import 'import_preview_dialog.dart';
 import 'money_big_plan_preview_dialog.dart';
@@ -65,8 +68,9 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
 
         // Check if Excel file (.xlsx / .xls)
         if (fileNameLower.endsWith('.xlsx') || fileNameLower.endsWith('.xls')) {
+          final isDividendExcel = fileNameLower.contains('ปันผล') || fileNameLower.contains('dividend');
           setState(() {
-            _selectedTemplate = 'money_big_plan';
+            _selectedTemplate = isDividendExcel ? 'dividend_foreign_excel' : 'money_big_plan';
             _pickedFileName = file.name;
             _excelBytes = fileBytes;
             _rawCsvRows = [];
@@ -171,6 +175,12 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
     // ─── Money BIG PLAN (Excel) path ─────────────────────────────────────────
     if (_selectedTemplate == 'money_big_plan') {
       await _proceedToMoneyBigPlanPreview();
+      return;
+    }
+
+    // ─── Foreign Dividend (Excel) path ───────────────────────────────────────
+    if (_selectedTemplate == 'dividend_foreign_excel') {
+      await _proceedToDividendExcelPreview();
       return;
     }
 
@@ -623,6 +633,108 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
     );
   }
 
+  /// Handles the foreign dividend Excel import preview flow.
+  Future<void> _proceedToDividendExcelPreview() async {
+    if (_excelBytes == null) return;
+
+    setState(() => _isProcessing = true);
+    try {
+      final rows = DividendExcelParser.parseExcelBytes(_excelBytes!);
+
+      if (!mounted) return;
+      setState(() => _isProcessing = false);
+
+      if (rows.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('ไม่พบข้อมูลเงินปันผลในไฟล์ Excel นี้'),
+            backgroundColor: VaultTheme.negative(context),
+          ),
+        );
+        return;
+      }
+
+      final result = await DividendExcelPreviewDialog.show(
+        context,
+        fileName: _pickedFileName ?? 'ปันผล.xlsx',
+        rows: rows,
+      );
+
+      if (result != null && mounted) {
+        _showDividendSuccessDialog(result);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาดในการอ่านไฟล์เงินปันผล: $e'),
+            backgroundColor: VaultTheme.negative(context),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showDividendSuccessDialog(DividendExcelImportSummary result) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.check_circle, color: VaultTheme.positive(context)),
+            const SizedBox(width: 8),
+            const Text('นำเข้าเงินปันผลสำเร็จ!'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('• นำเข้าสำเร็จ: ${result.imported} รายการ'),
+            if (result.skippedDuplicates > 0)
+              Text('• ข้ามรายการซ้ำ: ${result.skippedDuplicates}',
+                  style: const TextStyle(color: Colors.orange)),
+            if (result.errors.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              const Text('⚠️ มีข้อผิดพลาด:', style: TextStyle(color: Colors.red)),
+              ...result.errors.map((e) => Text('  • $e', style: const TextStyle(fontSize: 12))),
+            ],
+            const SizedBox(height: 12),
+            const Text(
+              'หมายเหตุ: รายการเงินปันผลถูกบันทึกเข้าบัญชี Dime! USD หมวดหมู่ดอกเบี้ยและเงินปันผล พร้อมประเภทภาษี 40(4) ต่างประเทศ และอัปเดตอัตราแลกเปลี่ยนอัตโนมัติ สามารถตรวจสอบหรือยกเลิกการนำเข้าได้ในหน้าประวัติ',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              setState(() {
+                _pickedFileName = null;
+                _excelBytes = null;
+                _rawCsvRows = [];
+                _currentMapping = null;
+              });
+            },
+            child: const Text('เสร็จสิ้น'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: VaultTheme.accent(context)),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ImportHistoryScreen()),
+              );
+            },
+            child: const Text('ดูประวัติการนำเข้า'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showSuccessDialog(CsvImportBatchResult result) {
     showDialog(
       context: context,
@@ -836,6 +948,19 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: _buildTemplateOption(
+                        id: 'dividend_foreign_excel',
+                        title: 'เงินปันผล US (ปันผล.xlsx)',
+                        subtitle: 'Dime! USD, ภาษี 15%, FX',
+                        icon: Icons.payments_outlined,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildTemplateOption(
                         id: 'custom',
                         title: 'CSV ทั่วไป',
                         subtitle: 'กำหนดคอลัมน์เอง',
@@ -874,7 +999,7 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
                         children: [
                           Icon(
                             _pickedFileName != null
-                                ? (_selectedTemplate == 'money_big_plan' ? Icons.table_chart : Icons.check_circle)
+                                ? (_selectedTemplate == 'money_big_plan' || _selectedTemplate == 'dividend_foreign_excel' ? Icons.table_chart : Icons.check_circle)
                                 : Icons.upload_file_outlined,
                             size: 44,
                             color: _pickedFileName != null ? VaultTheme.accent(context) : Colors.grey,
@@ -888,10 +1013,12 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
                               color: _pickedFileName != null ? VaultTheme.primaryText(context) : Colors.grey.shade600,
                             ),
                           ),
-                          if (_selectedTemplate == 'money_big_plan' && _excelBytes != null) ...[
+                          if ((_selectedTemplate == 'money_big_plan' || _selectedTemplate == 'dividend_foreign_excel') && _excelBytes != null) ...[
                             const SizedBox(height: 4),
                             Text(
-                              'พร้อมประมวลผลไฟล์ Excel Money BIG PLAN (${(_excelBytes!.length / 1024).toStringAsFixed(1)} KB)',
+                              _selectedTemplate == 'dividend_foreign_excel'
+                                  ? 'พร้อมประมวลผลไฟล์ Excel เงินปันผลต่างประเทศ (${(_excelBytes!.length / 1024).toStringAsFixed(1)} KB)'
+                                  : 'พร้อมประมวลผลไฟล์ Excel Money BIG PLAN (${(_excelBytes!.length / 1024).toStringAsFixed(1)} KB)',
                               style: TextStyle(fontSize: 12, color: VaultTheme.accent(context)),
                             ),
                           ] else if (_rawCsvRows.isNotEmpty) ...[
@@ -909,7 +1036,7 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
                 const SizedBox(height: 24),
 
                 // Step 3: Column Mapping Status & Preview Button
-                if (_pickedFileName != null && (_currentMapping != null || _isInvestTemplate || _selectedTemplate == 'money_big_plan')) ...[
+                if (_pickedFileName != null && (_currentMapping != null || _isInvestTemplate || _selectedTemplate == 'money_big_plan' || _selectedTemplate == 'dividend_foreign_excel')) ...[
                   const Text(
                     'ขั้นตอนที่ 3: ตรวจสอบและนำเข้า',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
@@ -923,7 +1050,20 @@ class _ImportWizardScreenState extends ConsumerState<ImportWizardScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (_selectedTemplate == 'money_big_plan') ...[
+                          if (_selectedTemplate == 'dividend_foreign_excel') ...[
+                            const Row(
+                              children: [
+                                Icon(Icons.check, color: Colors.green, size: 20),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'รูปแบบเงินปันผลหุ้นต่างประเทศ (บันทึกเข้าบัญชี Dime! USD, หมวดหมู่ดอกเบี้ยและเงินปันผล, ภาษี 40(4) ต่างประเทศ, อัปเดต FX Rate)',
+                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ] else if (_selectedTemplate == 'money_big_plan') ...[
                             const Row(
                               children: [
                                 Icon(Icons.check, color: Colors.green, size: 20),

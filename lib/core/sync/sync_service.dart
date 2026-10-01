@@ -222,6 +222,16 @@ class SyncService extends StateNotifier<SyncState> {
     state = state.copyWith(status: SyncStatus.syncing, errorMessage: null);
 
     try {
+      // 0. Auto-clean duplicates before sync to ensure local is pristine
+      final preDups = await _db.transactionsDao.deduplicateTransactions();
+      if (preDups.isNotEmpty && _auth.isLoggedIn) {
+        const chunkSize = 150;
+        for (var i = 0; i < preDups.length; i += chunkSize) {
+          final chunk = preDups.sublist(i, math.min(i + chunkSize, preDups.length));
+          await _supabase.from('transactions').delete().inFilter('id', chunk);
+        }
+      }
+
       final lastSync = forceFullSync ? null : state.lastSyncAt;
 
       // 1. Sync Accounts & Currencies
@@ -247,6 +257,16 @@ class SyncService extends StateNotifier<SyncState> {
 
       // 8. Sync Transactions
       await _syncTransactions(userId, lastSync);
+
+      // 9. Auto-clean duplicates after pull to guarantee zero duplicate rows
+      final postDups = await _db.transactionsDao.deduplicateTransactions();
+      if (postDups.isNotEmpty && _auth.isLoggedIn) {
+        const chunkSize = 150;
+        for (var i = 0; i < postDups.length; i += chunkSize) {
+          final chunk = postDups.sublist(i, math.min(i + chunkSize, postDups.length));
+          await _supabase.from('transactions').delete().inFilter('id', chunk);
+        }
+      }
 
       // Update Device State on Supabase (Active Device Wins)
       final deviceId = await _getOrCreateDeviceId();

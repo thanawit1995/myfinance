@@ -151,6 +151,12 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           "UPDATE transactions SET is_cleared = 1, work_period = NULL, expected_amount_satang = NULL WHERE transaction_type != 'income' AND is_cleared = 0;",
         );
+        await customStatement(
+          "UPDATE transactions SET source_account_id = destination_account_id WHERE (source_account_id IS NULL OR source_account_id = '') AND destination_account_id IS NOT NULL;",
+        );
+        await customStatement(
+          "UPDATE transactions SET destination_account_id = source_account_id WHERE (destination_account_id IS NULL OR destination_account_id = '') AND transaction_type = 'income' AND source_account_id IS NOT NULL;",
+        );
         await transactionsDao.cleanDistortedNotionNotes();
         await transactionsDao.alignIncomeDatesWithWorkPeriod();
         await insuranceDao.patchLegacyInsuranceTransactions();

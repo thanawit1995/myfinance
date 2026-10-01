@@ -810,6 +810,7 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
         amountThbSatang: netAmountThbSatang,
         feeThbSatang: Value(withholdingTaxThbSatang),
         withholdingTaxSatang: Value(withholdingTaxThbSatang),
+        sourceAccountId: Value(accountId),
         destinationAccountId: Value(accountId),
         assetId: Value(assetId),
         transactionDate: incomeDate,

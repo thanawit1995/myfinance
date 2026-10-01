@@ -47,8 +47,8 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
     super.initState();
     final tx = widget.transaction;
     _transactionType = tx.transactionType;
-    _selectedAccountId = tx.sourceAccountId;
-    _selectedDestinationAccountId = tx.destinationAccountId;
+    _selectedAccountId = tx.sourceAccountId ?? tx.destinationAccountId;
+    _selectedDestinationAccountId = tx.destinationAccountId ?? tx.sourceAccountId;
     _selectedCategoryId = tx.categoryId;
     _selectedTaxCategory = tx.taxCategory;
     _transactionDate = tx.transactionDate;
@@ -140,11 +140,13 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
         ? satang
         : (Decimal.fromInt(satang) * fxDecimal).round().toBigInt().toInt();
 
+    final resolvedAccountId = _selectedAccountId ?? widget.transaction.sourceAccountId ?? widget.transaction.destinationAccountId;
+
     final updatedTx = TransactionsCompanion(
       id: Value(widget.transaction.id),
       transactionType: Value(_transactionType),
-      sourceAccountId: Value(_selectedAccountId),
-      destinationAccountId: _transactionType == 'transfer' ? Value(_selectedDestinationAccountId) : const Value(null),
+      sourceAccountId: Value(resolvedAccountId),
+      destinationAccountId: _transactionType == 'transfer' ? Value(_selectedDestinationAccountId) : Value(resolvedAccountId),
       categoryId: _transactionType != 'transfer' ? Value(_selectedCategoryId) : const Value(null),
       amountOriginalSatang: Value(satang),
       currencyCode: Value(currency),
@@ -508,14 +510,22 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                         ],
                       );
                     } else {
+                      final effectiveAccountId = accounts.any((a) => a.id == _selectedAccountId)
+                          ? _selectedAccountId
+                          : (accounts.any((a) => a.id == widget.transaction.destinationAccountId)
+                              ? widget.transaction.destinationAccountId
+                              : (accounts.where((a) => a.currencyCode == widget.transaction.currencyCode).firstOrNull?.id ??
+                                  (accounts.isNotEmpty ? accounts.first.id : null)));
+
                       return DropdownButtonFormField<String>(
+                        key: ValueKey('acc_${effectiveAccountId}_${accounts.length}'),
                         decoration: const InputDecoration(
                           isDense: true,
                           contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           labelText: 'บัญชี',
                           border: OutlineInputBorder(),
                         ),
-                        initialValue: accounts.any((a) => a.id == _selectedAccountId) ? _selectedAccountId : null,
+                        value: effectiveAccountId,
                         items: accounts.map((a) => DropdownMenuItem(value: a.id, child: Text('${a.name} (${a.currencyCode})'))).toList(),
                         onChanged: (val) => setState(() => _selectedAccountId = val),
                       );

@@ -152,6 +152,7 @@ class DividendExcelImportExecutor {
           TransactionsCompanion.insert(
             id: txId,
             transactionType: 'income',
+            sourceAccountId: Value(dimeUsd.id),
             destinationAccountId: Value(dimeUsd.id),
             categoryId: Value(dividendCat.id),
             taxCategory: const Value('40_4_dividend_foreign'),

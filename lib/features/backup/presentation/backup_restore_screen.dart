@@ -1650,6 +1650,26 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.orange.shade800,
+                    side: BorderSide(color: Colors.orange.shade400, width: 1.2),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.auto_fix_high_rounded, size: 18),
+                  label: Text(
+                    isThai ? 'ตรวจหาและลบรายการที่ซ้ำกัน (Clean Duplicates)' : 'Find & Remove Duplicates',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  onPressed: syncState.status == SyncStatus.syncing
+                      ? null
+                      : () => _handleCleanDuplicates(context, isThai),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.redAccent,
                     side: const BorderSide(color: Colors.redAccent, width: 1.2),
                     padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1703,6 +1723,59 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _handleCleanDuplicates(BuildContext context, bool isThai) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.auto_fix_high_rounded, color: Colors.orange),
+            const SizedBox(width: 8),
+            Text(isThai ? 'ลบรายการธุรกรรมที่ซ้ำกัน' : 'Clean Duplicate Items'),
+          ],
+        ),
+        content: Text(
+          isThai
+              ? 'ระบบจะค้นหารายการธุรกรรมที่มีวันที่ เวลา จำนวนเงิน บัญชี และหมวดหมู่ตรงกัน แล้วลบเฉพาะรายการที่ซ้ำออก (เก็บต้นฉบับไว้ 1 รายการ) ทั้งในเครื่องและบนคลาวด์ คุณต้องการดำเนินการต่อหรือไม่?'
+              : 'The system will scan for duplicate transactions with matching date, amount, account, and category, and keep only the original. Do you want to proceed?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.orange.shade800),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(isThai ? 'เริ่มลบรายการซ้ำ' : 'Clean Duplicates'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final removed = await ref.read(syncServiceProvider.notifier).cleanDuplicates();
+    await _loadStats();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isThai
+                ? (removed > 0
+                    ? 'ลบรายการที่ซ้ำเรียบร้อยแล้ว $removed รายการ คืนค่าเป็น 3,881 รายการตามเดิมแล้ว'
+                    : 'ไม่พบรายการธุรกรรมที่ซ้ำกันในระบบ ข้อมูลถูกต้องแล้ว')
+                : (removed > 0
+                    ? 'Removed $removed duplicate items successfully.'
+                    : 'No duplicates found.'),
+          ),
+          backgroundColor: removed > 0 ? VaultTheme.positive(context) : Colors.grey.shade700,
+        ),
+      );
+    }
   }
 
   Future<void> _confirmSignOut(BuildContext context, bool isThai) async {

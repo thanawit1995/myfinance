@@ -1,32 +1,33 @@
 -- =============================================================================
--- myfinance — Supabase Schema Setup
--- Run this entire script in Supabase SQL Editor (once)
+-- myfinance — Supabase Schema Setup (Full System Sync)
+-- Run this entire script in Supabase SQL Editor
 -- =============================================================================
 
--- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- =============================================================================
--- TABLES (mirror SQLite schema + user_id for RLS)
+-- 1. TABLES
 -- =============================================================================
 
+-- Accounts
 CREATE TABLE IF NOT EXISTS public.accounts (
-  id                TEXT PRIMARY KEY,
-  user_id           UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  name              TEXT NOT NULL,
-  account_type      TEXT NOT NULL,
-  currency_code     TEXT NOT NULL DEFAULT 'THB',
-  is_domestic       BOOLEAN NOT NULL DEFAULT TRUE,
-  closing_day       INTEGER,
-  due_day           INTEGER,
+  id                  TEXT PRIMARY KEY,
+  user_id             UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name                TEXT NOT NULL,
+  account_type        TEXT NOT NULL,
+  currency_code       TEXT NOT NULL DEFAULT 'THB',
+  is_domestic         BOOLEAN NOT NULL DEFAULT TRUE,
+  closing_day         INTEGER,
+  due_day             INTEGER,
   credit_limit_satang BIGINT,
-  is_active         BOOLEAN NOT NULL DEFAULT TRUE,
-  sync_version      INTEGER NOT NULL DEFAULT 1,
-  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  deleted_at        TIMESTAMPTZ
+  is_active           BOOLEAN NOT NULL DEFAULT TRUE,
+  sync_version        INTEGER NOT NULL DEFAULT 1,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_at          TIMESTAMPTZ
 );
 
+-- Categories
 CREATE TABLE IF NOT EXISTS public.categories (
   id              TEXT PRIMARY KEY,
   user_id         UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -46,6 +47,7 @@ CREATE TABLE IF NOT EXISTS public.categories (
   deleted_at      TIMESTAMPTZ
 );
 
+-- Transactions
 CREATE TABLE IF NOT EXISTS public.transactions (
   id                      TEXT PRIMARY KEY,
   user_id                 UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -74,32 +76,50 @@ CREATE TABLE IF NOT EXISTS public.transactions (
   deleted_at              TIMESTAMPTZ
 );
 
+-- Budgets
 CREATE TABLE IF NOT EXISTS public.budgets (
   id            TEXT PRIMARY KEY,
   user_id       UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   category_id   TEXT NOT NULL,
   limit_satang  BIGINT NOT NULL,
-  period        TEXT NOT NULL DEFAULT 'monthly',
+  is_active     BOOLEAN NOT NULL DEFAULT TRUE,
   sync_version  INTEGER NOT NULL DEFAULT 1,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   deleted_at    TIMESTAMPTZ
 );
 
+-- Assets (Investments)
+CREATE TABLE IF NOT EXISTS public.assets (
+  id                  TEXT PRIMARY KEY,
+  user_id             UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  symbol              TEXT NOT NULL,
+  name                TEXT NOT NULL,
+  asset_type          TEXT NOT NULL,
+  currency_code       TEXT NOT NULL DEFAULT 'THB',
+  default_account_id  TEXT,
+  market              TEXT,
+  note                TEXT,
+  extra_details_json  TEXT,
+  sync_version        INTEGER NOT NULL DEFAULT 1,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_at          TIMESTAMPTZ
+);
+
+-- Insurance Policies
 CREATE TABLE IF NOT EXISTS public.insurance_policies (
   id                      TEXT PRIMARY KEY,
   user_id                 UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   policy_name             TEXT NOT NULL,
   insurance_type          TEXT NOT NULL,
-  company                 TEXT,
-  policy_number           TEXT,
-  start_date              DATE,
-  end_date                DATE,
-  due_date                DATE,
-  annual_premium_satang   BIGINT NOT NULL DEFAULT 0,
   sum_insured_satang      BIGINT NOT NULL DEFAULT 0,
   medical_coverage_satang BIGINT NOT NULL DEFAULT 0,
-  total_periods           INTEGER,
+  annual_premium_satang   BIGINT NOT NULL DEFAULT 0,
+  due_date                TIMESTAMPTZ,
+  total_periods           INTEGER NOT NULL DEFAULT 1,
+  payment_due_day         INTEGER,
+  payment_due_month       INTEGER,
   note                    TEXT,
   sync_version            INTEGER NOT NULL DEFAULT 1,
   created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -107,107 +127,103 @@ CREATE TABLE IF NOT EXISTS public.insurance_policies (
   deleted_at              TIMESTAMPTZ
 );
 
+-- Liabilities (Debts)
 CREATE TABLE IF NOT EXISTS public.liabilities (
-  id                TEXT PRIMARY KEY,
-  user_id           UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  name              TEXT NOT NULL,
-  liability_type    TEXT NOT NULL,
-  principal_satang  BIGINT NOT NULL DEFAULT 0,
-  interest_rate     TEXT,
-  monthly_payment_satang BIGINT NOT NULL DEFAULT 0,
-  start_date        DATE,
-  end_date          DATE,
-  note              TEXT,
-  sync_version      INTEGER NOT NULL DEFAULT 1,
-  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  deleted_at        TIMESTAMPTZ
+  id                        TEXT PRIMARY KEY,
+  user_id                   UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name                      TEXT NOT NULL,
+  liability_type            TEXT NOT NULL,
+  remaining_principal_satang BIGINT NOT NULL DEFAULT 0,
+  monthly_payment_satang    BIGINT NOT NULL DEFAULT 0,
+  interest_rate_percent     TEXT,
+  is_short_term             BOOLEAN NOT NULL DEFAULT FALSE,
+  linked_account_id         TEXT,
+  note                      TEXT,
+  sync_version              INTEGER NOT NULL DEFAULT 1,
+  created_at                TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at                TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_at                TIMESTAMPTZ
 );
 
-CREATE TABLE IF NOT EXISTS public.assets (
-  id            TEXT PRIMARY KEY,
-  user_id       UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  symbol        TEXT NOT NULL,
-  name          TEXT NOT NULL,
-  asset_type    TEXT NOT NULL,
-  currency_code TEXT NOT NULL DEFAULT 'THB',
-  note          TEXT,
-  sync_version  INTEGER NOT NULL DEFAULT 1,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  deleted_at    TIMESTAMPTZ
-);
-
+-- Recurring Rules
 CREATE TABLE IF NOT EXISTS public.recurring_rules (
-  id              TEXT PRIMARY KEY,
-  user_id         UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  name            TEXT NOT NULL,
-  account_id      TEXT,
-  category_id     TEXT,
-  transaction_type TEXT NOT NULL,
-  amount_satang   BIGINT NOT NULL DEFAULT 0,
-  frequency       TEXT NOT NULL,
-  next_due_date   DATE,
-  note            TEXT,
-  is_active       BOOLEAN NOT NULL DEFAULT TRUE,
-  sync_version    INTEGER NOT NULL DEFAULT 1,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  deleted_at      TIMESTAMPTZ
+  id                      TEXT PRIMARY KEY,
+  user_id                 UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  title                   TEXT NOT NULL,
+  transaction_type        TEXT NOT NULL,
+  source_account_id       TEXT NOT NULL,
+  destination_account_id  TEXT,
+  category_id             TEXT,
+  amount_satang           BIGINT NOT NULL DEFAULT 0,
+  currency_code           TEXT NOT NULL DEFAULT 'THB',
+  frequency               TEXT NOT NULL,
+  day_of_month            INTEGER,
+  next_run_date           TIMESTAMPTZ NOT NULL,
+  end_date                TIMESTAMPTZ,
+  is_active               BOOLEAN NOT NULL DEFAULT TRUE,
+  interval_units          INTEGER NOT NULL DEFAULT 1,
+  auto_post               BOOLEAN NOT NULL DEFAULT TRUE,
+  last_posted_date        TIMESTAMPTZ,
+  note                    TEXT,
+  sync_version            INTEGER NOT NULL DEFAULT 1,
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_at              TIMESTAMPTZ
+);
+
+-- Device State & Conflict Tracking
+CREATE TABLE IF NOT EXISTS public.sync_device_state (
+  user_id             UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  active_device_id    TEXT NOT NULL,
+  active_device_name  TEXT NOT NULL,
+  total_transactions  INTEGER NOT NULL DEFAULT 0,
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- =============================================================================
--- INDEXES (performance for sync queries)
+-- 2. INDEXES
 -- =============================================================================
 
-CREATE INDEX IF NOT EXISTS idx_transactions_user_updated ON public.transactions(user_id, updated_at);
-CREATE INDEX IF NOT EXISTS idx_accounts_user_updated     ON public.accounts(user_id, updated_at);
-CREATE INDEX IF NOT EXISTS idx_categories_user_updated   ON public.categories(user_id, updated_at);
-CREATE INDEX IF NOT EXISTS idx_budgets_user_updated      ON public.budgets(user_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_tx_user_updated   ON public.transactions(user_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_acc_user_updated  ON public.accounts(user_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_cat_user_updated  ON public.categories(user_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_bdg_user_updated  ON public.budgets(user_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_ast_user_updated  ON public.assets(user_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_ins_user_updated  ON public.insurance_policies(user_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_lia_user_updated  ON public.liabilities(user_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_rec_user_updated  ON public.recurring_rules(user_id, updated_at);
 
 -- =============================================================================
--- ROW LEVEL SECURITY (users can only see their own data)
+-- 3. ROW LEVEL SECURITY (RLS)
 -- =============================================================================
 
-ALTER TABLE public.accounts          ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.categories        ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.transactions      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.budgets           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.accounts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.budgets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.assets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.insurance_policies ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.liabilities       ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.assets            ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.recurring_rules   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.liabilities ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.recurring_rules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sync_device_state ENABLE ROW LEVEL SECURITY;
 
--- Policies: each user sees only their own rows
--- (DROP first to allow re-running this script safely)
+-- Helper to safely re-create policies
 DO $$
 DECLARE
   tbl TEXT;
 BEGIN
-  FOREACH tbl IN ARRAY ARRAY[
-    'accounts','categories','transactions','budgets',
-    'insurance_policies','liabilities','assets','recurring_rules'
-  ] LOOP
-    EXECUTE format('DROP POLICY IF EXISTS "user_owns_%1$s" ON public.%1$s;', tbl);
-    EXECUTE format('
-      CREATE POLICY "user_owns_%1$s"
-      ON public.%1$s
-      FOR ALL
-      TO authenticated
-      USING (user_id = auth.uid())
-      WITH CHECK (user_id = auth.uid());
-    ', tbl);
+  FOR tbl IN SELECT unnest(ARRAY[
+    'accounts', 'categories', 'transactions', 'budgets',
+    'assets', 'insurance_policies', 'liabilities', 'recurring_rules', 'sync_device_state'
+  ]) LOOP
+    EXECUTE format('DROP POLICY IF EXISTS "Users can view own %I" ON public.%I', tbl, tbl);
+    EXECUTE format('DROP POLICY IF EXISTS "Users can insert own %I" ON public.%I', tbl, tbl);
+    EXECUTE format('DROP POLICY IF EXISTS "Users can update own %I" ON public.%I', tbl, tbl);
+    EXECUTE format('DROP POLICY IF EXISTS "Users can delete own %I" ON public.%I', tbl, tbl);
+
+    EXECUTE format('CREATE POLICY "Users can view own %I" ON public.%I FOR SELECT USING (auth.uid() = user_id)', tbl, tbl);
+    EXECUTE format('CREATE POLICY "Users can insert own %I" ON public.%I FOR INSERT WITH CHECK (auth.uid() = user_id)', tbl, tbl);
+    EXECUTE format('CREATE POLICY "Users can update own %I" ON public.%I FOR UPDATE USING (auth.uid() = user_id)', tbl, tbl);
+    EXECUTE format('CREATE POLICY "Users can delete own %I" ON public.%I FOR DELETE USING (auth.uid() = user_id)', tbl, tbl);
   END LOOP;
 END $$;
-
--- =============================================================================
--- REALTIME (enable for high-frequency tables)
--- =============================================================================
-
-ALTER PUBLICATION supabase_realtime ADD TABLE public.transactions;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.accounts;
-
--- =============================================================================
--- DONE — copy the output URL to your Flutter app config
--- Project URL: https://dohnjjzypsvqdsjkqwli.supabase.co
--- =============================================================================

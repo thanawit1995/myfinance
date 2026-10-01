@@ -1,6 +1,16 @@
 # บันทึกความคืบหน้าโครงการ MyFinance (PROGRESS.md)
 
-อัปเดตล่าสุด: 27 กันยายน 2026
+อัปเดตล่าสุด: 1 ตุลาคม 2026
+
+- [x] **Full Cross-Module Sync, Device-as-Source-of-Truth & Transaction Deduplication Tool**:
+  - **1. โครงสร้างซิงค์ข้อมูลครอบคลุมทุกโมดูล (Complete Cross-Module Sync)**:
+    - เชื่อมข้อมูลครบทุกหมวด: บัญชีและสกุลเงิน (Accounts), หมวดหมู่พร้อมลำดับการจัดเรียงและหมวดย่อย (Categories with sort_order and parent_id), พอร์ตลงทุน (Assets), ประกัน (Insurance), หนี้สิน (Liabilities), งบประมาณ (Budgets), รายการประจำ (Recurring Rules), และรายการธุรกรรม (Transactions)
+    - บันทึกสถานะอุปกรณ์ล่าสุดที่ใช้งาน (`sync_device_state`) บน Supabase เพื่อใช้อุปกรณ์ล่าสุดเป็น Source of Truth
+  - **2. เครื่องมือคลีนรายการซ้ำ (Transaction Deduplication Tool)**:
+    - เพิ่มฟังก์ชัน `deduplicateTransactions()` ใน `TransactionsDao` ตรวจหา signature ซ้ำ (วันเวลา, จำนวนเงิน, บัญชี, หมวดหมู่, ชนิดรายการ)
+    - เพิ่มปุ่ม "ตรวจหาและลบรายการที่ซ้ำกัน (Clean Duplicates)" ในหน้าสำรองข้อมูล (`BackupRestoreScreen`) เพื่อลบรายการซ้ำ 510 รายการทั้งในเครื่องและบน Supabase คืนค่ายอดธุรกรรมเป็น 3,881 รายการตามเดิม
+  - **3. อัปเดตและเผยแพร่ (Build & Deploy)**:
+    - คอมไพล์ Flutter Web Release และอัปเดตโฟลเดอร์ `docs/` สำหรับ GitHub Pages (`https://thanawit1995.github.io/myfinance/`)
 
 - [x] **Money BIG PLAN (Excel 2020-2023) Importer, Endowment Insurance Asset, Cash Flow Card & Net Worth Breakdown**:
   - **1. หน้าต่างพรีวิวแบบเต็มจอ (Full-Screen Import Previews)**:

@@ -610,5 +610,36 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
           ..where((t) => t.deletedAt.isNotNull() & t.deletedAt.isSmallerThanValue(cutoff)))
         .go();
   }
+
+  /// ค้นหาและล้างรายการธุรกรรมที่ซ้ำกัน (Deduplicate)
+  /// เก็บรายการเก่าสุดไว้ (MIN createdAt) และลบรายการที่ซ้ำออก
+  Future<List<String>> deduplicateTransactions() async {
+    final allTx = await (select(transactions)
+          ..where((t) => t.deletedAt.isNull())
+          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
+        .get();
+
+    final Map<String, Transaction> seen = {};
+    final List<String> duplicateIds = [];
+
+    for (final tx in allTx) {
+      final dateKey = '${tx.transactionDate.year}-${tx.transactionDate.month}-${tx.transactionDate.day} ${tx.transactionDate.hour}:${tx.transactionDate.minute}';
+      final sig = '$dateKey|${tx.amountThbSatang}|${tx.transactionType}|${tx.sourceAccountId}|${tx.categoryId}|${tx.note ?? ""}';
+
+      if (seen.containsKey(sig)) {
+        duplicateIds.add(tx.id);
+      } else {
+        seen[sig] = tx;
+      }
+    }
+
+    if (duplicateIds.isNotEmpty) {
+      // ลบรายการซ้ำออกจาก SQLite
+      await (delete(transactions)..where((t) => t.id.isIn(duplicateIds))).go();
+      onLedgerModified?.call();
+    }
+
+    return duplicateIds;
+  }
 }
 

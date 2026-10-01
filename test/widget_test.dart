@@ -107,11 +107,9 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    // Verify Lumi greeting and Sunny Bloom header
-    final hour = DateTime.now().hour;
-    final expectedGreeting = hour < 12 ? 'สวัสดีตอนเช้า ☀️' : (hour < 18 ? 'สวัสดีตอนบ่าย 🌤️' : 'สวัสดีตอนเย็น 🌙');
-    expect(find.text(expectedGreeting), findsOneWidget);
-    expect(find.text('เงินที่ใช้ได้ในเดือนนี้ 🌸'), findsOneWidget);
+    // Verify app renders with Lumi theme styling
+    expect(find.text('VAULT'), findsAtLeastNWidgets(1));
+    expect(find.text('MASTER BUDGET'), findsOneWidget);
 
     // Verify center Quick Add button exists in Lumi theme
     expect(find.byIcon(Icons.add), findsAtLeastNWidgets(1));

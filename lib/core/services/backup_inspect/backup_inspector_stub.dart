@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import '../backup_crypto_helper.dart';
+import '../sqlite_reader/sqlite_reader.dart';
 import 'backup_inspection_result.dart';
 
 Future<BackupInspectionResult> inspectSqliteDatabaseFile(
@@ -73,11 +74,32 @@ Future<BackupInspectionResult> inspectSqliteDatabaseFile(
     );
   }
 
-  return BackupInspectionResult(
-    isValid: true,
-    isEncrypted: isEnc,
-    fileName: fileName,
-    sizeBytes: size,
-  );
-}
+  try {
+    final backupData = await readSqliteBackupData(decryptedBytes);
+    final sampleNames = backupData.accounts
+        .where((a) => a['deleted_at'] == null)
+        .map((a) => a['name']?.toString() ?? '')
+        .where((n) => n.isNotEmpty)
+        .take(5)
+        .toList();
 
+    return BackupInspectionResult(
+      isValid: true,
+      isEncrypted: isEnc,
+      totalAccounts: backupData.accountsCount,
+      sampleAccountNames: sampleNames,
+      totalTransactions: backupData.transactionsCount,
+      latestTransactionDate: backupData.latestTransactionDate,
+      fileName: fileName,
+      sizeBytes: size,
+    );
+  } catch (e) {
+    // If table inspection fails, fallback to basic valid format
+    return BackupInspectionResult(
+      isValid: true,
+      isEncrypted: isEnc,
+      fileName: fileName,
+      sizeBytes: size,
+    );
+  }
+}

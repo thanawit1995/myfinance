@@ -45,6 +45,18 @@ Future<bool> restoreWebDatabase(Uint8List bytes) async {
     final vaultDir = await driftDir
         .getDirectoryHandle('myfinance_vault', web.FileSystemGetDirectoryOptions(create: true))
         .toDart;
+
+    // Delete existing journal and WAL files in OPFS to prevent SQLite stale cache
+    try {
+      await vaultDir.removeEntry('database-journal').toDart;
+    } catch (_) {}
+    try {
+      await vaultDir.removeEntry('database-wal').toDart;
+    } catch (_) {}
+    try {
+      await vaultDir.removeEntry('database-shm').toDart;
+    } catch (_) {}
+
     final file = await vaultDir
         .getFileHandle('database', web.FileSystemGetFileOptions(create: true))
         .toDart;

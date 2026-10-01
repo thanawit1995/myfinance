@@ -2,13 +2,26 @@
 
 อัปเดตล่าสุด: 1 ตุลาคม 2026
 
+- [x] **Web SQLite Backup Reader, Restore Fix & Automated Deduplication (1 ต.ค. 2026)**:
+  - **1. แก้ไขปัญหาพรีวิวไฟล์สำรองแสดง 0 รายการ (Web SQLite Reader)**:
+    - สาเหตุที่เปิดไฟล์แบ็กอัปบน Edge แล้วไม่ขึ้นข้อมูล: ตัวตรวจไฟล์เดิมบนเว็บทำเพียงแค่เช็กหัวไฟล์ SQLite header แต่ไม่ได้อ่านตาราง ทำให้หน้าต่างพรีวิวแสดง 0 บัญชี 0 รายการ ผู้ใช้จึงคิดว่าไฟล์ไม่มีข้อมูล
+    - พัฒนา `sqlite_reader` ด้วย `WasmSqlite3` และ in-memory VFS สำหรับ WebAssembly ทำให้อ่านจำนวนบัญชี, ตัวอย่างชื่อบัญชี, จำนวนรายการจริง (3,881 รายการ) และวันที่ล่าสุดขึ้นหน้าต่าง Preview ได้ทันที
+  - **2. แก้ไขการกู้คืนฐานข้อมูลบนเบราว์เซอร์ (OPFS Cache Fix)**:
+    - ลบไฟล์ `database-wal`, `database-shm`, และ `database-journal` ที่อาจค้างอยู่ใน OPFS ก่อนบันทึกทับ เพื่อป้องกัน Chromium แคชข้อมูลเก่า
+    - อัปเดตสถิติหน้าจอทันทีเมื่อกู้คืนสำเร็จ และแจ้งเตือนให้กดตกลงเพื่อรีโหลดหน้าเว็บ
+  - **3. ตัดปุ่มล้างข้อมูลซ้ำตามคำขอ & รวมเข้าไพป์ไลน์ Sync อัตโนมัติ**:
+    - นำปุ่มตรวจหาและลบรายการซ้ำออกจากหน้าจอตามความต้องการของผู้ใช้
+    - ระบบ Deduplication ทำงานอัตโนมัติ 100% ทั้งก่อน push ขึ้นคลาวด์และหลัง pull ลงเครื่อง โดยผู้ใช้ไม่ต้องกดเอง
+  - **4. แก้ไขการนับงวดประกันจ่ายแล้ว (Insurance Paid Periods)**:
+    - คำนวณงวดประกันที่จ่ายแล้วจากปีที่ชำระจริง (Distinct Years) และจำกัดไม่เกินจำนวนงวดทั้งหมด (`totalPeriods`) แก้บั๊กแสดงผล 21/15 งวด
+
 - [x] **Full Cross-Module Sync, Device-as-Source-of-Truth & Transaction Deduplication Tool**:
   - **1. โครงสร้างซิงค์ข้อมูลครอบคลุมทุกโมดูล (Complete Cross-Module Sync)**:
     - เชื่อมข้อมูลครบทุกหมวด: บัญชีและสกุลเงิน (Accounts), หมวดหมู่พร้อมลำดับการจัดเรียงและหมวดย่อย (Categories with sort_order and parent_id), พอร์ตลงทุน (Assets), ประกัน (Insurance), หนี้สิน (Liabilities), งบประมาณ (Budgets), รายการประจำ (Recurring Rules), และรายการธุรกรรม (Transactions)
     - บันทึกสถานะอุปกรณ์ล่าสุดที่ใช้งาน (`sync_device_state`) บน Supabase เพื่อใช้อุปกรณ์ล่าสุดเป็น Source of Truth
-  - **2. เครื่องมือคลีนรายการซ้ำ (Transaction Deduplication Tool)**:
+  - **2. ระบบ Deduplication อัตโนมัติ**:
     - เพิ่มฟังก์ชัน `deduplicateTransactions()` ใน `TransactionsDao` ตรวจหา signature ซ้ำ (วันเวลา, จำนวนเงิน, บัญชี, หมวดหมู่, ชนิดรายการ)
-    - เพิ่มปุ่ม "ตรวจหาและลบรายการที่ซ้ำกัน (Clean Duplicates)" ในหน้าสำรองข้อมูล (`BackupRestoreScreen`) เพื่อลบรายการซ้ำ 510 รายการทั้งในเครื่องและบน Supabase คืนค่ายอดธุรกรรมเป็น 3,881 รายการตามเดิม
+    - รวมเข้ากับ `syncAll()` อัตโนมัติ
   - **3. อัปเดตและเผยแพร่ (Build & Deploy)**:
     - คอมไพล์ Flutter Web Release และอัปเดตโฟลเดอร์ `docs/` สำหรับ GitHub Pages (`https://thanawit1995.github.io/myfinance/`)
 

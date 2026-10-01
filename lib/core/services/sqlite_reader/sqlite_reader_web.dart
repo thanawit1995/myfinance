@@ -1,0 +1,80 @@
+import 'dart:typed_data';
+import 'package:sqlite3/wasm.dart';
+import 'sqlite_backup_data.dart';
+
+WasmSqlite3? _cachedSqlite3;
+InMemoryFileSystem? _cachedFs;
+
+Future<SqliteBackupData> readSqliteBackupData(Uint8List sqliteBytes) async {
+  final sqlite3 = _cachedSqlite3 ??= await WasmSqlite3.loadFromUrl(Uri.base.resolve('sqlite3.wasm'));
+  final fs = _cachedFs ??= InMemoryFileSystem();
+  try {
+    sqlite3.registerVirtualFileSystem(fs, makeDefault: true);
+  } catch (_) {
+    // Already registered, ignore
+  }
+
+  final filename = '/backup_temp_${DateTime.now().millisecondsSinceEpoch}.db';
+  final (file: file, outFlags: _) = fs.xOpen(
+    Sqlite3Filename(filename),
+    SqlFlag.SQLITE_OPEN_CREATE | SqlFlag.SQLITE_OPEN_READWRITE,
+  );
+  file.xWrite(sqliteBytes, 0);
+  file.xClose();
+
+  final db = sqlite3.open(filename);
+
+  List<Map<String, dynamic>> readTable(String tableName) {
+    try {
+      final result = db.select('SELECT * FROM $tableName');
+      return result.map((row) {
+        return <String, dynamic>{
+          for (final col in result.columnNames) col: row[col],
+        };
+      }).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  final accounts = readTable('accounts');
+  final categories = readTable('categories');
+  final transactions = readTable('transactions');
+  final assets = readTable('assets');
+  final insurance = readTable('insurance_policies');
+  final liabilities = readTable('liabilities');
+  final budgets = readTable('budgets');
+  final recurring = readTable('recurring_rules');
+
+  DateTime? latestDate;
+  try {
+    final maxDateRow = db.select('SELECT max(transaction_date) as m_date FROM transactions WHERE deleted_at IS NULL');
+    final mVal = maxDateRow.first['m_date'];
+    if (mVal is String && mVal.isNotEmpty) {
+      latestDate = DateTime.tryParse(mVal);
+    } else if (mVal is int) {
+      latestDate = mVal > 100000000000
+          ? DateTime.fromMillisecondsSinceEpoch(mVal)
+          : DateTime.fromMillisecondsSinceEpoch(mVal * 1000);
+    }
+  } catch (_) {}
+
+  db.dispose();
+  try {
+    fs.xDelete(filename, 0);
+  } catch (_) {}
+
+  return SqliteBackupData(
+    accountsCount: accounts.where((a) => a['deleted_at'] == null).length,
+    transactionsCount: transactions.where((t) => t['deleted_at'] == null).length,
+    latestTransactionDate: latestDate,
+    accounts: accounts,
+    categories: categories,
+    transactions: transactions,
+    assets: assets,
+    insurancePolicies: insurance,
+    liabilities: liabilities,
+    budgets: budgets,
+    recurringRules: recurring,
+  );
+}

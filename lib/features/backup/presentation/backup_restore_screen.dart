@@ -559,7 +559,17 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       if (ok) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('last_sync_timestamp', DateTime.now().toIso8601String());
-        await _loadStats();
+        if (kIsWeb) {
+          if (mounted) {
+            setState(() {
+              _currentAccountsCount = inspection.totalAccounts;
+              _currentTxCount = inspection.totalTransactions;
+              _currentDbSize = inspection.sizeBytes;
+            });
+          }
+        } else {
+          await _loadStats();
+        }
         if (!mounted) return;
         await showDialog(
           context: context,
@@ -574,8 +584,8 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
             ),
             content: Text(
               isThai
-                  ? 'นำเข้าข้อมูลจากไฟล์สำรองเรียบร้อยแล้ว กด "ตกลง" เพื่อรีโหลดหน้าเว็บและเริ่มใช้งานข้อมูลที่กู้คืนทันที'
-                  : 'Data restored successfully. Tap "OK" to reload and start using the restored data.',
+                  ? 'นำเข้าข้อมูลจากไฟล์สำรองเรียบร้อยแล้ว (${inspection.totalTransactions} รายการ) กด "ตกลง" เพื่อรีโหลดหน้าเว็บและเริ่มใช้งานข้อมูลที่กู้คืนทันที'
+                  : 'Data restored successfully (${inspection.totalTransactions} items). Tap "OK" to reload and start using the restored data.',
             ),
             actions: [
               FilledButton(

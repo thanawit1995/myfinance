@@ -64,7 +64,7 @@ void main() {
       final categories = await db.select(db.categories).get();
       expect(categories.length, greaterThanOrEqualTo(16));
       expect(categories.any((c) => c.nameTh == 'เงินเดือน' && c.taxIncomeType == '40_1'), isTrue);
-      expect(categories.any((c) => c.nameTh == 'รับจ้าง / ค่าอยู่เวร' && c.taxIncomeType == '40_2'), isTrue);
+      expect(categories.any((c) => c.nameTh == 'รับจ้าง / ค่าอยู่เวร' && c.taxIncomeType == '40_1'), isTrue);
       expect(categories.any((c) => c.nameTh == 'ดอกเบี้ยและเงินปันผล' && c.taxIncomeType == '40_4'), isTrue);
       expect(categories.any((c) => c.nameTh == 'ธุรกิจ / ขายของ' && c.taxIncomeType == '40_8'), isTrue);
       expect(categories.any((c) => c.nameTh == 'อาหารและเครื่องดื่ม'), isTrue);

@@ -234,9 +234,9 @@ class SyncStatusWidget extends ConsumerWidget {
                   onPressed: state.status == SyncStatus.syncing
                       ? null
                       : () {
-                          Navigator.of(ctx).pop();
-                          ref.read(syncServiceProvider.notifier).syncAll(forceFullSync: true);
-                        },
+                            Navigator.of(ctx).pop();
+                            ref.read(syncServiceProvider.notifier).syncAll(forceFullSync: true);
+                          },
                   child: Text(isThai ? 'ซิงค์ทั้งหมดใหม่' : 'Full Re-sync'),
                 ),
                 const SizedBox(width: 8),
@@ -254,10 +254,127 @@ class SyncStatusWidget extends ConsumerWidget {
                 ),
               ],
             ),
+            if (user != null) ...[
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.cloud_upload_outlined, color: Colors.amber, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          isThai ? 'ต้องการให้เครื่องนี้เป็น Master เขียนทับคลาวด์?' : 'Set This Device as Master?',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isThai
+                          ? 'หากข้อมูลในเครื่องนี้ถูกต้องแล้ว และต้องการลบข้อมูลเก่าบน Google Cloud ทิ้งทั้งหมดเพื่อใช้อันนี้แทน'
+                          : 'If local data is clean and you want to wipe & overwrite cloud with this device, use Force Push.',
+                      style: const TextStyle(fontSize: 11.5, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.deepOrange.shade700,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: state.status == SyncStatus.syncing
+                            ? null
+                            : () => _confirmForcePush(context, ref, isThai),
+                        icon: const Icon(Icons.upload_rounded, size: 18),
+                        label: Text(
+                          isThai ? 'เขียนทับข้อมูลบนคลาวด์ด้วยเครื่องนี้ 100%' : 'Force Push Local to Cloud',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _confirmForcePush(BuildContext context, WidgetRef ref, bool isThai) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.deepOrange),
+            const SizedBox(width: 8),
+            Text(isThai ? 'ยืนยันเขียนทับคลาวด์ (Force Push)' : 'Confirm Force Push'),
+          ],
+        ),
+        content: Text(
+          isThai
+              ? 'ระบบจะนำข้อมูลทั้งหมดในเครื่องนี้ขึ้นไปแทนที่บน Google Cloud 100% และลบข้อมูลธุรกรรมเก่าที่มีอยู่บนคลาวด์ทิ้ง\n\n'
+                'เหมาะสำหรับ:\n'
+                '• คุณเพิ่งกู้คืนไฟล์สำรอง (Backup) มาใหม่\n'
+                '• ข้อมูลบนคลาวด์มีรายการเก่าที่ผิดพลาดหรือซ้ำซ้อน\n\n'
+                'คุณแน่ใจหรือไม่ว่าต้องการดำเนินการ?'
+              : 'This will replace all transactions on the cloud with your current local database.\n\nAre you sure you want to proceed?',
+          style: const TextStyle(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.deepOrange),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(isThai ? 'ยืนยันเขียนทับคลาวด์' : 'Confirm Overwrite'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      Navigator.of(context).pop(); // close bottom sheet
+      final scaffoldMessenger = ScaffoldMessenger.of(context);
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text(isThai ? 'กำลังส่งข้อมูลขึ้นไปเขียนทับบนคลาวด์...' : 'Force pushing data to cloud...'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+
+      final ok = await ref.read(syncServiceProvider.notifier).forcePushLocalToCloud();
+      if (ok) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text(isThai ? 'เขียนทับข้อมูลบนคลาวด์สำเร็จเรียบร้อย! คลาวด์เป็นข้อมูลล่าสุดแล้ว' : 'Cloud successfully overwritten with local data!'),
+            backgroundColor: Colors.teal,
+          ),
+        );
+      } else {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text(isThai ? 'เกิดข้อผิดพลาดในการเขียนทับคลาวด์' : 'Failed to overwrite cloud data'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
   }
 
   Widget _infoRow(String label, String value) {

@@ -55,8 +55,22 @@ class SyncService extends StateNotifier<SyncState> {
 
   static const _prefLastSync = 'last_sync_timestamp';
   static const _prefDeviceId = 'myfinance_device_id';
+  static const _prefForcePushNext = 'pref_force_push_next_sync';
   StreamSubscription? _connectivitySub;
   StreamSubscription? _authSub;
+
+  /// ตั้งค่าสถานะให้การเชื่อมต่อครั้งถัดไปทำ Force Push (เขียนทับคลาวด์) แทนการดึงข้อมูลเก่า
+  static Future<void> markForcePushNext() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_prefForcePushNext, true);
+    debugPrint('[Sync] Marked force_push_next_sync = true');
+  }
+
+  /// ตรวจสอบว่ามีการตั้งค่าให้ Force Push ในครั้งถัดไปหรือไม่
+  static Future<bool> isForcePushNextMarked() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_prefForcePushNext) ?? false;
+  }
 
   SyncService(this._supabase, this._db, this._auth)
       : super(const SyncState()) {
@@ -85,25 +99,40 @@ class SyncService extends StateNotifier<SyncState> {
       state = state.copyWith(lastSyncAt: DateTime.tryParse(ts));
     }
 
-    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
+    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) async {
       final online = results.any((r) => r != ConnectivityResult.none);
       if (online && _auth.isLoggedIn) {
-        syncAll(forceFullSync: true);
+        final p = await SharedPreferences.getInstance();
+        if (p.getBool(_prefForcePushNext) ?? false) {
+          await forcePushLocalToCloud();
+        } else {
+          syncAll(forceFullSync: true);
+        }
       } else if (!online) {
         state = state.copyWith(status: SyncStatus.offline);
       }
     });
 
-    _authSub = _supabase.auth.onAuthStateChange.listen((data) {
+    _authSub = _supabase.auth.onAuthStateChange.listen((data) async {
       if (data.session != null) {
-        syncAll(forceFullSync: true);
+        final p = await SharedPreferences.getInstance();
+        if (p.getBool(_prefForcePushNext) ?? false) {
+          await forcePushLocalToCloud();
+        } else {
+          syncAll(forceFullSync: true);
+        }
       } else {
         state = const SyncState();
       }
     });
 
     if (_auth.isLoggedIn) {
-      await syncAll(forceFullSync: false);
+      final p = await SharedPreferences.getInstance();
+      if (p.getBool(_prefForcePushNext) ?? false) {
+        await forcePushLocalToCloud();
+      } else {
+        await syncAll(forceFullSync: false);
+      }
     }
   }
 
@@ -172,10 +201,15 @@ class SyncService extends StateNotifier<SyncState> {
     state = state.copyWith(status: SyncStatus.syncing, errorMessage: null);
 
     try {
-      // 1. ลบรายการธุรกรรมบน Supabase ของผู้ใช้นี้ทั้งหมดเพื่อเคลียร์ความซ้ำซ้อน
+      // 1. Push ตารางหลักขึ้นไปก่อน (บัญชี หมวดหมู่ สินทรัพย์) แบบ Push-Only ห้ามดึงข้อมูลเก่ากลับมา
+      await _syncAccounts(userId, null, pushOnly: true);
+      await _syncCategories(userId, null, pushOnly: true);
+      await _syncAssets(userId, null, pushOnly: true);
+
+      // 2. ลบรายการธุรกรรมบน Supabase ของผู้ใช้นี้ทั้งหมดเพื่อเคลียร์ความซ้ำซ้อน
       await _supabase.from('transactions').delete().eq('user_id', userId);
 
-      // 2. ดึงรายการธุรกรรมที่สะอาดจาก SQLite ในเครื่องทั้งหมด
+      // 3. ดึงรายการธุรกรรมที่สะอาดจาก SQLite ในเครื่องทั้งหมด และอัปโหลดขึ้นไปแทนที่
       final localTx = await (_db.select(_db.transactions)..where((t) => t.deletedAt.isNull())).get();
       const chunkSize = 200;
       for (var i = 0; i < localTx.length; i += chunkSize) {
@@ -184,26 +218,37 @@ class SyncService extends StateNotifier<SyncState> {
         await _supabase.from('transactions').insert(payload);
       }
 
-      // 3. Push โมดูลอื่นๆ ขึ้นคลาวด์
-      await _syncAccounts(userId, null);
-      await _syncCategories(userId, null);
-      await _syncAssets(userId, null);
-      await _syncInsurance(userId, null);
-      await _syncLiabilities(userId, null);
-      await _syncBudgets(userId, null);
-      await _syncRecurring(userId, null);
+      // 4. Push โมดูลอื่นๆ ขึ้นคลาวด์แบบ Push-Only
+      await _syncInsurance(userId, null, pushOnly: true);
+      await _syncLiabilities(userId, null, pushOnly: true);
+      await _syncBudgets(userId, null, pushOnly: true);
+      await _syncRecurring(userId, null, pushOnly: true);
+
+      // 5. บันทึกสถานะว่าเครื่องนี้เป็น Master บน Supabase
+      final deviceId = await _getOrCreateDeviceId();
+      final devName = _getDeviceDisplayName();
+      try {
+        await _supabase.from('sync_device_state').upsert({
+          'user_id': userId,
+          'active_device_id': deviceId,
+          'active_device_name': devName,
+          'total_transactions': localTx.length,
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+      } catch (_) {}
 
       final now = DateTime.now();
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_prefLastSync, now.toIso8601String());
+      await prefs.remove(_prefForcePushNext);
 
-      final devName = _getDeviceDisplayName();
       state = state.copyWith(
         status: SyncStatus.idle,
         lastSyncAt: now,
         masterDeviceName: devName,
         totalSynced: localTx.length,
       );
+      debugPrint('[Sync] Force Push complete: ${localTx.length} transactions uploaded.');
       return true;
     } catch (e) {
       debugPrint('[Sync] Error force pushing to cloud: $e');
@@ -306,7 +351,7 @@ class SyncService extends StateNotifier<SyncState> {
 
   // ─── 1. Accounts ────────────────────────────────────────────────────────────
 
-  Future<void> _syncAccounts(String userId, DateTime? lastSync) async {
+  Future<void> _syncAccounts(String userId, DateTime? lastSync, {bool pushOnly = false}) async {
     final q = _db.select(_db.accounts);
     if (lastSync != null) q.where((t) => t.updatedAt.isBiggerThanValue(lastSync));
     final localRows = await q.get();
@@ -330,6 +375,8 @@ class SyncService extends StateNotifier<SyncState> {
       }).toList();
       await _supabase.from('accounts').upsert(payload, onConflict: 'id');
     }
+
+    if (pushOnly) return;
 
     var query = _supabase.from('accounts').select().eq('user_id', userId);
     if (lastSync != null) query = query.gt('updated_at', lastSync.toIso8601String());
@@ -365,7 +412,7 @@ class SyncService extends StateNotifier<SyncState> {
 
   // ─── 2. Categories ──────────────────────────────────────────────────────────
 
-  Future<void> _syncCategories(String userId, DateTime? lastSync) async {
+  Future<void> _syncCategories(String userId, DateTime? lastSync, {bool pushOnly = false}) async {
     final q = _db.select(_db.categories)..where((c) => c.isSystem.equals(false));
     if (lastSync != null) q.where((c) => c.updatedAt.isBiggerThanValue(lastSync));
     final localRows = await q.get();
@@ -391,6 +438,8 @@ class SyncService extends StateNotifier<SyncState> {
       }).toList();
       await _supabase.from('categories').upsert(payload, onConflict: 'id');
     }
+
+    if (pushOnly) return;
 
     var query = _supabase.from('categories').select().eq('user_id', userId).eq('is_system', false);
     if (lastSync != null) query = query.gt('updated_at', lastSync.toIso8601String());
@@ -428,7 +477,7 @@ class SyncService extends StateNotifier<SyncState> {
 
   // ─── 3. Assets (Investments) ────────────────────────────────────────────────
 
-  Future<void> _syncAssets(String userId, DateTime? lastSync) async {
+  Future<void> _syncAssets(String userId, DateTime? lastSync, {bool pushOnly = false}) async {
     try {
       final q = _db.select(_db.assets);
       if (lastSync != null) q.where((t) => t.updatedAt.isBiggerThanValue(lastSync));
@@ -452,6 +501,8 @@ class SyncService extends StateNotifier<SyncState> {
         }).toList();
         await _supabase.from('assets').upsert(payload, onConflict: 'id');
       }
+
+      if (pushOnly) return;
 
       var query = _supabase.from('assets').select().eq('user_id', userId);
       if (lastSync != null) query = query.gt('updated_at', lastSync.toIso8601String());
@@ -489,7 +540,7 @@ class SyncService extends StateNotifier<SyncState> {
 
   // ─── 4. Insurance Policies ──────────────────────────────────────────────────
 
-  Future<void> _syncInsurance(String userId, DateTime? lastSync) async {
+  Future<void> _syncInsurance(String userId, DateTime? lastSync, {bool pushOnly = false}) async {
     try {
       final q = _db.select(_db.insurancePolicies);
       if (lastSync != null) q.where((t) => t.updatedAt.isBiggerThanValue(lastSync));
@@ -516,6 +567,8 @@ class SyncService extends StateNotifier<SyncState> {
         }).toList();
         await _supabase.from('insurance_policies').upsert(payload, onConflict: 'id');
       }
+
+      if (pushOnly) return;
 
       var query = _supabase.from('insurance_policies').select().eq('user_id', userId);
       if (lastSync != null) query = query.gt('updated_at', lastSync.toIso8601String());
@@ -556,7 +609,7 @@ class SyncService extends StateNotifier<SyncState> {
 
   // ─── 5. Liabilities (Debts) ─────────────────────────────────────────────────
 
-  Future<void> _syncLiabilities(String userId, DateTime? lastSync) async {
+  Future<void> _syncLiabilities(String userId, DateTime? lastSync, {bool pushOnly = false}) async {
     try {
       final q = _db.select(_db.liabilities);
       if (lastSync != null) q.where((t) => t.updatedAt.isBiggerThanValue(lastSync));
@@ -581,6 +634,8 @@ class SyncService extends StateNotifier<SyncState> {
         }).toList();
         await _supabase.from('liabilities').upsert(payload, onConflict: 'id');
       }
+
+      if (pushOnly) return;
 
       var query = _supabase.from('liabilities').select().eq('user_id', userId);
       if (lastSync != null) query = query.gt('updated_at', lastSync.toIso8601String());
@@ -619,7 +674,7 @@ class SyncService extends StateNotifier<SyncState> {
 
   // ─── 6. Budgets ─────────────────────────────────────────────────────────────
 
-  Future<void> _syncBudgets(String userId, DateTime? lastSync) async {
+  Future<void> _syncBudgets(String userId, DateTime? lastSync, {bool pushOnly = false}) async {
     try {
       final q = _db.select(_db.budgets);
       if (lastSync != null) q.where((t) => t.updatedAt.isBiggerThanValue(lastSync));
@@ -638,6 +693,8 @@ class SyncService extends StateNotifier<SyncState> {
         }).toList();
         await _supabase.from('budgets').upsert(payload, onConflict: 'id');
       }
+
+      if (pushOnly) return;
 
       var query = _supabase.from('budgets').select().eq('user_id', userId);
       if (lastSync != null) query = query.gt('updated_at', lastSync.toIso8601String());
@@ -670,7 +727,7 @@ class SyncService extends StateNotifier<SyncState> {
 
   // ─── 7. Recurring Rules ─────────────────────────────────────────────────────
 
-  Future<void> _syncRecurring(String userId, DateTime? lastSync) async {
+  Future<void> _syncRecurring(String userId, DateTime? lastSync, {bool pushOnly = false}) async {
     try {
       final q = _db.select(_db.recurringRules);
       if (lastSync != null) q.where((t) => t.updatedAt.isBiggerThanValue(lastSync));
@@ -702,6 +759,8 @@ class SyncService extends StateNotifier<SyncState> {
         }).toList();
         await _supabase.from('recurring_rules').upsert(payload, onConflict: 'id');
       }
+
+      if (pushOnly) return;
 
       var query = _supabase.from('recurring_rules').select().eq('user_id', userId);
       if (lastSync != null) query = query.gt('updated_at', lastSync.toIso8601String());

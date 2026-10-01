@@ -347,32 +347,77 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       setState(() => _isLoading = false);
 
       if (ok) {
+        await SyncService.markForcePushNext();
         await _loadStats();
         if (!mounted) return;
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (ctx) => AlertDialog(
-            title: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.teal),
-                const SizedBox(width: 8),
-                Text(isThai ? 'กู้คืนข้อมูลสำเร็จ' : 'Restore Complete'),
+
+        final isLoggedIn = ref.read(authServiceProvider).isLoggedIn;
+        if (isLoggedIn) {
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (ctx) => AlertDialog(
+              title: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.teal),
+                  const SizedBox(width: 8),
+                  Text(isThai ? 'กู้คืนข้อมูลสำเร็จ' : 'Restore Complete'),
+                ],
+              ),
+              content: Text(
+                isThai
+                    ? 'กู้คืนข้อมูลจากเวอร์ชั่นที่เลือกเรียบร้อยแล้ว\n\n'
+                      '💡 แนะนำ: เนื่องจากคุณเข้าสู่ระบบ Google ไว้อยู่ คุณต้องการส่งข้อมูลชุดนี้ขึ้นไปเขียนทับบน Google Cloud ทันทีเลยหรือไม่? (เพื่อล้างข้อมูลเก่าบนคลาวด์ทิ้ง และให้อุปกรณ์อื่นซิงค์ได้ตรงกัน 100%)'
+                    : 'Data restored successfully from selected version.\n\nWould you like to overwrite Google Cloud with this clean data now?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(isThai ? 'กู้คืนเฉพาะในเครื่องนี้' : 'Local Only'),
+                ),
+                FilledButton(
+                  style: FilledButton.styleFrom(backgroundColor: Colors.deepOrange),
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(isThai ? 'กำลังส่งข้อมูลขึ้นไปเขียนทับบนคลาวด์...' : 'Force pushing to cloud...'),
+                      ),
+                    );
+                    await ref.read(syncServiceProvider.notifier).forcePushLocalToCloud();
+                  },
+                  child: Text(isThai ? 'เขียนทับคลาวด์ทันที (Force Push)' : 'Force Push to Cloud'),
+                ),
               ],
             ),
-            content: Text(
-              isThai
-                  ? 'กู้คืนข้อมูลจากเวอร์ชั่นที่เลือกเรียบร้อยแล้ว แนะนำให้ปิดและเปิดแอปใหม่อีกครั้งเพื่อให้ทุกหน้าแสดงผลสมบูรณ์'
-                  : 'Data restored successfully from selected version. Please restart the app for all changes to take full effect.',
-            ),
-            actions: [
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(isThai ? 'ตกลง' : 'OK'),
+          );
+        } else {
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (ctx) => AlertDialog(
+              title: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.teal),
+                  const SizedBox(width: 8),
+                  Text(isThai ? 'กู้คืนข้อมูลสำเร็จ' : 'Restore Complete'),
+                ],
               ),
-            ],
-          ),
-        );
+              content: Text(
+                isThai
+                    ? 'กู้คืนข้อมูลจากเวอร์ชั่นที่เลือกเรียบร้อยแล้ว แนะนำให้ปิดและเปิดแอปใหม่อีกครั้งเพื่อให้ทุกหน้าแสดงผลสมบูรณ์\n\n'
+                      '📌 ระบบได้ตั้งค่าให้เครื่องนี้เป็น Master เรียบร้อย หากคุณเข้าสู่ระบบ Google ในภายหลัง ระบบจะส่งข้อมูลชุดนี้ขึ้นไปเขียนทับบนคลาวด์ให้อัตโนมัติ โดยไม่ดึงข้อมูลเก่ากลับมาทับ'
+                    : 'Data restored successfully from selected version. This device is now marked as master for future sync.',
+              ),
+              actions: [
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(isThai ? 'ตกลง' : 'OK'),
+                ),
+              ],
+            ),
+          );
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -571,6 +616,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       setState(() => _isLoading = false);
 
       if (ok) {
+        await SyncService.markForcePushNext();
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('last_sync_timestamp', DateTime.now().toIso8601String());
         if (kIsWeb) {
@@ -585,35 +631,87 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
           await _loadStats();
         }
         if (!mounted) return;
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (ctx) => AlertDialog(
-            title: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.teal),
-                const SizedBox(width: 8),
-                Text(isThai ? 'กู้คืนข้อมูลสำเร็จ' : 'Restore Complete'),
+
+        final isLoggedIn = ref.read(authServiceProvider).isLoggedIn;
+        if (isLoggedIn) {
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (ctx) => AlertDialog(
+              title: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.teal),
+                  const SizedBox(width: 8),
+                  Text(isThai ? 'กู้คืนข้อมูลสำเร็จ' : 'Restore Complete'),
+                ],
+              ),
+              content: Text(
+                isThai
+                    ? 'นำเข้าข้อมูลจากไฟล์สำรองเรียบร้อยแล้ว (${inspection.totalTransactions} รายการ)\n\n'
+                      '💡 แนะนำ: เนื่องจากคุณเข้าสู่ระบบ Google ไว้อยู่ คุณต้องการส่งข้อมูลชุดนี้ขึ้นไปเขียนทับบน Google Cloud ทันทีเลยหรือไม่? (เพื่อล้างข้อมูลเก่าบนคลาวด์ทิ้ง และให้อุปกรณ์อื่นซิงค์ได้ตรงกัน 100%)'
+                    : 'Data restored successfully (${inspection.totalTransactions} items).\n\nWould you like to overwrite Google Cloud with this clean data now?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    if (kIsWeb) {
+                      reloadWebPage();
+                    }
+                  },
+                  child: Text(isThai ? 'กู้คืนเฉพาะในเครื่องนี้' : 'Local Only'),
+                ),
+                FilledButton(
+                  style: FilledButton.styleFrom(backgroundColor: Colors.deepOrange),
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(isThai ? 'กำลังส่งข้อมูลขึ้นไปเขียนทับบนคลาวด์...' : 'Force pushing to cloud...'),
+                      ),
+                    );
+                    await ref.read(syncServiceProvider.notifier).forcePushLocalToCloud();
+                    if (kIsWeb) {
+                      reloadWebPage();
+                    }
+                  },
+                  child: Text(isThai ? 'เขียนทับคลาวด์ทันที (Force Push)' : 'Force Push to Cloud'),
+                ),
               ],
             ),
-            content: Text(
-              isThai
-                  ? 'นำเข้าข้อมูลจากไฟล์สำรองเรียบร้อยแล้ว (${inspection.totalTransactions} รายการ) กด "ตกลง" เพื่อรีโหลดหน้าเว็บและเริ่มใช้งานข้อมูลที่กู้คืนทันที'
-                  : 'Data restored successfully (${inspection.totalTransactions} items). Tap "OK" to reload and start using the restored data.',
-            ),
-            actions: [
-              FilledButton(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  if (kIsWeb) {
-                    reloadWebPage();
-                  }
-                },
-                child: Text(isThai ? 'ตกลง (รีโหลดหน้าเว็บ)' : 'OK (Reload)'),
+          );
+        } else {
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (ctx) => AlertDialog(
+              title: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.teal),
+                  const SizedBox(width: 8),
+                  Text(isThai ? 'กู้คืนข้อมูลสำเร็จ' : 'Restore Complete'),
+                ],
               ),
-            ],
-          ),
-        );
+              content: Text(
+                isThai
+                    ? 'นำเข้าข้อมูลจากไฟล์สำรองเรียบร้อยแล้ว (${inspection.totalTransactions} รายการ)\n\n'
+                      '📌 ระบบได้ตั้งค่าให้เครื่องนี้เป็น Master เรียบร้อย หากคุณเข้าสู่ระบบ Google ในภายหลัง ระบบจะส่งข้อมูลชุดนี้ขึ้นไปเขียนทับบนคลาวด์ให้อัตโนมัติ โดยไม่ดึงข้อมูลเก่ากลับมาทับ'
+                    : 'Data restored successfully (${inspection.totalTransactions} items). This device is now marked as master for future sync.',
+              ),
+              actions: [
+                FilledButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    if (kIsWeb) {
+                      reloadWebPage();
+                    }
+                  },
+                  child: Text(isThai ? 'ตกลง (รีโหลดหน้าเว็บ)' : 'OK (Reload)'),
+                ),
+              ],
+            ),
+          );
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1651,6 +1749,57 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
 
             // Action Buttons
             if (isLoggedIn) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.security_update_warning_rounded, color: Colors.amber, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          isThai ? 'ต้องการให้เครื่องนี้เป็น Master เขียนทับคลาวด์?' : 'Set This Device as Master?',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isThai
+                          ? 'หากคุณเพิ่งกู้คืนไฟล์สำรองมา หรือข้อมูลในเครื่องนี้เป็นฉบับที่ถูกต้องที่สุด และต้องการลบข้อมูลเก่าบน Google Cloud ทิ้งทั้งหมดเพื่อใช้อันนี้แทน ให้กดปุ่มนี้'
+                          : 'If local data is clean and you want to wipe & overwrite cloud with this device, use Force Push.',
+                      style: const TextStyle(fontSize: 11.5, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.deepOrange.shade700,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: _isLoading || syncState.status == SyncStatus.syncing
+                            ? null
+                            : _handleForcePushFromScreen,
+                        icon: const Icon(Icons.upload_rounded, size: 20),
+                        label: Text(
+                          isThai ? 'เขียนทับข้อมูลบนคลาวด์ด้วยเครื่องนี้ 100% (Force Push)' : 'Force Push Local to Cloud',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
@@ -1738,6 +1887,74 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     );
   }
 
+
+  Future<void> _handleForcePushFromScreen() async {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.deepOrange),
+            const SizedBox(width: 8),
+            Text(isThai ? 'ยืนยันเขียนทับคลาวด์ (Force Push)' : 'Confirm Force Push'),
+          ],
+        ),
+        content: Text(
+          isThai
+              ? 'ระบบจะนำข้อมูลทั้งหมดในเครื่องนี้ ($_currentTxCount รายการ) ขึ้นไปแทนที่บน Google Cloud 100% และลบข้อมูลธุรกรรมเก่าที่มีอยู่บนคลาวด์ทิ้งทั้งหมด\n\n'
+                'เหมาะสำหรับ:\n'
+                '• คุณเพิ่งกู้คืนไฟล์สำรอง (Backup) มาใหม่\n'
+                '• ข้อมูลบนคลาวด์มีรายการเก่าที่ผิดพลาดหรือซ้ำซ้อน\n\n'
+                'คุณแน่ใจหรือไม่ว่าต้องการดำเนินการ?'
+              : 'This will replace all transactions on the cloud with your current local database ($_currentTxCount items).\n\nAre you sure you want to proceed?',
+          style: const TextStyle(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.deepOrange),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(isThai ? 'ยืนยันเขียนทับคลาวด์' : 'Confirm Overwrite'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      setState(() => _isLoading = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isThai ? 'กำลังส่งข้อมูลขึ้นไปเขียนทับบนคลาวด์...' : 'Force pushing data to cloud...'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+
+      final ok = await ref.read(syncServiceProvider.notifier).forcePushLocalToCloud();
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      if (ok) {
+        await _loadStats();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isThai ? 'เขียนทับข้อมูลบนคลาวด์สำเร็จเรียบร้อย! คลาวด์เป็นข้อมูลล่าสุดแล้ว' : 'Cloud successfully overwritten with local data!'),
+            backgroundColor: VaultTheme.positive(context),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isThai ? 'เกิดข้อผิดพลาดในการเขียนทับคลาวด์' : 'Failed to overwrite cloud data'),
+            backgroundColor: VaultTheme.negative(context),
+          ),
+        );
+      }
+    }
+  }
 
   Future<void> _confirmSignOut(BuildContext context, bool isThai) async {
     final confirm = await showDialog<bool>(

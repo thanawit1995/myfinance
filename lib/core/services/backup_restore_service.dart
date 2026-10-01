@@ -390,37 +390,48 @@ class BackupRestoreService {
       }
 
       await db.transaction(() async {
-        if (data.accounts.isNotEmpty) {
-          await db.customStatement('DELETE FROM accounts;');
-          await insertTableRows('accounts', data.accounts);
-        }
-        if (data.categories.isNotEmpty) {
-          await db.customStatement('DELETE FROM categories;');
-          await insertTableRows('categories', data.categories);
-        }
-        if (data.transactions.isNotEmpty) {
-          await db.customStatement('DELETE FROM transactions;');
-          await insertTableRows('transactions', data.transactions);
-        }
-        if (data.assets.isNotEmpty) {
-          await db.customStatement('DELETE FROM assets;');
-          await insertTableRows('assets', data.assets);
-        }
-        if (data.insurancePolicies.isNotEmpty) {
-          await db.customStatement('DELETE FROM insurance_policies;');
-          await insertTableRows('insurance_policies', data.insurancePolicies);
-        }
-        if (data.liabilities.isNotEmpty) {
-          await db.customStatement('DELETE FROM liabilities;');
-          await insertTableRows('liabilities', data.liabilities);
-        }
-        if (data.budgets.isNotEmpty) {
-          await db.customStatement('DELETE FROM budgets;');
-          await insertTableRows('budgets', data.budgets);
-        }
-        if (data.recurringRules.isNotEmpty) {
-          await db.customStatement('DELETE FROM recurring_rules;');
-          await insertTableRows('recurring_rules', data.recurringRules);
+        if (data.allTables.isNotEmpty) {
+          for (final entry in data.allTables.entries) {
+            final table = entry.key;
+            final rows = entry.value;
+            if (rows.isNotEmpty) {
+              await db.customStatement('DELETE FROM "$table";');
+              await insertTableRows(table, rows);
+            }
+          }
+        } else {
+          if (data.accounts.isNotEmpty) {
+            await db.customStatement('DELETE FROM accounts;');
+            await insertTableRows('accounts', data.accounts);
+          }
+          if (data.categories.isNotEmpty) {
+            await db.customStatement('DELETE FROM categories;');
+            await insertTableRows('categories', data.categories);
+          }
+          if (data.transactions.isNotEmpty) {
+            await db.customStatement('DELETE FROM transactions;');
+            await insertTableRows('transactions', data.transactions);
+          }
+          if (data.assets.isNotEmpty) {
+            await db.customStatement('DELETE FROM assets;');
+            await insertTableRows('assets', data.assets);
+          }
+          if (data.insurancePolicies.isNotEmpty) {
+            await db.customStatement('DELETE FROM insurance_policies;');
+            await insertTableRows('insurance_policies', data.insurancePolicies);
+          }
+          if (data.liabilities.isNotEmpty) {
+            await db.customStatement('DELETE FROM liabilities;');
+            await insertTableRows('liabilities', data.liabilities);
+          }
+          if (data.budgets.isNotEmpty) {
+            await db.customStatement('DELETE FROM budgets;');
+            await insertTableRows('budgets', data.budgets);
+          }
+          if (data.recurringRules.isNotEmpty) {
+            await db.customStatement('DELETE FROM recurring_rules;');
+            await insertTableRows('recurring_rules', data.recurringRules);
+          }
         }
       });
     } catch (e) {

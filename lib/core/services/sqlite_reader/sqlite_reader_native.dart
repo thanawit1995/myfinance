@@ -39,6 +39,18 @@ Future<SqliteBackupData> readSqliteBackupData(Uint8List sqliteBytes) async {
   final budgets = readTable('budgets');
   final recurring = readTable('recurring_rules');
 
+  // Read all tables dynamically from SQLite database
+  final allTables = <String, List<Map<String, dynamic>>>{};
+  try {
+    final tableList = db.select(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'android_%'",
+    );
+    for (final r in tableList) {
+      final tName = r['name'] as String;
+      allTables[tName] = readTable(tName);
+    }
+  } catch (_) {}
+
   DateTime? latestDate;
   try {
     final maxDateRow = db.select('SELECT max(transaction_date) as m_date FROM transactions WHERE deleted_at IS NULL');
@@ -69,5 +81,6 @@ Future<SqliteBackupData> readSqliteBackupData(Uint8List sqliteBytes) async {
     liabilities: liabilities,
     budgets: budgets,
     recurringRules: recurring,
+    allTables: allTables,
   );
 }

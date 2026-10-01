@@ -90,6 +90,11 @@ Future<BackupInspectionResult> inspectSqliteDatabaseFile(
       sampleAccountNames: sampleNames,
       totalTransactions: backupData.transactionsCount,
       latestTransactionDate: backupData.latestTransactionDate,
+      totalCategories: backupData.categories.where((c) => c['deleted_at'] == null).length,
+      totalBudgets: backupData.budgets.where((b) => b['deleted_at'] == null).length,
+      totalAssets: backupData.assets.where((a) => a['deleted_at'] == null).length,
+      totalInsurance: backupData.insurancePolicies.where((i) => i['deleted_at'] == null).length,
+      totalLiabilities: backupData.liabilities.where((l) => l['deleted_at'] == null).length,
       fileName: fileName,
       sizeBytes: size,
     );

@@ -146,12 +146,35 @@ Future<BackupInspectionResult> inspectSqliteDatabaseFile(
         } catch (_) {}
       }
 
+      int getCount(String table) {
+        try {
+          return inspectedDb.select('SELECT count(*) as cnt FROM "$table" WHERE deleted_at IS NULL').first['cnt'] as int? ?? 0;
+        } catch (_) {
+          try {
+            return inspectedDb.select('SELECT count(*) as cnt FROM "$table"').first['cnt'] as int? ?? 0;
+          } catch (_) {
+            return 0;
+          }
+        }
+      }
+
+      final categoriesCount = getCount('categories');
+      final budgetsCount = getCount('budgets');
+      final assetsCount = getCount('assets');
+      final insuranceCount = getCount('insurance_policies');
+      final liabilitiesCount = getCount('liabilities');
+
       return BackupInspectionResult(
         isValid: true,
         totalAccounts: accountsCount,
         sampleAccountNames: sampleNames,
         totalTransactions: txCount,
         latestTransactionDate: latestDate,
+        totalCategories: categoriesCount,
+        totalBudgets: budgetsCount,
+        totalAssets: assetsCount,
+        totalInsurance: insuranceCount,
+        totalLiabilities: liabilitiesCount,
         sizeBytes: fileSize,
         fileName: fileName,
       );

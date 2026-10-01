@@ -10,6 +10,7 @@ class SqliteBackupData {
   final List<Map<String, dynamic>> liabilities;
   final List<Map<String, dynamic>> budgets;
   final List<Map<String, dynamic>> recurringRules;
+  final Map<String, List<Map<String, dynamic>>> allTables;
 
   const SqliteBackupData({
     required this.accountsCount,
@@ -23,5 +24,6 @@ class SqliteBackupData {
     this.liabilities = const [],
     this.budgets = const [],
     this.recurringRules = const [],
+    this.allTables = const {},
   });
 }

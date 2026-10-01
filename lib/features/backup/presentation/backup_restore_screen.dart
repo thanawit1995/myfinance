@@ -789,8 +789,48 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                     _buildPreviewRow(
                       Icons.receipt_long_outlined,
                       isThai ? 'รายการธุรกรรม' : 'Transactions',
-                      '${info.totalTransactions} ${isThai ? "รายการ" : "items"}',
+                      '${info.totalTransactions} ${isThai ? "รายการ (รับ/จ่าย/โอน/ลงทุน)" : "items"}',
                     ),
+                    if (info.totalCategories > 0) ...[
+                      const Divider(height: 16),
+                      _buildPreviewRow(
+                        Icons.category_outlined,
+                        isThai ? 'หมวดหมู่ & การจัดเรียง' : 'Categories & Order',
+                        '${info.totalCategories} ${isThai ? "หมวดหมู่" : "categories"}',
+                      ),
+                    ],
+                    if (info.totalBudgets > 0) ...[
+                      const Divider(height: 16),
+                      _buildPreviewRow(
+                        Icons.track_changes_outlined,
+                        isThai ? 'งบประมาณที่ตั้งไว้' : 'Budgets',
+                        '${info.totalBudgets} ${isThai ? "รายการ" : "budgets"}',
+                      ),
+                    ],
+                    if (info.totalAssets > 0) ...[
+                      const Divider(height: 16),
+                      _buildPreviewRow(
+                        Icons.trending_up_rounded,
+                        isThai ? 'สินทรัพย์การลงทุน' : 'Investments',
+                        '${info.totalAssets} ${isThai ? "รายการ" : "assets"}',
+                      ),
+                    ],
+                    if (info.totalInsurance > 0) ...[
+                      const Divider(height: 16),
+                      _buildPreviewRow(
+                        Icons.health_and_safety_outlined,
+                        isThai ? 'กรมธรรม์ประกัน' : 'Insurance',
+                        '${info.totalInsurance} ${isThai ? "กรมธรรม์" : "policies"}',
+                      ),
+                    ],
+                    if (info.totalLiabilities > 0) ...[
+                      const Divider(height: 16),
+                      _buildPreviewRow(
+                        Icons.credit_card_off_outlined,
+                        isThai ? 'หนี้สิน' : 'Liabilities',
+                        '${info.totalLiabilities} ${isThai ? "รายการ" : "items"}',
+                      ),
+                    ],
                     const Divider(height: 16),
                     _buildPreviewRow(
                       Icons.event_available_outlined,

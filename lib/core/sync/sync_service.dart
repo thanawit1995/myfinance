@@ -74,7 +74,7 @@ class SyncService extends StateNotifier<SyncState> {
     _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
       final online = results.any((r) => r != ConnectivityResult.none);
       if (online && _auth.isLoggedIn) {
-        syncAll();
+        syncAll(forceFullSync: true);
       } else if (!online) {
         state = state.copyWith(status: SyncStatus.offline);
       }
@@ -83,7 +83,7 @@ class SyncService extends StateNotifier<SyncState> {
     // Supabase auth state listener — crucial for OAuth redirect completion
     _authSub = _supabase.auth.onAuthStateChange.listen((data) {
       if (data.session != null) {
-        syncAll();
+        syncAll(forceFullSync: true);
         _subscribeRealtime();
       } else {
         _unsubscribeRealtime();
@@ -92,14 +92,14 @@ class SyncService extends StateNotifier<SyncState> {
     });
 
     if (_auth.isLoggedIn) {
-      await syncAll();
+      await syncAll(forceFullSync: true);
       _subscribeRealtime();
     }
   }
 
   // ─── Full Sync ──────────────────────────────────────────────────────────────
 
-  Future<void> syncAll({bool forceFullSync = false}) async {
+  Future<void> syncAll({bool forceFullSync = true}) async {
     if (!_auth.isLoggedIn) return;
     if (state.status == SyncStatus.syncing) return;
 
@@ -109,24 +109,14 @@ class SyncService extends StateNotifier<SyncState> {
     try {
       final lastSync = forceFullSync ? null : state.lastSyncAt;
 
-      // Disable foreign keys during sync merge to avoid dependency order violations
-      try {
-        await _db.customStatement('PRAGMA foreign_keys = OFF;');
-      } catch (_) {}
-
       // 1. Sync Accounts first
       await _syncAccounts(userId, lastSync);
 
       // 2. Sync Categories second
       await _syncCategories(userId, lastSync);
 
-      // 3. Sync Transactions in chunks
+      // 3. Sync Transactions in chunks & batch merge
       await _syncTransactions(userId, lastSync);
-
-      // Re-enable foreign keys
-      try {
-        await _db.customStatement('PRAGMA foreign_keys = ON;');
-      } catch (_) {}
 
       final now = DateTime.now();
       final prefs = await SharedPreferences.getInstance();
@@ -135,9 +125,6 @@ class SyncService extends StateNotifier<SyncState> {
       debugPrint('[Sync] Full sync completed successfully at $now');
     } catch (e, stack) {
       debugPrint('[Sync] Error during syncAll: $e\n$stack');
-      try {
-        await _db.customStatement('PRAGMA foreign_keys = ON;');
-      } catch (_) {}
       state = state.copyWith(
         status: SyncStatus.error,
         errorMessage: e.toString(),
@@ -157,7 +144,7 @@ class SyncService extends StateNotifier<SyncState> {
 
     if (localRows.isNotEmpty) {
       debugPrint('[Sync] Pushing ${localRows.length} local transactions in chunks...');
-      const chunkSize = 150;
+      const chunkSize = 200;
       for (var i = 0; i < localRows.length; i += chunkSize) {
         final chunk = localRows.sublist(
           i,
@@ -169,26 +156,35 @@ class SyncService extends StateNotifier<SyncState> {
       debugPrint('[Sync] Pushed ${localRows.length} transactions successfully.');
     }
 
-    // 2. PULL: Paginate through cloud rows in pages of 1,000
+    // 2. PULL: Paginate through cloud rows in pages of 1,000 with deterministic ordering
     int offset = 0;
     const pageSize = 1000;
     int totalPulled = 0;
 
     while (true) {
-      var query = _supabase
+      var filter = _supabase
           .from('transactions')
           .select()
           .eq('user_id', userId);
       if (lastSync != null) {
-        query = query.gt('updated_at', lastSync.toIso8601String());
+        filter = filter.gt('updated_at', lastSync.toIso8601String());
       }
+      final query = filter.order('id', ascending: true);
 
       final page = await query.range(offset, offset + pageSize - 1) as List<dynamic>;
       if (page.isEmpty) break;
 
-      for (final row in page) {
-        await _mergeCloudTransaction(row as Map<String, dynamic>);
-      }
+      // Fast batch insertion into local SQLite
+      await _db.batch((batch) {
+        for (final row in page) {
+          final map = row as Map<String, dynamic>;
+          batch.insert(
+            _db.transactions,
+            _rowToTxCompanion(map),
+            mode: InsertMode.insertOrReplace,
+          );
+        }
+      });
 
       totalPulled += page.length;
       if (page.length < pageSize) break;
@@ -228,50 +224,38 @@ class SyncService extends StateNotifier<SyncState> {
         'deleted_at': tx.deletedAt?.toIso8601String(),
       };
 
-  Future<void> _mergeCloudTransaction(Map<String, dynamic> row) async {
+  TransactionsCompanion _rowToTxCompanion(Map<String, dynamic> row) {
     final id = row['id'] as String;
     final cloudVersion = (row['sync_version'] as num?)?.toInt() ?? 1;
 
-    final local = await (_db.select(_db.transactions)
-          ..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
-    if (local != null && local.syncVersion >= cloudVersion) return;
-
-    // Verify foreign key references exist locally to avoid SQLite FK violations
-    final sourceAccId = row['source_account_id'] as String?;
-    final destAccId = row['destination_account_id'] as String?;
-    final catId = row['category_id'] as String?;
-
-    await _db.into(_db.transactions).insertOnConflictUpdate(
-          TransactionsCompanion(
-            id: Value(id),
-            transactionType: Value(row['transaction_type'] as String),
-            sourceAccountId: Value(sourceAccId),
-            destinationAccountId: Value(destAccId),
-            categoryId: Value(catId),
-            assetId: Value(row['asset_id'] as String?),
-            importBatchId: Value(row['import_batch_id'] as String?),
-            amountOriginalSatang: Value((row['amount_original_satang'] as num).toInt()),
-            currencyCode: Value(row['currency_code'] as String? ?? 'THB'),
-            fxRate: Value(row['fx_rate'] as String? ?? '1.000000'),
-            amountThbSatang: Value((row['amount_thb_satang'] as num).toInt()),
-            feeThbSatang: Value((row['fee_thb_satang'] as num?)?.toInt() ?? 0),
-            tag: Value(row['tag'] as String?),
-            taxCategory: Value(row['tax_category'] as String?),
-            withholdingTaxSatang: Value((row['withholding_tax_satang'] as num?)?.toInt() ?? 0),
-            transactionDate: Value(DateTime.parse(row['transaction_date'] as String)),
-            workPeriod: Value(row['work_period'] as String?),
-            expectedAmountSatang: Value((row['expected_amount_satang'] as num?)?.toInt()),
-            note: Value(row['note'] as String?),
-            isCleared: Value(row['is_cleared'] as bool? ?? true),
-            syncVersion: Value(cloudVersion),
-            createdAt: Value(DateTime.parse(row['created_at'] as String)),
-            updatedAt: Value(DateTime.parse(row['updated_at'] as String)),
-            deletedAt: Value(row['deleted_at'] != null
-                ? DateTime.parse(row['deleted_at'] as String)
-                : null),
-          ),
-        );
+    return TransactionsCompanion(
+      id: Value(id),
+      transactionType: Value(row['transaction_type'] as String),
+      sourceAccountId: Value(row['source_account_id'] as String?),
+      destinationAccountId: Value(row['destination_account_id'] as String?),
+      categoryId: Value(row['category_id'] as String?),
+      assetId: Value(row['asset_id'] as String?),
+      importBatchId: Value(row['import_batch_id'] as String?),
+      amountOriginalSatang: Value((row['amount_original_satang'] as num).toInt()),
+      currencyCode: Value(row['currency_code'] as String? ?? 'THB'),
+      fxRate: Value(row['fx_rate'] as String? ?? '1.000000'),
+      amountThbSatang: Value((row['amount_thb_satang'] as num).toInt()),
+      feeThbSatang: Value((row['fee_thb_satang'] as num?)?.toInt() ?? 0),
+      tag: Value(row['tag'] as String?),
+      taxCategory: Value(row['tax_category'] as String?),
+      withholdingTaxSatang: Value((row['withholding_tax_satang'] as num?)?.toInt() ?? 0),
+      transactionDate: Value(DateTime.parse(row['transaction_date'] as String)),
+      workPeriod: Value(row['work_period'] as String?),
+      expectedAmountSatang: Value((row['expected_amount_satang'] as num?)?.toInt()),
+      note: Value(row['note'] as String?),
+      isCleared: Value(row['is_cleared'] as bool? ?? true),
+      syncVersion: Value(cloudVersion),
+      createdAt: Value(DateTime.parse(row['created_at'] as String)),
+      updatedAt: Value(DateTime.parse(row['updated_at'] as String)),
+      deletedAt: Value(row['deleted_at'] != null
+          ? DateTime.parse(row['deleted_at'] as String)
+          : null),
+    );
   }
 
   // ─── Accounts ──────────────────────────────────────────────────────────────
@@ -294,8 +278,37 @@ class SyncService extends StateNotifier<SyncState> {
       query = query.gt('updated_at', lastSync.toIso8601String());
     }
     final cloudRows = await query as List<dynamic>;
-    for (final row in cloudRows) {
-      await _mergeCloudAccount(row as Map<String, dynamic>);
+    if (cloudRows.isNotEmpty) {
+      await _db.batch((batch) {
+        for (final row in cloudRows) {
+          final r = row as Map<String, dynamic>;
+          final id = r['id'] as String;
+          final cloudVersion = (r['sync_version'] as num?)?.toInt() ?? 1;
+
+          batch.insert(
+            _db.accounts,
+            AccountsCompanion(
+              id: Value(id),
+              name: Value(r['name'] as String),
+              accountType: Value(r['account_type'] as String),
+              currencyCode: Value(r['currency_code'] as String? ?? 'THB'),
+              isDomestic: Value(r['is_domestic'] as bool? ?? true),
+              closingDay: Value(r['closing_day'] as int?),
+              dueDay: Value(r['due_day'] as int?),
+              creditLimitSatang: Value(r['credit_limit_satang'] as int?),
+              isActive: Value(r['is_active'] as bool? ?? true),
+              syncVersion: Value(cloudVersion),
+              createdAt: Value(DateTime.parse(r['created_at'] as String)),
+              updatedAt: Value(DateTime.parse(r['updated_at'] as String)),
+              deletedAt: Value(r['deleted_at'] != null
+                  ? DateTime.parse(r['deleted_at'] as String)
+                  : null),
+            ),
+            mode: InsertMode.insertOrReplace,
+          );
+        }
+      });
+      debugPrint('[Sync] Merged ${cloudRows.length} accounts.');
     }
   }
 
@@ -315,36 +328,6 @@ class SyncService extends StateNotifier<SyncState> {
         'updated_at': a.updatedAt.toIso8601String(),
         'deleted_at': a.deletedAt?.toIso8601String(),
       };
-
-  Future<void> _mergeCloudAccount(Map<String, dynamic> row) async {
-    final id = row['id'] as String;
-    final cloudVersion = (row['sync_version'] as num?)?.toInt() ?? 1;
-
-    final local = await (_db.select(_db.accounts)
-          ..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
-    if (local != null && local.syncVersion >= cloudVersion) return;
-
-    await _db.into(_db.accounts).insertOnConflictUpdate(
-          AccountsCompanion(
-            id: Value(id),
-            name: Value(row['name'] as String),
-            accountType: Value(row['account_type'] as String),
-            currencyCode: Value(row['currency_code'] as String? ?? 'THB'),
-            isDomestic: Value(row['is_domestic'] as bool? ?? true),
-            closingDay: Value(row['closing_day'] as int?),
-            dueDay: Value(row['due_day'] as int?),
-            creditLimitSatang: Value(row['credit_limit_satang'] as int?),
-            isActive: Value(row['is_active'] as bool? ?? true),
-            syncVersion: Value(cloudVersion),
-            createdAt: Value(DateTime.parse(row['created_at'] as String)),
-            updatedAt: Value(DateTime.parse(row['updated_at'] as String)),
-            deletedAt: Value(row['deleted_at'] != null
-                ? DateTime.parse(row['deleted_at'] as String)
-                : null),
-          ),
-        );
-  }
 
   // ─── Categories ────────────────────────────────────────────────────────────
 
@@ -371,8 +354,39 @@ class SyncService extends StateNotifier<SyncState> {
       query = query.gt('updated_at', lastSync.toIso8601String());
     }
     final cloudRows = await query as List<dynamic>;
-    for (final row in cloudRows) {
-      await _mergeCloudCategory(row as Map<String, dynamic>);
+    if (cloudRows.isNotEmpty) {
+      await _db.batch((batch) {
+        for (final row in cloudRows) {
+          final r = row as Map<String, dynamic>;
+          final id = r['id'] as String;
+          final cloudVersion = (r['sync_version'] as num?)?.toInt() ?? 1;
+
+          batch.insert(
+            _db.categories,
+            CategoriesCompanion(
+              id: Value(id),
+              nameTh: Value(r['name_th'] as String? ?? ''),
+              nameEn: Value(r['name_en'] as String? ?? ''),
+              categoryType: Value(r['category_type'] as String),
+              parentId: Value(r['parent_id'] as String?),
+              taxIncomeType: Value(r['tax_income_type'] as String?),
+              icon: Value(r['icon'] as String?),
+              color: Value(r['color'] as String?),
+              isSystem: const Value(false),
+              isActive: Value(r['is_active'] as bool? ?? true),
+              sortOrder: Value(r['sort_order'] as int? ?? 0),
+              syncVersion: Value(cloudVersion),
+              createdAt: Value(DateTime.parse(r['created_at'] as String)),
+              updatedAt: Value(DateTime.parse(r['updated_at'] as String)),
+              deletedAt: Value(r['deleted_at'] != null
+                  ? DateTime.parse(r['deleted_at'] as String)
+                  : null),
+            ),
+            mode: InsertMode.insertOrReplace,
+          );
+        }
+      });
+      debugPrint('[Sync] Merged ${cloudRows.length} categories.');
     }
   }
 
@@ -395,38 +409,6 @@ class SyncService extends StateNotifier<SyncState> {
         'deleted_at': c.deletedAt?.toIso8601String(),
       };
 
-  Future<void> _mergeCloudCategory(Map<String, dynamic> row) async {
-    final id = row['id'] as String;
-    final cloudVersion = (row['sync_version'] as num?)?.toInt() ?? 1;
-
-    final local = await (_db.select(_db.categories)
-          ..where((c) => c.id.equals(id)))
-        .getSingleOrNull();
-    if (local != null && local.syncVersion >= cloudVersion) return;
-
-    await _db.into(_db.categories).insertOnConflictUpdate(
-          CategoriesCompanion(
-            id: Value(id),
-            nameTh: Value(row['name_th'] as String? ?? ''),
-            nameEn: Value(row['name_en'] as String? ?? ''),
-            categoryType: Value(row['category_type'] as String),
-            parentId: Value(row['parent_id'] as String?),
-            taxIncomeType: Value(row['tax_income_type'] as String?),
-            icon: Value(row['icon'] as String?),
-            color: Value(row['color'] as String?),
-            isSystem: const Value(false),
-            isActive: Value(row['is_active'] as bool? ?? true),
-            sortOrder: Value(row['sort_order'] as int? ?? 0),
-            syncVersion: Value(cloudVersion),
-            createdAt: Value(DateTime.parse(row['created_at'] as String)),
-            updatedAt: Value(DateTime.parse(row['updated_at'] as String)),
-            deletedAt: Value(row['deleted_at'] != null
-                ? DateTime.parse(row['deleted_at'] as String)
-                : null),
-          ),
-        );
-  }
-
   // ─── Realtime ──────────────────────────────────────────────────────────────
 
   void _subscribeRealtime() {
@@ -448,7 +430,9 @@ class SyncService extends StateNotifier<SyncState> {
           ),
           callback: (payload) {
             if (payload.newRecord.isNotEmpty) {
-              _mergeCloudTransaction(payload.newRecord);
+              _db.into(_db.transactions).insertOnConflictUpdate(
+                    _rowToTxCompanion(payload.newRecord),
+                  );
             }
           },
         )
@@ -467,7 +451,26 @@ class SyncService extends StateNotifier<SyncState> {
           ),
           callback: (payload) {
             if (payload.newRecord.isNotEmpty) {
-              _mergeCloudAccount(payload.newRecord);
+              final r = payload.newRecord;
+              _db.into(_db.accounts).insertOnConflictUpdate(
+                    AccountsCompanion(
+                      id: Value(r['id'] as String),
+                      name: Value(r['name'] as String),
+                      accountType: Value(r['account_type'] as String),
+                      currencyCode: Value(r['currency_code'] as String? ?? 'THB'),
+                      isDomestic: Value(r['is_domestic'] as bool? ?? true),
+                      closingDay: Value(r['closing_day'] as int?),
+                      dueDay: Value(r['due_day'] as int?),
+                      creditLimitSatang: Value(r['credit_limit_satang'] as int?),
+                      isActive: Value(r['is_active'] as bool? ?? true),
+                      syncVersion: Value((r['sync_version'] as num?)?.toInt() ?? 1),
+                      createdAt: Value(DateTime.parse(r['created_at'] as String)),
+                      updatedAt: Value(DateTime.parse(r['updated_at'] as String)),
+                      deletedAt: Value(r['deleted_at'] != null
+                          ? DateTime.parse(r['deleted_at'] as String)
+                          : null),
+                    ),
+                  );
             }
           },
         )

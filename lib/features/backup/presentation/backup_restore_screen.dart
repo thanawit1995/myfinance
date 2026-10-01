@@ -1618,67 +1618,50 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
 
             // Action Buttons
             if (isLoggedIn) ...[
-              Row(
-                children: [
-                  Expanded(
-                    child: FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.teal.shade700,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      icon: syncState.status == SyncStatus.syncing
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Icon(Icons.sync_rounded, size: 18),
-                      label: Text(
-                        isThai ? 'ซิงค์ทันที' : 'Sync Now',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                      onPressed: syncState.status == SyncStatus.syncing
-                          ? null
-                          : () async {
-                              await ref.read(syncServiceProvider.notifier).syncAll();
-                              await _loadStats();
-                            },
-                    ),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.teal.shade700,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  const SizedBox(width: 8),
-                  OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: syncState.status == SyncStatus.syncing
-                        ? null
-                        : () async {
-                            await ref.read(syncServiceProvider.notifier).syncAll(forceFullSync: true);
-                            await _loadStats();
-                          },
-                    child: Text(
-                      isThai ? 'ซิงค์ทั้งหมดใหม่' : 'Full Sync',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
-                    ),
+                  icon: syncState.status == SyncStatus.syncing
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.sync_rounded, size: 20),
+                  label: Text(
+                    isThai ? 'ซิงค์ข้อมูลเดี๋ยวนี้ (Sync All Data)' : 'Sync All Data Now',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                   ),
-                  const SizedBox(width: 8),
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.redAccent,
-                      side: const BorderSide(color: Colors.redAccent, width: 1.2),
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    icon: const Icon(Icons.logout_rounded, size: 16),
-                    label: Text(
-                      isThai ? 'ออกจากระบบ' : 'Sign Out',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
-                    ),
-                    onPressed: () => _confirmSignOut(context, isThai),
+                  onPressed: syncState.status == SyncStatus.syncing
+                      ? null
+                      : () async {
+                          await ref.read(syncServiceProvider.notifier).syncAll(forceFullSync: true);
+                          await _loadStats();
+                        },
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.redAccent,
+                    side: const BorderSide(color: Colors.redAccent, width: 1.2),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                ],
+                  icon: const Icon(Icons.logout_rounded, size: 18),
+                  label: Text(
+                    isThai ? 'ออกจากระบบคลาวด์' : 'Sign Out',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  onPressed: () => _confirmSignOut(context, isThai),
+                ),
               ),
             ] else ...[
               SizedBox(

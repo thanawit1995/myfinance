@@ -270,6 +270,62 @@ void main() {
       final reSettle = await ccDao.settleHistoricalDebt(cardAcc.id.value);
       expect(reSettle, equals(0));
     });
+
+    test('cleanupDuplicateHistoricalSettlements removes redundant auto-settle transactions', () async {
+      final cardAcc = AccountsCompanion.insert(
+        id: 'card-dup-settle-test',
+        name: 'SCB Card',
+        accountType: 'credit_card',
+        currencyCode: 'THB',
+        isDomestic: true,
+        closingDay: const Value(23),
+        dueDay: const Value(10),
+        createdAt: DateTime(2023, 10, 1),
+        updatedAt: DateTime(2023, 10, 1),
+      );
+      await db.into(db.accounts).insert(cardAcc);
+
+      // Create two duplicate auto-settle records
+      await db.into(db.transactions).insert(
+        TransactionsCompanion.insert(
+          id: 'settle-tx-1',
+          transactionType: 'transfer',
+          destinationAccountId: Value(cardAcc.id.value),
+          amountOriginalSatang: 150000,
+          currencyCode: 'THB',
+          amountThbSatang: 150000,
+          transactionDate: DateTime(2026, 8, 23, 23, 59, 59),
+          note: const Value('ชำระหนี้ SCB Card รอบประวัติศาสตร์ก่อน 24 ส.ค. 2569 (Auto-settle)'),
+          tag: const Value('historical_settle'),
+          createdAt: DateTime(2026, 8, 24, 10, 0),
+          updatedAt: DateTime(2026, 8, 24, 10, 0),
+        ),
+      );
+      await db.into(db.transactions).insert(
+        TransactionsCompanion.insert(
+          id: 'settle-tx-2',
+          transactionType: 'transfer',
+          destinationAccountId: Value(cardAcc.id.value),
+          amountOriginalSatang: 150000,
+          currencyCode: 'THB',
+          amountThbSatang: 150000,
+          transactionDate: DateTime(2026, 8, 23, 23, 59, 59),
+          note: const Value('ชำระหนี้ SCB Card รอบประวัติศาสตร์ก่อน 24 ส.ค. 2569 (Auto-settle)'),
+          tag: const Value('historical_settle'),
+          createdAt: DateTime(2026, 8, 24, 10, 5),
+          updatedAt: DateTime(2026, 8, 24, 10, 5),
+        ),
+      );
+
+      final removed = await ccDao.cleanupDuplicateHistoricalSettlements(cardAcc.id.value);
+      expect(removed, equals(1));
+
+      final remaining = await (db.select(db.transactions)
+            ..where((t) => t.destinationAccountId.equals(cardAcc.id.value) & t.tag.equals('historical_settle')))
+          .get();
+      expect(remaining.length, equals(1));
+      expect(remaining.first.id, equals('settle-tx-1'));
+    });
   });
 }
 

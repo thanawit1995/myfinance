@@ -260,60 +260,6 @@ class CreditCardDao extends DatabaseAccessor<AppDatabase> with _$CreditCardDaoMi
     return into(transactions).insert(tx);
   }
 
-  /// Calculates the net unpaid debt incurred on this credit card before [cutoffDate] (default 24 Aug 2026)
-  /// and, if greater than 0, inserts a settlement transfer transaction to clear the historical debt.
-  /// Returns the settled amount in satang (0 if nothing to settle).
-  Future<int> settleHistoricalDebt(String creditCardAccountId, {DateTime? cutoffDate}) async {
-    final cutoff = cutoffDate ?? DateTime(2026, 8, 24, 0, 0, 0);
-
-    // Fetch transactions before cutoffDate
-    final pastTrans = await (select(transactions)
-          ..where((t) =>
-              t.deletedAt.isNull() &
-              t.transactionDate.isSmallerThanValue(cutoff) &
-              (t.sourceAccountId.equals(creditCardAccountId) | t.destinationAccountId.equals(creditCardAccountId))))
-        .get();
-
-    int totalPastCharges = 0;
-    int totalPastPayments = 0;
-    for (final t in pastTrans) {
-      final cost = t.amountThbSatang + t.feeThbSatang;
-      if (t.sourceAccountId == creditCardAccountId && (t.transactionType == 'expense' || t.transactionType == 'transfer')) {
-        totalPastCharges += cost;
-      } else if (t.destinationAccountId == creditCardAccountId && (t.transactionType == 'transfer' || t.transactionType == 'income')) {
-        totalPastPayments += t.amountThbSatang;
-      }
-    }
-
-    final netPastDebt = totalPastCharges - totalPastPayments;
-    if (netPastDebt <= 0) return 0;
-
-    final now = DateTime.now();
-    // Settlement timestamp: exactly 1 second before the cutoff date
-    final settlementDate = cutoff.subtract(const Duration(seconds: 1));
-
-    final card = await (select(accounts)..where((a) => a.id.equals(creditCardAccountId))).getSingleOrNull();
-    final cardName = card?.name ?? 'บัตรเครดิต';
-
-    final settlementTx = TransactionsCompanion.insert(
-      id: _uuid.v4(),
-      transactionType: 'transfer',
-      sourceAccountId: const Value(null), // Settled from outside/historical funds without deducting user current bank account
-      destinationAccountId: Value(creditCardAccountId),
-      amountOriginalSatang: netPastDebt,
-      currencyCode: 'THB',
-      amountThbSatang: netPastDebt,
-      feeThbSatang: const Value(0),
-      transactionDate: settlementDate,
-      note: Value('ชำระหนี้ $cardName รอบประวัติศาสตร์ก่อน 24 ส.ค. 2569 (Auto-settle)'),
-      createdAt: now,
-      updatedAt: now,
-    );
-
-    await into(transactions).insert(settlementTx);
-    return netPastDebt;
-  }
-
   /// Checks how much historical debt remains before [cutoffDate] (default 24 Aug 2026).
   Future<int> getHistoricalDebtSatang(String creditCardAccountId, {DateTime? cutoffDate}) async {
     final cutoff = cutoffDate ?? DateTime(2026, 8, 24, 0, 0, 0);
@@ -338,6 +284,124 @@ class CreditCardDao extends DatabaseAccessor<AppDatabase> with _$CreditCardDaoMi
 
     final net = totalPastCharges - totalPastPayments;
     return net > 0 ? net : 0;
+  }
+
+  /// Cleans up any duplicate auto-settlement transactions for this card,
+  /// ensuring only at most 1 active auto-settlement transaction exists.
+  Future<int> cleanupDuplicateHistoricalSettlements(String creditCardAccountId, {DateTime? cutoffDate}) async {
+    final cutoff = cutoffDate ?? DateTime(2026, 8, 24, 0, 0, 0);
+
+    final autoSettleTxs = await (select(transactions)
+          ..where((t) =>
+              t.deletedAt.isNull() &
+              t.destinationAccountId.equals(creditCardAccountId) &
+              t.transactionDate.isSmallerThanValue(cutoff) &
+              (t.tag.equals('historical_settle') | t.note.like('%Auto-settle%')))
+          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
+        .get();
+
+    if (autoSettleTxs.length <= 1) return 0;
+
+    // Keep the first one, delete the rest
+    final duplicateIds = autoSettleTxs.skip(1).map((t) => t.id).toList();
+    await (delete(transactions)..where((t) => t.id.isIn(duplicateIds))).go();
+
+    return duplicateIds.length;
+  }
+
+  /// Calculates the net unpaid debt incurred on this credit card before [cutoffDate] (default 24 Aug 2026)
+  /// and updates or inserts a settlement transfer transaction to clear the historical debt.
+  /// Guarantees idempotency (will not create duplicate settlement records).
+  /// Returns the settled amount in satang (0 if nothing to settle or already settled).
+  Future<int> settleHistoricalDebt(String creditCardAccountId, {DateTime? cutoffDate}) async {
+    final cutoff = cutoffDate ?? DateTime(2026, 8, 24, 0, 0, 0);
+
+    // 1. Clean up any existing duplicate settlement records first
+    await cleanupDuplicateHistoricalSettlements(creditCardAccountId, cutoffDate: cutoff);
+
+    // 2. Fetch transactions before cutoffDate
+    final pastTrans = await (select(transactions)
+          ..where((t) =>
+              t.deletedAt.isNull() &
+              t.transactionDate.isSmallerThanValue(cutoff) &
+              (t.sourceAccountId.equals(creditCardAccountId) | t.destinationAccountId.equals(creditCardAccountId))))
+        .get();
+
+    Transaction? existingAutoSettle;
+    int totalPastCharges = 0;
+    int regularPastPayments = 0;
+
+    for (final t in pastTrans) {
+      final isAutoSettle = t.destinationAccountId == creditCardAccountId &&
+          (t.tag == 'historical_settle' || (t.note != null && t.note!.contains('Auto-settle')));
+
+      if (isAutoSettle) {
+        existingAutoSettle = t;
+        continue;
+      }
+
+      final cost = t.amountThbSatang + t.feeThbSatang;
+      if (t.sourceAccountId == creditCardAccountId && (t.transactionType == 'expense' || t.transactionType == 'transfer')) {
+        totalPastCharges += cost;
+      } else if (t.destinationAccountId == creditCardAccountId && (t.transactionType == 'transfer' || t.transactionType == 'income')) {
+        regularPastPayments += t.amountThbSatang;
+      }
+    }
+
+    final netRawPastDebt = totalPastCharges - regularPastPayments;
+
+    final autoSettle = existingAutoSettle;
+    if (netRawPastDebt <= 0) {
+      // If there was an auto-settle record but now raw debt is 0 (or paid off by real payments), remove the redundant auto-settle record
+      if (autoSettle != null) {
+        await (delete(transactions)..where((t) => t.id.equals(autoSettle.id))).go();
+      }
+      return 0;
+    }
+
+    final now = DateTime.now();
+    final settlementDate = cutoff.subtract(const Duration(seconds: 1));
+    final card = await (select(accounts)..where((a) => a.id.equals(creditCardAccountId))).getSingleOrNull();
+    final cardName = card?.name ?? 'บัตรเครดิต';
+
+    if (autoSettle != null) {
+      // If already settled with the exact same amount, do nothing (idempotent)
+      if (autoSettle.amountThbSatang == netRawPastDebt) {
+        return 0; // Already settled, nothing changed
+      }
+
+      // Update existing settlement transaction with the new correct debt amount
+      await (update(transactions)..where((t) => t.id.equals(autoSettle.id))).write(
+        TransactionsCompanion(
+          amountOriginalSatang: Value(netRawPastDebt),
+          amountThbSatang: Value(netRawPastDebt),
+          note: Value('ชำระหนี้ $cardName รอบประวัติศาสตร์ก่อน 24 ส.ค. 2569 (Auto-settle)'),
+          tag: const Value('historical_settle'),
+          updatedAt: Value(now),
+        ),
+      );
+      return netRawPastDebt;
+    }
+
+    // Insert new single settlement transaction
+    final settlementTx = TransactionsCompanion.insert(
+      id: _uuid.v4(),
+      transactionType: 'transfer',
+      sourceAccountId: const Value(null), // Settled from outside/historical funds without deducting user current bank account
+      destinationAccountId: Value(creditCardAccountId),
+      amountOriginalSatang: netRawPastDebt,
+      currencyCode: 'THB',
+      amountThbSatang: netRawPastDebt,
+      feeThbSatang: const Value(0),
+      transactionDate: settlementDate,
+      tag: const Value('historical_settle'),
+      note: Value('ชำระหนี้ $cardName รอบประวัติศาสตร์ก่อน 24 ส.ค. 2569 (Auto-settle)'),
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    await into(transactions).insert(settlementTx);
+    return netRawPastDebt;
   }
 }
 

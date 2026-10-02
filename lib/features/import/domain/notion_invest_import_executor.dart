@@ -174,6 +174,7 @@ class NotionInvestImportExecutor {
 
         // 6. Record buy trade via DAO (atomic: Transaction + Lot + Audit)
         final paymentLabel = row.paymentType == PaymentType.dividend ? 'ปันผล' : row.paymentType.name.toUpperCase();
+        final unitPriceDisplay = row.unitPriceOriginal > Decimal.zero ? row.unitPriceOriginal.toString() : (pricePerShareSatang / 100.0).toStringAsFixed(2);
         await _dao.recordBuyTrade(
           assetId: asset.id,
           accountId: accountId,
@@ -184,7 +185,7 @@ class NotionInvestImportExecutor {
           currencyCode: currencyCode,
           fxRate: fxRate,
           feeThbSatang: 0,
-          note: 'Imported from Notion — ${row.ticker} ($paymentLabel)',
+          note: 'Imported from Notion — ${row.ticker} ${row.quantity} @ $unitPriceDisplay ($paymentLabel)',
           importBatchId: batchId,
         );
 

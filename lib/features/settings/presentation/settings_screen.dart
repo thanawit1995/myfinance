@@ -19,6 +19,8 @@ import '../../reports/presentation/reports_screen.dart';
 import '../../backup/presentation/backup_restore_screen.dart';
 import '../../import/presentation/import_wizard_screen.dart';
 import '../../import/presentation/import_history_screen.dart';
+import '../../accounts/presentation/credit_card_summary_screen.dart' show transactionsVersionProvider;
+import '../../../../core/database/database_provider.dart';
 import 'trash_bin_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -475,6 +477,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 );
               },
             ),
+            _buildDivider(),
+            _buildTile(
+              icon: Icons.auto_fix_high_rounded,
+              iconColor: Colors.teal,
+              title: isThai ? 'ตรวจสอบและฟื้นฟูพอร์ตลงทุน (Dime! USD)' : 'Audit & Reconcile Investments',
+              subtitle: isThai
+                  ? 'ตรวจสอบความสอดคล้องของรายการซื้อหุ้นและฟื้นฟูรายการที่ตกหล่นใน Dime! USD'
+                  : 'Verify investment lots and restore any missing buy transactions in Dime! USD',
+              onTap: () => _handleAuditInvestments(isThai),
+            ),
           ]),
 
           const SizedBox(height: 28),
@@ -730,6 +742,46 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         SnackBar(
           content: Text(wasChanging ? 'เปลี่ยนรหัส PIN สำเร็จเรียบร้อยแล้ว' : 'ตั้งรหัส PIN และเปิดล็อกแอปเรียบร้อยแล้ว'),
           backgroundColor: VaultTheme.positive(context),
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleAuditInvestments(bool isThai) async {
+    final invDao = ref.read(investmentsDaoProvider);
+    final result = await invDao.auditAndReconcileInvestments();
+
+    ref.read(transactionsVersionProvider.notifier).state++;
+
+    if (!mounted) return;
+
+    if (result.orphanLotsFound == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isThai
+                ? 'ข้อมูลพอร์ตการลงทุนและบัญชี Dime! USD ถูกต้องสมบูรณ์ 100%'
+                : 'All investment lots and Dime! USD transactions are in sync.',
+          ),
+          backgroundColor: VaultTheme.positive(context),
+        ),
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(isThai ? 'ฟื้นฟูรายการลงทุนสำเร็จ' : 'Investment Reconciliation Complete'),
+          content: Text(
+            isThai
+                ? 'ระบบตรวจพบรายการซื้อหุ้นที่ตกหล่น ${result.orphanLotsFound} รายการ และได้ทำการฟื้นฟูกลับเข้าสู่ระบบเรียบร้อยแล้ว:\n\nหุ้นที่ฟื้นฟู: ${result.restoredSymbols.join(", ")}'
+                : 'Found ${result.orphanLotsFound} missing buy transactions and restored them to the ledger:\n\nRestored: ${result.restoredSymbols.join(", ")}',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(isThai ? 'ตกลง' : 'OK'),
+            ),
+          ],
         ),
       );
     }

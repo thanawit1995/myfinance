@@ -897,5 +897,61 @@ void main() {
       expect(holding.unrealizedPriceGainLossThbSatang, 321910);
       expect(holding.totalUnrealizedGainLossThbSatang, 321910);
     });
+
+    test('auditAndReconcileInvestments restores missing buy transaction for orphan lots', () async {
+      final now = DateTime.now();
+      const assetId = 'asset-orphan-test';
+      await db.investmentsDao.createAsset(
+        AssetsCompanion.insert(
+          id: assetId,
+          symbol: 'NVDA',
+          name: 'NVIDIA Corporation',
+          assetType: 'us_stock',
+          currencyCode: 'USD',
+          defaultAccountId: '00000000-0000-4000-8000-000000000005', // Dime! USD
+          market: const Value('NASDAQ'),
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      final lotId = await db.investmentsDao.recordBuyTrade(
+        assetId: assetId,
+        accountId: '00000000-0000-4000-8000-000000000005',
+        tradeDate: DateTime(2026, 7, 10),
+        quantity: Decimal.parse('5'),
+        priceOriginalSatang: 12000, // $120.00
+        currencyCode: 'USD',
+        fxRate: Decimal.parse('36.500000'),
+        feeThbSatang: 0,
+      );
+
+      final lot = await (db.select(db.investmentLots)..where((l) => l.id.equals(lotId))).getSingle();
+      final buyTxId = lot.buyTransactionId;
+
+      // Simulate accidental deletion of buy transaction (e.g., from old deduplication or sync gap)
+      await (db.delete(db.transactions)..where((t) => t.id.equals(buyTxId))).go();
+
+      // Verify transaction is gone
+      final deletedTx = await (db.select(db.transactions)..where((t) => t.id.equals(buyTxId))).getSingleOrNull();
+      expect(deletedTx, isNull);
+
+      // Run audit and reconcile
+      final auditResult = await db.investmentsDao.auditAndReconcileInvestments();
+      expect(auditResult.orphanLotsFound, equals(1));
+      expect(auditResult.restoredTransactions, equals(1));
+      expect(auditResult.restoredSymbols, contains('NVDA'));
+
+      // Verify transaction has been restored in ledger
+      final restoredTx = await (db.select(db.transactions)..where((t) => t.id.equals(buyTxId))).getSingleOrNull();
+      expect(restoredTx, isNotNull);
+      expect(restoredTx!.sourceAccountId, equals('00000000-0000-4000-8000-000000000005'));
+      expect(restoredTx.currencyCode, equals('USD'));
+      expect(restoredTx.tag, equals('investment_buy:$assetId'));
+
+      // Deduplication must NOT delete this restored transaction
+      final dupResult = await db.transactionsDao.deduplicateTransactions();
+      expect(dupResult.contains(buyTxId), isFalse);
+    });
   });
 }

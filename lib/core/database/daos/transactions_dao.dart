@@ -621,19 +621,39 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
           ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
         .get();
 
+    // Query active buy transaction IDs linked to investment lots to ensure they are NEVER accidentally deduplicated
+    final linkedLotTxIds = <String>{};
+    try {
+      final lots = await (attachedDatabase.select(attachedDatabase.investmentLots)
+            ..where((l) => l.deletedAt.isNull()))
+          .get();
+      for (final lot in lots) {
+        linkedLotTxIds.add(lot.buyTransactionId);
+      }
+    } catch (_) {}
+
     final Map<String, Transaction> seen = {};
     final List<String> duplicateIds = [];
 
     for (final tx in allTx) {
+      // NEVER delete a transaction that is backing an active investment lot
+      if (linkedLotTxIds.contains(tx.id)) {
+        continue;
+      }
+
       final d = tx.transactionDate;
       final dateKey = '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
       final cleanNote = (tx.note ?? '').trim().toLowerCase();
+      final tagStr = tx.tag ?? '';
 
       final String sig;
-      if (cleanNote.isNotEmpty) {
+      if (tagStr.isNotEmpty && (tagStr.startsWith('investment_') || tagStr == 'historical_settle')) {
+        // Investment trades and settlement records include currency, original satang, and tag in signature
+        sig = '$dateKey|${tx.amountOriginalSatang}|${tx.amountThbSatang}|${tx.currencyCode}|${tx.transactionType}|$tagStr|${tx.sourceAccountId ?? ""}|$cleanNote';
+      } else if (cleanNote.isNotEmpty) {
         sig = '$dateKey|${tx.amountThbSatang}|${tx.transactionType}|$cleanNote';
       } else {
-        sig = '$dateKey|${tx.amountThbSatang}|${tx.transactionType}|${tx.sourceAccountId ?? ""}|${tx.tag ?? ""}';
+        sig = '$dateKey|${tx.amountThbSatang}|${tx.transactionType}|${tx.sourceAccountId ?? ""}|$tagStr';
       }
 
       if (seen.containsKey(sig)) {

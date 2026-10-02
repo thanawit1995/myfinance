@@ -614,13 +614,16 @@ class _CreditCardSummaryScreenState extends ConsumerState<CreditCardSummaryScree
       ref.read(transactionsVersionProvider.notifier).state++;
       if (!mounted) return;
       setState(() {});
+      final msg = settled > 0
+          ? (isThai
+              ? 'ตัดยอดประวัติศาสตร์ ${Money(settled).format(symbol: "฿")} สำเร็จ ยอดหนี้คงเหลือเฉพาะ 2 รอบล่าสุดแล้ว'
+              : 'Historical debt ${Money(settled).format(symbol: "฿")} settled successfully.')
+          : (isThai
+              ? 'ตัดยอดเรียบร้อยแล้ว ยอดหนี้เหลือเฉพาะ 2 รอบล่าสุด'
+              : 'Historical debt is already settled.');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            isThai
-                ? 'ตัดยอดประวัติศาสตร์ ${Money(settled).format(symbol: "฿")} สำเร็จ ยอดหนี้คงเหลือเฉพาะ 2 รอบล่าสุดแล้ว'
-                : 'Historical debt ${Money(settled).format(symbol: "฿")} settled successfully.',
-          ),
+          content: Text(msg),
           backgroundColor: VaultTheme.positive(context),
         ),
       );

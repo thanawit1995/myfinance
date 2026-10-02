@@ -1,6 +1,20 @@
 # บันทึกความคืบหน้าโครงการ MyFinance (PROGRESS.md)
 
-อัปเดตล่าสุด: 1 ตุลาคม 2026
+อัปเดตล่าสุด: 2 ตุลาคม 2026
+
+- [x] **Credit Card Auto-Settle Idempotency & Dime! USD Investment Reconciliation (2 ต.ค. 2026)**:
+  - **1. แก้ไขปัญหาระบบตัดยอดบัตรเครดิตรอบก่อน 24/8/69 ทำงานซ้ำๆ**:
+    - ปรับปรุง `settleHistoricalDebt` ใน `CreditCardDao` ให้เป็นระบบ Idempotent ตรวจจับรายการตัดยอดประวัติศาสตร์เดิม หากเคยตัดยอดแล้วจะไม่ออกรายการใหม่ซ้ำอีก และทำการ Update ยอดหนี้ให้ตรงตามจริงแทนการ Insert เพิ่ม
+    - พัฒนาฟังก์ชัน `cleanupDuplicateHistoricalSettlements` กวาดล้างรายการตัดยอด Auto-settle ที่เคยถูกสร้างซ้ำซ้อนในฐานข้อมูลเดิมให้เหลือเพียงรายการเดียวที่ถูกต้อง
+    - ปรับปรุงการแจ้งเตือนใน `CreditCardSummaryScreen` ให้แสดงผลถูกต้องและซ่อนแบนเนอร์ทันที
+  - **2. แก้ไขและป้องกันรายการซื้อหุ้นใน Dime! USD หายไป**:
+    - ปรับปรุง `deduplicateTransactions` ใน `TransactionsDao` ให้คุ้มครองรายการธุรกรรมที่ผูกอยู่กับ `InvestmentLots` ห้ามลบเด็ดขาด พร้อมปรับปรุง signature ของรายการลงทุนให้แยกตามสินทรัพย์, สกุลเงิน และจำนวนเงินต้น
+    - ปรับปรุง `NotionInvestImportExecutor` ให้บันทึก Note แยกตามจำนวนหุ้นและราคาอย่างชัดเจน ป้องกันการชนกันของ Signature
+    - พัฒนาฟังก์ชัน `auditAndReconcileInvestments()` ใน `InvestmentsDao` ค้นหา Orphan Lots ที่รายการธุรกรรมหายไป และฟื้นฟูกลับเข้าบัญชีแยกประเภทของ Dime! USD อัตโนมัติ
+    - เพิ่มเมนู "ตรวจสอบและฟื้นฟูพอร์ตลงทุน (Dime! USD)" ในหน้าการตั้งค่า (`SettingsScreen`) เพื่อให้ผู้ใช้กดตรวจสอบและกู้คืนรายการได้ใน 1 คลิก
+  - **3. การทดสอบและการรับรองคุณภาพ**:
+    - เพิ่ม Unit Test ใน `credit_card_engine_test.dart` ทดสอบการล้างรายการตัดยอดซ้ำและการป้องกันการสร้างซ้ำ
+    - เพิ่ม Unit Test ใน `investments_dao_test.dart` ทดสอบการตรวจจับ Orphan Lots, การฟื้นฟูรายการธุรกรรม และการป้องกัน Deduplication ลบรายการซื้อหุ้น
 
 - [x] **Investment UI Overhaul, Dividend Tax Automation, Medical Income Tax Mapping & Foreign Dividend Excel Importer (1 ต.ค. 2026)**:
   - **1. ปรับปรุง UI หน้าการลงทุน (Portfolio Screen) & ซ่อนปุ่ม Sync ไม่ให้บังปุ่มควบคุม**:

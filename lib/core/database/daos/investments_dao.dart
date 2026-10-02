@@ -1372,5 +1372,117 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
           ..orderBy([(l) => OrderingTerm.asc(l.buyDate), (l) => OrderingTerm.asc(l.createdAt)]))
         .get();
   }
+
+  /// Audits all active investment lots and verifies that their buy transactions exist in the ledger.
+  /// If any orphan lots are found (e.g. due to deduplication or sync gaps),
+  /// restores their corresponding ledger transactions to ensure Dime! USD / asset accounts reflect accurate records.
+  Future<InvestmentAuditResult> auditAndReconcileInvestments() async {
+    final activeLots = await (select(investmentLots)..where((l) => l.deletedAt.isNull())).get();
+    if (activeLots.isEmpty) {
+      return const InvestmentAuditResult(
+        orphanLotsFound: 0,
+        restoredTransactions: 0,
+        restoredSymbols: [],
+      );
+    }
+
+    final buyTxIds = activeLots.map((l) => l.buyTransactionId).toSet().toList();
+    final existingTxs = await (select(transactions)
+          ..where((t) => t.id.isIn(buyTxIds) & t.deletedAt.isNull()))
+        .get();
+    final existingTxIds = existingTxs.map((t) => t.id).toSet();
+
+    final orphanLots = activeLots.where((l) => !existingTxIds.contains(l.buyTransactionId)).toList();
+    if (orphanLots.isEmpty) {
+      return const InvestmentAuditResult(
+        orphanLotsFound: 0,
+        restoredTransactions: 0,
+        restoredSymbols: [],
+      );
+    }
+
+    // Resolve accounts and categories
+    final allAccounts = await (select(accounts)..where((a) => a.deletedAt.isNull())).get();
+    final dimeUsd = allAccounts.where((a) =>
+        a.id == '00000000-0000-4000-8000-000000000005' ||
+        a.name.trim().toLowerCase() == 'dime! usd' ||
+        a.name.trim().toLowerCase() == 'dime usd'
+    ).firstOrNull;
+
+    final allAssets = await (select(assets)..where((a) => a.deletedAt.isNull())).get();
+    final assetMap = {for (final a in allAssets) a.id: a};
+
+    final investmentCategory = await attachedDatabase.categoriesDao.getOrCreateInvestmentExpenseCategory();
+    final restoredSymbols = <String>{};
+    int restoredCount = 0;
+    final now = DateTime.now();
+
+    for (final lot in orphanLots) {
+      final asset = assetMap[lot.assetId];
+      final symbol = asset?.symbol ?? 'ASSET';
+      final currency = asset?.currencyCode ?? 'USD';
+
+      // Determine target account: asset default account -> Dime! USD -> first available offshore/fcd account -> first account
+      final targetAccountId = asset?.defaultAccountId ??
+          dimeUsd?.id ??
+          allAccounts.where((a) => a.currencyCode == currency).firstOrNull?.id ??
+          allAccounts.firstOrNull?.id;
+
+      final qty = Decimal.tryParse(lot.quantity) ?? Decimal.zero;
+      final fx = Decimal.tryParse(lot.fxRate) ?? Decimal.one;
+
+      int amountOriginalSatang = 0;
+      if (lot.pricePerUnitOriginal != null) {
+        final p = Decimal.tryParse(lot.pricePerUnitOriginal!) ?? Decimal.zero;
+        amountOriginalSatang = (qty * p * Decimal.fromInt(100)).round().toBigInt().toInt();
+      } else {
+        amountOriginalSatang = (qty * Decimal.fromInt(lot.costPerUnitOriginalSatang)).round().toBigInt().toInt();
+      }
+
+      int amountThbSatang = lot.totalCostThbSatang > 0
+          ? lot.totalCostThbSatang
+          : (Decimal.fromInt(amountOriginalSatang) * fx).round().toBigInt().toInt();
+
+      final restoredTx = TransactionsCompanion.insert(
+        id: lot.buyTransactionId,
+        transactionType: 'expense',
+        categoryId: Value(investmentCategory.id),
+        assetId: Value(lot.assetId),
+        sourceAccountId: Value(targetAccountId),
+        amountOriginalSatang: amountOriginalSatang,
+        currencyCode: currency,
+        fxRate: Value(fx.toString()),
+        amountThbSatang: amountThbSatang,
+        feeThbSatang: Value(lot.feeThbSatang),
+        transactionDate: lot.buyDate,
+        tag: Value('investment_buy:${lot.assetId}'),
+        note: Value('ซื้อ $symbol $qty หน่วย (Restored Trade)'),
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      await into(transactions).insert(restoredTx, mode: InsertMode.insertOrReplace);
+      restoredSymbols.add(symbol);
+      restoredCount++;
+    }
+
+    return InvestmentAuditResult(
+      orphanLotsFound: orphanLots.length,
+      restoredTransactions: restoredCount,
+      restoredSymbols: restoredSymbols.toList(),
+    );
+  }
+}
+
+class InvestmentAuditResult {
+  final int orphanLotsFound;
+  final int restoredTransactions;
+  final List<String> restoredSymbols;
+
+  const InvestmentAuditResult({
+    required this.orphanLotsFound,
+    required this.restoredTransactions,
+    required this.restoredSymbols,
+  });
 }
 

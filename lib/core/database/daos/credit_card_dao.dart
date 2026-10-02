@@ -149,8 +149,11 @@ class CreditCardDao extends DatabaseAccessor<AppDatabase> with _$CreditCardDaoMi
     final currentCycleTrans = <Transaction>[];
 
     for (final t in allTrans) {
-      final isCharge = t.sourceAccountId == accountId && (t.transactionType == 'expense' || t.transactionType == 'transfer');
-      final isPayment = t.destinationAccountId == accountId && (t.transactionType == 'transfer' || t.transactionType == 'income');
+      final isPayment = t.destinationAccountId == accountId &&
+          (t.transactionType == 'transfer' || t.transactionType == 'income' || t.tag == 'historical_settle');
+      final isCharge = !isPayment && t.sourceAccountId == accountId &&
+          (t.transactionType == 'expense' || t.transactionType == 'transfer') &&
+          t.tag != 'historical_settle';
 
       final cost = t.amountThbSatang + t.feeThbSatang;
 
@@ -164,7 +167,7 @@ class CreditCardDao extends DatabaseAccessor<AppDatabase> with _$CreditCardDaoMi
         }
       } else if (isPayment) {
         totalPayments += t.amountThbSatang;
-        if (!t.transactionDate.isBefore(cycle.previousCycleEnd)) {
+        if (t.tag != 'historical_settle' && !t.transactionDate.isBefore(cycle.previousCycleEnd)) {
           paymentsAfterPrevStatement += t.amountThbSatang;
         }
       }
@@ -182,6 +185,7 @@ class CreditCardDao extends DatabaseAccessor<AppDatabase> with _$CreditCardDaoMi
       final due = DateTime(cEnd.year, cEnd.month + 1, dueDay);
 
       final cycleTxs = allTrans.where((t) =>
+        t.tag != 'historical_settle' &&
         !t.transactionDate.isBefore(cStart) && !t.transactionDate.isAfter(cEnd)
       ).toList();
 
@@ -189,9 +193,14 @@ class CreditCardDao extends DatabaseAccessor<AppDatabase> with _$CreditCardDaoMi
       int cPayments = 0;
       for (final t in cycleTxs) {
         final cost = t.amountThbSatang + t.feeThbSatang;
-        if (t.sourceAccountId == accountId && (t.transactionType == 'expense' || t.transactionType == 'transfer')) {
+        final isPayment = t.destinationAccountId == accountId &&
+            (t.transactionType == 'transfer' || t.transactionType == 'income');
+        final isCharge = !isPayment && t.sourceAccountId == accountId &&
+            (t.transactionType == 'expense' || t.transactionType == 'transfer');
+
+        if (isCharge) {
           cCharges += cost;
-        } else if (t.destinationAccountId == accountId && (t.transactionType == 'transfer' || t.transactionType == 'income')) {
+        } else if (isPayment) {
           cPayments += t.amountThbSatang;
         }
       }
@@ -275,9 +284,15 @@ class CreditCardDao extends DatabaseAccessor<AppDatabase> with _$CreditCardDaoMi
     int totalPastPayments = 0;
     for (final t in pastTrans) {
       final cost = t.amountThbSatang + t.feeThbSatang;
-      if (t.sourceAccountId == creditCardAccountId && (t.transactionType == 'expense' || t.transactionType == 'transfer')) {
+      final isPayment = t.destinationAccountId == creditCardAccountId &&
+          (t.transactionType == 'transfer' || t.transactionType == 'income' || t.tag == 'historical_settle');
+      final isCharge = !isPayment && t.sourceAccountId == creditCardAccountId &&
+          (t.transactionType == 'expense' || t.transactionType == 'transfer') &&
+          t.tag != 'historical_settle';
+
+      if (isCharge) {
         totalPastCharges += cost;
-      } else if (t.destinationAccountId == creditCardAccountId && (t.transactionType == 'transfer' || t.transactionType == 'income')) {
+      } else if (isPayment) {
         totalPastPayments += t.amountThbSatang;
       }
     }
@@ -294,11 +309,26 @@ class CreditCardDao extends DatabaseAccessor<AppDatabase> with _$CreditCardDaoMi
     final autoSettleTxs = await (select(transactions)
           ..where((t) =>
               t.deletedAt.isNull() &
-              t.destinationAccountId.equals(creditCardAccountId) &
+              (t.destinationAccountId.equals(creditCardAccountId) | t.sourceAccountId.equals(creditCardAccountId)) &
               t.transactionDate.isSmallerThanValue(cutoff) &
               (t.tag.equals('historical_settle') | t.note.like('%Auto-settle%')))
           ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
         .get();
+
+    if (autoSettleTxs.isEmpty) return 0;
+
+    // Ensure the primary settlement record has sourceAccountId = null and destinationAccountId = cardId
+    final primary = autoSettleTxs.first;
+    if (primary.sourceAccountId != null || primary.destinationAccountId != creditCardAccountId || primary.tag != 'historical_settle') {
+      await (update(transactions)..where((t) => t.id.equals(primary.id))).write(
+        TransactionsCompanion(
+          sourceAccountId: const Value(null),
+          destinationAccountId: Value(creditCardAccountId),
+          tag: const Value('historical_settle'),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+    }
 
     if (autoSettleTxs.length <= 1) return 0;
 
@@ -332,7 +362,7 @@ class CreditCardDao extends DatabaseAccessor<AppDatabase> with _$CreditCardDaoMi
     int regularPastPayments = 0;
 
     for (final t in pastTrans) {
-      final isAutoSettle = t.destinationAccountId == creditCardAccountId &&
+      final isAutoSettle = (t.destinationAccountId == creditCardAccountId || t.sourceAccountId == creditCardAccountId) &&
           (t.tag == 'historical_settle' || (t.note != null && t.note!.contains('Auto-settle')));
 
       if (isAutoSettle) {
@@ -341,9 +371,14 @@ class CreditCardDao extends DatabaseAccessor<AppDatabase> with _$CreditCardDaoMi
       }
 
       final cost = t.amountThbSatang + t.feeThbSatang;
-      if (t.sourceAccountId == creditCardAccountId && (t.transactionType == 'expense' || t.transactionType == 'transfer')) {
+      final isPayment = t.destinationAccountId == creditCardAccountId &&
+          (t.transactionType == 'transfer' || t.transactionType == 'income');
+      final isCharge = !isPayment && t.sourceAccountId == creditCardAccountId &&
+          (t.transactionType == 'expense' || t.transactionType == 'transfer');
+
+      if (isCharge) {
         totalPastCharges += cost;
-      } else if (t.destinationAccountId == creditCardAccountId && (t.transactionType == 'transfer' || t.transactionType == 'income')) {
+      } else if (isPayment) {
         regularPastPayments += t.amountThbSatang;
       }
     }
@@ -365,14 +400,19 @@ class CreditCardDao extends DatabaseAccessor<AppDatabase> with _$CreditCardDaoMi
     final cardName = card?.name ?? 'บัตรเครดิต';
 
     if (autoSettle != null) {
-      // If already settled with the exact same amount, do nothing (idempotent)
-      if (autoSettle.amountThbSatang == netRawPastDebt) {
+      // If already settled with the exact same amount and proper accounts, do nothing (idempotent)
+      if (autoSettle.amountThbSatang == netRawPastDebt &&
+          autoSettle.sourceAccountId == null &&
+          autoSettle.destinationAccountId == creditCardAccountId &&
+          autoSettle.tag == 'historical_settle') {
         return 0; // Already settled, nothing changed
       }
 
-      // Update existing settlement transaction with the new correct debt amount
+      // Update existing settlement transaction with the new correct debt amount and clean accounts
       await (update(transactions)..where((t) => t.id.equals(autoSettle.id))).write(
         TransactionsCompanion(
+          sourceAccountId: const Value(null),
+          destinationAccountId: Value(creditCardAccountId),
           amountOriginalSatang: Value(netRawPastDebt),
           amountThbSatang: Value(netRawPastDebt),
           note: Value('ชำระหนี้ $cardName รอบประวัติศาสตร์ก่อน 24 ส.ค. 2569 (Auto-settle)'),

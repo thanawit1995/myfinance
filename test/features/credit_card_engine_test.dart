@@ -266,6 +266,12 @@ void main() {
       expect(summaryAfter.previousStatementDebtSatang, equals(200000));
       expect(summaryAfter.currentCycleDebtSatang, equals(100000));
 
+      // In statement cycles: auto-settle MUST NOT be added to chargesSatang of cycle 2 (24 Jul - 23 Aug)
+      expect(summaryAfter.statementCycles[0].chargesSatang, equals(100000));
+      expect(summaryAfter.statementCycles[1].chargesSatang, equals(200000));
+      expect(summaryAfter.statementCycles[2].chargesSatang, equals(150000)); // Only the 1,500 THB purchase
+      expect(summaryAfter.statementCycles[2].paymentsSatang, equals(0));
+
       // Calling settle again should return 0 since already settled
       final reSettle = await ccDao.settleHistoricalDebt(cardAcc.id.value);
       expect(reSettle, equals(0));

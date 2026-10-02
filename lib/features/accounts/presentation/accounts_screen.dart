@@ -268,13 +268,13 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
   }
 
   Widget _buildCreditCardTile(BuildContext context, Account account, bool isThai) {
-    return FutureBuilder<int>(
-      future: ref.read(accountsDaoProvider).getAccountBalanceSatang(account.id),
+    return FutureBuilder<CreditCardSummary?>(
+      future: ref.read(creditCardDaoProvider).getSummary(account.id),
       builder: (context, snapshot) {
-        final balanceSatang = snapshot.data ?? 0;
-        // Credit card balance is negative (debt)
-        final isDebt = balanceSatang < 0;
-        final debtMoney = Money(balanceSatang.abs());
+        final summary = snapshot.data;
+        final debtSatang = summary?.totalDebtSatang ?? 0;
+        final isDebt = debtSatang > 0;
+        final debtMoney = Money(debtSatang);
 
         return Card(
           margin: const EdgeInsets.symmetric(vertical: 4),

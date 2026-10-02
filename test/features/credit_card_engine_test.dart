@@ -272,6 +272,10 @@ void main() {
       expect(summaryAfter.statementCycles[2].chargesSatang, equals(150000)); // Only the 1,500 THB purchase
       expect(summaryAfter.statementCycles[2].paymentsSatang, equals(0));
 
+      // AccountsDao.getAccountBalanceSatang must reflect negative total debt (-300,000 satang)
+      final accBalance = await db.accountsDao.getAccountBalanceSatang(cardAcc.id.value);
+      expect(accBalance, equals(-300000));
+
       // Calling settle again should return 0 since already settled
       final reSettle = await ccDao.settleHistoricalDebt(cardAcc.id.value);
       expect(reSettle, equals(0));

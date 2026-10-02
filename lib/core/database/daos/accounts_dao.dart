@@ -239,6 +239,12 @@ class AccountsDao extends DatabaseAccessor<AppDatabase> with _$AccountsDaoMixin 
     final account = await getAccountById(accountId);
     if (account == null) return 0;
 
+    if (account.accountType == 'credit_card') {
+      final summary = await attachedDatabase.creditCardDao.getSummary(accountId);
+      final debtSatang = summary?.totalDebtSatang ?? 0;
+      return -debtSatang; // Credit card balance is negative of total outstanding debt
+    }
+
     final transList = await (select(transactions)
           ..where((t) =>
               t.deletedAt.isNull() &
@@ -248,19 +254,7 @@ class AccountsDao extends DatabaseAccessor<AppDatabase> with _$AccountsDaoMixin 
     final isForeign = account.currencyCode != 'THB';
     int balance = 0;
 
-    if (account.accountType == 'credit_card') {
-      // Credit card logic: charges are debt (negative), payments reduce debt (positive)
-      for (final t in transList) {
-        final amount = isForeign ? t.amountOriginalSatang : t.amountThbSatang;
-        final fee = isForeign ? 0 : t.feeThbSatang;
-        if (t.sourceAccountId == accountId && (t.transactionType == 'expense' || t.transactionType == 'transfer')) {
-          balance -= (amount + fee);
-        } else if (t.destinationAccountId == accountId && (t.transactionType == 'transfer' || t.transactionType == 'income')) {
-          balance += amount;
-        }
-      }
-    } else {
-      // Deposit / Cash / Asset account logic
+    // Deposit / Cash / Asset account logic
       for (final t in transList) {
         final amount = isForeign ? t.amountOriginalSatang : t.amountThbSatang;
         final fee = isForeign ? 0 : t.feeThbSatang;

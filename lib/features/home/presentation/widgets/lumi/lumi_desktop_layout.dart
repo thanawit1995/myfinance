@@ -6,6 +6,7 @@ import 'financial_overview_card.dart';
 import 'lumi_tip_card.dart';
 import 'portfolio_card.dart';
 import 'recent_activity_card.dart';
+import '../../../../budget/presentation/widgets/expense_trend_projection_chart.dart';
 
 class LumiHomeDataBundle {
   final int netWorthSatang;
@@ -22,6 +23,13 @@ class LumiHomeDataBundle {
   final List<Transaction> recentTransactions;
   final String attentionMessage;
   final bool attentionIsWarning;
+  final int totalCashSatang;
+  final int accruedIncomeSatang;
+  final int accruedIncomeCount;
+  final int insuranceSavingsSatang;
+  final Map<int, int> dailyExpenses;
+  final int currentDay;
+  final int daysInMonth;
 
   const LumiHomeDataBundle({
     required this.netWorthSatang,
@@ -38,6 +46,13 @@ class LumiHomeDataBundle {
     required this.recentTransactions,
     required this.attentionMessage,
     required this.attentionIsWarning,
+    this.totalCashSatang = 0,
+    this.accruedIncomeSatang = 0,
+    this.accruedIncomeCount = 0,
+    this.insuranceSavingsSatang = 0,
+    this.dailyExpenses = const {},
+    this.currentDay = 1,
+    this.daysInMonth = 30,
   });
 }
 
@@ -51,6 +66,8 @@ class LumiDesktopLayout extends StatelessWidget {
   final VoidCallback onNavigateToPlan;
   final VoidCallback onViewMonthlySummary;
   final VoidCallback onAddTransaction;
+  final VoidCallback? onNavigateToAccruedIncome;
+  final VoidCallback? onNavigateToInsurance;
 
   const LumiDesktopLayout({
     super.key,
@@ -63,6 +80,8 @@ class LumiDesktopLayout extends StatelessWidget {
     required this.onNavigateToPlan,
     required this.onViewMonthlySummary,
     required this.onAddTransaction,
+    this.onNavigateToAccruedIncome,
+    this.onNavigateToInsurance,
   });
 
   @override
@@ -102,6 +121,16 @@ class LumiDesktopLayout extends StatelessWidget {
                           totalExpenseSatang: data.totalExpenseSatang,
                           onTap: onNavigateToBudget,
                         ),
+                        const SizedBox(height: 14),
+
+                        // Expense Trend & Projection Line Chart
+                        ExpenseTrendProjectionCard(
+                          dailyExpenses: data.dailyExpenses,
+                          currentDay: data.currentDay,
+                          daysInMonth: data.daysInMonth,
+                          totalExpenseSatang: data.totalExpenseSatang,
+                          totalBudgetSatang: data.totalBudgetSatang,
+                        ),
                         const SizedBox(height: 18),
 
                         // Lumi Tip / Advice Card
@@ -112,14 +141,23 @@ class LumiDesktopLayout extends StatelessWidget {
                         ),
                         const SizedBox(height: 18),
 
-                        // Financial Overview Card (Net Worth & Cash Flow)
+                        // Financial Overview Card (Net Worth & Cash Flow & Breakdown Tiles)
                         FinancialOverviewCard(
                           netWorthSatang: data.netWorthSatang,
                           momChangePercent: data.momChangePercent,
                           cashFlowMonthSatang: data.cashFlowMonthSatang,
                           totalIncomeSatang: data.totalIncomeSatang,
                           totalExpenseSatang: data.totalExpenseSatang,
+                          totalCashSatang: data.totalCashSatang,
+                          portfolioValueSatang: data.portfolioValueSatang,
+                          accruedIncomeSatang: data.accruedIncomeSatang,
+                          accruedIncomeCount: data.accruedIncomeCount,
+                          insuranceSavingsSatang: data.insuranceSavingsSatang,
                           onViewMonthlySummary: onViewMonthlySummary,
+                          onNavigateToMoney: onNavigateToMoney,
+                          onNavigateToInvest: onNavigateToInvest,
+                          onNavigateToAccruedIncome: onNavigateToAccruedIncome,
+                          onNavigateToInsurance: onNavigateToInsurance,
                         ),
                       ],
                     ),
@@ -171,6 +209,14 @@ class LumiDesktopLayout extends StatelessWidget {
                     totalExpenseSatang: data.totalExpenseSatang,
                     onTap: onNavigateToBudget,
                   ),
+                  const SizedBox(height: 14),
+                  ExpenseTrendProjectionCard(
+                    dailyExpenses: data.dailyExpenses,
+                    currentDay: data.currentDay,
+                    daysInMonth: data.daysInMonth,
+                    totalExpenseSatang: data.totalExpenseSatang,
+                    totalBudgetSatang: data.totalBudgetSatang,
+                  ),
                   const SizedBox(height: 16),
                   LumiTipCard(
                     message: data.attentionMessage,
@@ -184,7 +230,16 @@ class LumiDesktopLayout extends StatelessWidget {
                     cashFlowMonthSatang: data.cashFlowMonthSatang,
                     totalIncomeSatang: data.totalIncomeSatang,
                     totalExpenseSatang: data.totalExpenseSatang,
+                    totalCashSatang: data.totalCashSatang,
+                    portfolioValueSatang: data.portfolioValueSatang,
+                    accruedIncomeSatang: data.accruedIncomeSatang,
+                    accruedIncomeCount: data.accruedIncomeCount,
+                    insuranceSavingsSatang: data.insuranceSavingsSatang,
                     onViewMonthlySummary: onViewMonthlySummary,
+                    onNavigateToMoney: onNavigateToMoney,
+                    onNavigateToInvest: onNavigateToInvest,
+                    onNavigateToAccruedIncome: onNavigateToAccruedIncome,
+                    onNavigateToInsurance: onNavigateToInsurance,
                   ),
                   const SizedBox(height: 16),
                   PortfolioCard(

@@ -411,16 +411,26 @@ class SyncService extends StateNotifier<SyncState> {
         }
       }
 
-      if (base64Payload == null || base64Payload.isEmpty) {
-        throw Exception(isThai
-            ? 'ไม่พบข้อมูล Master บนคลาวด์ กรุณากดส่งข้อมูลจากเครื่องหลักขึ้นไปก่อน'
-            : 'No Cloud Master Snapshot found. Please push from master device first.');
-      }
-
-      // 3. ปลดล็อกและเขียนทับฐานข้อมูลในเครื่องด้วย snapshot 100%
-      final ok = await CloudVaultSnapshotHelper.unpackCompressedBase64ToDatabase(base64Payload, _db);
-      if (!ok) {
-        throw Exception(isThai ? 'ไม่สามารถกู้คืนฐานข้อมูลจากคลาวด์ได้' : 'Failed to restore database from cloud snapshot');
+      if (base64Payload != null && base64Payload.isNotEmpty) {
+        // 3. ปลดล็อกและเขียนทับฐานข้อมูลในเครื่องด้วย snapshot 100%
+        final ok = await CloudVaultSnapshotHelper.unpackCompressedBase64ToDatabase(base64Payload, _db);
+        if (!ok) {
+          throw Exception(isThai ? 'ไม่สามารถกู้คืนฐานข้อมูลจากคลาวด์ได้' : 'Failed to restore database from cloud snapshot');
+        }
+      } else {
+        // Dual-Engine Fallback: หากไม่มี Snapshot blob ให้ดึงจากตารางจริงทั้งหมดบนคลาวด์
+        debugPrint('[Sync] Master snapshot blob not found, falling back to full relational sync...');
+        final txCheck = await _supabase
+            .from('transactions')
+            .select('id')
+            .eq('user_id', userId)
+            .limit(1);
+        if (txCheck.isEmpty) {
+          throw Exception(isThai
+              ? 'ไม่พบข้อมูลบนคลาวด์ กรุณากดส่งข้อมูลจากเครื่องหลักขึ้นไปก่อน'
+              : 'No Cloud data found. Please push from master device first.');
+        }
+        await syncAll(forceFullSync: true);
       }
 
       final now = DateTime.now();
@@ -479,6 +489,22 @@ class SyncService extends StateNotifier<SyncState> {
           'updated_at': res['updated_at'] != null ? DateTime.tryParse(res['updated_at'] as String) : null,
           'size_bytes': (res['target_budget_satang'] as num?)?.toInt() ?? 0,
           'total_transactions': int.tryParse(res['color'] as String? ?? '0') ?? 0,
+        };
+      }
+    } catch (_) {}
+
+    try {
+      final devState = await _supabase
+          .from('sync_device_state')
+          .select('active_device_name, updated_at, total_transactions')
+          .eq('user_id', userId)
+          .maybeSingle();
+      if (devState != null) {
+        return {
+          'device_name': devState['active_device_name'] as String? ?? 'Cloud Synced Database',
+          'updated_at': devState['updated_at'] != null ? DateTime.tryParse(devState['updated_at'] as String) : null,
+          'size_bytes': 0,
+          'total_transactions': (devState['total_transactions'] as num?)?.toInt() ?? 0,
         };
       }
     } catch (_) {}

@@ -263,78 +263,86 @@ class _RulesListTabState extends ConsumerState<_RulesListTab> {
                                     if (edited == true) widget.onChanged();
                                   },
                                   child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                    child: Row(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        // Type Icon Avatar
-                                        CircleAvatar(
-                                          radius: 17,
-                                          backgroundColor: _getTypeColor(rule.transactionType).withValues(alpha: 0.12),
-                                          child: Icon(
-                                            rule.transactionType == 'income'
-                                                ? Icons.arrow_downward_rounded
-                                                : (rule.transactionType == 'expense'
-                                                    ? Icons.arrow_upward_rounded
-                                                    : Icons.swap_horiz_rounded),
-                                            size: 17,
-                                            color: _getTypeColor(rule.transactionType),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 10),
-
-                                        // Title & Info
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Row(
-                                                children: [
-                                                  Flexible(
-                                                    child: Text(
-                                                      rule.title,
-                                                      style: TextStyle(
-                                                        fontFamily: VaultTheme.fontFamily,
-                                                        fontSize: 14,
-                                                        fontWeight: FontWeight.bold,
-                                                        color: VaultTheme.primaryText(context),
-                                                      ),
-                                                      maxLines: 1,
-                                                      overflow: TextOverflow.ellipsis,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 6),
-                                                  Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                                    decoration: BoxDecoration(
-                                                      color: rule.autoPost
-                                                          ? (VaultTheme.isDark(context)
-                                                              ? Colors.green.withValues(alpha: 0.25)
-                                                              : Colors.green.withValues(alpha: 0.12))
-                                                          : (VaultTheme.isDark(context)
-                                                              ? Colors.amber.withValues(alpha: 0.25)
-                                                              : Colors.amber.withValues(alpha: 0.18)),
-                                                      borderRadius: BorderRadius.circular(4),
-                                                    ),
-                                                    child: Text(
-                                                      rule.autoPost ? 'Auto' : (isThai ? 'รอยืนยัน' : 'Manual'),
-                                                      style: TextStyle(
-                                                        fontSize: 9.5,
-                                                        fontWeight: FontWeight.w600,
-                                                        color: rule.autoPost
-                                                            ? (VaultTheme.isDark(context)
-                                                                ? Colors.greenAccent
-                                                                : Colors.green.shade800)
-                                                            : (VaultTheme.isDark(context)
-                                                                ? Colors.amber.shade300
-                                                                : Colors.brown.shade800),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
+                                        // Row 1: Avatar + Title (Full width) + Amount
+                                        Row(
+                                          children: [
+                                            CircleAvatar(
+                                              radius: 15,
+                                              backgroundColor: _getTypeColor(rule.transactionType).withValues(alpha: 0.12),
+                                              child: Icon(
+                                                rule.transactionType == 'income'
+                                                    ? Icons.arrow_downward_rounded
+                                                    : (rule.transactionType == 'expense'
+                                                        ? Icons.arrow_upward_rounded
+                                                        : Icons.swap_horiz_rounded),
+                                                size: 15,
+                                                color: _getTypeColor(rule.transactionType),
                                               ),
-                                              const SizedBox(height: 3),
-                                              Text(
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: Text(
+                                                rule.title,
+                                                style: TextStyle(
+                                                  fontFamily: VaultTheme.fontFamily,
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: VaultTheme.primaryText(context),
+                                                ),
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              Money(rule.amountSatang).format(symbol: '฿'),
+                                              style: VaultTheme.tabular(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.bold,
+                                                color: _getTypeColor(rule.transactionType),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
+                                        // Row 2: Badge + Frequency & Next Date + Action / Switch / Menu
+                                        Row(
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                              decoration: BoxDecoration(
+                                                color: rule.autoPost
+                                                    ? (VaultTheme.isDark(context)
+                                                        ? Colors.green.withValues(alpha: 0.25)
+                                                        : Colors.green.withValues(alpha: 0.12))
+                                                    : (VaultTheme.isDark(context)
+                                                        ? Colors.amber.withValues(alpha: 0.25)
+                                                        : Colors.amber.withValues(alpha: 0.18)),
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                rule.autoPost ? 'Auto' : (isThai ? 'รอยืนยัน' : 'Manual'),
+                                                style: TextStyle(
+                                                  fontSize: 9.5,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: rule.autoPost
+                                                      ? (VaultTheme.isDark(context)
+                                                          ? Colors.greenAccent
+                                                          : Colors.green.shade800)
+                                                      : (VaultTheme.isDark(context)
+                                                          ? Colors.amber.shade300
+                                                          : Colors.brown.shade800),
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Text(
                                                 '${_formatFrequency(rule, isThai)} • ${isThai ? "รอบถัดไป: " : "Next: "}${DateFormat('d MMM', isThai ? 'th' : 'en_US').format(rule.nextRunDate)}'
                                                 '${sourceAcc != null ? " • ${rule.transactionType == 'transfer' && destAcc != null ? '${sourceAcc.name} → ${destAcc.name}' : sourceAcc.name}" : ""}',
                                                 style: TextStyle(
@@ -346,126 +354,104 @@ class _RulesListTabState extends ConsumerState<_RulesListTab> {
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                               ),
-                                            ],
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-
-                                        // Amount & Switch / Options
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.end,
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Text(
-                                              Money(rule.amountSatang).format(symbol: '฿'),
-                                              style: VaultTheme.tabular(
-                                                fontSize: 13.5,
-                                                fontWeight: FontWeight.bold,
-                                                color: _getTypeColor(rule.transactionType),
-                                              ),
                                             ),
-                                            const SizedBox(height: 2),
-                                            Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                if (isDue && !rule.autoPost && rule.isActive) ...[
-                                                  SizedBox(
-                                                    height: 24,
-                                                    child: FilledButton.tonal(
-                                                      style: FilledButton.styleFrom(
-                                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 0),
-                                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                                      ),
-                                                      onPressed: () async {
-                                                        await dao.postSingleOccurrence(rule.id, rule.nextRunDate);
-                                                        if (context.mounted) {
-                                                          ScaffoldMessenger.of(context).showSnackBar(
-                                                            SnackBar(
-                                                              content: Text(isThai
-                                                                  ? 'บันทึกรายการ "${rule.title}" เรียบร้อยแล้ว'
-                                                                  : 'Recorded "${rule.title}"'),
-                                                            ),
-                                                          );
-                                                        }
-                                                        widget.onChanged();
-                                                      },
-                                                      child: Text(
-                                                        isThai ? 'ทำรายการ' : 'Post',
-                                                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                                                      ),
-                                                    ),
+                                            if (isDue && !rule.autoPost && rule.isActive) ...[
+                                              const SizedBox(width: 4),
+                                              SizedBox(
+                                                height: 24,
+                                                child: FilledButton.tonal(
+                                                  style: FilledButton.styleFrom(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 0),
+                                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                                   ),
-                                                  const SizedBox(width: 2),
-                                                ],
-                                                Transform.scale(
-                                                  scale: 0.72,
-                                                  alignment: Alignment.centerRight,
-                                                  child: Switch(
-                                                    value: rule.isActive,
-                                                    onChanged: (val) async {
-                                                      await dao.toggleActive(rule.id, val);
-                                                      widget.onChanged();
-                                                    },
-                                                  ),
-                                                ),
-                                                PopupMenuButton<String>(
-                                                  icon: Icon(Icons.more_vert, size: 16, color: VaultTheme.secondaryText(context)),
-                                                  padding: EdgeInsets.zero,
-                                                  constraints: const BoxConstraints(),
-                                                  tooltip: isThai ? 'ตัวเลือก' : 'Options',
-                                                  onSelected: (action) async {
-                                                    if (action == 'edit') {
-                                                      final edited = await RecurringRuleDialog.show(context, rule: rule);
-                                                      if (edited == true) widget.onChanged();
-                                                    } else if (action == 'delete') {
-                                                      final confirm = await showDialog<bool>(
-                                                        context: context,
-                                                        builder: (ctx) => AlertDialog(
-                                                          title: Text(isThai ? 'ยืนยันลบกฎ' : 'Delete Rule'),
+                                                  onPressed: () async {
+                                                    await dao.postSingleOccurrence(rule.id, rule.nextRunDate);
+                                                    if (context.mounted) {
+                                                      ScaffoldMessenger.of(context).showSnackBar(
+                                                        SnackBar(
                                                           content: Text(isThai
-                                                              ? 'คุณต้องการลบ "${rule.title}" หรือไม่?'
-                                                              : 'Delete rule "${rule.title}"?'),
-                                                          actions: [
-                                                            TextButton(
-                                                              onPressed: () => Navigator.of(ctx).pop(false),
-                                                              child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
-                                                            ),
-                                                            FilledButton(
-                                                              style: FilledButton.styleFrom(backgroundColor: Colors.red),
-                                                              onPressed: () => Navigator.of(ctx).pop(true),
-                                                              child: Text(isThai ? 'ลบ' : 'Delete'),
-                                                            ),
-                                                          ],
+                                                              ? 'บันทึกรายการ "${rule.title}" เรียบร้อยแล้ว'
+                                                              : 'Recorded "${rule.title}"'),
                                                         ),
                                                       );
-                                                      if (confirm == true) {
-                                                        await dao.deleteRule(rule.id);
-                                                        widget.onChanged();
-                                                      }
                                                     }
+                                                    widget.onChanged();
                                                   },
-                                                  itemBuilder: (ctx) => [
-                                                    PopupMenuItem(
-                                                      value: 'edit',
-                                                      child: Row(
-                                                        children: [
-                                                          const Icon(Icons.edit_outlined, size: 16),
-                                                          const SizedBox(width: 8),
-                                                          Text(isThai ? 'แก้ไข' : 'Edit'),
-                                                        ],
-                                                      ),
+                                                  child: Text(
+                                                    isThai ? 'ทำรายการ' : 'Post',
+                                                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                            const SizedBox(width: 2),
+                                            Transform.scale(
+                                              scale: 0.72,
+                                              alignment: Alignment.centerRight,
+                                              child: Switch(
+                                                value: rule.isActive,
+                                                onChanged: (val) async {
+                                                  await dao.toggleActive(rule.id, val);
+                                                  widget.onChanged();
+                                                },
+                                              ),
+                                            ),
+                                            PopupMenuButton<String>(
+                                              icon: Icon(Icons.more_vert, size: 16, color: VaultTheme.secondaryText(context)),
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(),
+                                              tooltip: isThai ? 'ตัวเลือก' : 'Options',
+                                              onSelected: (action) async {
+                                                if (action == 'edit') {
+                                                  final edited = await RecurringRuleDialog.show(context, rule: rule);
+                                                  if (edited == true) widget.onChanged();
+                                                } else if (action == 'delete') {
+                                                  final confirm = await showDialog<bool>(
+                                                    context: context,
+                                                    builder: (ctx) => AlertDialog(
+                                                      title: Text(isThai ? 'ยืนยันลบกฎ' : 'Delete Rule'),
+                                                      content: Text(isThai
+                                                          ? 'คุณต้องการลบ "${rule.title}" หรือไม่?'
+                                                          : 'Delete rule "${rule.title}"?'),
+                                                      actions: [
+                                                        TextButton(
+                                                          onPressed: () => Navigator.of(ctx).pop(false),
+                                                          child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+                                                        ),
+                                                        FilledButton(
+                                                          style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                                                          onPressed: () => Navigator.of(ctx).pop(true),
+                                                          child: Text(isThai ? 'ลบ' : 'Delete'),
+                                                        ),
+                                                      ],
                                                     ),
-                                                    PopupMenuItem(
-                                                      value: 'delete',
-                                                      child: Row(
-                                                        children: [
-                                                          const Icon(Icons.delete_outline, size: 16, color: Colors.red),
-                                                          const SizedBox(width: 8),
-                                                          Text(isThai ? 'ลบ' : 'Delete', style: const TextStyle(color: Colors.red)),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  ],
+                                                  );
+                                                  if (confirm == true) {
+                                                    await dao.deleteRule(rule.id);
+                                                    widget.onChanged();
+                                                  }
+                                                }
+                                              },
+                                              itemBuilder: (ctx) => [
+                                                PopupMenuItem(
+                                                  value: 'edit',
+                                                  child: Row(
+                                                    children: [
+                                                      const Icon(Icons.edit_outlined, size: 16),
+                                                      const SizedBox(width: 8),
+                                                      Text(isThai ? 'แก้ไข' : 'Edit'),
+                                                    ],
+                                                  ),
+                                                ),
+                                                PopupMenuItem(
+                                                  value: 'delete',
+                                                  child: Row(
+                                                    children: [
+                                                      const Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                                                      const SizedBox(width: 8),
+                                                      Text(isThai ? 'ลบ' : 'Delete', style: const TextStyle(color: Colors.red)),
+                                                    ],
+                                                  ),
                                                 ),
                                               ],
                                             ),

@@ -9,7 +9,16 @@ class FinancialOverviewCard extends StatelessWidget {
   final int cashFlowMonthSatang;
   final int totalIncomeSatang;
   final int totalExpenseSatang;
+  final int totalCashSatang;
+  final int portfolioValueSatang;
+  final int accruedIncomeSatang;
+  final int accruedIncomeCount;
+  final int insuranceSavingsSatang;
   final VoidCallback onViewMonthlySummary;
+  final VoidCallback? onNavigateToMoney;
+  final VoidCallback? onNavigateToInvest;
+  final VoidCallback? onNavigateToAccruedIncome;
+  final VoidCallback? onNavigateToInsurance;
 
   const FinancialOverviewCard({
     super.key,
@@ -18,12 +27,22 @@ class FinancialOverviewCard extends StatelessWidget {
     required this.cashFlowMonthSatang,
     required this.totalIncomeSatang,
     required this.totalExpenseSatang,
+    this.totalCashSatang = 0,
+    this.portfolioValueSatang = 0,
+    this.accruedIncomeSatang = 0,
+    this.accruedIncomeCount = 0,
+    this.insuranceSavingsSatang = 0,
     required this.onViewMonthlySummary,
+    this.onNavigateToMoney,
+    this.onNavigateToInvest,
+    this.onNavigateToAccruedIncome,
+    this.onNavigateToInsurance,
   });
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
     final isNetWorthPositive = netWorthSatang >= 0;
     final isMoMPositive = momChangePercent >= 0;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -44,7 +63,7 @@ class FinancialOverviewCard extends StatelessWidget {
           ),
         ],
       ),
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -104,24 +123,30 @@ class FinancialOverviewCard extends StatelessWidget {
             ],
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
           // Primary Net Worth
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              Text(
-                Money(netWorthSatang).format(symbol: '฿'),
-                style: VaultTheme.tabular(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  color: isNetWorthPositive
-                      ? (isDark ? VaultTheme.primaryText(context) : const Color(0xFF332B32))
-                      : const Color(0xFFE64A63),
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    Money(netWorthSatang).format(symbol: '฿'),
+                    style: VaultTheme.tabular(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      color: isNetWorthPositive
+                          ? (isDark ? VaultTheme.primaryText(context) : const Color(0xFF332B32))
+                          : const Color(0xFFE64A63),
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
@@ -152,7 +177,7 @@ class FinancialOverviewCard extends StatelessWidget {
             ],
           ),
 
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Text(
             l10n?.netWorthDesc ?? 'ความมั่งคั่งสุทธิ (สินทรัพย์ - หนี้สิน)',
             style: TextStyle(
@@ -162,7 +187,71 @@ class FinancialOverviewCard extends StatelessWidget {
             ),
           ),
 
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
+
+          // 2x2 Clickable Breakdown Tiles (Cash, Portfolio, Accrued Income, Insurance)
+          Row(
+            children: [
+              Expanded(
+                child: _buildBreakdownTile(
+                  context: context,
+                  icon: Icons.account_balance_wallet_outlined,
+                  iconColor: const Color(0xFF42A5F5),
+                  label: isThai ? 'เงินสด/เงินฝาก' : 'Cash & Bank',
+                  amountSatang: totalCashSatang,
+                  badge: null,
+                  onTap: onNavigateToMoney,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildBreakdownTile(
+                  context: context,
+                  icon: Icons.trending_up_rounded,
+                  iconColor: const Color(0xFFAB47BC),
+                  label: isThai ? 'พอร์ตลงทุน' : 'Portfolio',
+                  amountSatang: portfolioValueSatang,
+                  badge: null,
+                  onTap: onNavigateToInvest,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildBreakdownTile(
+                  context: context,
+                  icon: Icons.pending_actions_rounded,
+                  iconColor: const Color(0xFFFF9800),
+                  label: isThai ? 'เงินค้างรับ' : 'Accrued Income',
+                  amountSatang: accruedIncomeSatang,
+                  badge: accruedIncomeCount > 0 ? '$accruedIncomeCount' : null,
+                  onTap: onNavigateToAccruedIncome,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildBreakdownTile(
+                  context: context,
+                  icon: Icons.health_and_safety_outlined,
+                  iconColor: const Color(0xFF26A69A),
+                  label: isThai ? 'สะสมประกัน' : 'Insurance',
+                  amountSatang: insuranceSavingsSatang,
+                  badge: null,
+                  onTap: onNavigateToInsurance,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 14),
+          Divider(
+            color: isDark ? VaultTheme.border(context) : const Color(0xFFF3DCE5),
+            height: 1,
+          ),
+          const SizedBox(height: 14),
 
           // Sub metrics: Month Income vs Month Expense vs Cash Flow
           Row(
@@ -176,7 +265,7 @@ class FinancialOverviewCard extends StatelessWidget {
                   bgColor: isDark ? const Color(0xFF1B2E23) : const Color(0xFFF0FAF2),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: _buildMiniMetric(
                   context: context,
@@ -186,7 +275,7 @@ class FinancialOverviewCard extends StatelessWidget {
                   bgColor: isDark ? const Color(0xFF381924) : const Color(0xFFFFF0F5),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: _buildMiniMetric(
                   context: context,
@@ -201,6 +290,92 @@ class FinancialOverviewCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBreakdownTile({
+    required BuildContext context,
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required int amountSatang,
+    required String? badge,
+    required VoidCallback? onTap,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF2A1F2C) : const Color(0xFFFAF5F8),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isDark ? const Color(0xFF3E2C41) : const Color(0xFFF0DDE5),
+            width: 0.8,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 14, color: iconColor),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? const Color(0xFFD4C2D0) : const Color(0xFF6B5865),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (badge != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF9800).withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      badge,
+                      style: const TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFFF9800),
+                      ),
+                    ),
+                  )
+                else
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 14,
+                    color: isDark ? const Color(0xFF755B70) : const Color(0xFFB5A1AF),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                Money(amountSatang).format(symbol: '฿'),
+                style: VaultTheme.tabular(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? VaultTheme.primaryText(context) : const Color(0xFF332B32),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -235,15 +410,17 @@ class FinancialOverviewCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 4),
-          Text(
-            Money(amountSatang).format(symbol: '฿'),
-            style: VaultTheme.tabular(
-              fontSize: 13.5,
-              fontWeight: FontWeight.w800,
-              color: color,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              Money(amountSatang).format(symbol: '฿'),
+              style: VaultTheme.tabular(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

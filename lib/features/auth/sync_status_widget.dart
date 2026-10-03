@@ -16,36 +16,32 @@ class SyncStatusWidget extends ConsumerWidget {
     final isThai = Localizations.localeOf(context).languageCode == 'th';
 
     if (user == null) {
-      // Not logged in — clear pill to sign in
-      return Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: () => Navigator.of(context).pushNamed('/login'),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: VaultTheme.surface(context).withValues(alpha: 0.92),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: VaultTheme.border(context), width: 1),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.cloud_off_rounded, size: 16, color: Colors.grey),
-                const SizedBox(width: 5),
-                Text(
-                  isThai ? 'เข้าสู่ระบบซิงค์' : 'Sign in to Sync',
-                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.grey),
-                ),
-              ],
+      // Not logged in — compact cloud icon to sign in
+      return Tooltip(
+        message: isThai ? 'เข้าสู่ระบบซิงค์คลาวด์' : 'Sign in to Sync',
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: () => Navigator.of(context).pushNamed('/login'),
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: VaultTheme.surface(context).withValues(alpha: 0.92),
+                shape: BoxShape.circle,
+                border: Border.all(color: VaultTheme.border(context), width: 1),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Center(
+                child: Icon(Icons.cloud_off_rounded, size: 18, color: Colors.grey),
+              ),
             ),
           ),
         ),
@@ -69,36 +65,75 @@ class SyncStatusWidget extends ConsumerWidget {
         break;
     }
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: () => _showSyncDetail(context, ref, syncState),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: VaultTheme.surface(context).withValues(alpha: 0.94),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: statusColor.withValues(alpha: 0.4), width: 1.2),
-            boxShadow: [
-              BoxShadow(
-                color: statusColor.withValues(alpha: 0.12),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildIcon(syncState.status),
-              const SizedBox(width: 5),
-              _buildLabel(context, syncState),
-            ],
+    return Tooltip(
+      message: _getTooltipMessage(context, syncState),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () => _showSyncDetail(context, ref, syncState),
+          child: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: VaultTheme.surface(context).withValues(alpha: 0.94),
+              shape: BoxShape.circle,
+              border: Border.all(color: statusColor.withValues(alpha: 0.4), width: 1.2),
+              boxShadow: [
+                BoxShadow(
+                  color: statusColor.withValues(alpha: 0.15),
+                  blurRadius: 5,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                _buildIcon(syncState.status),
+                Positioned(
+                  right: 4,
+                  bottom: 4,
+                  child: Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: statusColor,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: VaultTheme.surface(context), width: 1),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
+  }
+
+  String _getTooltipMessage(BuildContext context, SyncState state) {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+    switch (state.status) {
+      case SyncStatus.syncing:
+        return isThai ? 'กำลังซิงค์ข้อมูลกับคลาวด์...' : 'Syncing with cloud...';
+      case SyncStatus.offline:
+        return isThai ? 'ออฟไลน์ (ไม่มีอินเทอร์เน็ต)' : 'Offline';
+      case SyncStatus.error:
+        return isThai ? 'ซิงค์ผิดพลาด: แตะเพื่อดูรายละเอียด' : 'Sync error: tap for details';
+      case SyncStatus.idle:
+        if (state.lastSyncAt != null) {
+          final diff = DateTime.now().difference(state.lastSyncAt!);
+          if (diff.inMinutes < 1) {
+            return isThai ? 'ซิงค์แล้วล่าสุด (ข้อมูลตรงกัน)' : 'In Sync (up to date)';
+          } else if (diff.inMinutes < 60) {
+            return isThai ? 'ซิงค์เมื่อ ${diff.inMinutes} นาทีที่แล้ว' : 'Synced ${diff.inMinutes}m ago';
+          } else {
+            return isThai ? 'ซิงค์เมื่อ ${DateFormat('HH:mm').format(state.lastSyncAt!)}' : 'Synced at ${DateFormat('HH:mm').format(state.lastSyncAt!)}';
+          }
+        }
+        return isThai ? 'สถานะคลาวด์: แตะเพื่อดูรายละเอียด' : 'Cloud Status: tap for details';
+    }
   }
 
   Widget _buildIcon(SyncStatus status) {
@@ -118,40 +153,6 @@ class SyncStatusWidget extends ConsumerWidget {
     }
   }
 
-  Widget _buildLabel(BuildContext context, SyncState state) {
-    final isThai = Localizations.localeOf(context).languageCode == 'th';
-    String text;
-    switch (state.status) {
-      case SyncStatus.syncing:
-        text = isThai ? 'กำลังซิงค์...' : 'Syncing...';
-        break;
-      case SyncStatus.offline:
-        text = isThai ? 'ออฟไลน์' : 'Offline';
-        break;
-      case SyncStatus.error:
-        text = isThai ? 'ซิงค์ผิดพลาด' : 'Sync error';
-        break;
-      case SyncStatus.idle:
-        if (state.lastSyncAt != null) {
-          final diff = DateTime.now().difference(state.lastSyncAt!);
-          if (diff.inMinutes < 1) {
-            text = isThai ? 'ซิงค์แล้ว' : 'In Sync';
-          } else if (diff.inMinutes < 60) {
-            text = isThai
-                ? '${diff.inMinutes} นาทีที่แล้ว'
-                : '${diff.inMinutes}m ago';
-          } else {
-            text = DateFormat('HH:mm').format(state.lastSyncAt!);
-          }
-        } else {
-          text = isThai ? 'ยังไม่เคยซิงค์' : 'Not synced';
-        }
-    }
-    return Text(
-      text,
-      style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
-    );
-  }
 
   void _showSyncDetail(BuildContext context, WidgetRef ref, SyncState state) {
     final isThai = Localizations.localeOf(context).languageCode == 'th';

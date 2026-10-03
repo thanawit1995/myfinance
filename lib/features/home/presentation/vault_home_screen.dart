@@ -373,7 +373,6 @@ class VaultHomeScreen extends ConsumerWidget {
   }
 
   void _showRecurringNotificationsSheet(BuildContext context, WidgetRef ref) {
-    final db = ref.read(databaseProvider);
     final isThai = Localizations.localeOf(context).languageCode == 'th';
 
     showModalBottomSheet(
@@ -384,158 +383,560 @@ class VaultHomeScreen extends ConsumerWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.65,
-          minChildSize: 0.4,
-          maxChildSize: 0.9,
-          expand: false,
-          builder: (sheetCtx, scrollController) {
-            return FutureBuilder<List<Transaction>>(
-              future: (db.select(db.transactions)
-                    ..where((t) => t.tag.equals('recurring_auto') & t.deletedAt.isNull())
-                    ..orderBy([(t) => OrderingTerm.desc(t.transactionDate), (t) => OrderingTerm.desc(t.createdAt)])
-                    ..limit(50))
-                  .get(),
-              builder: (context, snapshot) {
-                final list = snapshot.data ?? [];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade400,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return StatefulBuilder(
+          builder: (sheetCtx, setSheetState) {
+            return DraggableScrollableSheet(
+              initialChildSize: 0.75,
+              minChildSize: 0.45,
+              maxChildSize: 0.95,
+              expand: false,
+              builder: (innerCtx, scrollController) {
+                return FutureBuilder<({
+                  List<({RecurringRule rule, DateTime projectedDate})> upcoming,
+                  List<Transaction> recent,
+                  Map<String, Account> accountsMap,
+                  Map<String, Category> categoriesMap,
+                })>(
+                  future: _loadNotificationsData(ref),
+                  builder: (context, snapshot) {
+                    final data = snapshot.data;
+                    final upcoming = data?.upcoming ?? [];
+                    final recent = data?.recent ?? [];
+                    final accountsMap = data?.accountsMap ?? {};
+                    final categoriesMap = data?.categoriesMap ?? {};
+
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.notifications_active_rounded, color: Colors.amber, size: 22),
-                              const SizedBox(width: 8),
-                              Text(
-                                isThai ? 'การแจ้งเตือนรายการประจำ' : 'Recurring Notifications',
-                                style: TextStyle(
-                                  fontFamily: VaultTheme.fontFamily,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: VaultTheme.primaryText(context),
-                                ),
-                              ),
-                            ],
-                          ),
-                          TextButton(
-                            onPressed: () async {
-                              final prefs = await SharedPreferences.getInstance();
-                              await prefs.setString(
-                                'last_read_recurring_notification_time',
-                                DateTime.now().toIso8601String(),
-                              );
-                              ref.read(transactionsVersionProvider.notifier).state++;
-                              if (ctx.mounted) Navigator.pop(ctx);
-                            },
-                            child: Text(
-                              isThai ? 'รับทราบแล้ว' : 'Mark all read',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: VaultTheme.accent(context),
+                          Center(
+                            child: Container(
+                              width: 40,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade400,
+                                borderRadius: BorderRadius.circular(2),
                               ),
                             ),
                           ),
+                          const SizedBox(height: 14),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.notifications_active_rounded, color: Colors.amber, size: 22),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    isThai ? 'การแจ้งเตือนรายการประจำ' : 'Recurring Notifications',
+                                    style: TextStyle(
+                                      fontFamily: VaultTheme.fontFamily,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: VaultTheme.primaryText(context),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              FilledButton.tonalIcon(
+                                style: FilledButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                icon: const Icon(Icons.done_all_rounded, size: 16),
+                                label: Text(
+                                  isThai ? 'รับทราบแล้ว' : 'Mark read',
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                ),
+                                onPressed: () async {
+                                  final prefs = await SharedPreferences.getInstance();
+                                  await prefs.setString(
+                                    'last_read_recurring_notification_time',
+                                    DateTime.now().toUtc().add(const Duration(seconds: 2)).toIso8601String(),
+                                  );
+                                  ref.read(transactionsVersionProvider.notifier).state++;
+                                  if (ctx.mounted) Navigator.pop(ctx);
+                                },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          const Divider(height: 1),
+                          Expanded(
+                            child: snapshot.connectionState == ConnectionState.waiting
+                                ? const Center(child: CircularProgressIndicator())
+                                : ListView(
+                                    controller: scrollController,
+                                    children: [
+                                      // SECTION 1: รายการใน 7 วันข้างหน้า
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 14, bottom: 8),
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.calendar_month_outlined, size: 18, color: Colors.blueAccent),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              isThai ? 'รายการที่จะมาถึงใน 7 วันข้างหน้า' : 'Upcoming in next 7 days',
+                                              style: TextStyle(
+                                                fontSize: 13.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: VaultTheme.primaryText(context),
+                                              ),
+                                            ),
+                                            const Spacer(),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                              decoration: BoxDecoration(
+                                                color: Colors.blueAccent.withValues(alpha: 0.12),
+                                                borderRadius: BorderRadius.circular(10),
+                                              ),
+                                              child: Text(
+                                                '${upcoming.length}',
+                                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.blueAccent),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      if (upcoming.isEmpty)
+                                        Container(
+                                          padding: const EdgeInsets.all(16),
+                                          alignment: Alignment.center,
+                                          decoration: BoxDecoration(
+                                            color: VaultTheme.surface(context),
+                                            borderRadius: BorderRadius.circular(10),
+                                            border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+                                          ),
+                                          child: Text(
+                                            isThai ? 'ไม่มีรายการประจำใน 7 วันข้างหน้า' : 'No upcoming items in the next 7 days',
+                                            style: TextStyle(fontSize: 12, color: VaultTheme.secondaryText(context)),
+                                          ),
+                                        )
+                                      else
+                                        ...upcoming.map((item) {
+                                          final rule = item.rule;
+                                          final dueDate = item.projectedDate;
+                                          final daysDiff = dueDate.difference(DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day)).inDays;
+                                          final daysText = daysDiff == 0
+                                              ? (isThai ? 'วันนี้' : 'Today')
+                                              : daysDiff == 1
+                                                  ? (isThai ? 'พรุ่งนี้' : 'Tomorrow')
+                                                  : (isThai ? 'อีก $daysDiff วัน' : 'in $daysDiff days');
+                                          final dateFormatted = DateFormat('d MMM', isThai ? 'th' : 'en_US').format(dueDate);
+                                          final isIncome = rule.transactionType == 'income';
+                                          final isTransfer = rule.transactionType == 'transfer';
+                                          final amountColor = isIncome
+                                              ? Colors.green
+                                              : (isTransfer ? Colors.blueGrey : Colors.redAccent);
+                                          final sourceAcc = accountsMap[rule.sourceAccountId];
+                                          final destAcc = isTransfer && rule.destinationAccountId != null ? accountsMap[rule.destinationAccountId] : null;
+
+                                          return Card(
+                                            margin: const EdgeInsets.only(bottom: 8),
+                                            elevation: 0.5,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(12),
+                                              side: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
+                                            ),
+                                            child: InkWell(
+                                              borderRadius: BorderRadius.circular(12),
+                                              onTap: () {
+                                                _showEarlyPostRecurringDialog(
+                                                  context,
+                                                  ref,
+                                                  rule,
+                                                  dueDate,
+                                                  accountsMap,
+                                                  categoriesMap,
+                                                  () => setSheetState(() {}),
+                                                );
+                                              },
+                                              child: Padding(
+                                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                                child: Row(
+                                                  children: [
+                                                    CircleAvatar(
+                                                      radius: 17,
+                                                      backgroundColor: amountColor.withValues(alpha: 0.12),
+                                                      child: Icon(
+                                                        isIncome
+                                                            ? Icons.arrow_downward_rounded
+                                                            : (isTransfer ? Icons.swap_horiz_rounded : Icons.arrow_upward_rounded),
+                                                        color: amountColor,
+                                                        size: 18,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 10),
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          Row(
+                                                            children: [
+                                                              Expanded(
+                                                                child: Text(
+                                                                  rule.title,
+                                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                                                                  maxLines: 1,
+                                                                  overflow: TextOverflow.ellipsis,
+                                                                ),
+                                                              ),
+                                                              const SizedBox(width: 4),
+                                                              Container(
+                                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                                                decoration: BoxDecoration(
+                                                                  color: rule.autoPost
+                                                                      ? (VaultTheme.isDark(context) ? Colors.green.withValues(alpha: 0.25) : Colors.green.withValues(alpha: 0.12))
+                                                                      : (VaultTheme.isDark(context) ? Colors.amber.withValues(alpha: 0.25) : Colors.amber.withValues(alpha: 0.18)),
+                                                                  borderRadius: BorderRadius.circular(4),
+                                                                ),
+                                                                child: Text(
+                                                                  rule.autoPost ? 'Auto' : (isThai ? 'รอยืนยัน' : 'Manual'),
+                                                                  style: TextStyle(
+                                                                    fontSize: 9.5,
+                                                                    fontWeight: FontWeight.bold,
+                                                                    color: rule.autoPost
+                                                                        ? (VaultTheme.isDark(context) ? Colors.greenAccent : Colors.green.shade800)
+                                                                        : (VaultTheme.isDark(context) ? Colors.amber.shade300 : Colors.brown.shade800),
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                          const SizedBox(height: 3),
+                                                          Text(
+                                                            '$daysText ($dateFormatted)${sourceAcc != null ? " • ${isTransfer && destAcc != null ? '${sourceAcc.name} → ${destAcc.name}' : sourceAcc.name}" : ""}',
+                                                            style: TextStyle(fontSize: 11.5, color: VaultTheme.secondaryText(context)),
+                                                            maxLines: 1,
+                                                            overflow: TextOverflow.ellipsis,
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Column(
+                                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                                      children: [
+                                                        Text(
+                                                          '${isIncome ? '+' : (isTransfer ? '' : '-')}${Money(rule.amountSatang).format(symbol: '฿')}',
+                                                          style: TextStyle(
+                                                            fontFamily: VaultTheme.fontFamily,
+                                                            fontWeight: FontWeight.bold,
+                                                            fontSize: 13.5,
+                                                            color: amountColor,
+                                                          ),
+                                                        ),
+                                                        const SizedBox(height: 2),
+                                                        Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            Text(
+                                                              isThai ? 'แตะเพื่อลงล่วงหน้า' : 'Tap to post',
+                                                              style: TextStyle(fontSize: 10, color: VaultTheme.accent(context), fontWeight: FontWeight.w600),
+                                                            ),
+                                                            const SizedBox(width: 2),
+                                                            Icon(Icons.chevron_right_rounded, size: 14, color: VaultTheme.accent(context)),
+                                                          ],
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        }),
+
+                                      const SizedBox(height: 18),
+
+                                      // SECTION 2: รายการที่เพิ่งบันทึกแล้ว
+                                      Padding(
+                                        padding: const EdgeInsets.only(bottom: 8),
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.history_rounded, size: 18, color: Colors.green),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              isThai ? 'รายการประจำที่บันทึกแล้วล่าสุด' : 'Recently posted recurring transactions',
+                                              style: TextStyle(
+                                                fontSize: 13.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: VaultTheme.primaryText(context),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      if (recent.isEmpty)
+                                        Container(
+                                          padding: const EdgeInsets.all(16),
+                                          alignment: Alignment.center,
+                                          decoration: BoxDecoration(
+                                            color: VaultTheme.surface(context),
+                                            borderRadius: BorderRadius.circular(10),
+                                            border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+                                          ),
+                                          child: Text(
+                                            isThai ? 'ยังไม่มีรายการประจำที่บันทึกแล้ว' : 'No posted recurring transactions yet',
+                                            style: TextStyle(fontSize: 12, color: VaultTheme.secondaryText(context)),
+                                          ),
+                                        )
+                                      else
+                                        ...recent.map((tx) {
+                                          final isIncome = tx.transactionType == 'income';
+                                          final isTransfer = tx.transactionType == 'transfer';
+                                          final amountStr = Money(tx.amountThbSatang).format(symbol: '฿');
+                                          final dateStr = DateFormat('dd/MM/yyyy').format(tx.transactionDate);
+                                          final isEarly = tx.tag == 'recurring_early_posted';
+
+                                          return Card(
+                                            margin: const EdgeInsets.only(bottom: 6),
+                                            elevation: 0,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(10),
+                                              side: BorderSide(color: Colors.grey.withValues(alpha: 0.15)),
+                                            ),
+                                            child: ListTile(
+                                              dense: true,
+                                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                                              leading: CircleAvatar(
+                                                radius: 15,
+                                                backgroundColor: (isIncome ? Colors.green : Colors.redAccent).withValues(alpha: 0.12),
+                                                child: Icon(
+                                                  isIncome ? Icons.arrow_downward_rounded : (isTransfer ? Icons.swap_horiz_rounded : Icons.arrow_upward_rounded),
+                                                  color: isIncome ? Colors.green : Colors.redAccent,
+                                                  size: 16,
+                                                ),
+                                              ),
+                                              title: Text(
+                                                tx.note?.isNotEmpty == true ? tx.note! : (isThai ? 'รายการประจำ' : 'Recurring item'),
+                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              subtitle: Text(
+                                                '$dateStr • ${isEarly ? (isThai ? "บันทึกล่วงหน้า" : "Early posted") : (isThai ? "สร้างอัตโนมัติ" : "Auto-posted")}',
+                                                style: TextStyle(fontSize: 11, color: VaultTheme.secondaryText(context)),
+                                              ),
+                                              trailing: Text(
+                                                '${isIncome ? '+' : '-'}$amountStr',
+                                                style: TextStyle(
+                                                  fontFamily: VaultTheme.fontFamily,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 13,
+                                                  color: isIncome ? Colors.green : Colors.redAccent,
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        }),
+                                      const SizedBox(height: 16),
+                                    ],
+                                  ),
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        isThai
-                            ? 'รายการธุรกรรมประจำที่ระบบบันทึกให้อัตโนมัติเมื่อถึงกำหนด'
-                            : 'Recurring transactions automatically posted by the system on schedule.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: VaultTheme.secondaryText(context),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      const Divider(height: 1),
-                      Expanded(
-                        child: snapshot.connectionState == ConnectionState.waiting
-                            ? const Center(child: CircularProgressIndicator())
-                            : list.isEmpty
-                                ? Center(
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(Icons.notifications_none_rounded, size: 48, color: Colors.grey.shade400),
-                                        const SizedBox(height: 12),
-                                        Text(
-                                          isThai ? 'ยังไม่มีรายการประจำที่ถูกสร้างอัตโนมัติ' : 'No auto-created recurring items yet',
-                                          style: TextStyle(
-                                            color: VaultTheme.secondaryText(context),
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                : ListView.separated(
-                                    controller: scrollController,
-                                    itemCount: list.length,
-                                    separatorBuilder: (_, __) => const Divider(height: 1),
-                                    itemBuilder: (context, idx) {
-                                      final tx = list[idx];
-                                      final isIncome = tx.transactionType == 'income';
-                                      final amountStr = Money(tx.amountThbSatang).format(symbol: '฿');
-                                      final dateStr = DateFormat('dd/MM/yyyy').format(tx.transactionDate);
-
-                                      return ListTile(
-                                        contentPadding: const EdgeInsets.symmetric(vertical: 4),
-                                        leading: CircleAvatar(
-                                          backgroundColor: (isIncome ? Colors.green : Colors.redAccent).withValues(alpha: 0.12),
-                                          child: Icon(
-                                            isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
-                                            color: isIncome ? Colors.green : Colors.redAccent,
-                                            size: 20,
-                                          ),
-                                        ),
-                                        title: Text(
-                                          tx.note?.isNotEmpty == true
-                                              ? tx.note!
-                                              : (isThai ? 'รายการประจำอัตโนมัติ' : 'Auto Recurring Transaction'),
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
-                                        ),
-                                        subtitle: Text(
-                                          '$dateStr • ${isThai ? 'สร้างอัตโนมัติ' : 'Auto-posted'}',
-                                          style: TextStyle(fontSize: 11.5, color: VaultTheme.secondaryText(context)),
-                                        ),
-                                        trailing: Text(
-                                          '${isIncome ? '+' : '-'}$amountStr',
-                                          style: TextStyle(
-                                            fontFamily: VaultTheme.fontFamily,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 14,
-                                            color: isIncome ? Colors.green : Colors.redAccent,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                      ),
-                    ],
-                  ),
+                    );
+                  },
                 );
               },
             );
           },
         );
       },
+    );
+  }
+
+  Future<({
+    List<({RecurringRule rule, DateTime projectedDate})> upcoming,
+    List<Transaction> recent,
+    Map<String, Account> accountsMap,
+    Map<String, Category> categoriesMap,
+  })> _loadNotificationsData(WidgetRef ref) async {
+    final db = ref.read(databaseProvider);
+    final upcoming = await ref.read(recurringTransactionsDaoProvider).getUpcoming30Days(windowDays: 7);
+    final recent = await (db.select(db.transactions)
+          ..where((t) =>
+              (t.tag.equals('recurring_auto') |
+               t.tag.equals('recurring_manual_confirmed') |
+               t.tag.equals('recurring_early_posted')) &
+              t.deletedAt.isNull())
+          ..orderBy([(t) => OrderingTerm.desc(t.transactionDate), (t) => OrderingTerm.desc(t.createdAt)])
+          ..limit(30))
+        .get();
+    final accounts = await ref.read(accountsDaoProvider).getAllAccounts();
+    final categories = await ref.read(categoriesDaoProvider).getAllCategories();
+    return (
+      upcoming: upcoming,
+      recent: recent,
+      accountsMap: {for (final a in accounts) a.id: a},
+      categoriesMap: {for (final c in categories) c.id: c},
+    );
+  }
+
+  void _showEarlyPostRecurringDialog(
+    BuildContext context,
+    WidgetRef ref,
+    RecurringRule rule,
+    DateTime scheduledDueDate,
+    Map<String, Account> accountsMap,
+    Map<String, Category> categoriesMap,
+    VoidCallback onDone,
+  ) {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+    DateTime selectedDate = DateTime.now();
+    final amountCtrl = TextEditingController(text: (rule.amountSatang / 100).toStringAsFixed(2));
+    final noteCtrl = TextEditingController(text: rule.title);
+    final sourceAccountId = rule.sourceAccountId;
+    final categoryId = rule.categoryId;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final sourceAcc = accountsMap[sourceAccountId];
+          final cat = categoriesMap[categoryId];
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                Icon(Icons.schedule_send_rounded, color: VaultTheme.accent(context), size: 24),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    isThai ? 'ลงบัญชีก่อนกำหนด' : 'Post Early & Edit',
+                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isThai
+                        ? 'รอบกำหนดการเดิม: ${DateFormat('d MMMM yyyy', 'th').format(scheduledDueDate)}\nระบบจะบันทึกรายการในวันที่คุณระบุ และข้ามรอบของกำหนดการนี้ไปรอบถัดไปทันที'
+                        : 'Scheduled: ${DateFormat('d MMM yyyy').format(scheduledDueDate)}\nThis will record the transaction now and skip this cycle in schedule.',
+                    style: TextStyle(fontSize: 12, color: VaultTheme.secondaryText(context)),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Date Picker
+                  InkWell(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2035),
+                      );
+                      if (picked != null) {
+                        setDialogState(() => selectedDate = picked);
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade400),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.calendar_today_rounded, size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            isThai
+                                ? 'วันที่บันทึก: ${DateFormat('d MMMM yyyy', 'th').format(selectedDate)}'
+                                : 'Date: ${DateFormat('d MMM yyyy').format(selectedDate)}',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                          const Spacer(),
+                          Text(isThai ? 'เปลี่ยน' : 'Change', style: TextStyle(fontSize: 12, color: VaultTheme.accent(context))),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Amount
+                  TextField(
+                    controller: amountCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: isThai ? 'จำนวนเงิน (บาท)' : 'Amount (THB)',
+                      border: const OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Note
+                  TextField(
+                    controller: noteCtrl,
+                    decoration: InputDecoration(
+                      labelText: isThai ? 'บันทึกย่อ / รายละเอียด' : 'Note / Title',
+                      border: const OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Info
+                  if (sourceAcc != null)
+                    Text(
+                      '${isThai ? "บัญชี: " : "Account: "}${sourceAcc.name}${cat != null ? " • หมวดหมู่: ${isThai ? cat.nameTh : cat.nameEn}" : ""}',
+                      style: TextStyle(fontSize: 11.5, color: VaultTheme.secondaryText(context)),
+                    ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogCtx).pop(),
+                child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  final amtDouble = double.tryParse(amountCtrl.text.replaceAll(',', '')) ?? 0;
+                  final amtSatang = (amtDouble * 100).round();
+                  if (amtSatang <= 0) return;
+
+                  Navigator.of(dialogCtx).pop();
+
+                  await ref.read(recurringTransactionsDaoProvider).postCustomOccurrence(
+                    ruleId: rule.id,
+                    scheduledDueDate: scheduledDueDate,
+                    actualDate: selectedDate,
+                    amountSatang: amtSatang,
+                    note: noteCtrl.text.trim().isEmpty ? rule.title : noteCtrl.text.trim(),
+                    sourceAccountId: sourceAccountId,
+                    destinationAccountId: rule.destinationAccountId,
+                    categoryId: categoryId,
+                  );
+
+                  ref.read(transactionsVersionProvider.notifier).state++;
+                  onDone();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(isThai
+                            ? 'บันทึกรายการ "${rule.title}" เรียบร้อยแล้ว (เลื่อนรอบถัดไปแล้ว)'
+                            : 'Posted "${rule.title}" early! Next cycle updated.'),
+                      ),
+                    );
+                  }
+                },
+                child: Text(isThai ? 'บันทึกลงบัญชีทันที' : 'Post Now'),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
@@ -1741,17 +2142,21 @@ class VaultHomeScreen extends ConsumerWidget {
     try {
       final prefs = await SharedPreferences.getInstance();
       final lastReadStr = prefs.getString('last_read_recurring_notification_time');
-      final lastReadTime = lastReadStr != null ? DateTime.tryParse(lastReadStr) : null;
+      final lastReadTime = lastReadStr != null ? DateTime.tryParse(lastReadStr)?.toUtc() : null;
 
       final recentRecurring = await (db.select(db.transactions)
-            ..where((t) => t.tag.equals('recurring_auto') & t.deletedAt.isNull())
+            ..where((t) =>
+                (t.tag.equals('recurring_auto') |
+                 t.tag.equals('recurring_manual_confirmed') |
+                 t.tag.equals('recurring_early_posted')) &
+                t.deletedAt.isNull())
             ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
             ..limit(20))
           .get();
 
       unreadRecurring = lastReadTime == null
           ? recentRecurring.length
-          : recentRecurring.where((t) => t.createdAt.isAfter(lastReadTime)).length;
+          : recentRecurring.where((t) => t.createdAt.toUtc().isAfter(lastReadTime)).length;
     } catch (_) {}
 
     return _VaultHomeData(

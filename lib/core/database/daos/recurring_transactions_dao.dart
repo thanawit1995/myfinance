@@ -315,6 +315,74 @@ class RecurringTransactionsDao extends DatabaseAccessor<AppDatabase> with _$Recu
     );
   }
 
+  /// Early post or customize an occurrence of a recurring rule before its scheduled due date
+  Future<void> postCustomOccurrence({
+    required String ruleId,
+    required DateTime scheduledDueDate,
+    required DateTime actualDate,
+    required int amountSatang,
+    required String? note,
+    String? sourceAccountId,
+    String? destinationAccountId,
+    String? categoryId,
+  }) async {
+    final rule = await getRuleById(ruleId);
+    if (rule == null) return;
+
+    final now = DateTime.now();
+    final txId = _uuid.v4();
+
+    await into(transactions).insert(
+      TransactionsCompanion.insert(
+        id: txId,
+        transactionType: rule.transactionType,
+        amountOriginalSatang: amountSatang,
+        currencyCode: rule.currencyCode,
+        amountThbSatang: amountSatang,
+        sourceAccountId: Value(sourceAccountId ?? rule.sourceAccountId),
+        destinationAccountId: Value(destinationAccountId ?? rule.destinationAccountId),
+        categoryId: Value(categoryId ?? rule.categoryId),
+        transactionDate: actualDate,
+        isCleared: const Value(true),
+        note: Value(note ?? rule.title),
+        tag: const Value('recurring_early_posted'),
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+
+    await into(auditLogs).insert(
+      AuditLogsCompanion.insert(
+        id: _uuid.v4(),
+        entityTable: 'transactions',
+        entityId: txId,
+        action: 'EARLY_POST_RECURRING',
+        afterDataJson: Value('{"ruleId": "$ruleId", "scheduledDate": "$scheduledDueDate", "actualDate": "$actualDate", "amount": $amountSatang}'),
+        changeTimestamp: now,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+
+    // Compute next run date from the scheduled dueDate to advance cycle
+    final nextDate = RecurringEngine.computeNextRunDate(
+      frequency: rule.frequency,
+      intervalUnits: rule.intervalUnits,
+      fromDate: scheduledDueDate,
+      dayOfMonth: rule.dayOfMonth,
+    );
+    final isExpired = rule.endDate != null && nextDate.isAfter(rule.endDate!);
+
+    await (update(recurringRules)..where((r) => r.id.equals(rule.id))).write(
+      RecurringRulesCompanion(
+        lastPostedDate: Value(scheduledDueDate),
+        nextRunDate: Value(nextDate),
+        isActive: Value(!isExpired),
+        updatedAt: Value(now),
+      ),
+    );
+  }
+
   /// Returns projected occurrences for all active rules in the next [windowDays] (default 30 days)
   Future<List<({RecurringRule rule, DateTime projectedDate})>> getUpcoming30Days({int windowDays = 30}) async {
     final active = await getActiveRules();

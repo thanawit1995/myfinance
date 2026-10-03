@@ -40,6 +40,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
   bool _isSearchExpanded = false;
 
   List<Transaction>? _transactions;
+  Map<String, Account> _accountsMap = {};
   bool _isLoading = false;
   StreamSubscription? _dbSubscription;
 
@@ -68,6 +69,8 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
       setState(() => _isLoading = true);
     }
     try {
+      final accounts = await ref.read(accountsDaoProvider).getAllAccounts();
+      final accountsMap = {for (final a in accounts) a.id: a};
       final list = await ref.read(transactionsDaoProvider).searchTransactions(
         query: _searchController.text.trim().isEmpty ? null : _searchController.text.trim(),
         startDate: _selectedDateRange?.start,
@@ -79,6 +82,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
       );
       if (mounted) {
         setState(() {
+          _accountsMap = accountsMap;
           _transactions = list;
           _isLoading = false;
         });
@@ -92,6 +96,8 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
 
   Future<void> _silentReloadTransactions() async {
     try {
+      final accounts = await ref.read(accountsDaoProvider).getAllAccounts();
+      final accountsMap = {for (final a in accounts) a.id: a};
       final list = await ref.read(transactionsDaoProvider).searchTransactions(
         query: _searchController.text.trim().isEmpty ? null : _searchController.text.trim(),
         startDate: _selectedDateRange?.start,
@@ -103,6 +109,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
       );
       if (mounted) {
         setState(() {
+          _accountsMap = accountsMap;
           _transactions = list;
         });
       }
@@ -427,6 +434,67 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
         ? (isThai ? 'รายจ่าย' : 'Expense')
         : (isIncome ? (isThai ? 'รายรับ' : 'Income') : (isThai ? 'โอนเงิน' : 'Transfer'));
 
+    final sourceAcc = tx.sourceAccountId != null ? _accountsMap[tx.sourceAccountId] : null;
+    final isCredit = sourceAcc?.accountType == 'credit_card';
+
+    Widget? subtitleWidget;
+    final List<Widget> subBadges = [];
+
+    // Credit Card badge (Item 5)
+    if (isCredit) {
+      subBadges.add(
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+          decoration: BoxDecoration(
+            color: Colors.blue.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.credit_card_rounded, size: 11, color: Colors.blue),
+              const SizedBox(width: 3),
+              Text(
+                sourceAcc?.name ?? (isThai ? 'บัตรเครดิต' : 'Credit'),
+                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (isIncome && !tx.isCleared) {
+      subBadges.add(
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+          decoration: BoxDecoration(
+            color: Colors.amber.withValues(alpha: 0.18),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            tx.workPeriod != null ? 'ค้างรับ (${tx.workPeriod})' : 'ค้างรับ/ตกเบิก',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: Colors.amber.shade900,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (subBadges.isNotEmpty) {
+      subtitleWidget = Padding(
+        padding: const EdgeInsets.only(top: 3),
+        child: Wrap(
+          spacing: 6,
+          runSpacing: 4,
+          children: subBadges,
+        ),
+      );
+    }
+
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
       leading: Container(
@@ -442,30 +510,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
         tx.note?.isNotEmpty == true ? tx.note! : defaultNote,
         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
       ),
-      subtitle: (isIncome && !tx.isCleared)
-          ? Padding(
-              padding: const EdgeInsets.only(top: 3),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      tx.workPeriod != null ? 'ค้างรับ (${tx.workPeriod})' : 'ค้างรับ/ตกเบิก',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.amber.shade900,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : null,
+      subtitle: subtitleWidget,
       trailing: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -527,6 +572,38 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
     }
   }
 
+  Widget _buildModalTypeChip({
+    required String label,
+    required String? value,
+    required bool isSelected,
+    required IconData icon,
+    Color? color,
+    required VoidCallback onTap,
+  }) {
+    final chipColor = color ?? Theme.of(context).colorScheme.primary;
+    return ChoiceChip(
+      avatar: Icon(
+        icon,
+        size: 15,
+        color: isSelected ? Colors.white : chipColor,
+      ),
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          color: isSelected ? Colors.white : null,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+      selected: isSelected,
+      onSelected: (_) => onTap(),
+      showCheckmark: false,
+      selectedColor: chipColor,
+      backgroundColor: chipColor.withValues(alpha: 0.08),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+    );
+  }
+
   Future<void> _showFilterDialog() async {
     final isThai = Localizations.localeOf(context).languageCode == 'th';
     final accounts = await ref.read(accountsDaoProvider).getActiveAccounts();
@@ -541,6 +618,15 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
       builder: (ctx) {
         return StatefulBuilder(
           builder: (bottomSheetCtx, setModalState) {
+            final activeType = _selectedType;
+
+            // Filter categories according to activeType (Item 4)
+            final availableCategories = categories.where((c) {
+              if (activeType == null) return true;
+              if (activeType == 'transfer') return false;
+              return c.categoryType == activeType;
+            }).toList();
+
             return Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -550,14 +636,155 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
                   Text(isThai ? 'ตัวกรองข้อมูล' : 'Filter Transactions', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 16),
 
-                  // Date range picker
+                  // 1. Transaction Type Selector First! (Item 4)
+                  Text(
+                    isThai ? '1. เลือกประเภทรายการ' : '1. Transaction Type',
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
+                  ),
+                  const SizedBox(height: 6),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildModalTypeChip(
+                          label: isThai ? 'ทั้งหมด' : 'All',
+                          value: null,
+                          isSelected: _selectedType == null,
+                          icon: Icons.list_alt_rounded,
+                          onTap: () {
+                            setModalState(() {
+                              _selectedType = null;
+                            });
+                          },
+                        ),
+                        const SizedBox(width: 6),
+                        _buildModalTypeChip(
+                          label: isThai ? 'รายจ่าย' : 'Expense',
+                          value: 'expense',
+                          isSelected: _selectedType == 'expense',
+                          icon: Icons.arrow_upward_rounded,
+                          color: Colors.red,
+                          onTap: () {
+                            setModalState(() {
+                              _selectedType = 'expense';
+                              if (_selectedCategoryId != null &&
+                                  !categories.any((c) => c.id == _selectedCategoryId && c.categoryType == 'expense')) {
+                                _selectedCategoryId = null;
+                              }
+                            });
+                          },
+                        ),
+                        const SizedBox(width: 6),
+                        _buildModalTypeChip(
+                          label: isThai ? 'รายรับ' : 'Income',
+                          value: 'income',
+                          isSelected: _selectedType == 'income',
+                          icon: Icons.arrow_downward_rounded,
+                          color: Colors.green,
+                          onTap: () {
+                            setModalState(() {
+                              _selectedType = 'income';
+                              if (_selectedCategoryId != null &&
+                                  !categories.any((c) => c.id == _selectedCategoryId && c.categoryType == 'income')) {
+                                _selectedCategoryId = null;
+                              }
+                            });
+                          },
+                        ),
+                        const SizedBox(width: 6),
+                        _buildModalTypeChip(
+                          label: isThai ? 'โอนเงิน' : 'Transfer',
+                          value: 'transfer',
+                          isSelected: _selectedType == 'transfer',
+                          icon: Icons.swap_horiz_rounded,
+                          color: Colors.blueGrey,
+                          onTap: () {
+                            setModalState(() {
+                              _selectedType = 'transfer';
+                              _selectedCategoryId = null;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // 2. Category Dropdown filtered by Type! (Item 4)
+                  if (activeType == 'transfer')
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, size: 16, color: Colors.grey.shade600),
+                          const SizedBox(width: 8),
+                          Text(
+                            isThai ? 'รายการโอนเงินไม่มีการจัดหมวดหมู่' : 'Transfers do not have categories',
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    DropdownButtonFormField<String>(
+                      decoration: InputDecoration(
+                        labelText: isThai
+                            ? (activeType == 'expense'
+                                ? '2. เลือกหมวดหมู่รายจ่าย'
+                                : (activeType == 'income' ? '2. เลือกหมวดหมู่รายรับ' : '2. เลือกหมวดหมู่'))
+                            : '2. Filter by Category',
+                        border: const OutlineInputBorder(),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                      initialValue: availableCategories.any((c) => c.id == _selectedCategoryId) ? _selectedCategoryId : null,
+                      items: [
+                        DropdownMenuItem(
+                          value: null,
+                          child: Text(isThai
+                              ? (activeType == null ? 'ทุกหมวดหมู่' : 'ทุกหมวดในประเภทนี้')
+                              : 'All Categories'),
+                        ),
+                        ...availableCategories.map((c) => DropdownMenuItem(value: c.id, child: Text(c.localizedName(context)))),
+                      ],
+                      onChanged: (val) => setModalState(() => _selectedCategoryId = val),
+                    ),
+                  const SizedBox(height: 12),
+
+                  // 3. Account dropdown
+                  DropdownButtonFormField<String>(
+                    decoration: InputDecoration(
+                      labelText: isThai ? '3. กรองตามบัญชี' : '3. Filter by Account',
+                      border: const OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                    initialValue: _selectedAccountId,
+                    items: [
+                      DropdownMenuItem(value: null, child: Text(isThai ? 'ทุกบัญชี' : 'All Accounts')),
+                      ...accounts.map((a) => DropdownMenuItem(value: a.id, child: Text(a.name))),
+                    ],
+                    onChanged: (val) => setModalState(() => _selectedAccountId = val),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // 4. Date range picker
                   ListTile(
+                    contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.date_range),
                     title: Text(
                       _selectedDateRange == null
                           ? (isThai ? 'เลือกช่วงวันที่' : 'Select Date Range')
                           : '${DateFormat('d/M/y').format(_selectedDateRange!.start)} - ${DateFormat('d/M/y').format(_selectedDateRange!.end)}',
                     ),
+                    trailing: _selectedDateRange != null
+                        ? IconButton(
+                            icon: const Icon(Icons.close, size: 18),
+                            onPressed: () => setModalState(() => _selectedDateRange = null),
+                          )
+                        : null,
                     onTap: () async {
                       final picked = await showDateRangePicker(
                         context: context,
@@ -570,37 +797,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
                       }
                     },
                   ),
-                  const SizedBox(height: 12),
-
-                  // Account dropdown
-                  DropdownButtonFormField<String>(
-                    decoration: InputDecoration(
-                      labelText: isThai ? 'กรองตามบัญชี' : 'Filter by Account',
-                      border: const OutlineInputBorder(),
-                    ),
-                    initialValue: _selectedAccountId,
-                    items: [
-                      DropdownMenuItem(value: null, child: Text(isThai ? 'ทุกบัญชี' : 'All Accounts')),
-                      ...accounts.map((a) => DropdownMenuItem(value: a.id, child: Text(a.name))),
-                    ],
-                    onChanged: (val) => setModalState(() => _selectedAccountId = val),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Category dropdown
-                  DropdownButtonFormField<String>(
-                    decoration: InputDecoration(
-                      labelText: isThai ? 'กรองตามหมวดหมู่' : 'Filter by Category',
-                      border: const OutlineInputBorder(),
-                    ),
-                    initialValue: _selectedCategoryId,
-                    items: [
-                      DropdownMenuItem(value: null, child: Text(isThai ? 'ทุกหมวดหมู่' : 'All Categories')),
-                      ...categories.map((c) => DropdownMenuItem(value: c.id, child: Text(c.localizedName(context)))),
-                    ],
-                    onChanged: (val) => setModalState(() => _selectedCategoryId = val),
-                  ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
 
                   Row(
                     children: [
@@ -611,8 +808,9 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
                               _selectedDateRange = null;
                               _selectedAccountId = null;
                               _selectedCategoryId = null;
+                              _selectedType = null;
                             });
-                            setState(() => _selectedType = null);
+                            setState(() {});
                             _loadTransactions();
                           },
                           child: Text(isThai ? 'ล้างตัวกรองทั้งหมด' : 'Clear Filters'),
@@ -623,6 +821,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
                         child: FilledButton(
                           onPressed: () {
                             Navigator.of(ctx).pop();
+                            setState(() {});
                             _loadTransactions();
                           },
                           child: const Text('นำไปใช้'),

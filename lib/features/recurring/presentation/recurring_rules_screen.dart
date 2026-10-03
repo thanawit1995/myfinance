@@ -308,8 +308,12 @@ class _RulesListTabState extends ConsumerState<_RulesListTab> {
                                                     padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                                                     decoration: BoxDecoration(
                                                       color: rule.autoPost
-                                                          ? Colors.green.withValues(alpha: 0.12)
-                                                          : Colors.amber.withValues(alpha: 0.15),
+                                                          ? (VaultTheme.isDark(context)
+                                                              ? Colors.green.withValues(alpha: 0.25)
+                                                              : Colors.green.withValues(alpha: 0.12))
+                                                          : (VaultTheme.isDark(context)
+                                                              ? Colors.amber.withValues(alpha: 0.25)
+                                                              : Colors.amber.withValues(alpha: 0.18)),
                                                       borderRadius: BorderRadius.circular(4),
                                                     ),
                                                     child: Text(
@@ -318,8 +322,12 @@ class _RulesListTabState extends ConsumerState<_RulesListTab> {
                                                         fontSize: 9.5,
                                                         fontWeight: FontWeight.w600,
                                                         color: rule.autoPost
-                                                            ? Colors.green.shade800
-                                                            : Colors.brown.shade800,
+                                                            ? (VaultTheme.isDark(context)
+                                                                ? Colors.greenAccent
+                                                                : Colors.green.shade800)
+                                                            : (VaultTheme.isDark(context)
+                                                                ? Colors.amber.shade300
+                                                                : Colors.brown.shade800),
                                                       ),
                                                     ),
                                                   ),

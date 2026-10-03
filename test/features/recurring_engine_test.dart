@@ -99,5 +99,32 @@ void main() {
       expect(dueDates[2].day, equals(12));
       expect(dueDates[3].day, equals(13));
     });
+
+    test('Early posting: Posting before scheduled date advances nextRunDate and prevents duplicate on scheduled day', () {
+      // Rule scheduled for Oct 10th
+      final scheduledDate = DateTime(2026, 10, 10);
+
+      // User posts early on Oct 3rd for the Oct 10th cycle
+      // Next run date advances to Nov 10th
+      final nextRunDate = RecurringEngine.computeNextRunDate(
+        frequency: 'monthly',
+        intervalUnits: 1,
+        fromDate: scheduledDate,
+        dayOfMonth: 10,
+      );
+      expect(nextRunDate, equals(DateTime(2026, 11, 10)));
+
+      // When Oct 10th actually arrives:
+      final dueDatesOnOct10 = RecurringEngine.calculateDueDates(
+        nextRunDate: nextRunDate, // now Nov 10th
+        frequency: 'monthly',
+        intervalUnits: 1,
+        lastPostedDate: scheduledDate, // recorded as Oct 10th
+        now: DateTime(2026, 10, 10, 12, 0),
+      );
+
+      // On Oct 10th, since nextRunDate is Nov 10th, dueDates is empty (cycle skipped as desired!)
+      expect(dueDatesOnOct10, isEmpty);
+    });
   });
 }

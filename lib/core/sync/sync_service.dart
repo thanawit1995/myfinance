@@ -10,6 +10,7 @@ import 'package:uuid/uuid.dart';
 import '../database/app_database.dart';
 import '../database/database_provider.dart';
 import 'auth_service.dart';
+import 'cloud_vault_snapshot_helper.dart';
 
 // ─── Sync Status ─────────────────────────────────────────────────────────────
 
@@ -255,6 +256,9 @@ class SyncService extends StateNotifier<SyncState> {
         await _supabase.from('transactions').delete().eq('user_id', userId).eq('tag', 'historical_settle');
       } catch (_) {}
 
+      // 0. Push Cloud Master Snapshot (All 25 tables compressed & Base64 encoded)
+      await _pushMasterSnapshot(userId);
+
       // 1. Push ตารางหลักขึ้นไปก่อน (บัญชี หมวดหมู่ สินทรัพย์) แบบ Push-Only ห้ามดึงข้อมูลเก่ากลับมา
       await _syncAccounts(userId, null, pushOnly: true);
       await _syncCategories(userId, null, pushOnly: true);
@@ -311,6 +315,175 @@ class SyncService extends StateNotifier<SyncState> {
       state = state.copyWith(status: SyncStatus.error, errorMessage: e.toString());
       return false;
     }
+  }
+
+  /// อัปโหลดฐานข้อมูล SQLite ทั้ง 25 ตาราง (บีบอัด GZip Base64) ขึ้นเป็น Master Snapshot
+  Future<void> _pushMasterSnapshot(String userId) async {
+    try {
+      final packResult = await CloudVaultSnapshotHelper.packDatabaseToCompressedBase64(_db);
+      final devName = _getDeviceDisplayName();
+      final now = DateTime.now();
+
+      final txCount = await (_db.selectOnly(_db.transactions)..addColumns([_db.transactions.id.count()]))
+          .map((row) => row.read(_db.transactions.id.count()))
+          .getSingle() ?? 0;
+
+      bool saved = false;
+      // 1. ลองบันทึกลง cloud_vault_backup ก่อน
+      try {
+        await _supabase.from('cloud_vault_backup').upsert({
+          'user_id': userId,
+          'device_name': devName,
+          'backup_data': packResult.base64Payload,
+          'size_bytes': packResult.rawSizeBytes,
+          'total_transactions': txCount,
+          'updated_at': now.toIso8601String(),
+        });
+        saved = true;
+        debugPrint('[Sync] Master snapshot saved to cloud_vault_backup (${packResult.compressedSizeBytes} bytes).');
+      } catch (e) {
+        debugPrint('[Sync] cloud_vault_backup upsert note: $e');
+      }
+
+      // 2. หากยังไม่มีตาราง cloud_vault_backup บน Supabase ให้บันทึกสำรองลง projects (fallback)
+      if (!saved) {
+        await _supabase.from('projects').upsert({
+          'id': '__cloud_vault_master_backup__',
+          'user_id': userId,
+          'name': '__cloud_vault_master_backup__',
+          'description': packResult.base64Payload,
+          'target_budget_satang': packResult.rawSizeBytes,
+          'start_date': now.toIso8601String(),
+          'end_date': now.toIso8601String(),
+          'icon': devName,
+          'color': '$txCount',
+          'is_active': false,
+          'sync_version': 1,
+          'created_at': now.toIso8601String(),
+          'updated_at': now.toIso8601String(),
+        }, onConflict: 'id');
+        debugPrint('[Sync] Master snapshot saved to projects fallback (${packResult.compressedSizeBytes} bytes).');
+      }
+    } catch (e) {
+      debugPrint('[Sync] Error in _pushMasterSnapshot: $e');
+    }
+  }
+
+  /// ดึงฐานข้อมูล Master Snapshot 25 ตารางจากคลาวด์มาเขียนทับเครื่องนี้ 100%
+  Future<bool> pullMasterSnapshotFromCloud({bool isThai = true}) async {
+    if (!_auth.isLoggedIn) return false;
+    if (state.status == SyncStatus.syncing) return false;
+
+    final userId = _auth.currentUser!.id;
+    state = state.copyWith(status: SyncStatus.syncing, errorMessage: null);
+
+    try {
+      String? base64Payload;
+
+      // 1. ลองดึงจาก cloud_vault_backup ก่อน
+      try {
+        final res = await _supabase
+            .from('cloud_vault_backup')
+            .select('backup_data')
+            .eq('user_id', userId)
+            .maybeSingle();
+        if (res != null && res['backup_data'] != null) {
+          base64Payload = res['backup_data'] as String;
+        }
+      } catch (e) {
+        debugPrint('[Sync] cloud_vault_backup select note: $e');
+      }
+
+      // 2. ถ้าไม่พบ ลองดึงจาก projects fallback (__cloud_vault_master_backup__)
+      if (base64Payload == null || base64Payload.isEmpty) {
+        try {
+          final res = await _supabase
+              .from('projects')
+              .select('description')
+              .eq('user_id', userId)
+              .eq('id', '__cloud_vault_master_backup__')
+              .maybeSingle();
+          if (res != null && res['description'] != null) {
+            base64Payload = res['description'] as String;
+          }
+        } catch (e) {
+          debugPrint('[Sync] projects fallback select note: $e');
+        }
+      }
+
+      if (base64Payload == null || base64Payload.isEmpty) {
+        throw Exception(isThai
+            ? 'ไม่พบข้อมูล Master บนคลาวด์ กรุณากดส่งข้อมูลจากเครื่องหลักขึ้นไปก่อน'
+            : 'No Cloud Master Snapshot found. Please push from master device first.');
+      }
+
+      // 3. ปลดล็อกและเขียนทับฐานข้อมูลในเครื่องด้วย snapshot 100%
+      final ok = await CloudVaultSnapshotHelper.unpackCompressedBase64ToDatabase(base64Payload, _db);
+      if (!ok) {
+        throw Exception(isThai ? 'ไม่สามารถกู้คืนฐานข้อมูลจากคลาวด์ได้' : 'Failed to restore database from cloud snapshot');
+      }
+
+      final now = DateTime.now();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_prefLastSync, now.toIso8601String());
+
+      final txCount = await (_db.selectOnly(_db.transactions)..addColumns([_db.transactions.id.count()]))
+          .map((row) => row.read(_db.transactions.id.count()))
+          .getSingle();
+
+      state = state.copyWith(
+        status: SyncStatus.idle,
+        lastSyncAt: now,
+        masterDeviceName: 'Cloud Master Vault',
+        totalSynced: txCount ?? 0,
+      );
+      return true;
+    } catch (e) {
+      debugPrint('[Sync] Error pulling master snapshot from cloud: $e');
+      state = state.copyWith(status: SyncStatus.error, errorMessage: e.toString());
+      return false;
+    }
+  }
+
+  /// ดึงข้อมูลสรุปของ Master Snapshot บนคลาวด์
+  Future<Map<String, dynamic>?> getMasterSnapshotInfo() async {
+    if (!_auth.isLoggedIn) return null;
+    final userId = _auth.currentUser!.id;
+
+    try {
+      final res = await _supabase
+          .from('cloud_vault_backup')
+          .select('device_name, updated_at, size_bytes, total_transactions')
+          .eq('user_id', userId)
+          .maybeSingle();
+      if (res != null) {
+        return {
+          'device_name': res['device_name'] as String? ?? 'Cloud Vault',
+          'updated_at': res['updated_at'] != null ? DateTime.tryParse(res['updated_at'] as String) : null,
+          'size_bytes': (res['size_bytes'] as num?)?.toInt() ?? 0,
+          'total_transactions': (res['total_transactions'] as num?)?.toInt() ?? 0,
+        };
+      }
+    } catch (_) {}
+
+    try {
+      final res = await _supabase
+          .from('projects')
+          .select('icon, updated_at, target_budget_satang, color')
+          .eq('user_id', userId)
+          .eq('id', '__cloud_vault_master_backup__')
+          .maybeSingle();
+      if (res != null) {
+        return {
+          'device_name': res['icon'] as String? ?? 'Cloud Vault',
+          'updated_at': res['updated_at'] != null ? DateTime.tryParse(res['updated_at'] as String) : null,
+          'size_bytes': (res['target_budget_satang'] as num?)?.toInt() ?? 0,
+          'total_transactions': int.tryParse(res['color'] as String? ?? '0') ?? 0,
+        };
+      }
+    } catch (_) {}
+
+    return null;
   }
 
   // ─── Full Sync Across All Modules ──────────────────────────────────────────
@@ -910,6 +1083,7 @@ class SyncService extends StateNotifier<SyncState> {
         await _db.batch((batch) {
           for (final r in cloudRows) {
             final row = r as Map<String, dynamic>;
+            if (row['id'] == '__cloud_vault_master_backup__') continue;
             batch.insert(
               _db.projects,
               ProjectsCompanion(

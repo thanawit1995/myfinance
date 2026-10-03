@@ -1239,6 +1239,30 @@
 
 ---
 
+### Phase 4.4: ระบบ Cloud Master Vault (Full Snapshot Sync) & Clean Slate Master Restoration
+- [x] **Core Snapshot Architecture (`CloudVaultSnapshotHelper`)**:
+  - ใช้ `dumpDriftDatabaseToSqliteBytes()` ดึงข้อมูลสดครบถ้วนทั้ง 25 ตารางจาก Drift Database (ผ่าน WAL checkpointing) ทั้งบน Native (Windows/Android) และ Web
+  - บีบอัด SQLite Binary ด้วย pure Dart GZip (`archive` package) และแปลงเป็น Base64
+  - ระบบถอดรหัสและกู้คืน Clean Slate: ล้างและเขียนทับทุกตารางอย่างแม่นยำ รวมถึงตารางที่ถูกลบจนว่างเปล่าใน Master (เช่น GPF, หนี้บัตรที่จ่ายแล้ว)
+- [x] **Cloud Master Integration (`SyncService`)**:
+  - `_pushMasterSnapshot`: อัปโหลด Master Snapshot ขึ้นสู่ Supabase `cloud_vault_backup` (พร้อมระบบ Fallback ไปยัง `projects` อัตโนมัติแบบ seamless หากตารางยังไม่ได้ถูกสร้างบน Supabase)
+  - `pullMasterSnapshotFromCloud`: ดึงข้อมูล Master Snapshot ล่าสุด แตกไฟล์ และกู้คืนเข้า SQLite พร้อม Live Table Injection ในเครื่องทันที
+  - `getMasterSnapshotInfo`: ตรวจสอบและดึงข้อมูลสรุปของ Master Snapshot บนคลาวด์
+  - แยก `__cloud_vault_master_backup__` ออกจากการซิงค์ Projects ปกติ
+  - คงฟังก์ชัน `quickStartupSync()` ทำหน้าที่ซิงค์เฉพาะ Delta รายการเปลี่ยนแปลงตอนเปิดแอปตามเดิม
+- [x] **UI & User Experience (`BackupRestoreScreen` & `SyncStatusWidget`)**:
+  - เพิ่มปุ่มเด่นชัด:
+    * **"เขียนทับข้อมูลบนคลาวด์ด้วยเครื่องนี้ 100% (Master Push)"** (สีส้ม) สำหรับส่งข้อมูลจากเครื่องหลัก
+    * **"ดึงข้อมูล Master จากคลาวด์แทนที่เครื่องนี้ 100% (Master Pull)"** (สีน้ำเงิน) สำหรับเครื่องปลายทาง (มือถือ/แท็บเล็ต) ให้ตรงกับเครื่องหลักเป๊ะเหมือนไฟล์ `.db`
+    * **"ซิงค์ข้อมูลเดี๋ยวนี้ (Sync All Data)"** (สีเขียว) สำหรับการซิงค์ปกติ
+  - กล่องข้อความแจ้งเตือนและการยืนยันพร้อมระบบ Safety Backup กันเหนียวอัตโนมัติก่อนเขียนทับ
+- [x] **การรับประกันคุณภาพ (Quality Assurance)**:
+  - Unit tests: เพิ่ม `test/core/cloud_vault_snapshot_test.dart`
+  - `flutter test`: **184/184 ผ่านฉลุย 100%**
+  - `flutter analyze`: **0 errors, 0 warnings**
+
+---
+
 ## 2. สิ่งที่ต้องทำในอนาคต (Future Enhancements)
 
 - [ ] การสร้าง Release Installer สำหรับ Windows (.msi / .exe)

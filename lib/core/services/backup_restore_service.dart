@@ -419,9 +419,9 @@ class BackupRestoreService {
             if (skipTables.contains(table) || table.startsWith('sqlite_') || table.startsWith('_drift_')) {
               continue;
             }
+            await db.customStatement('DELETE FROM "$table";');
             final rows = entry.value;
             if (rows.isNotEmpty) {
-              await db.customStatement('DELETE FROM "$table";');
               await insertTableRows(table, rows);
             }
           }

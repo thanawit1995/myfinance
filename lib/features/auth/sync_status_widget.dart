@@ -303,6 +303,25 @@ class SyncStatusWidget extends ConsumerWidget {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.blue.shade700,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: state.status == SyncStatus.syncing
+                            ? null
+                            : () => _confirmPullMaster(context, ref, isThai),
+                        icon: const Icon(Icons.cloud_download_rounded, size: 18),
+                        label: Text(
+                          isThai ? 'ดึงข้อมูล Master จากคลาวด์แทนที่เครื่องนี้ 100%' : 'Pull Master from Cloud',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -370,6 +389,70 @@ class SyncStatusWidget extends ConsumerWidget {
         scaffoldMessenger.showSnackBar(
           SnackBar(
             content: Text(isThai ? 'เกิดข้อผิดพลาดในการเขียนทับคลาวด์' : 'Failed to overwrite cloud data'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmPullMaster(BuildContext context, WidgetRef ref, bool isThai) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.cloud_download_rounded, color: Colors.blueAccent),
+            const SizedBox(width: 8),
+            Text(isThai ? 'ยืนยันดึงข้อมูล Master จากคลาวด์' : 'Confirm Pull Master Snapshot'),
+          ],
+        ),
+        content: Text(
+          isThai
+              ? 'ระบบจะดึงฐานข้อมูล Master 25 ตารางจาก Google Cloud มาเขียนทับฐานข้อมูลในเครื่องนี้ 100%\n\n'
+                'ข้อมูลทั้งหมดจะตรงกับเครื่องที่ส่ง Master ขึ้นไปอย่างสมบูรณ์แบบ (เหมือนการนำเข้าไฟล์ .db)\n\n'
+                '• มีระบบ Safety Backup สำรองข้อมูลเดิมในเครื่องนี้ให้อัตโนมัติก่อนเริ่มกู้คืน\n\n'
+                'คุณแน่ใจหรือไม่ว่าต้องการดำเนินการ?'
+              : 'This will replace all tables in this device with the Cloud Master Snapshot 100%.\n\nA safety backup will be created automatically before restoring.\n\nDo you want to proceed?',
+          style: const TextStyle(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.blue.shade700),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(isThai ? 'ยืนยันดึงข้อมูล Master' : 'Confirm Pull Master'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      Navigator.of(context).pop(); // close bottom sheet
+      final scaffoldMessenger = ScaffoldMessenger.of(context);
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text(isThai ? 'กำลังดึงฐานข้อมูล Master จากคลาวด์...' : 'Pulling Master Snapshot from cloud...'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+
+      final ok = await ref.read(syncServiceProvider.notifier).pullMasterSnapshotFromCloud(isThai: isThai);
+      if (ok) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text(isThai ? 'ดึงข้อมูล Master สำเร็จเรียบร้อย! ข้อมูลทุกตารางตรงกับ Master 100%' : 'Successfully pulled Master Snapshot!'),
+            backgroundColor: Colors.teal,
+          ),
+        );
+      } else {
+        final err = ref.read(syncServiceProvider).errorMessage;
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text(err ?? (isThai ? 'เกิดข้อผิดพลาดในการดึงข้อมูล Master' : 'Failed to pull master snapshot')),
             backgroundColor: Colors.redAccent,
           ),
         );

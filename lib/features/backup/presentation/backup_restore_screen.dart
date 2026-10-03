@@ -1850,7 +1850,29 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                         label: FittedBox(
                           fit: BoxFit.scaleDown,
                           child: Text(
-                            isThai ? 'เขียนทับข้อมูลบนคลาวด์ด้วยเครื่องนี้ 100% (Force Push)' : 'Force Push Local to Cloud',
+                            isThai ? 'เขียนทับข้อมูลบนคลาวด์ด้วยเครื่องนี้ 100% (Master Push)' : 'Force Push Local to Cloud',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.blue.shade700,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: _isLoading || syncState.status == SyncStatus.syncing
+                            ? null
+                            : _handlePullMasterFromScreen,
+                        icon: const Icon(Icons.cloud_download_rounded, size: 20),
+                        label: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            isThai ? 'ดึงข้อมูล Master จากคลาวด์แทนที่เครื่องนี้ 100%' : 'Pull Master Snapshot from Cloud',
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                           ),
                         ),
@@ -1999,6 +2021,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
 
       if (ok) {
         await _loadStats();
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(isThai ? 'เขียนทับข้อมูลบนคลาวด์สำเร็จเรียบร้อย! คลาวด์เป็นข้อมูลล่าสุดแล้ว' : 'Cloud successfully overwritten with local data!'),
@@ -2009,6 +2032,78 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(isThai ? 'เกิดข้อผิดพลาดในการเขียนทับคลาวด์' : 'Failed to overwrite cloud data'),
+            backgroundColor: VaultTheme.negative(context),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handlePullMasterFromScreen() async {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.cloud_download_rounded, color: Colors.blueAccent),
+            const SizedBox(width: 8),
+            Text(isThai ? 'ยืนยันดึงข้อมูล Master จากคลาวด์' : 'Confirm Pull Master Snapshot'),
+          ],
+        ),
+        content: Text(
+          isThai
+              ? 'ระบบจะดึงฐานข้อมูล Master 25 ตารางจาก Google Cloud มาเขียนทับฐานข้อมูลในเครื่องนี้ 100%\n\n'
+                'ข้อมูลทั้งหมดจะตรงกับเครื่องที่ส่ง Master ขึ้นไปอย่างสมบูรณ์แบบ (เหมือนการนำเข้าไฟล์ .db)\n\n'
+                '• ระบบจะสร้างไฟล์สำรองฉุกเฉิน (Safety Backup) ในเครื่องนี้ให้อัตโนมัติก่อนเริ่มกู้คืน\n\n'
+                'คุณต้องการดำเนินการหรือไม่?'
+              : 'This will replace all tables in this device with the Cloud Master Snapshot 100%.\n\nA safety backup will be created automatically before restoring.\n\nDo you want to proceed?',
+          style: const TextStyle(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.blue.shade700),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(isThai ? 'ยืนยันดึงข้อมูล Master' : 'Confirm Pull Master'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      setState(() => _isLoading = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isThai ? 'กำลังดึงฐานข้อมูล Master จากคลาวด์...' : 'Pulling Master Snapshot from cloud...'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+
+      final ok = await ref.read(syncServiceProvider.notifier).pullMasterSnapshotFromCloud(isThai: isThai);
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      if (ok) {
+        await _loadStats();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isThai
+                ? 'ดึงข้อมูล Master จากคลาวด์สำเร็จเรียบร้อย! ข้อมูลทุกตารางตรงกับ Master 100%'
+                : 'Successfully restored Master Snapshot! All tables matched 100%'),
+            backgroundColor: VaultTheme.positive(context),
+          ),
+        );
+      } else {
+        if (!mounted) return;
+        final err = ref.read(syncServiceProvider).errorMessage;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(err ?? (isThai ? 'เกิดข้อผิดพลาดในการดึงข้อมูล Master' : 'Failed to pull master snapshot')),
             backgroundColor: VaultTheme.negative(context),
           ),
         );

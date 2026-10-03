@@ -214,6 +214,16 @@ CREATE TABLE IF NOT EXISTS public.sync_device_state (
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Cloud Vault Master Backup (Full 25-table SQLite binary snapshot, compressed GZip Base64)
+CREATE TABLE IF NOT EXISTS public.cloud_vault_backup (
+  user_id             UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  device_name         TEXT NOT NULL,
+  backup_data         TEXT NOT NULL,
+  size_bytes          BIGINT NOT NULL DEFAULT 0,
+  total_transactions  INTEGER NOT NULL DEFAULT 0,
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- =============================================================================
 -- 2. INDEXES
 -- =============================================================================
@@ -244,6 +254,7 @@ ALTER TABLE public.recurring_rules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.credit_card_installments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sync_device_state ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.cloud_vault_backup ENABLE ROW LEVEL SECURITY;
 
 -- Helper to safely re-create policies
 DO $$
@@ -253,7 +264,7 @@ BEGIN
   FOR tbl IN SELECT unnest(ARRAY[
     'accounts', 'categories', 'transactions', 'budgets',
     'assets', 'insurance_policies', 'liabilities', 'recurring_rules',
-    'projects', 'credit_card_installments', 'sync_device_state'
+    'projects', 'credit_card_installments', 'sync_device_state', 'cloud_vault_backup'
   ]) LOOP
     EXECUTE format('DROP POLICY IF EXISTS "Users can view own %I" ON public.%I', tbl, tbl);
     EXECUTE format('DROP POLICY IF EXISTS "Users can insert own %I" ON public.%I', tbl, tbl);

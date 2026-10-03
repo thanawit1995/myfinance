@@ -7,6 +7,7 @@ import '../../../../core/database/daos/credit_card_dao.dart';
 import '../../../../core/database/database_provider.dart';
 import '../../../../core/money/money.dart';
 import '../../../../core/theme/vault_theme.dart';
+import 'edit_credit_card_dialog.dart';
 
 class CreditCardSummaryScreen extends ConsumerStatefulWidget {
   final Account account;
@@ -19,6 +20,25 @@ class CreditCardSummaryScreen extends ConsumerStatefulWidget {
 
 class _CreditCardSummaryScreenState extends ConsumerState<CreditCardSummaryScreen> {
   int _selectedCycleIndex = 0; // 0..5 = statementCycles, 6 = All transactions
+  late Account _currentAccount;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentAccount = widget.account;
+  }
+
+  Future<void> _openEditDialog() async {
+    final changed = await EditCreditCardDialog.show(context, account: _currentAccount);
+    if (changed == true && mounted) {
+      final updated = await ref.read(accountsDaoProvider).getAccountById(_currentAccount.id);
+      if (updated != null && mounted) {
+        setState(() {
+          _currentAccount = updated;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +63,7 @@ class _CreditCardSummaryScreenState extends ConsumerState<CreditCardSummaryScree
         backgroundColor: surface,
         elevation: 0,
         title: Text(
-          widget.account.name,
+          _currentAccount.name,
           style: TextStyle(
             fontFamily: VaultTheme.fontFamily,
             fontSize: 16,
@@ -53,6 +73,11 @@ class _CreditCardSummaryScreenState extends ConsumerState<CreditCardSummaryScree
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: isThai ? 'แก้ไขข้อมูลบัตร / รอบบิล' : 'Edit Card & Cycle',
+            onPressed: _openEditDialog,
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: isThai ? 'รีเฟรชยอด' : 'Refresh',
             onPressed: () => setState(() {}),
@@ -60,7 +85,7 @@ class _CreditCardSummaryScreenState extends ConsumerState<CreditCardSummaryScree
         ],
       ),
       body: FutureBuilder<CreditCardSummary?>(
-        future: ccDao.getSummary(widget.account.id),
+        future: ccDao.getSummary(_currentAccount.id),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(child: CircularProgressIndicator(color: accent));
@@ -119,6 +144,15 @@ class _CreditCardSummaryScreenState extends ConsumerState<CreditCardSummaryScree
                                 fontSize: 15,
                                 color: primaryText,
                               ),
+                            ),
+                            const SizedBox(width: 4),
+                            IconButton(
+                              icon: Icon(Icons.edit_calendar_outlined, size: 18, color: accent),
+                              tooltip: isThai ? 'แก้ไขวันตัดรอบและวันครบกำหนด' : 'Edit cycle dates',
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                              onPressed: _openEditDialog,
                             ),
                           ],
                         ),

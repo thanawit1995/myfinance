@@ -8,6 +8,7 @@ import '../../../../core/money/money.dart';
 import 'account_detail_screen.dart';
 import 'credit_card_summary_screen.dart';
 import 'add_account_dialog.dart';
+import 'edit_credit_card_dialog.dart';
 import '../../investments/presentation/portfolio_screen.dart';
 
 class AccountsScreen extends ConsumerStatefulWidget {
@@ -288,8 +289,8 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
             title: Text(account.name, style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text(
               isThai
-                  ? 'สรุปยอดทุกวันที่ ${account.closingDay ?? 23}'
-                  : 'Statement closes on day ${account.closingDay ?? 23}',
+                  ? 'ตัดรอบวันที่ ${account.closingDay ?? 23} • ครบชำระวันที่ ${account.dueDay ?? 10}'
+                  : 'Closes day ${account.closingDay ?? 23} • Due day ${account.dueDay ?? 10}',
               style: const TextStyle(fontSize: 12),
             ),
             trailing: Column(
@@ -323,6 +324,22 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
   }
 
   Future<void> _showEditAccountDialog(Account account, bool isThai) async {
+    if (account.accountType == 'credit_card') {
+      final changed = await EditCreditCardDialog.show(context, account: account);
+      if (changed == true && mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            duration: const Duration(seconds: 4),
+            content: Text(isThai
+                ? 'อัปเดตข้อมูลบัตรเครดิตสำเร็จ'
+                : 'Credit card updated successfully'),
+          ),
+        );
+      }
+      return;
+    }
+
     final controller = TextEditingController(text: account.name);
     final newName = await showDialog<String>(
       context: context,

@@ -296,6 +296,57 @@ void main() {
       final netWorthAfterPay = await db.accountsDao.getTotalNetWorthSatang();
       expect(netWorthAfterPay, equals(800000)); // 8,000 THB
     });
+
+    test('Updating credit card closingDay and dueDay dynamically recalculates billing cycle and due date', () async {
+      // 1. Create a credit card with default closingDay = 23, dueDay = 10
+      await db.accountsDao.createAccount(
+        AccountsCompanion.insert(
+          id: 'card-edit-test-1',
+          name: 'KBank Wave Card',
+          accountType: 'credit_card',
+          currencyCode: 'THB',
+          isDomestic: true,
+          closingDay: const Value(23),
+          dueDay: const Value(10),
+          createdAt: DateTime(2026, 9, 1),
+          updatedAt: DateTime(2026, 9, 1),
+        ),
+      );
+
+      // Verify initial cycle for 15 Sep 2026
+      var summary = await ccDao.getSummary('card-edit-test-1', DateTime(2026, 9, 15));
+      expect(summary, isNotNull);
+      expect(summary!.cycle.statementDay, equals(23));
+      expect(summary.cycle.dueDay, equals(10));
+      expect(summary.cycle.cycleEnd.day, equals(23));
+
+      // 2. User edits card to closingDay = 28, dueDay = 15, creditLimit = 50,000 THB
+      final rowsUpdated = await db.accountsDao.updateCreditCardDetails(
+        id: 'card-edit-test-1',
+        name: 'KBank Wave Card (Custom Cycle)',
+        closingDay: 28,
+        dueDay: 15,
+        creditLimitSatang: 5000000,
+      );
+      expect(rowsUpdated, equals(1));
+
+      // 3. Verify updated account in database
+      final updatedAcc = await db.accountsDao.getAccountById('card-edit-test-1');
+      expect(updatedAcc, isNotNull);
+      expect(updatedAcc!.name, equals('KBank Wave Card (Custom Cycle)'));
+      expect(updatedAcc.closingDay, equals(28));
+      expect(updatedAcc.dueDay, equals(15));
+      expect(updatedAcc.creditLimitSatang, equals(5000000));
+
+      // 4. Verify ccDao.getSummary now dynamically computes the new cycle end and due day
+      summary = await ccDao.getSummary('card-edit-test-1', DateTime(2026, 9, 15));
+      expect(summary, isNotNull);
+      expect(summary!.account.name, equals('KBank Wave Card (Custom Cycle)'));
+      expect(summary.cycle.statementDay, equals(28));
+      expect(summary.cycle.dueDay, equals(15));
+      expect(summary.cycle.cycleEnd.day, equals(28));
+      expect(summary.cycle.daysRemaining, equals(13)); // 28 - 15 = 13 days
+    });
   });
 }
 

@@ -2,6 +2,23 @@
 
 อัปเดตล่าสุด: 3 ตุลาคม 2026 (รอบดึกส่งท้าย)
 
+- [x] **Credit Card Closing Day & Payment Due Date Editing Feature (4 ต.ค. 2026)**:
+  - **1. เพิ่มฟังก์ชันอัปเดตใน AccountsDao (`accounts_dao.dart`)**:
+    - เพิ่มเมธอด `updateCreditCardDetails({id, name, closingDay, dueDay, creditLimitSatang})`
+  - **2. สร้าง EditCreditCardDialog (`edit_credit_card_dialog.dart`)**:
+    - รองรับการแก้ไขชื่อบัตร, วันตัดรอบบิล (1-31), วันครบกำหนดชำระ (1-31), และวงเงินบัตรเครดิต
+    - มีระบบ Validate ป้องกันการกรอกตัวเลขผิดพลาด
+    - กล่องพรีวิวสรุปรอบบิลแบบ Realtime แสดงคำอธิบายรอบบิลและวันชำระเงินของเดือนถัดไปอย่างชัดเจน
+    - รองรับดีไซน์ทั้งธีม VAULT และ Lumi
+  - **3. เชื่อมต่อใน CreditCardSummaryScreen & AccountsScreen**:
+    - `CreditCardSummaryScreen`: เพิ่มปุ่มแก้ไขใน AppBar และปุ่มแก้ไขในแบนเนอร์รอบบิลปัจจุบัน แตะแล้วคำนวณรอบบิลและวันนับถอยหลังใหม่ทันที
+    - `AccountsScreen`: อัปเดตซับไตเติลให้แสดงทั้งวันตัดรอบและวันครบกำหนดชำระ พร้อมเปิด Dialog แก้ไขบัตรเครดิตเต็มรูปแบบเมื่อกดแก้ไข
+  - **4. การทดสอบและการรับรองคุณภาพ**:
+    - เพิ่ม Unit Test ใน `credit_card_engine_test.dart` ทดสอบการแก้ไขรอบบิลแล้วคำนวณใหม่ถูกต้อง 100%
+    - `flutter analyze --no-fatal-infos`: **0 errors, 0 warnings**
+    - `flutter test`: ผ่านทั้งหมด **191/191 tests passed** (100%)
+    - `flutter build web`: คอมไพล์และอัปเดตไฟล์ใน `docs/` เรียบร้อย
+
 - [x] **Safari iOS Bottom Navigation Coordinate Mapping & Full-Height Hitbox Fix (3 ต.ค. 2026)**:
   - **1. แก้ปัญหาพิกัดแตะเพี้ยน (Touch Offset) บน iOS Safari (`index.html`)**:
     - **สาเหตุรากฐาน**: บน Safari iOS เมื่อใช้ `viewport-fit=cover` และหน้าเว็บเกิดการเลื่อนหลุด (Rubber-band bounce หรือ Scroll) แม้เพียงเล็กน้อย `window.scrollY` หรือ `visualViewport.offsetTop` จะไม่เป็น 0 ทำให้พิกัดการแตะของ WebKit เลื่อนลงด้านล่าง ผู้ใช้จึงต้องกด "เหนือปุ่ม" จึงจะโดนปุ่ม

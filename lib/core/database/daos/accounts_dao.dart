@@ -70,6 +70,24 @@ class AccountsDao extends DatabaseAccessor<AppDatabase> with _$AccountsDaoMixin 
     );
   }
 
+  Future<int> updateCreditCardDetails({
+    required String id,
+    String? name,
+    int? closingDay,
+    int? dueDay,
+    int? creditLimitSatang,
+  }) {
+    return (update(accounts)..where((a) => a.id.equals(id))).write(
+      AccountsCompanion(
+        name: name != null ? Value(name) : const Value.absent(),
+        closingDay: Value(closingDay),
+        dueDay: Value(dueDay),
+        creditLimitSatang: Value(creditLimitSatang),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
   /// Cleans up any legacy insurance savings account if previously created.
   Future<void> removeLegacyInsuranceSavingsAccount() async {
     const accId = '00000000-0000-4000-8000-000000000007';

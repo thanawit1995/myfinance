@@ -1,6 +1,25 @@
 # บันทึกความคืบหน้าโครงการ MyFinance (PROGRESS.md)
 
-อัปเดตล่าสุด: 3 ตุลาคม 2026
+อัปเดตล่าสุด: 3 ตุลาคม 2026 (รอบค่ำ)
+
+- [x] **Budget Title Cleanup, Financial Position Clean Layout, Monthly Summary via Expense Trend & Accrued Income Month Tagging (3 ต.ค. 2026)**:
+  - **1. ลบคำว่า "ไม่ Rollover" ในหน้า Budget (`budget_screen.dart`, `app_th.arb`, `app_en.arb`)**:
+    - ปรับข้อความหัวข้อจาก `สรุปงบประมาณรวมเดือนนี้ 🌸 (ไม่ Rollover)` เป็น **`สรุปงบประมาณรวมเดือนนี้ 🌸`** ให้สะอาดตา ไม่รบกวนการอ่าน
+  - **2. คลีนการ์ด Financial Position ในโหมด Lumi (`financial_overview_card.dart`)**:
+    - ลบกรอบ Mini Metrics ย่อย 3 ช่องด้านล่าง (รายรับเดือนนี้, รายจ่ายเดือนนี้, กระแสเงินสด) ออกตามคำขอ ทำให้การ์ดกะทัดรัด โฟกัสเฉพาะความมั่งคั่งสุทธิและหมวดหมู่สินทรัพย์ 4 ด้าน
+  - **3. ย้ายปุ่มดูรายงานสรุปรายเดือนไปยังหัวข้อกราฟรายจ่าย (`ExpenseTrendProjectionCard`)**:
+    - ลบปุ่ม "ดูรายงานรายเดือน" และ "ดูทั้งหมด ›" ออกจาก Financial Position ทั้งธีม VAULT และ Lumi
+    - ปรับหัวข้อกราฟให้กระชับขึ้นจาก "แนวโน้มและคาดการณ์รายจ่าย" เป็น **`แนวโน้มรายจ่าย`** แก้ปัญหาข้อความยาวจนโดนตัดคำบนมือถือ
+    - หัวข้อการ์ดกราฟสามารถแตะ (Tappable) เพื่อเปิดหน้ารายงานสรุปรายเดือน (`MonthlySummaryScreen`) ได้ทันที
+  - **4. ติด Tag รอบเดือนให้กับรายการรายรับ Accrued Income ย้อนหลังและอัตโนมัติ**:
+    - เพิ่มฟังก์ชัน `formatPeriodToTag()` แปลงรอบเดือน เช่น `2026-09` เป็น Tag ที่อ่านเข้าใจง่าย เช่น **`รายได้ ก.ย. 2026`**
+    - เมื่อบันทึกรับเงิน (`markIncomeAsReceived`) หรือสร้างรายการค้างรับใหม่ ระบบจะติด Tag รอบเดือนในคอลัมน์ `tag` ให้อัตโนมัติ
+    - เพิ่มระบบ Backfill `autoTagExistingAccruedIncomes()` เติม Tag ให้กับรายการค้างรับเดิมทั้งหมดในฐานข้อมูล
+    - ในหน้ารายการธุรกรรม (`TransactionListScreen`) แสดงป้ายกำกับสีม่วง **`รายได้รอบ ก.ย. 2026`** สำหรับรายการที่ได้รับเงินแล้ว และค้นหาด้วยรอบเดือนหรือ Tag ได้ทันที
+  - **5. การทดสอบและการรับรองคุณภาพ**:
+    - `flutter test`: ผ่านทั้งหมด **186/186 tests passed** (100%)
+    - `flutter analyze`: **0 errors, 0 warnings** (ในโค้ดแอป)
+    - `flutter build web`: คอมไพล์ผ่านสมบูรณ์
 
 - [x] **Cloud Restore Dual-Engine, Compact Sync Icon, Recurring 2-Row Layout, Lumi Accrued Breakdown & Expense Trend Projection (3 ต.ค. 2026)**:
   - **1. แก้ปัญหาดึงข้อมูลคลาวด์ไม่พบข้อมูล (Cloud Pull / Dual-Engine Restore)**:

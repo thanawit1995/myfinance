@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/database/database_provider.dart';
+import '../../../../core/database/daos/transactions_dao.dart';
 import '../../../../core/money/money.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/category_name_helper.dart';
@@ -465,24 +466,86 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
       );
     }
 
-    if (isIncome && !tx.isCleared) {
-      subBadges.add(
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-          decoration: BoxDecoration(
-            color: Colors.amber.withValues(alpha: 0.18),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            tx.workPeriod != null ? 'ค้างรับ (${tx.workPeriod})' : 'ค้างรับ/ตกเบิก',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: Colors.amber.shade900,
+    if (isIncome && tx.workPeriod != null && tx.workPeriod!.trim().isNotEmpty) {
+      final periodTag = TransactionsDao.formatPeriodToTag(tx.workPeriod!);
+      if (!tx.isCleared) {
+        subBadges.add(
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+            decoration: BoxDecoration(
+              color: Colors.amber.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.pending_actions_rounded, size: 11, color: Colors.amber.shade900),
+                const SizedBox(width: 3),
+                Text(
+                  'ค้างรับ ($periodTag)',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.amber.shade900,
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
-      );
+        );
+      } else {
+        subBadges.add(
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+            decoration: BoxDecoration(
+              color: const Color(0xFF673AB7).withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.label_outline_rounded, size: 11, color: Color(0xFF673AB7)),
+                const SizedBox(width: 3),
+                Text(
+                  periodTag,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF673AB7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    } else if (tx.tag != null && tx.tag!.trim().isNotEmpty) {
+      final cleanTags = tx.tag!
+          .split(',')
+          .map((t) => t.trim())
+          .where((t) => !t.startsWith('project:') && !t.startsWith('policy:') && !t.startsWith('deduction:'))
+          .toList();
+      if (cleanTags.isNotEmpty) {
+        for (final t in cleanTags.take(2)) {
+          subBadges.add(
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+              decoration: BoxDecoration(
+                color: Colors.blueGrey.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                t,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.blueGrey.shade800,
+                ),
+              ),
+            ),
+          );
+        }
+      }
     }
 
     if (subBadges.isNotEmpty) {

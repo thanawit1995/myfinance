@@ -268,7 +268,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    isLumi ? (l10n?.summaryBudgetNonRollover ?? 'สรุปงบประมาณรวมเดือนนี้ 🌸 (ไม่ Rollover)') : 'SUMMARY BUDGET (NON-ROLLOVER)',
+                    isLumi ? (l10n?.summaryBudgetNonRollover ?? 'สรุปงบประมาณรวมเดือนนี้ 🌸') : 'SUMMARY BUDGET',
                     style: TextStyle(
                       fontFamily: VaultTheme.fontFamily,
                       fontSize: 12,

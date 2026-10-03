@@ -9,6 +9,7 @@ class ExpenseTrendProjectionCard extends StatelessWidget {
   final int daysInMonth;
   final int totalExpenseSatang;
   final int totalBudgetSatang;
+  final VoidCallback? onTap;
 
   const ExpenseTrendProjectionCard({
     super.key,
@@ -17,6 +18,7 @@ class ExpenseTrendProjectionCard extends StatelessWidget {
     required this.daysInMonth,
     required this.totalExpenseSatang,
     required this.totalBudgetSatang,
+    this.onTap,
   });
 
   @override
@@ -115,74 +117,86 @@ class ExpenseTrendProjectionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header Row: Title & Projected Badge
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.trending_up_rounded,
-                size: 18,
-                color: actualColor,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  isThai ? 'แนวโน้มและคาดการณ์รายจ่าย' : 'Expense Trend & Projection',
-                  style: TextStyle(
-                    fontFamily: VaultTheme.fontFamily,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: VaultTheme.primaryText(context),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+          // Header Row: Title & Projected Badge (tappable to view monthly report)
+          GestureDetector(
+            onTap: onTap,
+            behavior: HitTestBehavior.opaque,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.trending_up_rounded,
+                  size: 18,
+                  color: actualColor,
                 ),
-              ),
-              if (hasBudget)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: isOverBudgetProjected
-                        ? (isDark ? const Color(0xFF3E1C22) : const Color(0xFFFFEBEE))
-                        : (isDark ? const Color(0xFF1B3326) : const Color(0xFFE8F5E9)),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isOverBudgetProjected
-                          ? const Color(0xFFFF5252).withValues(alpha: 0.5)
-                          : const Color(0xFF4CAF50).withValues(alpha: 0.5),
-                      width: 0.8,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    isThai ? 'แนวโน้มรายจ่าย' : 'Expense Trend',
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: VaultTheme.primaryText(context),
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isOverBudgetProjected
-                            ? Icons.warning_amber_rounded
-                            : Icons.check_circle_outline_rounded,
-                        size: 13,
+                ),
+                if (onTap != null)
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 16,
+                    color: isDark
+                        ? const Color(0xFF9E8FA0)
+                        : const Color(0xFFB5A1AF),
+                  ),
+                if (hasBudget)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: isOverBudgetProjected
+                          ? (isDark ? const Color(0xFF3E1C22) : const Color(0xFFFFEBEE))
+                          : (isDark ? const Color(0xFF1B3326) : const Color(0xFFE8F5E9)),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
                         color: isOverBudgetProjected
-                            ? const Color(0xFFFF5252)
-                            : const Color(0xFF4CAF50),
+                            ? const Color(0xFFFF5252).withValues(alpha: 0.5)
+                            : const Color(0xFF4CAF50).withValues(alpha: 0.5),
+                        width: 0.8,
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        isOverBudgetProjected
-                            ? (isThai ? 'เสี่ยงเกินงบ' : 'Risk Over')
-                            : (isThai ? 'ตามเป้าหมาย' : 'On Track'),
-                        style: TextStyle(
-                          fontFamily: VaultTheme.fontFamily,
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w700,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isOverBudgetProjected
+                              ? Icons.warning_amber_rounded
+                              : Icons.check_circle_outline_rounded,
+                          size: 13,
                           color: isOverBudgetProjected
                               ? const Color(0xFFFF5252)
                               : const Color(0xFF4CAF50),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 4),
+                        Text(
+                          isOverBudgetProjected
+                              ? (isThai ? 'เสี่ยงเกินงบ' : 'Risk Over')
+                              : (isThai ? 'ตามเป้าหมาย' : 'On Track'),
+                          style: TextStyle(
+                            fontFamily: VaultTheme.fontFamily,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: isOverBudgetProjected
+                                ? const Color(0xFFFF5252)
+                                : const Color(0xFF4CAF50),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
 
           const SizedBox(height: 12),

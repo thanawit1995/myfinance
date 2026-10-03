@@ -554,8 +554,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get specialProjectsTab => 'Special Projects';
 
   @override
-  String get summaryBudgetNonRollover =>
-      'Monthly Budget Summary 🌸 (Non-Rollover)';
+  String get summaryBudgetNonRollover => 'Monthly Budget Summary 🌸';
 
   @override
   String get budgetByCategory => 'Budget by Category';

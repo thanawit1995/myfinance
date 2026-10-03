@@ -130,6 +130,7 @@ class LumiDesktopLayout extends StatelessWidget {
                           daysInMonth: data.daysInMonth,
                           totalExpenseSatang: data.totalExpenseSatang,
                           totalBudgetSatang: data.totalBudgetSatang,
+                          onTap: onViewMonthlySummary,
                         ),
                         const SizedBox(height: 18),
 
@@ -216,6 +217,7 @@ class LumiDesktopLayout extends StatelessWidget {
                     daysInMonth: data.daysInMonth,
                     totalExpenseSatang: data.totalExpenseSatang,
                     totalBudgetSatang: data.totalBudgetSatang,
+                    onTap: onViewMonthlySummary,
                   ),
                   const SizedBox(height: 16),
                   LumiTipCard(

@@ -9,6 +9,7 @@ import 'package:myfinance/features/home/presentation/widgets/lumi/lumi_desktop_l
 import 'package:myfinance/features/home/presentation/widgets/lumi/lumi_tip_card.dart';
 import 'package:myfinance/features/home/presentation/widgets/lumi/portfolio_card.dart';
 import 'package:myfinance/features/home/presentation/widgets/lumi/recent_activity_card.dart';
+import 'package:myfinance/features/budget/presentation/widgets/expense_trend_projection_chart.dart';
 import 'package:myfinance/l10n/app_localizations.dart';
 
 void main() {
@@ -78,9 +79,11 @@ void main() {
     expect(find.text('คำแนะนำจาก Lumi 💡'), findsOneWidget);
     expect(find.text('ใช้เงินได้เฉลี่ยวันละ ฿850 จนถึงสิ้นเดือน'), findsOneWidget);
 
+    expect(find.byType(ExpenseTrendProjectionCard), findsOneWidget);
+    expect(find.text('แนวโน้มรายจ่าย'), findsOneWidget);
+
     expect(find.byType(FinancialOverviewCard), findsOneWidget);
     expect(find.text('ภาพรวมสถานะการเงิน'), findsOneWidget);
-    expect(find.text('ดูรายงานรายเดือน'), findsOneWidget);
 
     expect(find.byType(PortfolioCard), findsOneWidget);
     expect(find.text('พอร์ตการลงทุน'), findsOneWidget);
@@ -95,8 +98,8 @@ void main() {
     await tester.tap(find.byType(BudgetHeroCard));
     expect(budgetTapped, isTrue);
 
-    // Test interactivity: Tap view monthly summary
-    await tester.tap(find.text('ดูรายงานรายเดือน'));
+    // Test interactivity: Tap view monthly summary via Expense Trend chart
+    await tester.tap(find.text('แนวโน้มรายจ่าย'));
     expect(summaryTapped, isTrue);
   });
 }

@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 import '../app_database.dart';
 import '../tables/all_tables.dart';
+import 'transactions_dao.dart';
 import '../../../features/recurring/domain/recurring_engine.dart';
 
 part 'recurring_transactions_dao.g.dart';
@@ -183,7 +184,9 @@ class RecurringTransactionsDao extends DatabaseAccessor<AppDatabase> with _$Recu
             isCleared: Value(isCleared),
             taxCategory: Value(taxCat),
             note: Value(cleanNote),
-            tag: const Value('recurring_auto'),
+            tag: Value(workPeriod != null && workPeriod.trim().isNotEmpty
+                ? 'recurring_auto, ${TransactionsDao.formatPeriodToTag(workPeriod)}'
+                : 'recurring_auto'),
             createdAt: now,
             updatedAt: now,
           ),

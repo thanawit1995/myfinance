@@ -1121,7 +1121,7 @@ abstract class AppLocalizations {
   /// No description provided for @summaryBudgetNonRollover.
   ///
   /// In th, this message translates to:
-  /// **'สรุปงบประมาณรวมเดือนนี้ 🌸 (ไม่ Rollover)'**
+  /// **'สรุปงบประมาณรวมเดือนนี้ 🌸'**
   String get summaryBudgetNonRollover;
 
   /// No description provided for @budgetByCategory.

@@ -6,6 +6,7 @@ import 'package:drift/drift.dart' as drift;
 
 import '../../../../core/database/app_database.dart';
 import '../../../../core/database/database_provider.dart';
+import '../../../../core/database/daos/transactions_dao.dart';
 import '../../../../core/money/money.dart';
 import '../../../../core/theme/vault_theme.dart';
 import '../../import/domain/csv_import_parser.dart';
@@ -20,6 +21,14 @@ class AccruedIncomeScreen extends ConsumerStatefulWidget {
 class _AccruedIncomeScreenState extends ConsumerState<AccruedIncomeScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(transactionsDaoProvider).autoTagExistingAccruedIncomes();
+    });
+  }
 
   @override
   void dispose() {
@@ -1104,54 +1113,60 @@ class _AccruedIncomeScreenState extends ConsumerState<AccruedIncomeScreen> {
                 final txId = const Uuid().v4();
                 final nowTime = DateTime.now();
 
+                final userTag = tagController.text.trim();
+                final periodTag = TransactionsDao.formatPeriodToTag(period);
+                final effectiveTag = userTag.isEmpty
+                    ? periodTag
+                    : (userTag.contains(periodTag) ? userTag : '$userTag, $periodTag');
+
                 await txDao.insertTransaction(
                   TransactionsCompanion.insert(
                     id: txId,
-                    transactionType: 'income',
-                    sourceAccountId: drift.Value(defaultAccId),
-                    categoryId: drift.Value(selectedCategoryId),
-                    amountOriginalSatang: moneyParsed.satang,
-                    amountThbSatang: moneyParsed.satang,
-                    currencyCode: 'THB',
-                    fxRate: const drift.Value('1.0'),
-                    feeThbSatang: const drift.Value(0),
-                    taxCategory: drift.Value(selectedTaxType),
-                    withholdingTaxSatang: const drift.Value(0),
-                    transactionDate: nowTime,
-                    workPeriod: drift.Value(period),
-                    expectedAmountSatang: drift.Value(moneyParsed.satang),
-                    isCleared: const drift.Value(false),
-                    note: drift.Value(name),
-                    tag: drift.Value(tagController.text.trim().isEmpty ? null : tagController.text.trim()),
-                    createdAt: nowTime,
-                    updatedAt: nowTime,
-                  ),
-                );
+                        transactionType: 'income',
+                        sourceAccountId: drift.Value(defaultAccId),
+                        categoryId: drift.Value(selectedCategoryId),
+                        amountOriginalSatang: moneyParsed.satang,
+                        amountThbSatang: moneyParsed.satang,
+                        currencyCode: 'THB',
+                        fxRate: const drift.Value('1.0'),
+                        feeThbSatang: const drift.Value(0),
+                        taxCategory: drift.Value(selectedTaxType),
+                        withholdingTaxSatang: const drift.Value(0),
+                        transactionDate: nowTime,
+                        workPeriod: drift.Value(period),
+                        expectedAmountSatang: drift.Value(moneyParsed.satang),
+                        isCleared: const drift.Value(false),
+                        note: drift.Value(name),
+                        tag: drift.Value(effectiveTag),
+                        createdAt: nowTime,
+                        updatedAt: nowTime,
+                      ),
+                    );
 
-                // If recurring is enabled, register Recurring Rule
-                if (isRecurring) {
-                  final recurDao = ref.read(recurringTransactionsDaoProvider);
-                  final nextRun = DateTime(nowTime.year, nowTime.month + 1, recurringDayOfMonth);
-                  await recurDao.createRule(
-                    RecurringRulesCompanion.insert(
-                      id: const Uuid().v4(),
-                      title: name,
-                      transactionType: 'income',
-                      sourceAccountId: defaultAccId,
-                      categoryId: drift.Value(selectedCategoryId),
-                      amountSatang: moneyParsed.satang,
-                      currencyCode: 'THB',
-                      frequency: 'monthly',
-                      dayOfMonth: drift.Value(recurringDayOfMonth),
-                      nextRunDate: nextRun,
-                      isActive: const drift.Value(true),
-                      autoPost: const drift.Value(false),
-                      note: drift.Value(tagController.text.trim().isEmpty ? null : tagController.text.trim()),
-                      createdAt: nowTime,
-                      updatedAt: nowTime,
-                    ),
-                  );
-                }
+                    // If recurring is enabled, register Recurring Rule
+                    if (isRecurring) {
+                      final recurDao = ref.read(recurringTransactionsDaoProvider);
+                      final nextRun = DateTime(nowTime.year, nowTime.month + 1, recurringDayOfMonth);
+                      await recurDao.createRule(
+                        RecurringRulesCompanion.insert(
+                          id: const Uuid().v4(),
+                          title: name,
+                          transactionType: 'income',
+                          sourceAccountId: defaultAccId,
+                          categoryId: drift.Value(selectedCategoryId),
+                          amountSatang: moneyParsed.satang,
+                          currencyCode: 'THB',
+                          frequency: 'monthly',
+                          dayOfMonth: drift.Value(recurringDayOfMonth),
+                          nextRunDate: nextRun,
+                          isActive: const drift.Value(true),
+                          autoPost: const drift.Value(false),
+                          note: drift.Value('[accrued] $effectiveTag'),
+                          createdAt: nowTime,
+                          updatedAt: nowTime,
+                        ),
+                      );
+                    }
 
                 if (ctx.mounted) Navigator.pop(ctx);
                 if (context.mounted) {

@@ -310,7 +310,7 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
     }
     if (query != null && query.trim().isNotEmpty) {
       final term = '%${query.trim()}%';
-      q.where((t) => t.note.like(term) | t.tag.like(term));
+      q.where((t) => t.note.like(term) | t.tag.like(term) | t.workPeriod.like(term));
     }
 
     q.orderBy([(t) => OrderingTerm.desc(t.transactionDate)]);
@@ -423,6 +423,24 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
         .get();
   }
 
+  /// แปลงรอบเดือน เช่น "2026-09" เป็น tag ที่อ่านเข้าใจง่าย เช่น "รายได้ ก.ย. 2026"
+  static String formatPeriodToTag(String period) {
+    final trimmed = period.trim();
+    final parts = trimmed.split('-');
+    if (parts.length == 2) {
+      final year = int.tryParse(parts[0]);
+      final month = int.tryParse(parts[1]);
+      if (year != null && month != null && month >= 1 && month <= 12) {
+        const thaiShortMonths = [
+          'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+          'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+        ];
+        return 'รายได้ ${thaiShortMonths[month - 1]} $year';
+      }
+    }
+    return 'รายได้รอบ $trimmed';
+  }
+
   /// บันทึกรับเงินเข้าบัญชีจริง (Mark as Received)
   Future<bool> markIncomeAsReceived(
     String transactionId, {
@@ -436,6 +454,17 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
     final now = DateTime.now();
     final updatedAmount = actualAmountSatang ?? existing.amountThbSatang;
 
+    // ติด tag รอบรายได้ถ้ามี workPeriod เพื่อให้ค้นหา/ดูย้อนหลังได้ชัดเจน
+    String? updatedTag = existing.tag;
+    if (existing.workPeriod != null && existing.workPeriod!.trim().isNotEmpty) {
+      final periodTag = formatPeriodToTag(existing.workPeriod!);
+      if (updatedTag == null || updatedTag.trim().isEmpty) {
+        updatedTag = periodTag;
+      } else if (!updatedTag.contains(periodTag) && !updatedTag.contains(existing.workPeriod!)) {
+        updatedTag = '$updatedTag, $periodTag';
+      }
+    }
+
     final updated = await (update(transactions)..where((t) => t.id.equals(transactionId))).write(
       TransactionsCompanion(
         isCleared: const Value(true),
@@ -443,6 +472,7 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
         transactionDate: Value(receivedDate),
         amountThbSatang: Value(updatedAmount),
         amountOriginalSatang: Value(updatedAmount),
+        tag: Value(updatedTag),
         updatedAt: Value(now),
       ),
     );
@@ -459,12 +489,14 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
             'source_account_id': existing.sourceAccountId,
             'transaction_date': existing.transactionDate.toIso8601String(),
             'amount_thb_satang': existing.amountThbSatang,
+            'tag': existing.tag,
           })),
           afterDataJson: Value(jsonEncode({
             'is_cleared': true,
             'source_account_id': accountId,
             'transaction_date': receivedDate.toIso8601String(),
             'amount_thb_satang': updatedAmount,
+            'tag': updatedTag,
           })),
           changeTimestamp: now,
           createdAt: now,
@@ -474,6 +506,42 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
       return true;
     }
     return false;
+  }
+
+  /// ติด tag รอบรายได้ให้กับรายการ accrued income ทั้งหมดที่ยังไม่มี tag ย้อนหลัง
+  Future<int> autoTagExistingAccruedIncomes() async {
+    final txs = await (select(transactions)
+          ..where((t) =>
+              t.deletedAt.isNull() &
+              t.transactionType.equals('income') &
+              t.workPeriod.isNotNull()))
+        .get();
+
+    int updatedCount = 0;
+    for (final tx in txs) {
+      final wp = tx.workPeriod;
+      if (wp == null || wp.trim().isEmpty) continue;
+      final periodTag = formatPeriodToTag(wp);
+      final currentTag = tx.tag;
+      if (currentTag == null || currentTag.trim().isEmpty) {
+        await (update(transactions)..where((t) => t.id.equals(tx.id))).write(
+          TransactionsCompanion(
+            tag: Value(periodTag),
+            updatedAt: Value(DateTime.now()),
+          ),
+        );
+        updatedCount++;
+      } else if (!currentTag.contains(periodTag) && !currentTag.contains(wp)) {
+        await (update(transactions)..where((t) => t.id.equals(tx.id))).write(
+          TransactionsCompanion(
+            tag: Value('$currentTag, $periodTag'),
+            updatedAt: Value(DateTime.now()),
+          ),
+        );
+        updatedCount++;
+      }
+    }
+    return updatedCount;
   }
 
   Future<int> cleanupUnclearedExpenses() async {

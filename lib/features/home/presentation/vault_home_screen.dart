@@ -151,6 +151,9 @@ class VaultHomeScreen extends ConsumerWidget {
                     daysInMonth: DateTime(now.year, now.month + 1, 0).day,
                     totalExpenseSatang: data.totalExpenseMonthSatang,
                     totalBudgetSatang: data.totalBudgetMonthSatang,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const MonthlySummaryScreen()),
+                    ),
                   ),
                   const SizedBox(height: 16),
 
@@ -1541,43 +1544,24 @@ class VaultHomeScreen extends ConsumerWidget {
                   color: isLumi ? VaultTheme.primaryText(context) : VaultTheme.secondaryText(context),
                 ),
               ),
-              if (isLumi)
-                InkWell(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const MonthlySummaryScreen()),
-                    );
-                  },
-                  child: Text(
-                    '${l10n?.viewAll ?? 'ดูทั้งหมด'} ›',
-                    style: const TextStyle(
-                      fontFamily: VaultTheme.fontFamily,
+              Row(
+                children: [
+                  Icon(
+                    isMomPositive ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                    size: 13,
+                    color: isMomPositive ? VaultTheme.positive(context) : VaultTheme.negative(context),
+                  ),
+                  const SizedBox(width: 2),
+                  Text(
+                    '${isMomPositive ? '+' : ''}${momChangePercent.toStringAsFixed(1)}% ${isThai ? 'vs สิ้นเดือนก่อน' : 'vs last month'}',
+                    style: VaultTheme.tabular(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFFFF5C9D),
-                    ),
-                  ),
-                )
-              else
-                Row(
-                  children: [
-                    Icon(
-                      isMomPositive ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
-                      size: 13,
                       color: isMomPositive ? VaultTheme.positive(context) : VaultTheme.negative(context),
                     ),
-                    const SizedBox(width: 2),
-                    Text(
-                      '${isMomPositive ? '+' : ''}${momChangePercent.toStringAsFixed(1)}% ${isThai ? 'vs สิ้นเดือนก่อน' : 'vs last month'}',
-                      style: VaultTheme.tabular(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: isMomPositive ? VaultTheme.positive(context) : VaultTheme.negative(context),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
+              ),
             ],
           ),
           const SizedBox(height: 10),
@@ -1690,40 +1674,7 @@ class VaultHomeScreen extends ConsumerWidget {
             ],
           ),
           if (!isLumi) ...[
-            const SizedBox(height: 10),
-            Divider(color: VaultTheme.border(context), height: 1),
             const SizedBox(height: 8),
-            InkWell(
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const MonthlySummaryScreen()),
-                );
-              },
-              borderRadius: BorderRadius.circular(8),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.assessment_outlined,
-                      size: 15,
-                      color: VaultTheme.accent(context),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      isThai ? 'ดูรายงานสรุปรายเดือน ›' : 'View Monthly Report ›',
-                      style: TextStyle(
-                        fontFamily: VaultTheme.fontFamily,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: VaultTheme.accent(context),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
           ],
         ],
       ),

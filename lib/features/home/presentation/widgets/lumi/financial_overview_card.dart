@@ -67,7 +67,7 @@ class FinancialOverviewCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header row with "Monthly Report ›"
+          // Header row — title only (no "View Monthly Report" button; navigate via expense trend chart instead)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -91,33 +91,6 @@ class FinancialOverviewCard extends StatelessWidget {
                       ),
                     ),
                   ],
-                ),
-              ),
-              InkWell(
-                onTap: onViewMonthlySummary,
-                borderRadius: BorderRadius.circular(12),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        l10n?.viewMonthlyReport ?? 'ดูรายงานรายเดือน',
-                        style: const TextStyle(
-                          fontFamily: VaultTheme.fontFamily,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFFFF5C9D),
-                        ),
-                      ),
-                      const SizedBox(width: 2),
-                      const Icon(
-                        Icons.chevron_right_rounded,
-                        size: 16,
-                        color: Color(0xFFFF5C9D),
-                      ),
-                    ],
-                  ),
                 ),
               ),
             ],
@@ -245,50 +218,6 @@ class FinancialOverviewCard extends StatelessWidget {
               ),
             ],
           ),
-
-          const SizedBox(height: 14),
-          Divider(
-            color: isDark ? VaultTheme.border(context) : const Color(0xFFF3DCE5),
-            height: 1,
-          ),
-          const SizedBox(height: 14),
-
-          // Sub metrics: Month Income vs Month Expense vs Cash Flow
-          Row(
-            children: [
-              Expanded(
-                child: _buildMiniMetric(
-                  context: context,
-                  label: l10n?.monthIncome ?? 'รายรับเดือนนี้',
-                  amountSatang: totalIncomeSatang,
-                  color: isDark ? const Color(0xFF81C784) : const Color(0xFF2E8B57),
-                  bgColor: isDark ? const Color(0xFF1B2E23) : const Color(0xFFF0FAF2),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildMiniMetric(
-                  context: context,
-                  label: l10n?.monthExpense ?? 'รายจ่ายเดือนนี้',
-                  amountSatang: totalExpenseSatang,
-                  color: isDark ? const Color(0xFFFF8A9E) : const Color(0xFFE64A63),
-                  bgColor: isDark ? const Color(0xFF381924) : const Color(0xFFFFF0F5),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildMiniMetric(
-                  context: context,
-                  label: l10n?.cashFlow ?? 'กระแสเงินสด',
-                  amountSatang: cashFlowMonthSatang,
-                  color: cashFlowMonthSatang >= 0
-                      ? (isDark ? const Color(0xFF81C784) : const Color(0xFF2E8B57))
-                      : (isDark ? const Color(0xFFFF8A9E) : const Color(0xFFE64A63)),
-                  bgColor: isDark ? const Color(0xFF2B202D) : const Color(0xFFFFF9F5),
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -380,50 +309,5 @@ class FinancialOverviewCard extends StatelessWidget {
     );
   }
 
-  Widget _buildMiniMetric({
-    required BuildContext context,
-    required String label,
-    required int amountSatang,
-    required Color color,
-    required Color bgColor,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontFamily: VaultTheme.fontFamily,
-              fontSize: 10.5,
-              fontWeight: FontWeight.w600,
-              color: isDark ? const Color(0xFFA594A1) : const Color(0xFF87767F),
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 4),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              Money(amountSatang).format(symbol: '฿'),
-              style: VaultTheme.tabular(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                color: color,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
+

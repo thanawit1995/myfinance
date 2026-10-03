@@ -160,6 +160,13 @@ Future<Uint8List> dumpDriftDatabaseToSqliteBytes(dynamic db) async {
         exportDb.execute(viewSql);
       } catch (_) {}
     }
+
+    try {
+      final int ver = (db.schemaVersion is int) ? (db.schemaVersion as int) : 10;
+      exportDb.execute('PRAGMA user_version = $ver;');
+    } catch (_) {
+      exportDb.execute('PRAGMA user_version = 10;');
+    }
   } finally {
     exportDb.dispose();
   }

@@ -489,6 +489,7 @@ class BackupRestoreService {
     } finally {
       try {
         await db.customStatement('PRAGMA foreign_keys = ON;');
+        await db.customStatement('PRAGMA user_version = ${db.schemaVersion};');
       } catch (_) {}
     }
 

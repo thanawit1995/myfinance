@@ -123,5 +123,22 @@ void main() {
       final snapshot = await (db.select(db.balanceSnapshots)..where((s) => s.id.equals(snapshotId))).getSingle();
       expect(snapshot.closingBalanceSatang, equals(5000000));
     });
+
+    test('Can safely open database when tables exist but user_version is 0 without throwing idx_trans_date already exists', () async {
+      // 1. Manually reset user_version to 0
+      await db.customStatement('PRAGMA user_version = 0;');
+
+      // 2. Simulate calling migration.onCreate (as Drift does when user_version == 0)
+      final migrator = db.createMigrator();
+      await db.migration.onCreate(migrator);
+
+      // Verify user_version was updated to schemaVersion and db is healthy
+      final verRow = await db.customSelect('PRAGMA user_version;').getSingle();
+      expect(verRow.data['user_version'], equals(db.schemaVersion));
+
+      // Transactions query still works
+      final txList = await db.select(db.transactions).get();
+      expect(txList, isA<List>());
+    });
   });
 }

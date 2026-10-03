@@ -78,6 +78,25 @@ class AppDatabase extends _$AppDatabase {
   MigrationStrategy get migration {
     return MigrationStrategy(
       onCreate: (Migrator m) async {
+        final existingTables = await customSelect(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_drift_%';",
+        ).get();
+        if (existingTables.isNotEmpty) {
+          // Tables already exist in this database file (e.g. from restored backup, CSV import, or master snapshot with user_version = 0).
+          // Do NOT run m.createAll() as it throws 'SqliteException(1): index idx_trans_date already exists'.
+          for (final entity in allSchemaEntities) {
+            if (entity is TableInfo) {
+              final exists = existingTables.any((t) => t.data['name'] == entity.actualTableName);
+              if (!exists) {
+                await m.createTable(entity);
+              }
+            }
+          }
+          await _ensureAllColumnsExist(m);
+          await _ensureAllIndexesExist();
+          await customStatement('PRAGMA user_version = $schemaVersion;');
+          return;
+        }
         await m.createAll();
         await SeedData.insertSeedData(this);
         await SeedData.insertTaxRulesSeedData(this);
@@ -164,4 +183,68 @@ class AppDatabase extends _$AppDatabase {
       },
     );
   }
+
+  Future<void> _safeAddColumn(Migrator m, dynamic table, GeneratedColumn col) async {
+    try {
+      await m.addColumn(table, col);
+    } catch (_) {}
+  }
+
+  Future<void> _ensureAllColumnsExist(Migrator m) async {
+    await _safeAddColumn(m, transactions, transactions.feeThbSatang);
+    await _safeAddColumn(m, transactions, transactions.tag);
+    await _safeAddColumn(m, assets, assets.market);
+    await _safeAddColumn(m, assets, assets.note);
+    await _safeAddColumn(m, assets, assets.extraDetailsJson);
+    await _safeAddColumn(m, investmentLots, investmentLots.totalCostThbSatang);
+    await _safeAddColumn(m, investmentLots, investmentLots.remainingCostThbSatang);
+    await _safeAddColumn(m, investmentSales, investmentSales.priceGainLossThbSatang);
+    await _safeAddColumn(m, investmentSales, investmentSales.fxGainLossThbSatang);
+    await _safeAddColumn(m, investmentSales, investmentSales.sellFxRate);
+    await _safeAddColumn(m, investmentSales, investmentSales.buyFxRate);
+    await _safeAddColumn(m, recurringRules, recurringRules.intervalUnits);
+    await _safeAddColumn(m, recurringRules, recurringRules.autoPost);
+    await _safeAddColumn(m, recurringRules, recurringRules.lastPostedDate);
+    await _safeAddColumn(m, recurringRules, recurringRules.note);
+    await _safeAddColumn(m, financialHealthSettings, financialHealthSettings.warningValue);
+    await _safeAddColumn(m, transactions, transactions.taxCategory);
+    await _safeAddColumn(m, transactions, transactions.withholdingTaxSatang);
+    await _safeAddColumn(m, foreignRemittances, foreignRemittances.destinationAccountId);
+    await _safeAddColumn(m, foreignRemittances, foreignRemittances.incomeSourceType);
+    await _safeAddColumn(m, foreignRemittances, foreignRemittances.isPrincipal);
+    await _safeAddColumn(m, foreignRemittances, foreignRemittances.taxYearRemitted);
+    await _safeAddColumn(m, foreignRemittances, foreignRemittances.taxableReason);
+    await _safeAddColumn(m, transactions, transactions.importBatchId);
+    await _safeAddColumn(m, transactions, transactions.syncVersion);
+    await _safeAddColumn(m, accounts, accounts.syncVersion);
+    await _safeAddColumn(m, categories, categories.syncVersion);
+    await _safeAddColumn(m, transactions, transactions.workPeriod);
+    await _safeAddColumn(m, transactions, transactions.expectedAmountSatang);
+    await _safeAddColumn(m, investmentLots, investmentLots.pricePerUnitOriginal);
+    await _safeAddColumn(m, investmentLots, investmentLots.pricePerUnitThb);
+    await _safeAddColumn(m, assetPrices, assetPrices.marketPriceOriginal);
+    await _safeAddColumn(m, assetPrices, assetPrices.marketPriceThb);
+    await _safeAddColumn(m, categories, categories.sortOrder);
+  }
+
+  Future<void> _ensureAllIndexesExist() async {
+    const indexSqls = [
+      'CREATE INDEX IF NOT EXISTS idx_trans_date ON transactions (transaction_date);',
+      'CREATE INDEX IF NOT EXISTS idx_trans_source_acc ON transactions (source_account_id);',
+      'CREATE INDEX IF NOT EXISTS idx_trans_category ON transactions (category_id);',
+      'CREATE INDEX IF NOT EXISTS idx_trans_asset ON transactions (asset_id);',
+      'CREATE INDEX IF NOT EXISTS idx_trans_deleted_at ON transactions (deleted_at);',
+      'CREATE INDEX IF NOT EXISTS idx_trans_import_batch ON transactions (import_batch_id);',
+      'CREATE INDEX IF NOT EXISTS idx_lots_asset ON investment_lots (asset_id);',
+      'CREATE INDEX IF NOT EXISTS idx_sales_lot ON investment_sales (lot_id);',
+      'CREATE INDEX IF NOT EXISTS idx_snapshots_acc_date ON account_snapshots (account_id, snapshot_date);',
+      'CREATE INDEX IF NOT EXISTS idx_incomes_asset ON investment_incomes (asset_id);',
+    ];
+    for (final sql in indexSqls) {
+      try {
+        await customStatement(sql);
+      } catch (_) {}
+    }
+  }
 }
+

@@ -4,6 +4,7 @@ import '../../../../../core/database/app_database.dart';
 import '../../../../../core/money/money.dart';
 import '../../../../../core/theme/vault_theme.dart';
 import '../../../../../l10n/app_localizations.dart';
+import '../../../../transactions/presentation/edit_transaction_dialog.dart';
 
 class RecentActivityCard extends StatelessWidget {
   final List<Transaction> transactions;
@@ -164,9 +165,17 @@ class RecentActivityCard extends StatelessWidget {
         ? Icons.arrow_downward_rounded
         : (isTransfer ? Icons.swap_horiz_rounded : Icons.shopping_bag_outlined);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () async {
+        final changed = await EditTransactionDialog.show(context, tx);
+        if (changed == true) {
+          onAddTransaction();
+        }
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+        child: Row(
         children: [
           // Pastel icon bubble
           Container(
@@ -220,8 +229,9 @@ class RecentActivityCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildEmptyState(BuildContext context) {
     final l10n = AppLocalizations.of(context);

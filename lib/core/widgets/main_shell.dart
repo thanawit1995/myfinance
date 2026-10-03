@@ -410,14 +410,6 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
                   child: screens[_currentIndex],
                 ),
               ),
-              if (_currentIndex != 2)
-                const Positioned(
-                  top: 10,
-                  right: 14,
-                  child: SafeArea(
-                    child: SyncStatusWidget(),
-                  ),
-                ),
             ],
           ),
           bottomNavigationBar: Container(

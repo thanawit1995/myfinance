@@ -13,6 +13,8 @@ import '../../../../core/database/daos/insurance_dao.dart';
 import '../../insurance/presentation/insurance_policies_screen.dart';
 import '../../income_tracker/presentation/accrued_income_screen.dart';
 import '../../transactions/presentation/quick_add_screen.dart';
+import '../../transactions/presentation/edit_transaction_dialog.dart';
+import '../../auth/sync_status_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:drift/drift.dart' hide Column;
 import 'widgets/lumi/lumi_desktop_layout.dart';
@@ -145,7 +147,7 @@ class VaultHomeScreen extends ConsumerWidget {
                   const SizedBox(height: 24),
 
                   // 6. Recent Activity — แสดง 3 รายการล่าสุดเท่านั้น
-                  _buildRecentActivity(context, data),
+                  _buildRecentActivity(context, ref, data),
                   const SizedBox(height: 80), // เว้นพื้นที่สำหรับปุ่มลอย FAB
                 ],
               );
@@ -240,81 +242,95 @@ class VaultHomeScreen extends ConsumerWidget {
             ),
           )
         else
-          Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: VaultTheme.accent(context).withValues(alpha: 0.35), width: 1.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: ClipOval(
-                  child: Image.asset(
-                    'assets/images/app_logo.png',
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'OURS',
-                        style: TextStyle(
-                          fontFamily: VaultTheme.fontFamily,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 2.0,
-                          color: VaultTheme.primaryText(context),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: VaultTheme.accent(context).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          'VAULT',
-                          style: TextStyle(
-                            fontFamily: VaultTheme.fontFamily,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.0,
-                            color: VaultTheme.accent(context),
-                          ),
-                        ),
+          Expanded(
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: VaultTheme.accent(context).withValues(alpha: 0.35), width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Our money, our journey. • $monthName $yearStr',
-                    style: TextStyle(
-                      fontFamily: VaultTheme.fontFamily,
-                      fontSize: 12,
-                      letterSpacing: 0.3,
-                      color: VaultTheme.secondaryText(context),
+                  child: ClipOval(
+                    child: Image.asset(
+                      'assets/images/app_logo.png',
+                      fit: BoxFit.cover,
                     ),
                   ),
-                ],
-              ),
-            ],
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'OURS',
+                            style: TextStyle(
+                              fontFamily: VaultTheme.fontFamily,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 2.0,
+                              color: VaultTheme.primaryText(context),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: VaultTheme.accent(context).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'VAULT',
+                              style: TextStyle(
+                                fontFamily: VaultTheme.fontFamily,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.0,
+                                color: VaultTheme.accent(context),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Our money, our journey. • $monthName $yearStr',
+                        style: TextStyle(
+                          fontFamily: VaultTheme.fontFamily,
+                          fontSize: 12,
+                          letterSpacing: 0.3,
+                          color: VaultTheme.secondaryText(context),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-        _buildNotificationBell(context, ref, data.unreadRecurringCount),
+        const SizedBox(width: 8),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SyncStatusWidget(),
+            const SizedBox(width: 4),
+            _buildNotificationBell(context, ref, data.unreadRecurringCount),
+          ],
+        ),
       ],
     );
   }
@@ -1109,121 +1125,134 @@ class VaultHomeScreen extends ConsumerWidget {
           Row(
             children: [
               Expanded(
-                child: FittedBox(
-                  alignment: Alignment.centerLeft,
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    '${isThai ? 'เงินสด/เงินฝาก' : 'Cash & Bank'}: ${Money(data.totalCashSatang).format(symbol: '฿')}',
-                    style: VaultTheme.tabular(
-                      fontSize: 12,
-                      color: VaultTheme.secondaryText(context),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: onNavigateToMoney,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.account_balance_wallet_outlined, size: 15, color: Colors.blueAccent.shade200),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            '${isThai ? 'เงินสด/เงินฝาก' : 'Cash & Bank'}: ${Money(data.totalCashSatang).format(symbol: '฿')}',
+                            style: VaultTheme.tabular(
+                              fontSize: 12,
+                              color: VaultTheme.secondaryText(context),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: FittedBox(
-                  alignment: Alignment.centerRight,
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    '${l10n?.portfolio ?? 'พอร์ตลงทุน'}: ${Money(data.portfolioValueSatang).format(symbol: '฿')}',
-                    style: VaultTheme.tabular(
-                      fontSize: 12,
-                      color: VaultTheme.secondaryText(context),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: onNavigateToInvest,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.trending_up_rounded, size: 15, color: Colors.purpleAccent.shade100),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            '${l10n?.portfolio ?? (isThai ? 'พอร์ตลงทุน' : 'Portfolio')}: ${Money(data.portfolioValueSatang).format(symbol: '฿')}',
+                            style: VaultTheme.tabular(
+                              fontSize: 12,
+                              color: VaultTheme.secondaryText(context),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          InkWell(
-            borderRadius: BorderRadius.circular(8),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const AccruedIncomeScreen()),
-              );
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: FittedBox(
-                      alignment: Alignment.centerLeft,
-                      fit: BoxFit.scaleDown,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.pending_actions_rounded, size: 15, color: Colors.amber.shade700),
-                          const SizedBox(width: 5),
-                          Text(
-                            '${isThai ? 'เงินค้างรับ / ตกเบิก' : 'Accrued Income'}${data.accruedIncomeCount > 0 ? ' (${data.accruedIncomeCount})' : ''}: ${Money(data.accruedIncomeSatang).format(symbol: '฿')}',
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const AccruedIncomeScreen()),
+                    );
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.pending_actions_rounded, size: 15, color: Colors.amber.shade700),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            '${isThai ? 'เงินค้างรับ' : 'Accrued'}${data.accruedIncomeCount > 0 ? ' (${data.accruedIncomeCount})' : ''}: ${Money(data.accruedIncomeSatang).format(symbol: '฿')}',
                             style: VaultTheme.tabular(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                               color: data.accruedIncomeSatang > 0 ? Colors.amber.shade700 : VaultTheme.secondaryText(context),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              if (data.insuranceSavingsSatang > 0) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const InsurancePoliciesScreen()),
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.health_and_safety_outlined, size: 15, color: Colors.teal),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              '${isThai ? 'เงินสะสมประกัน' : 'Insurance'}: ${Money(data.insuranceSavingsSatang).format(symbol: '฿')}',
+                              style: VaultTheme.tabular(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.teal,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${isThai ? 'ดูรายการ' : 'View'} ›',
-                    style: TextStyle(
-                      fontFamily: VaultTheme.fontFamily,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color: VaultTheme.accent(context),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (data.insuranceSavingsSatang > 0) ...[
-            const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: FittedBox(
-                    alignment: Alignment.centerLeft,
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      '${isThai ? 'เงินสะสมในประกัน' : 'Insurance Savings'}: ${Money(data.insuranceSavingsSatang).format(symbol: '฿')}',
-                      style: VaultTheme.tabular(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.green,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                InkWell(
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const InsurancePoliciesScreen()),
-                    );
-                  },
-                  child: Text(
-                    '${isThai ? 'ดูกรมธรรม์' : 'View Policies'} ›',
-                    style: TextStyle(
-                      fontFamily: VaultTheme.fontFamily,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color: VaultTheme.accent(context),
-                    ),
-                  ),
                 ),
               ],
-            ),
-          ],
+            ],
+          ),
           if (!isLumi) ...[
             const SizedBox(height: 10),
             Divider(color: VaultTheme.border(context), height: 1),
@@ -1433,7 +1462,7 @@ class VaultHomeScreen extends ConsumerWidget {
   }
 
   // --- 6. Recent Activity (3 รายการล่าสุด) ---
-  Widget _buildRecentActivity(BuildContext context, _VaultHomeData data) {
+  Widget _buildRecentActivity(BuildContext context, WidgetRef ref, _VaultHomeData data) {
     final l10n = AppLocalizations.of(context);
     final isLumi = VaultTheme.isLumi(context);
     final isDark = VaultTheme.isDark(context);
@@ -1526,6 +1555,12 @@ class VaultHomeScreen extends ConsumerWidget {
                 return ListTile(
                   dense: true,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  onTap: () async {
+                    final changed = await EditTransactionDialog.show(context, tx);
+                    if (changed == true && context.mounted) {
+                      ref.read(transactionsVersionProvider.notifier).state++;
+                    }
+                  },
                   leading: isLumi
                       ? Container(
                           width: 38,

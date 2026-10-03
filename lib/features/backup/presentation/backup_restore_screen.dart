@@ -1884,34 +1884,6 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
-                child: FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.teal.shade700,
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  icon: syncState.status == SyncStatus.syncing
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Icon(Icons.sync_rounded, size: 20),
-                  label: Text(
-                    isThai ? 'ซิงค์ข้อมูลเดี๋ยวนี้ (Sync All Data)' : 'Sync All Data Now',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
-                  ),
-                  onPressed: syncState.status == SyncStatus.syncing
-                      ? null
-                      : () async {
-                          await ref.read(syncServiceProvider.notifier).syncAll(forceFullSync: true);
-                          await _loadStats();
-                        },
-                ),
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
                 child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.redAccent,

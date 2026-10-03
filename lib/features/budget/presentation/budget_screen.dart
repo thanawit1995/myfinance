@@ -14,6 +14,7 @@ import '../../../../core/widgets/category_name_helper.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../categories/presentation/categories_screen.dart';
 import '../../categories/presentation/category_form_dialog.dart';
+import '../../transactions/presentation/transaction_list_screen.dart';
 
 class BudgetScreen extends ConsumerStatefulWidget {
   const BudgetScreen({super.key});
@@ -379,7 +380,21 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
       color: VaultTheme.surface(context),
       child: InkWell(
         borderRadius: BorderRadius.circular(isLumi ? 18 : 14),
-        onTap: () => _showEditBudgetDialog(context, b),
+        onTap: () {
+          final now = DateTime.now();
+          final firstDay = DateTime(now.year, now.month, 1);
+          final lastDay = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => TransactionListScreen(
+                initialCategoryId: b.categoryId,
+                initialTransactionType: 'expense',
+                initialDateRange: DateTimeRange(start: firstDay, end: lastDay),
+                title: b.localizedName(context),
+              ),
+            ),
+          );
+        },
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -417,7 +432,14 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                           ),
                         ),
                         const SizedBox(width: 6),
-                        Icon(Icons.edit_outlined, size: 14, color: VaultTheme.mutedText(context)),
+                        InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () => _showEditBudgetDialog(context, b),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: Icon(Icons.edit_outlined, size: 16, color: VaultTheme.secondaryText(context)),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -474,46 +496,13 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  TextButton.icon(
-                    icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
-                    label: Text(
-                      l10n?.deleteBudget ?? (isThai ? 'ลบงบประมาณ' : 'Delete Budget'),
-                      style: const TextStyle(fontSize: 12, color: Colors.red),
+                  Text(
+                    isThai ? 'แตะการ์ดเพื่อดูรายการธุรกรรม' : 'Tap to view transactions',
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: 11,
+                      color: VaultTheme.mutedText(context),
                     ),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    onPressed: () async {
-                      final catName = b.localizedName(context);
-                      final confirm = await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: Text(l10n?.confirmDeleteBudget ?? (isThai ? 'ยืนยันลบงบประมาณ' : 'Confirm Delete Budget')),
-                          content: Text(
-                            isThai
-                                ? 'ต้องการลบงบประมาณสำหรับ "$catName" หรือไม่?\n\n(ข้อมูลรายจ่ายที่บันทึกไปแล้วจะไม่หายไป)'
-                                : 'Delete budget for "$catName"?\n\n(Recorded expenses will not be lost)',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(ctx).pop(false),
-                              child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
-                            ),
-                            FilledButton(
-                              style: FilledButton.styleFrom(backgroundColor: Colors.red),
-                              onPressed: () => Navigator.of(ctx).pop(true),
-                              child: Text(isThai ? 'ลบ' : 'Delete'),
-                            ),
-                          ],
-                        ),
-                      );
-                      if (confirm == true) {
-                        await ref.read(budgetsDaoProvider).deleteBudget(b.budgetId);
-                        if (mounted) setState(() {});
-                      }
-                    },
                   ),
                   Text(
                     b.remainingSatang >= 0

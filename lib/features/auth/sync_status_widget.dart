@@ -208,121 +208,68 @@ class SyncStatusWidget extends ConsumerWidget {
               _infoRow(isThai ? 'ข้อผิดพลาด' : 'Error', state.errorMessage!),
             ],
             const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.teal.shade700,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    onPressed: state.status == SyncStatus.syncing
-                        ? null
-                        : () {
-                            Navigator.of(ctx).pop();
-                            ref.read(syncServiceProvider.notifier).syncAll();
-                          },
-                    icon: const Icon(Icons.sync_rounded, size: 18),
-                    label: Text(isThai ? 'ซิงค์ทันที' : 'Sync Now'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+            if (user != null) ...[
+              // 1. Master push (upload)
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.deepOrange.shade700,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   onPressed: state.status == SyncStatus.syncing
                       ? null
-                      : () {
-                            Navigator.of(ctx).pop();
-                            ref.read(syncServiceProvider.notifier).syncAll(forceFullSync: true);
-                          },
-                  child: Text(isThai ? 'ซิงค์ทั้งหมดใหม่' : 'Full Re-sync'),
+                      : () => _confirmForcePush(context, ref, isThai),
+                  icon: const Icon(Icons.upload_rounded, size: 20),
+                  label: Text(
+                    isThai ? '1. อัปโหลด Master ขึ้นคลาวด์ (Master Push)' : '1. Master Push (Upload)',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
                 ),
-                const SizedBox(width: 8),
-                OutlinedButton(
+              ),
+              const SizedBox(height: 10),
+
+              // 2. Download master data
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.blue.shade700,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: state.status == SyncStatus.syncing
+                      ? null
+                      : () => _confirmPullMaster(context, ref, isThai),
+                  icon: const Icon(Icons.cloud_download_rounded, size: 20),
+                  label: Text(
+                    isThai ? '2. ดาวน์โหลด Master จากคลาวด์ (Download Master)' : '2. Download Master Data',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // 3. Log out
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.redAccent,
-                    side: const BorderSide(color: Colors.redAccent),
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+                    side: const BorderSide(color: Colors.redAccent, width: 1.2),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   onPressed: () async {
                     Navigator.of(ctx).pop();
                     await ref.read(authServiceProvider).signOut();
                   },
-                  child: Text(isThai ? 'ออกจากระบบ' : 'Sign Out'),
-                ),
-              ],
-            ),
-            if (user != null) ...[
-              const SizedBox(height: 14),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.amber.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.cloud_upload_outlined, color: Colors.amber, size: 18),
-                        const SizedBox(width: 8),
-                        Text(
-                          isThai ? 'ต้องการให้เครื่องนี้เป็น Master เขียนทับคลาวด์?' : 'Set This Device as Master?',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      isThai
-                          ? 'หากข้อมูลในเครื่องนี้ถูกต้องแล้ว และต้องการลบข้อมูลเก่าบน Google Cloud ทิ้งทั้งหมดเพื่อใช้อันนี้แทน'
-                          : 'If local data is clean and you want to wipe & overwrite cloud with this device, use Force Push.',
-                      style: const TextStyle(fontSize: 11.5, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.deepOrange.shade700,
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                        onPressed: state.status == SyncStatus.syncing
-                            ? null
-                            : () => _confirmForcePush(context, ref, isThai),
-                        icon: const Icon(Icons.upload_rounded, size: 18),
-                        label: Text(
-                          isThai ? 'เขียนทับข้อมูลบนคลาวด์ด้วยเครื่องนี้ 100%' : 'Force Push Local to Cloud',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.blue.shade700,
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                        onPressed: state.status == SyncStatus.syncing
-                            ? null
-                            : () => _confirmPullMaster(context, ref, isThai),
-                        icon: const Icon(Icons.cloud_download_rounded, size: 18),
-                        label: Text(
-                          isThai ? 'ดึงข้อมูล Master จากคลาวด์แทนที่เครื่องนี้ 100%' : 'Pull Master from Cloud',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
-                        ),
-                      ),
-                    ),
-                  ],
+                  icon: const Icon(Icons.logout_rounded, size: 18),
+                  label: Text(
+                    isThai ? '3. ออกจากระบบคลาวด์ (Log Out)' : '3. Log Out',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
                 ),
               ),
             ],

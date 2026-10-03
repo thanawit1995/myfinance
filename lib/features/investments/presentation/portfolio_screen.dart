@@ -14,7 +14,6 @@ import 'dividend_income_dialog.dart';
 import 'monthly_valuation_screen.dart';
 import 'lot_inspection_screen.dart';
 import '../../settings/presentation/trash_bin_screen.dart';
-import '../../auth/sync_status_widget.dart';
 import '../../../../l10n/app_localizations.dart';
 
 class PortfolioScreen extends ConsumerStatefulWidget {
@@ -243,10 +242,6 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
       appBar: AppBar(
         title: Text((l10n?.portfolio ?? (isThai ? 'พอร์ตการลงทุน' : 'PORTFOLIO')).toUpperCase()),
         actions: [
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-            child: SyncStatusWidget(),
-          ),
           PopupMenuButton<String>(
             tooltip: isThai ? 'เมนูเพิ่มเติม' : 'More Options',
             onSelected: (val) async {

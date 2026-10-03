@@ -395,8 +395,8 @@ class _CategoryListViewState extends ConsumerState<_CategoryListView> {
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            if (showInactive)
+            if (showInactive) ...[
+              const SizedBox(width: 8),
               FilledButton.tonal(
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -421,24 +421,8 @@ class _CategoryListViewState extends ConsumerState<_CategoryListView> {
                   l10n?.restoreCategory ?? 'กู้คืน',
                   style: const TextStyle(fontSize: 12),
                 ),
-              )
-            else
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.all(4),
-                constraints: const BoxConstraints(),
-                icon: Icon(Icons.edit_outlined,
-                    size: 20, color: VaultTheme.secondaryText(context)),
-                tooltip: l10n?.editCategory ?? 'แก้ไขหมวดหมู่',
-                onPressed: () async {
-                  final updated =
-                      await CategoryFormDialog.show(context, category: cat);
-                  if (updated != null) {
-                    widget.onChanged();
-                    await _loadData();
-                  }
-                },
               ),
+            ],
           ],
         ),
       ),

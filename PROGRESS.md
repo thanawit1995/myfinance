@@ -2,18 +2,17 @@
 
 อัปเดตล่าสุด: 3 ตุลาคม 2026 (รอบดึกส่งท้าย)
 
-- [x] **Safari iOS Bottom Navigation Touch & Gesture Bar Clearance Fix (3 ต.ค. 2026)**:
-  - **1. ยกระดับแถบเมนูพ้นระยะ iPhone Gesture Bar & Safari Toolbar (`main_shell.dart`)**:
-    - คำนวณ `safeBottom = math.max(mediaBottom, kIsWeb ? 22.0 : 8.0)` พร้อม `Padding(padding: EdgeInsets.only(bottom: safeBottom))` เพื่อยกแถบเมนูขึ้นพ้นขีด Home Indicator และ Floating Toolbar ของ Safari อย่างเด็ดขาด
-    - เพิ่มความสูงแถบเมนูจาก 60px เป็น 66px
-  - **2. ขยายขนาดปุ่มและ Touch Target ป้องกันการ Drop Events (`main_shell.dart`)**:
-    - ใช้ `GestureDetector(behavior: HitTestBehavior.opaque, onTap: ...)` เต็มพื้นที่แต่ละช่องแท็บ (Expanded) ป้องกัน Safari สับสนระหว่างการแตะกับการปัดหน้าจอ
-    - ขยายปุ่มกลาง (+) Quick Add จาก 46px เป็น 50px พร้อม Hit Target กว้างขึ้น
-    - ขยายไอคอนแท็บเป็น 24px และเพิ่ม Padding ให้เห็นชัดเจนและกดง่าย
-  - **3. ปรับ CSS WebKit Touch Optimization (`web/index.html`)**:
-    - เพิ่ม `touch-action: manipulation;` ปิด Tap Delay 300ms บน Safari และป้องกัน Gesture Conflict
-    - เพิ่ม `height: 100dvh;` ป้องกัน Layout ดันลงใต้ Floating Bar บน iOS Safari
-  - **4. การทดสอบและการรับรองคุณภาพ**:
+- [x] **Safari iOS Bottom Navigation Coordinate Mapping & Full-Height Hitbox Fix (3 ต.ค. 2026)**:
+  - **1. แก้ปัญหาพิกัดแตะเพี้ยน (Touch Offset) บน iOS Safari (`index.html`)**:
+    - **สาเหตุรากฐาน**: บน Safari iOS เมื่อใช้ `viewport-fit=cover` และหน้าเว็บเกิดการเลื่อนหลุด (Rubber-band bounce หรือ Scroll) แม้เพียงเล็กน้อย `window.scrollY` หรือ `visualViewport.offsetTop` จะไม่เป็น 0 ทำให้พิกัดการแตะของ WebKit เลื่อนลงด้านล่าง ผู้ใช้จึงต้องกด "เหนือปุ่ม" จึงจะโดนปุ่ม
+    - **การแก้ไข**:
+      1. กำหนด `position: fixed; top: 0; left: 0; right: 0; bottom: 0; overscroll-behavior: none; -webkit-overflow-scrolling: auto;` ใน CSS เพื่อล็อกให้ Root Window ไม่เลื่อนหลุดเด็ดขาด
+      2. เพิ่ม `interactive-widget=resizes-content` ใน Meta Viewport
+      3. เพิ่ม JavaScript Listener ตรวจจับ `scroll` และ `visualViewport.scroll` ให้ดึง `window.scrollTo(0, 0)` ทันที พิกัดแตะจึงตรงกับตำแหน่งที่แสดงบนจอ 100%
+  - **2. ขยาย Hitbox ครอบคลุมทั้งความสูงของแถบเมนู (`main_shell.dart`)**:
+    - ปรับ `_buildNavItem` และปุ่มกลาง (+) ให้ `GestureDetector(behavior: HitTestBehavior.opaque)` ครอบคลุมพื้นที่เต็มความสูง (`height: 64 + safeBottom`, รวมพื้นที่ด้านล่าง ~86-98pt) และเต็มความกว้างของแต่ละคอลัมน์ (Expanded)
+    - ใส่ `color: Colors.transparent` เพื่อสร้าง Render Target ที่สมบูรณ์ ไม่ว่าผู้ใช้จะแตะโดนตัวไอคอน, ตัวอักษร, หรือบริเวณด้านบน/ล่างของแถบเมนู ก็จะทำงานทันที 100% ไม่มี Dead Zone
+  - **3. การทดสอบและการรับรองคุณภาพ**:
     - `flutter analyze --no-fatal-infos`: **0 errors, 0 warnings**
     - `flutter test`: ผ่านทั้งหมด **190/190 tests passed** (100%)
     - `flutter build web`: คอมไพล์และอัปเดตไฟล์ใน `docs/` เรียบร้อย

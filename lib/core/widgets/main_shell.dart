@@ -439,81 +439,86 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
             child: SafeArea(
               top: false,
               bottom: false,
-              child: Padding(
-                padding: EdgeInsets.only(bottom: safeBottom),
-                child: SizedBox(
-                  height: 66,
-                  child: Row(
-                    children: [
-                      _buildNavItem(
-                        context,
-                        icon: Icons.home_outlined,
-                        selectedIcon: Icons.home_rounded,
-                        label: l10n?.home ?? 'Home',
-                        isSelected: _currentIndex == 0,
-                        onTap: () => _onTabSelected(0),
-                      ),
-                      _buildNavItem(
-                        context,
-                        icon: Icons.account_balance_wallet_outlined,
-                        selectedIcon: Icons.account_balance_wallet_rounded,
-                        label: l10n?.money ?? 'Money',
-                        isSelected: _currentIndex == 1,
-                        onTap: () => _onTabSelected(1),
-                      ),
-                      Expanded(
-                        child: Center(
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: () async {
-                              await Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const QuickAddScreen(initialType: 'expense'),
+              child: SizedBox(
+                height: 64 + safeBottom,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildNavItem(
+                      context,
+                      icon: Icons.home_outlined,
+                      selectedIcon: Icons.home_rounded,
+                      label: l10n?.home ?? 'Home',
+                      isSelected: _currentIndex == 0,
+                      onTap: () => _onTabSelected(0),
+                      safeBottom: safeBottom,
+                    ),
+                    _buildNavItem(
+                      context,
+                      icon: Icons.account_balance_wallet_outlined,
+                      selectedIcon: Icons.account_balance_wallet_rounded,
+                      label: l10n?.money ?? 'Money',
+                      isSelected: _currentIndex == 1,
+                      onTap: () => _onTabSelected(1),
+                      safeBottom: safeBottom,
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const QuickAddScreen(initialType: 'expense'),
+                            ),
+                          );
+                          if (mounted) setState(() {});
+                        },
+                        child: Container(
+                          color: Colors.transparent,
+                          padding: EdgeInsets.only(bottom: safeBottom),
+                          alignment: Alignment.center,
+                          child: Container(
+                            width: 50,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: isLumi ? const Color(0xFFFF5B9A) : accentCol,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: (isLumi ? const Color(0xFFFF5B9A) : accentCol).withValues(alpha: 0.35),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
                                 ),
-                              );
-                              if (mounted) setState(() {});
-                            },
-                            child: Container(
-                              width: 50,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                color: isLumi ? const Color(0xFFFF5B9A) : accentCol,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: (isLumi ? const Color(0xFFFF5B9A) : accentCol).withValues(alpha: 0.35),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.add,
-                                color: Colors.white,
-                                size: 28,
-                              ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.add,
+                              color: Colors.white,
+                              size: 28,
                             ),
                           ),
                         ),
                       ),
-                      _buildNavItem(
-                        context,
-                        icon: Icons.show_chart_rounded,
-                        selectedIcon: Icons.show_chart_rounded,
-                        label: l10n?.invest ?? 'Invest',
-                        isSelected: _currentIndex == 2,
-                        onTap: () => _onTabSelected(2),
-                      ),
-                      _buildNavItem(
-                        context,
-                        icon: Icons.more_horiz_rounded,
-                        selectedIcon: Icons.more_horiz_rounded,
-                        label: l10n?.more ?? 'More',
-                        isSelected: _currentIndex == 3,
-                        onTap: () => _onTabSelected(3),
-                      ),
-                    ],
-                  ),
+                    ),
+                    _buildNavItem(
+                      context,
+                      icon: Icons.show_chart_rounded,
+                      selectedIcon: Icons.show_chart_rounded,
+                      label: l10n?.invest ?? 'Invest',
+                      isSelected: _currentIndex == 2,
+                      onTap: () => _onTabSelected(2),
+                      safeBottom: safeBottom,
+                    ),
+                    _buildNavItem(
+                      context,
+                      icon: Icons.more_horiz_rounded,
+                      selectedIcon: Icons.more_horiz_rounded,
+                      label: l10n?.more ?? 'More',
+                      isSelected: _currentIndex == 3,
+                      onTap: () => _onTabSelected(3),
+                      safeBottom: safeBottom,
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -555,6 +560,7 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
     required String label,
     required bool isSelected,
     required VoidCallback onTap,
+    required double safeBottom,
   }) {
     final accentCol = VaultTheme.accent(context);
     final isLumi = VaultTheme.isLumi(context);
@@ -565,8 +571,10 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: SizedBox(
-          height: double.infinity,
+        child: Container(
+          color: Colors.transparent,
+          padding: EdgeInsets.only(bottom: safeBottom),
+          alignment: Alignment.center,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [

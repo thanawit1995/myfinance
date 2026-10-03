@@ -287,7 +287,8 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
                 // Group transactions by date
                 final grouped = <DateTime, List<Transaction>>{};
                 for (final tx in transactions) {
-                  final d = DateTime(tx.transactionDate.year, tx.transactionDate.month, tx.transactionDate.day);
+                  final localDate = tx.transactionDate.toLocal();
+                  final d = DateTime(localDate.year, localDate.month, localDate.day);
                   grouped.putIfAbsent(d, () => []).add(tx);
                 }
                 final sortedDates = grouped.keys.toList()..sort((a, b) => b.compareTo(a));

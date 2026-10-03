@@ -62,11 +62,11 @@ Future<SqliteBackupData> readSqliteBackupData(Uint8List sqliteBytes) async {
     final maxDateRow = db.select('SELECT max(transaction_date) as m_date FROM transactions WHERE deleted_at IS NULL');
     final mVal = maxDateRow.first['m_date'];
     if (mVal is String && mVal.isNotEmpty) {
-      latestDate = DateTime.tryParse(mVal);
+      latestDate = DateTime.tryParse(mVal)?.toLocal();
     } else if (mVal is int) {
-      latestDate = mVal > 100000000000
-          ? DateTime.fromMillisecondsSinceEpoch(mVal)
-          : DateTime.fromMillisecondsSinceEpoch(mVal * 1000);
+      latestDate = (mVal > 100000000000
+          ? DateTime.fromMillisecondsSinceEpoch(mVal, isUtc: true)
+          : DateTime.fromMillisecondsSinceEpoch(mVal * 1000, isUtc: true)).toLocal();
     }
   } catch (_) {}
 

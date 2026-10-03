@@ -323,7 +323,7 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
                                     style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
                                   ),
                                   subtitle: Text(
-                                    DateFormat('d MMM yyyy, HH:mm').format(tx.transactionDate),
+                                    DateFormat('d MMM yyyy, HH:mm').format(tx.transactionDate.toLocal()),
                                     style: const TextStyle(fontSize: 11.5),
                                   ),
                                   trailing: Row(

@@ -736,6 +736,19 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     final dateFormat = DateFormat('dd MMM yyyy, HH:mm', isThai ? 'th' : 'en_US');
     final sizeKb = (info.sizeBytes / 1024).toStringAsFixed(1);
 
+    DateTime? fileBackupDate;
+    final fileMatch = RegExp(r'(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})').firstMatch(info.fileName);
+    if (fileMatch != null) {
+      try {
+        final year = int.parse(fileMatch.group(1)!);
+        final month = int.parse(fileMatch.group(2)!);
+        final day = int.parse(fileMatch.group(3)!);
+        final hour = int.parse(fileMatch.group(4)!);
+        final minute = int.parse(fileMatch.group(5)!);
+        fileBackupDate = DateTime(year, month, day, hour, minute);
+      } catch (_) {}
+    }
+
     return showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -775,6 +788,14 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                       info.fileName,
                       subtitle: '$sizeKb KB',
                     ),
+                    if (fileBackupDate != null) ...[
+                      const Divider(height: 16),
+                      _buildPreviewRow(
+                        Icons.access_time_rounded,
+                        isThai ? 'เวลาที่สร้างไฟล์สำรอง' : 'Backup Created At',
+                        dateFormat.format(fileBackupDate),
+                      ),
+                    ],
                     const Divider(height: 16),
                     _buildPreviewRow(
                       Icons.account_balance_outlined,
@@ -849,10 +870,13 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                     const Divider(height: 16),
                     _buildPreviewRow(
                       Icons.event_available_outlined,
-                      isThai ? 'บันทึกล่าสุด' : 'Latest Entry',
+                      isThai ? 'รายการธุรกรรมล่าสุดในไฟล์' : 'Latest Transaction in File',
                       info.latestTransactionDate != null
-                          ? dateFormat.format(info.latestTransactionDate!)
+                          ? dateFormat.format(info.latestTransactionDate!.toLocal())
                           : (isThai ? 'ไม่พบวันที่' : 'None'),
+                      subtitle: isThai
+                          ? 'ข้อมูลธุรกรรมล่าสุดที่บันทึกไว้ในฐานข้อมูล'
+                          : 'Most recent transaction entry recorded in file',
                     ),
                   ],
                 ),

@@ -16,6 +16,7 @@ import '../../categories/presentation/category_picker_sheet.dart';
 import '../../insurance/presentation/insurance_policy_form_dialog.dart';
 import '../../recurring/domain/recurring_engine.dart';
 import '../../import/domain/csv_import_parser.dart';
+import 'package:intl/intl.dart';
 
 class QuickAddScreen extends ConsumerStatefulWidget {
   final String? initialType;
@@ -728,7 +729,11 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
                 },
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
+
+            // Date Selector Bar
+            _buildDateSelectorRow(theme, isThai),
+            const SizedBox(height: 10),
 
             // 2. Big Amount Display (Interactive Modern Native Numeric Input)
             Container(
@@ -913,6 +918,102 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
             const SizedBox(height: 12),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildDateSelectorRow(ThemeData theme, bool isThai) {
+    final now = DateTime.now();
+    final isToday = _transactionDate.year == now.year &&
+        _transactionDate.month == now.month &&
+        _transactionDate.day == now.day;
+    final y = now.subtract(const Duration(days: 1));
+    final isYesterday = _transactionDate.year == y.year &&
+        _transactionDate.month == y.month &&
+        _transactionDate.day == y.day;
+    final isOther = !isToday && !isYesterday;
+
+    final dateFormatted = DateFormat('d MMM yyyy', isThai ? 'th' : 'en_US').format(_transactionDate);
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          Icon(Icons.calendar_today_outlined, size: 16, color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(width: 8),
+          ChoiceChip(
+            label: Text(
+              isThai ? 'วันนี้' : 'Today',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+            selected: isToday,
+            onSelected: (val) {
+              if (val) {
+                final cur = DateTime.now();
+                setState(() {
+                  _transactionDate = DateTime(cur.year, cur.month, cur.day, _transactionDate.hour, _transactionDate.minute);
+                });
+              }
+            },
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+          ),
+          const SizedBox(width: 6),
+          ChoiceChip(
+            label: Text(
+              isThai ? 'เมื่อวาน' : 'Yesterday',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isYesterday ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+            selected: isYesterday,
+            onSelected: (val) {
+              if (val) {
+                final prev = DateTime.now().subtract(const Duration(days: 1));
+                setState(() {
+                  _transactionDate = DateTime(prev.year, prev.month, prev.day, _transactionDate.hour, _transactionDate.minute);
+                });
+              }
+            },
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+          ),
+          const SizedBox(width: 6),
+          ActionChip(
+            avatar: Icon(
+              Icons.edit_calendar_outlined,
+              size: 15,
+              color: isOther ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+            ),
+            label: Text(
+              isOther ? dateFormatted : (isThai ? 'ระบุวันที่' : 'Custom Date'),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isOther ? FontWeight.bold : FontWeight.normal,
+                color: isOther ? theme.colorScheme.primary : null,
+              ),
+            ),
+            onPressed: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _transactionDate,
+                firstDate: DateTime(2000),
+                lastDate: DateTime(2100),
+              );
+              if (picked != null) {
+                setState(() {
+                  _transactionDate = DateTime(picked.year, picked.month, picked.day, _transactionDate.hour, _transactionDate.minute);
+                });
+              }
+            },
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+          ),
+        ],
       ),
     );
   }

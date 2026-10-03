@@ -317,7 +317,7 @@ class CsvImportParser {
 
     // Try standard ISO
     try {
-      return DateTime.parse(s);
+      return DateTime.parse(s).toLocal();
     } catch (_) {}
 
     // Pattern 1: "Month Day, Year" or "Month Day Year" (e.g. "January 6, 2026", "December 29, 2024", "Jan 6, 2026")

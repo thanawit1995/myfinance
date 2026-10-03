@@ -283,7 +283,6 @@ class AccountsDao extends DatabaseAccessor<AppDatabase> with _$AccountsDaoMixin 
           }
         }
       }
-    }
 
     return balance;
   }

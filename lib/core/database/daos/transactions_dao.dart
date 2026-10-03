@@ -647,8 +647,8 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
       final tagStr = tx.tag ?? '';
 
       final String sig;
-      if (tagStr.isNotEmpty && (tagStr.startsWith('investment_') || tagStr == 'historical_settle')) {
-        // Investment trades and settlement records include currency, original satang, and tag in signature
+      if (tagStr.isNotEmpty && tagStr.startsWith('investment_')) {
+        // Investment trades include currency, original satang, and tag in signature
         sig = '$dateKey|${tx.amountOriginalSatang}|${tx.amountThbSatang}|${tx.currencyCode}|${tx.transactionType}|$tagStr|${tx.sourceAccountId ?? ""}|$cleanNote';
       } else if (cleanNote.isNotEmpty) {
         sig = '$dateKey|${tx.amountThbSatang}|${tx.transactionType}|$cleanNote';

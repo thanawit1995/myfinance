@@ -1,3 +1,4 @@
+import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -57,7 +58,7 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
       body: Column(
         children: [
           // Balance Card
-          FutureBuilder(
+          FutureBuilder<({int nativeBalanceSatang, int thbEquivalentSatang, Decimal fxRate})>(
             future: accDao.getAccountBalanceBreakdown(widget.account.id),
             builder: (context, snapshot) {
               final data = snapshot.data;

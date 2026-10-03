@@ -19,7 +19,6 @@ import '../../reports/presentation/reports_screen.dart';
 import '../../backup/presentation/backup_restore_screen.dart';
 import '../../import/presentation/import_wizard_screen.dart';
 import '../../import/presentation/import_history_screen.dart';
-import '../../accounts/presentation/credit_card_summary_screen.dart' show transactionsVersionProvider;
 import '../../../../core/database/database_provider.dart';
 import 'trash_bin_screen.dart';
 

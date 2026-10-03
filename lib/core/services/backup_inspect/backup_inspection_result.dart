@@ -10,6 +10,8 @@ class BackupInspectionResult {
   final int totalAssets;
   final int totalInsurance;
   final int totalLiabilities;
+  final int totalProjects;
+  final int totalRecurringRules;
   final int sizeBytes;
   final String fileName;
   final bool isEncrypted;
@@ -27,6 +29,8 @@ class BackupInspectionResult {
     this.totalAssets = 0,
     this.totalInsurance = 0,
     this.totalLiabilities = 0,
+    this.totalProjects = 0,
+    this.totalRecurringRules = 0,
     this.sizeBytes = 0,
     required this.fileName,
     this.isEncrypted = false,

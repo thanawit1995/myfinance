@@ -10,6 +10,12 @@ class SqliteBackupData {
   final List<Map<String, dynamic>> liabilities;
   final List<Map<String, dynamic>> budgets;
   final List<Map<String, dynamic>> recurringRules;
+  final List<Map<String, dynamic>> projects;
+  final List<Map<String, dynamic>> creditCardInstallments;
+  final List<Map<String, dynamic>> investmentLots;
+  final List<Map<String, dynamic>> investmentSales;
+  final List<Map<String, dynamic>> investmentIncomes;
+  final List<Map<String, dynamic>> taxDeductions;
   final Map<String, List<Map<String, dynamic>>> allTables;
 
   const SqliteBackupData({
@@ -24,6 +30,12 @@ class SqliteBackupData {
     this.liabilities = const [],
     this.budgets = const [],
     this.recurringRules = const [],
+    this.projects = const [],
+    this.creditCardInstallments = const [],
+    this.investmentLots = const [],
+    this.investmentSales = const [],
+    this.investmentIncomes = const [],
+    this.taxDeductions = const [],
     this.allTables = const {},
   });
 }

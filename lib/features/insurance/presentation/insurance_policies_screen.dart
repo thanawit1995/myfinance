@@ -147,39 +147,82 @@ class _InsurancePoliciesScreenState extends ConsumerState<InsurancePoliciesScree
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              // 1. Overview summary cards
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildSummaryCard(
-                      context,
-                      title: 'เบี้ยต่อปีรวม',
-                      valueText: Money(totalAnnualPremiumSatang).format(symbol: '฿'),
-                      icon: Icons.payments_outlined,
-                      color: Colors.blue,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildSummaryCard(
-                      context,
-                      title: 'เงินสะสมในประกัน',
-                      valueText: Money(totalSavingsAccumulatedSatang).format(symbol: '฿'),
-                      icon: Icons.savings_outlined,
-                      color: Colors.green,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildSummaryCard(
-                      context,
-                      title: 'ทุนประกันรวม',
-                      valueText: Money(totalSumInsuredSatang).format(symbol: '฿'),
-                      icon: Icons.security_outlined,
-                      color: Colors.purple,
-                    ),
-                  ),
-                ],
+              // 1. Overview summary cards (Responsive: 2 rows on mobile, 3 columns on wide screen)
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isNarrow = constraints.maxWidth < 460;
+                  if (isNarrow) {
+                    return Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildSummaryCard(
+                                context,
+                                title: 'เบี้ยต่อปีรวม',
+                                valueText: Money(totalAnnualPremiumSatang).format(symbol: '฿'),
+                                icon: Icons.payments_outlined,
+                                color: Colors.blue,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _buildSummaryCard(
+                                context,
+                                title: 'เงินสะสมในประกัน',
+                                valueText: Money(totalSavingsAccumulatedSatang).format(symbol: '฿'),
+                                icon: Icons.savings_outlined,
+                                color: Colors.green,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        _buildSummaryCard(
+                          context,
+                          title: 'ทุนประกันรวมทั้งหมด',
+                          valueText: Money(totalSumInsuredSatang).format(symbol: '฿'),
+                          icon: Icons.security_outlined,
+                          color: Colors.purple,
+                          isFullWidth: true,
+                        ),
+                      ],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: _buildSummaryCard(
+                          context,
+                          title: 'เบี้ยต่อปีรวม',
+                          valueText: Money(totalAnnualPremiumSatang).format(symbol: '฿'),
+                          icon: Icons.payments_outlined,
+                          color: Colors.blue,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildSummaryCard(
+                          context,
+                          title: 'เงินสะสมในประกัน',
+                          valueText: Money(totalSavingsAccumulatedSatang).format(symbol: '฿'),
+                          icon: Icons.savings_outlined,
+                          color: Colors.green,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildSummaryCard(
+                          context,
+                          title: 'ทุนประกันรวม',
+                          valueText: Money(totalSumInsuredSatang).format(symbol: '฿'),
+                          icon: Icons.security_outlined,
+                          color: Colors.purple,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 16),
 
@@ -251,42 +294,94 @@ class _InsurancePoliciesScreenState extends ConsumerState<InsurancePoliciesScree
     required String valueText,
     required IconData icon,
     required Color color,
+    bool isFullWidth = false,
   }) {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       color: VaultTheme.surface(context),
       elevation: 0,
       child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, size: 18, color: color),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: isFullWidth
+            ? Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, size: 20, color: color),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              valueText,
-              style: TextStyle(
-                fontFamily: VaultTheme.fontFamily,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: VaultTheme.primaryText(context),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        FittedBox(
+                          alignment: Alignment.centerLeft,
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            valueText,
+                            style: TextStyle(
+                              fontFamily: VaultTheme.fontFamily,
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                              color: VaultTheme.primaryText(context),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(icon, size: 18, color: color),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  FittedBox(
+                    alignment: Alignment.centerLeft,
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      valueText,
+                      style: TextStyle(
+                        fontFamily: VaultTheme.fontFamily,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: VaultTheme.primaryText(context),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
       ),
     );
   }

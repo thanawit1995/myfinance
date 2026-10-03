@@ -10,7 +10,6 @@ import '../../../core/services/web_db_helper/web_db_helper.dart';
 import '../../../core/sync/auth_service.dart';
 import '../../../core/sync/sync_service.dart';
 import '../../../core/theme/vault_theme.dart';
-import '../../auth/login_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class BackupRestoreScreen extends ConsumerStatefulWidget {
@@ -829,6 +828,22 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                         Icons.credit_card_off_outlined,
                         isThai ? 'หนี้สิน' : 'Liabilities',
                         '${info.totalLiabilities} ${isThai ? "รายการ" : "items"}',
+                      ),
+                    ],
+                    if (info.totalRecurringRules > 0) ...[
+                      const Divider(height: 16),
+                      _buildPreviewRow(
+                        Icons.repeat_rounded,
+                        isThai ? 'รายการทำซ้ำ (Recurring)' : 'Recurring Rules',
+                        '${info.totalRecurringRules} ${isThai ? "รายการ" : "rules"}',
+                      ),
+                    ],
+                    if (info.totalProjects > 0) ...[
+                      const Divider(height: 16),
+                      _buildPreviewRow(
+                        Icons.folder_special_outlined,
+                        isThai ? 'โครงการพิเศษ' : 'Projects',
+                        '${info.totalProjects} ${isThai ? "โครงการ" : "projects"}',
                       ),
                     ],
                     const Divider(height: 16),
@@ -1804,9 +1819,11 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                       children: [
                         const Icon(Icons.security_update_warning_rounded, color: Colors.amber, size: 18),
                         const SizedBox(width: 8),
-                        Text(
-                          isThai ? 'ต้องการให้เครื่องนี้เป็น Master เขียนทับคลาวด์?' : 'Set This Device as Master?',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        Expanded(
+                          child: Text(
+                            isThai ? 'ต้องการให้เครื่องนี้เป็น Master เขียนทับคลาวด์?' : 'Set This Device as Master?',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
                         ),
                       ],
                     ),
@@ -1830,9 +1847,12 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                             ? null
                             : _handleForcePushFromScreen,
                         icon: const Icon(Icons.upload_rounded, size: 20),
-                        label: Text(
-                          isThai ? 'เขียนทับข้อมูลบนคลาวด์ด้วยเครื่องนี้ 100% (Force Push)' : 'Force Push Local to Cloud',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        label: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            isThai ? 'เขียนทับข้อมูลบนคลาวด์ด้วยเครื่องนี้ 100% (Force Push)' : 'Force Push Local to Cloud',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
                         ),
                       ),
                     ),

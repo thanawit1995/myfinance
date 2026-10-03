@@ -188,7 +188,13 @@ class BackupRestoreService {
   Future<String?> exportAndShareBackup({bool isThai = true, String? customPassword}) async {
     final nowStr = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
     final exportFileName = 'myfinance_backup_$nowStr.db';
-    final hasPassword = customPassword != null && customPassword.trim().isNotEmpty;
+    final trimmedPassword = customPassword != null && customPassword.trim().isNotEmpty ? customPassword.trim() : null;
+    final hasPassword = trimmedPassword != null;
+
+    // Flush WAL to make sure database is fully checkpointed to the main file (both Web and Native)
+    try {
+      await db.customStatement('PRAGMA wal_checkpoint(TRUNCATE);');
+    } catch (_) {}
 
     if (kIsWeb) {
       final bytes = await exportWebDatabase();
@@ -197,8 +203,8 @@ class BackupRestoreService {
       }
 
       // เข้ารหัสเฉพาะเมื่อผู้ใช้ตั้งรหัสผ่านเอง หากไม่ตั้งรหัสให้ส่งออกเป็น SQLite แท้
-      final bytesToExport = hasPassword
-          ? BackupCryptoHelper.encryptDatabase(bytes, customPassword!.trim())
+      final bytesToExport = trimmedPassword != null
+          ? BackupCryptoHelper.encryptDatabase(bytes, trimmedPassword)
           : bytes;
 
       final shareFileName = hasPassword ? 'myfinance_backup_$nowStr.txt' : exportFileName;
@@ -220,19 +226,14 @@ class BackupRestoreService {
       }
     }
 
-    // Flush WAL to make sure database is fully checkpointed to the main file
-    try {
-      await db.customStatement('PRAGMA wal_checkpoint(TRUNCATE);');
-    } catch (_) {}
-
     final localDb = await getLocalDatabaseFile();
     if (localDb == null || !await localDb.exists()) {
       throw Exception(isThai ? 'ไม่พบไฟล์ฐานข้อมูลในเครื่อง' : 'Local database file not found');
     }
 
     final rawBytes = await localDb.readAsBytes();
-    final bytesToExport = hasPassword
-        ? BackupCryptoHelper.encryptDatabase(rawBytes, customPassword!.trim())
+    final bytesToExport = trimmedPassword != null
+        ? BackupCryptoHelper.encryptDatabase(rawBytes, trimmedPassword)
         : rawBytes;
 
     if (Platform.isWindows) {
@@ -275,15 +276,20 @@ class BackupRestoreService {
   Future<String?> downloadBackupDirectly({bool isThai = true, String? customPassword}) async {
     final nowStr = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
     final exportFileName = 'myfinance_backup_$nowStr.db';
-    final hasPassword = customPassword != null && customPassword.trim().isNotEmpty;
+    final trimmedPassword = customPassword != null && customPassword.trim().isNotEmpty ? customPassword.trim() : null;
+
+    // Flush WAL to make sure database is fully checkpointed to the main file (both Web and Native)
+    try {
+      await db.customStatement('PRAGMA wal_checkpoint(TRUNCATE);');
+    } catch (_) {}
 
     if (kIsWeb) {
       final bytes = await exportWebDatabase();
       if (bytes == null || bytes.isEmpty) {
         throw Exception(isThai ? 'ไม่พบข้อมูลในเบราว์เซอร์' : 'No database in browser storage');
       }
-      final bytesToExport = hasPassword
-          ? BackupCryptoHelper.encryptDatabase(bytes, customPassword!.trim())
+      final bytesToExport = trimmedPassword != null
+          ? BackupCryptoHelper.encryptDatabase(bytes, trimmedPassword)
           : bytes;
       downloadFileWeb(bytesToExport, exportFileName);
       return exportFileName;
@@ -391,8 +397,12 @@ class BackupRestoreService {
 
       await db.transaction(() async {
         if (data.allTables.isNotEmpty) {
+          final skipTables = {'sqlite_sequence', 'android_metadata'};
           for (final entry in data.allTables.entries) {
             final table = entry.key;
+            if (skipTables.contains(table) || table.startsWith('sqlite_') || table.startsWith('_drift_')) {
+              continue;
+            }
             final rows = entry.value;
             if (rows.isNotEmpty) {
               await db.customStatement('DELETE FROM "$table";');
@@ -431,6 +441,30 @@ class BackupRestoreService {
           if (data.recurringRules.isNotEmpty) {
             await db.customStatement('DELETE FROM recurring_rules;');
             await insertTableRows('recurring_rules', data.recurringRules);
+          }
+          if (data.projects.isNotEmpty) {
+            await db.customStatement('DELETE FROM projects;');
+            await insertTableRows('projects', data.projects);
+          }
+          if (data.creditCardInstallments.isNotEmpty) {
+            await db.customStatement('DELETE FROM credit_card_installments;');
+            await insertTableRows('credit_card_installments', data.creditCardInstallments);
+          }
+          if (data.investmentLots.isNotEmpty) {
+            await db.customStatement('DELETE FROM investment_lots;');
+            await insertTableRows('investment_lots', data.investmentLots);
+          }
+          if (data.investmentSales.isNotEmpty) {
+            await db.customStatement('DELETE FROM investment_sales;');
+            await insertTableRows('investment_sales', data.investmentSales);
+          }
+          if (data.investmentIncomes.isNotEmpty) {
+            await db.customStatement('DELETE FROM investment_incomes;');
+            await insertTableRows('investment_incomes', data.investmentIncomes);
+          }
+          if (data.taxDeductions.isNotEmpty) {
+            await db.customStatement('DELETE FROM tax_deductions;');
+            await insertTableRows('tax_deductions', data.taxDeductions);
           }
         }
       });

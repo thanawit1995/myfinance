@@ -1,6 +1,36 @@
 # บันทึกความคืบหน้าโครงการ MyFinance (PROGRESS.md)
 
-อัปเดตล่าสุด: 2 ตุลาคม 2026
+อัปเดตล่าสุด: 3 ตุลาคม 2026
+
+- [x] **Complete SQLite .db 25-Table Integrity, Historical CC Debt Removal, Quick Startup Sync, UI Redesign & Recurring Notification Center (3 ต.ค. 2026)**:
+  - **1. ปรับปรุงระบบสำรอง/กู้คืนไฟล์ SQLite .db ให้สมบูรณ์ 25 ตาราง**:
+    - แก้ปัญหา WAL checkpoint บน Web SQLite Wasm ด้วยคำสั่ง `PRAGMA wal_checkpoint(TRUNCATE);` ก่อนส่งออกไฟล์ .db ทำให้ข้อมูลล่าสุดที่ค้างใน memory/WAL ถูกเขียนลงไฟล์ .db จริง 100%
+    - ปรับปรุงตัวอ่านและฉีดข้อมูล Drift Table Injection (`sqlite_reader_native`, `sqlite_reader_web`, `backup_restore_service`) ให้อ่านและกู้คืนข้อมูลครบทั้ง 25 ตาราง รวมถึง `budgets`, `categories` (พร้อมลำดับ `sort_order` ทั้งหมด), `recurring_rules`, `projects`, `liabilities`, `credit_card_installments`, `investment_lots`, `investment_sales`, `investment_incomes`, `tax_deductions`
+    - กรองตารางระบบ SQLite (`sqlite_sequence`, `sqlite_stat*`) ออก ไม่ให้เกิดข้อผิดพลาดในการกู้คืน
+    - อัปเดตหน้าพรีวิวไฟล์สำรอง (`BackupInspectionResult`) ให้แสดงจำนวนกฎรายการประจำ (Recurring Rules) และโครงการพิเศษ (Projects)
+  - **2. ลบระบบชำระหนี้ประวัติศาสตร์ของบัตรเครดิตออกอย่างถาวร (Eliminate Historical CC Settle)**:
+    - ตัดฟังก์ชัน `settleHistoricalDebt`, `getHistoricalDebtSatang`, `cleanupDuplicateHistoricalSettlements` ออกจาก `CreditCardDao`
+    - ตัดแบนเนอร์และปุ่มตัดยอดประวัติศาสตร์ออกจาก `CreditCardSummaryScreen`
+    - ตัดการเรียก auto-settle ออกจากตัวนำเข้า Notion (`import_executor.dart`)
+    - สร้าง `purgeHistoricalSettlements()` กวาดล้างธุรกรรมประดิษฐ์ `tag = 'historical_settle'` และบันทึกลงในรอบการซิงค์ เพื่อแก้ปัญหาข้อมูลชนกันระหว่าง PC กับมือถือได้อย่างหมดจด
+  - **3. เร่งความเร็วการซิงค์ตอนเปิดแอป (Quick Startup Sync) & แก้การ์ด Master Device ล้นจอ**:
+    - สร้าง `quickStartupSync()` ซิงค์เฉพาะ delta data ที่อัปเดตล่าสุดตอนเปิดแอปหรือกลับมาต่อเน็ต โดยไม่รันลูป deduplication หนัก ทำให้เปิดแอปได้เร็วทันใจ
+    - สงวน `syncAll()` แบบ Full Sync พร้อมกวาดล้างข้อมูลซ้ำไว้สำหรับการกดด้วยตนเองของผู้ใช้
+    - ซิงค์ตาราง `projects` และ `credit_card_installments` ขึ้น Supabase พร้อมอัปเดต `supabase_schema.sql` และ RLS policies
+    - ซิงค์ `sort_order` ของหมวดหมู่ทั้งหมดทั้งหมวดหมู่ระบบและหมวดหมู่ที่ผู้ใช้สร้างเอง ทำให้ลำดับหมวดหมู่ตรงกันทุกอุปกรณ์
+    - แก้ไข UI การ์ด Master Device สีส้มในหน้าสำรองข้อมูล (`backup_restore_screen.dart`) ด้วย `Expanded` และ `FittedBox` ไม่ให้ข้อความหลุดล้นกรอบ
+  - **4. ปรับปรุง UI กรมธรรม์ประกัน & การ์ดสถานะทางการเงินหน้าแรก**:
+    - ปรับปรุงการ์ดภาพรวมประกัน (`insurance_policies_screen.dart`): ออกแบบด้วย `LayoutBuilder` รองรับหน้าจอมือถือ (แยก 2 แถว จัดเบี้ยประกันและเงินสะสมอยู่แถวบน ทุนประกันรวมอยู่แถวล่างเต็มความกว้าง) พร้อม `FittedBox` ป้องกันปัญหาตัวเลขตัดบรรทัด `00.00`
+    - ปรับปรุงการ์ดความมั่งคั่งสุทธิหน้าแรก (`vault_home_screen.dart`): เพิ่ม `Expanded` + `FittedBox(fit: BoxFit.scaleDown)` ป้องกันตัวเลขเงินสดและพอร์ตการลงทุนล้นกรอบการ์ด
+    - เพิ่มแถบเข้าถึงด่วนใน 1 คลิก สำหรับ **"เงินค้างรับ / ตกเบิก"** พาไปยังหน้า `AccruedIncomeScreen` ได้ทันที
+  - **5. ระบบแจ้งเตือนรายการธุรกรรมประจำอัตโนมัติ (Recurring Notification Center)**:
+    - เพิ่มไอคอนกระดิ่งแจ้งเตือนพร้อมจุด Badge สีแดงที่ Header หน้า Home (`vault_home_screen.dart`)
+    - กดกระดิ่งเพื่อเปิด Bottom Sheet ดูประวัติรายการธุรกรรมประจำที่ระบบบันทึกให้อัตโนมัติ พร้อมปุ่ม "รับทราบแล้ว"
+    - แสดงข้อความ SnackBar แจ้งเตือนทันทีเมื่อเปิดแอปแล้วพบว่าระบบได้บันทึกรายการประจำใหม่
+  - **6. การทดสอบและการรับรองคุณภาพ**:
+    - สร้าง Unit Test ครอบคลุม: `test/core/backup_restore_integrity_test.dart`
+    - `flutter test`: ผ่านทั้งหมด **181/181 tests passed** (100%)
+    - `dart analyze lib test`: **0 errors, 0 warnings**
 
 - [x] **Credit Card Auto-Settle Idempotency & Dime! USD Investment Reconciliation (2 ต.ค. 2026)**:
   - **1. แก้ไขปัญหาระบบตัดยอดบัตรเครดิตรอบก่อน 24/8/69 ทำงานซ้ำๆ**:

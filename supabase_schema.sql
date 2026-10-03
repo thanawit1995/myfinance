@@ -171,6 +171,40 @@ CREATE TABLE IF NOT EXISTS public.recurring_rules (
   deleted_at              TIMESTAMPTZ
 );
 
+-- Projects
+CREATE TABLE IF NOT EXISTS public.projects (
+  id                    TEXT PRIMARY KEY,
+  user_id               UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name                  TEXT NOT NULL,
+  description           TEXT,
+  target_budget_satang  BIGINT NOT NULL DEFAULT 0,
+  start_date            TIMESTAMPTZ NOT NULL,
+  end_date              TIMESTAMPTZ NOT NULL,
+  icon                  TEXT,
+  color                 TEXT,
+  is_active             BOOLEAN NOT NULL DEFAULT TRUE,
+  sync_version          INTEGER NOT NULL DEFAULT 1,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_at            TIMESTAMPTZ
+);
+
+-- Credit Card Installments
+CREATE TABLE IF NOT EXISTS public.credit_card_installments (
+  id                      TEXT PRIMARY KEY,
+  user_id                 UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  transaction_id          TEXT NOT NULL,
+  account_id              TEXT NOT NULL,
+  total_amount_satang     BIGINT NOT NULL DEFAULT 0,
+  monthly_amount_satang   BIGINT NOT NULL DEFAULT 0,
+  total_tenor_months      INTEGER NOT NULL DEFAULT 1,
+  remaining_tenor_months  INTEGER NOT NULL DEFAULT 1,
+  start_date              TIMESTAMPTZ NOT NULL,
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_at              TIMESTAMPTZ
+);
+
 -- Device State & Conflict Tracking
 CREATE TABLE IF NOT EXISTS public.sync_device_state (
   user_id             UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -192,6 +226,8 @@ CREATE INDEX IF NOT EXISTS idx_ast_user_updated  ON public.assets(user_id, updat
 CREATE INDEX IF NOT EXISTS idx_ins_user_updated  ON public.insurance_policies(user_id, updated_at);
 CREATE INDEX IF NOT EXISTS idx_lia_user_updated  ON public.liabilities(user_id, updated_at);
 CREATE INDEX IF NOT EXISTS idx_rec_user_updated  ON public.recurring_rules(user_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_prj_user_updated  ON public.projects(user_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_cci_user_updated  ON public.credit_card_installments(user_id, updated_at);
 
 -- =============================================================================
 -- 3. ROW LEVEL SECURITY (RLS)
@@ -205,6 +241,8 @@ ALTER TABLE public.assets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.insurance_policies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.liabilities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.recurring_rules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.credit_card_installments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sync_device_state ENABLE ROW LEVEL SECURITY;
 
 -- Helper to safely re-create policies
@@ -214,7 +252,8 @@ DECLARE
 BEGIN
   FOR tbl IN SELECT unnest(ARRAY[
     'accounts', 'categories', 'transactions', 'budgets',
-    'assets', 'insurance_policies', 'liabilities', 'recurring_rules', 'sync_device_state'
+    'assets', 'insurance_policies', 'liabilities', 'recurring_rules',
+    'projects', 'credit_card_installments', 'sync_device_state'
   ]) LOOP
     EXECUTE format('DROP POLICY IF EXISTS "Users can view own %I" ON public.%I', tbl, tbl);
     EXECUTE format('DROP POLICY IF EXISTS "Users can insert own %I" ON public.%I', tbl, tbl);

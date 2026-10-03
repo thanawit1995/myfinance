@@ -286,15 +286,6 @@ class ImportExecutor {
       );
     });
 
-    // 5. Auto-settle historical credit card debt before 24 Aug 2026 for Notion expense imports
-    if (templateType == 'notion_expense' || templateType == 'notion_bills') {
-      final activeAccs = await accountsDao.getActiveAccounts();
-      for (final acc in activeAccs) {
-        if (acc.accountType == 'credit_card') {
-          await db.creditCardDao.settleHistoricalDebt(acc.id);
-        }
-      }
-    }
 
     return CsvImportBatchResult(
 

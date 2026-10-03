@@ -26,7 +26,7 @@ Future<SqliteBackupData> readSqliteBackupData(Uint8List sqliteBytes) async {
 
   List<Map<String, dynamic>> readTable(String tableName) {
     try {
-      final result = db.select('SELECT * FROM $tableName');
+      final result = db.select('SELECT * FROM "$tableName"');
       return result.map((row) {
         return <String, dynamic>{
           for (final col in result.columnNames) col: row[col],
@@ -45,6 +45,12 @@ Future<SqliteBackupData> readSqliteBackupData(Uint8List sqliteBytes) async {
   final liabilities = readTable('liabilities');
   final budgets = readTable('budgets');
   final recurring = readTable('recurring_rules');
+  final projects = readTable('projects');
+  final installments = readTable('credit_card_installments');
+  final lots = readTable('investment_lots');
+  final sales = readTable('investment_sales');
+  final invIncomes = readTable('investment_incomes');
+  final taxDeductions = readTable('tax_deductions');
 
   // Read all tables dynamically from SQLite database
   final allTables = <String, List<Map<String, dynamic>>>{};
@@ -88,6 +94,12 @@ Future<SqliteBackupData> readSqliteBackupData(Uint8List sqliteBytes) async {
     liabilities: liabilities,
     budgets: budgets,
     recurringRules: recurring,
+    projects: projects,
+    creditCardInstallments: installments,
+    investmentLots: lots,
+    investmentSales: sales,
+    investmentIncomes: invIncomes,
+    taxDeductions: taxDeductions,
     allTables: allTables,
   );
 }

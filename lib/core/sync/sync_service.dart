@@ -106,7 +106,7 @@ class SyncService extends StateNotifier<SyncState> {
         if (p.getBool(_prefForcePushNext) ?? false) {
           await forcePushLocalToCloud();
         } else {
-          syncAll(forceFullSync: true);
+          await quickStartupSync();
         }
       } else if (!online) {
         state = state.copyWith(status: SyncStatus.offline);
@@ -119,7 +119,7 @@ class SyncService extends StateNotifier<SyncState> {
         if (p.getBool(_prefForcePushNext) ?? false) {
           await forcePushLocalToCloud();
         } else {
-          syncAll(forceFullSync: true);
+          await quickStartupSync();
         }
       } else {
         state = const SyncState();
@@ -131,8 +131,56 @@ class SyncService extends StateNotifier<SyncState> {
       if (p.getBool(_prefForcePushNext) ?? false) {
         await forcePushLocalToCloud();
       } else {
-        await syncAll(forceFullSync: false);
+        await quickStartupSync();
       }
+    }
+  }
+
+  /// ซิงค์ด่วนเมื่อเปิดแอป (Quick Startup Sync)
+  /// ซิงค์เฉพาะรายการที่มีการเปลี่ยนแปลงล่าสุด (Delta) อย่างรวดเร็ว ไม่รัน Loop ตรวจจับความซ้ำซ้อนทั้งฐานข้อมูล
+  Future<void> quickStartupSync() async {
+    if (!_auth.isLoggedIn) return;
+    if (state.status == SyncStatus.syncing) return;
+
+    final userId = _auth.currentUser!.id;
+    final lastSync = state.lastSyncAt;
+
+    if (lastSync == null) {
+      await syncAll(forceFullSync: true);
+      return;
+    }
+
+    state = state.copyWith(status: SyncStatus.syncing, errorMessage: null);
+
+    try {
+      // Purge any legacy historical settle transactions locally
+      await _db.creditCardDao.purgeHistoricalSettlements();
+
+      // Delta sync for essential tables
+      await _syncAccounts(userId, lastSync);
+      await _syncCategories(userId, lastSync);
+      await _syncBudgets(userId, lastSync);
+      await _syncRecurring(userId, lastSync);
+      await _syncTransactions(userId, lastSync);
+
+      final now = DateTime.now();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_prefLastSync, now.toIso8601String());
+
+      final txCount = await (_db.selectOnly(_db.transactions)..addColumns([_db.transactions.id.count()]))
+          .map((row) => row.read(_db.transactions.id.count()))
+          .getSingle();
+
+      state = state.copyWith(
+        status: SyncStatus.idle,
+        lastSyncAt: now,
+        masterDeviceName: _getDeviceDisplayName(),
+        totalSynced: txCount ?? 0,
+      );
+      debugPrint('[Sync] Quick startup sync completed in background at $now.');
+    } catch (e) {
+      debugPrint('[Sync] Quick startup sync error: $e');
+      state = state.copyWith(status: SyncStatus.idle);
     }
   }
 
@@ -201,6 +249,12 @@ class SyncService extends StateNotifier<SyncState> {
     state = state.copyWith(status: SyncStatus.syncing, errorMessage: null);
 
     try {
+      // Purge any legacy historical settle transactions before push
+      await _db.creditCardDao.purgeHistoricalSettlements();
+      try {
+        await _supabase.from('transactions').delete().eq('user_id', userId).eq('tag', 'historical_settle');
+      } catch (_) {}
+
       // 1. Push ตารางหลักขึ้นไปก่อน (บัญชี หมวดหมู่ สินทรัพย์) แบบ Push-Only ห้ามดึงข้อมูลเก่ากลับมา
       await _syncAccounts(userId, null, pushOnly: true);
       await _syncCategories(userId, null, pushOnly: true);
@@ -223,6 +277,8 @@ class SyncService extends StateNotifier<SyncState> {
       await _syncLiabilities(userId, null, pushOnly: true);
       await _syncBudgets(userId, null, pushOnly: true);
       await _syncRecurring(userId, null, pushOnly: true);
+      await _syncProjects(userId, null, pushOnly: true);
+      await _syncCreditCardInstallments(userId, null, pushOnly: true);
 
       // 5. บันทึกสถานะว่าเครื่องนี้เป็น Master บน Supabase
       final deviceId = await _getOrCreateDeviceId();
@@ -267,6 +323,12 @@ class SyncService extends StateNotifier<SyncState> {
     state = state.copyWith(status: SyncStatus.syncing, errorMessage: null);
 
     try {
+      // Purge any legacy historical settle transactions before sync
+      await _db.creditCardDao.purgeHistoricalSettlements();
+      try {
+        await _supabase.from('transactions').delete().eq('user_id', userId).eq('tag', 'historical_settle');
+      } catch (_) {}
+
       // 0. Auto-clean duplicates before sync to ensure local is pristine
       final preDups = await _db.transactionsDao.deduplicateTransactions();
       if (preDups.isNotEmpty && _auth.isLoggedIn) {
@@ -300,7 +362,13 @@ class SyncService extends StateNotifier<SyncState> {
       // 7. Sync Recurring Rules
       await _syncRecurring(userId, lastSync);
 
-      // 8. Sync Transactions
+      // 8. Sync Projects
+      await _syncProjects(userId, lastSync);
+
+      // 9. Sync Credit Card Installments
+      await _syncCreditCardInstallments(userId, lastSync);
+
+      // 10. Sync Transactions
       await _syncTransactions(userId, lastSync);
 
       // 9. Auto-clean duplicates after pull to guarantee zero duplicate rows
@@ -413,7 +481,7 @@ class SyncService extends StateNotifier<SyncState> {
   // ─── 2. Categories ──────────────────────────────────────────────────────────
 
   Future<void> _syncCategories(String userId, DateTime? lastSync, {bool pushOnly = false}) async {
-    final q = _db.select(_db.categories)..where((c) => c.isSystem.equals(false));
+    final q = _db.select(_db.categories);
     if (lastSync != null) q.where((c) => c.updatedAt.isBiggerThanValue(lastSync));
     final localRows = await q.get();
 
@@ -441,7 +509,7 @@ class SyncService extends StateNotifier<SyncState> {
 
     if (pushOnly) return;
 
-    var query = _supabase.from('categories').select().eq('user_id', userId).eq('is_system', false);
+    var query = _supabase.from('categories').select().eq('user_id', userId);
     if (lastSync != null) query = query.gt('updated_at', lastSync.toIso8601String());
     final cloudRows = await query as List<dynamic>;
 
@@ -460,7 +528,7 @@ class SyncService extends StateNotifier<SyncState> {
               taxIncomeType: Value(row['tax_income_type'] as String?),
               icon: Value(row['icon'] as String?),
               color: Value(row['color'] as String?),
-              isSystem: const Value(false),
+              isSystem: Value(row['is_system'] as bool? ?? false),
               isActive: Value(row['is_active'] as bool? ?? true),
               sortOrder: Value(row['sort_order'] as int? ?? 0),
               syncVersion: Value((row['sync_version'] as num?)?.toInt() ?? 1),
@@ -804,7 +872,133 @@ class SyncService extends StateNotifier<SyncState> {
     }
   }
 
-  // ─── 8. Transactions ────────────────────────────────────────────────────────
+  // ─── 8. Projects ────────────────────────────────────────────────────────────
+
+  Future<void> _syncProjects(String userId, DateTime? lastSync, {bool pushOnly = false}) async {
+    try {
+      final q = _db.select(_db.projects);
+      if (lastSync != null) q.where((p) => p.updatedAt.isBiggerThanValue(lastSync));
+      final localRows = await q.get();
+
+      if (localRows.isNotEmpty) {
+        final payload = localRows.map((p) => {
+          'id': p.id,
+          'user_id': userId,
+          'name': p.name,
+          'description': p.description,
+          'target_budget_satang': p.targetBudgetSatang,
+          'start_date': p.startDate.toIso8601String(),
+          'end_date': p.endDate.toIso8601String(),
+          'icon': p.icon,
+          'color': p.color,
+          'is_active': p.isActive,
+          'sync_version': p.syncVersion,
+          'created_at': p.createdAt.toIso8601String(),
+          'updated_at': p.updatedAt.toIso8601String(),
+          'deleted_at': p.deletedAt?.toIso8601String(),
+        }).toList();
+        await _supabase.from('projects').upsert(payload, onConflict: 'id');
+      }
+
+      if (pushOnly) return;
+
+      var query = _supabase.from('projects').select().eq('user_id', userId);
+      if (lastSync != null) query = query.gt('updated_at', lastSync.toIso8601String());
+      final cloudRows = await query as List<dynamic>;
+
+      if (cloudRows.isNotEmpty) {
+        await _db.batch((batch) {
+          for (final r in cloudRows) {
+            final row = r as Map<String, dynamic>;
+            batch.insert(
+              _db.projects,
+              ProjectsCompanion(
+                id: Value(row['id'] as String),
+                name: Value(row['name'] as String),
+                description: Value(row['description'] as String?),
+                targetBudgetSatang: Value((row['target_budget_satang'] as num).toInt()),
+                startDate: Value(DateTime.parse(row['start_date'] as String)),
+                endDate: Value(DateTime.parse(row['end_date'] as String)),
+                icon: Value(row['icon'] as String?),
+                color: Value(row['color'] as String?),
+                isActive: Value(row['is_active'] as bool? ?? true),
+                syncVersion: Value((row['sync_version'] as num?)?.toInt() ?? 1),
+                createdAt: Value(DateTime.parse(row['created_at'] as String)),
+                updatedAt: Value(DateTime.parse(row['updated_at'] as String)),
+                deletedAt: Value(row['deleted_at'] != null ? DateTime.parse(row['deleted_at'] as String) : null),
+              ),
+              mode: InsertMode.insertOrReplace,
+            );
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('[Sync] _syncProjects info (cloud table may not be provisioned): $e');
+    }
+  }
+
+  // ─── 9. Credit Card Installments ────────────────────────────────────────────
+
+  Future<void> _syncCreditCardInstallments(String userId, DateTime? lastSync, {bool pushOnly = false}) async {
+    try {
+      final q = _db.select(_db.creditCardInstallments);
+      if (lastSync != null) q.where((i) => i.updatedAt.isBiggerThanValue(lastSync));
+      final localRows = await q.get();
+
+      if (localRows.isNotEmpty) {
+        final payload = localRows.map((i) => {
+          'id': i.id,
+          'user_id': userId,
+          'transaction_id': i.transactionId,
+          'account_id': i.accountId,
+          'total_amount_satang': i.totalAmountSatang,
+          'monthly_amount_satang': i.monthlyAmountSatang,
+          'total_tenor_months': i.totalTenorMonths,
+          'remaining_tenor_months': i.remainingTenorMonths,
+          'start_date': i.startDate.toIso8601String(),
+          'created_at': i.createdAt.toIso8601String(),
+          'updated_at': i.updatedAt.toIso8601String(),
+          'deleted_at': i.deletedAt?.toIso8601String(),
+        }).toList();
+        await _supabase.from('credit_card_installments').upsert(payload, onConflict: 'id');
+      }
+
+      if (pushOnly) return;
+
+      var query = _supabase.from('credit_card_installments').select().eq('user_id', userId);
+      if (lastSync != null) query = query.gt('updated_at', lastSync.toIso8601String());
+      final cloudRows = await query as List<dynamic>;
+
+      if (cloudRows.isNotEmpty) {
+        await _db.batch((batch) {
+          for (final r in cloudRows) {
+            final row = r as Map<String, dynamic>;
+            batch.insert(
+              _db.creditCardInstallments,
+              CreditCardInstallmentsCompanion(
+                id: Value(row['id'] as String),
+                transactionId: Value(row['transaction_id'] as String),
+                accountId: Value(row['account_id'] as String),
+                totalAmountSatang: Value((row['total_amount_satang'] as num).toInt()),
+                monthlyAmountSatang: Value((row['monthly_amount_satang'] as num).toInt()),
+                totalTenorMonths: Value((row['total_tenor_months'] as num).toInt()),
+                remainingTenorMonths: Value((row['remaining_tenor_months'] as num).toInt()),
+                startDate: Value(DateTime.parse(row['start_date'] as String)),
+                createdAt: Value(DateTime.parse(row['created_at'] as String)),
+                updatedAt: Value(DateTime.parse(row['updated_at'] as String)),
+                deletedAt: Value(row['deleted_at'] != null ? DateTime.parse(row['deleted_at'] as String) : null),
+              ),
+              mode: InsertMode.insertOrReplace,
+            );
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('[Sync] _syncCreditCardInstallments info (cloud table may not be provisioned): $e');
+    }
+  }
+
+  // ─── 10. Transactions ────────────────────────────────────────────────────────
 
   Future<void> _syncTransactions(String userId, DateTime? lastSync) async {
     // 1. PUSH

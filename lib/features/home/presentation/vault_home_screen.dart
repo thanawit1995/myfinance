@@ -11,7 +11,10 @@ import '../../summary/presentation/monthly_summary_screen.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../core/database/daos/insurance_dao.dart';
 import '../../insurance/presentation/insurance_policies_screen.dart';
+import '../../income_tracker/presentation/accrued_income_screen.dart';
 import '../../transactions/presentation/quick_add_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:drift/drift.dart' hide Column;
 import 'widgets/lumi/lumi_desktop_layout.dart';
 
 class VaultHomeScreen extends ConsumerWidget {
@@ -90,7 +93,7 @@ class VaultHomeScreen extends ConsumerWidget {
 
                 return LumiDesktopLayout(
                   data: bundle,
-                  headerWidget: _buildHeader(context, now),
+                  headerWidget: _buildHeader(context, ref, now, data),
                   onNavigateToBudget: onNavigateToBudget,
                   onNavigateToMoney: onNavigateToMoney,
                   onNavigateToInvest: onNavigateToInvest,
@@ -116,7 +119,7 @@ class VaultHomeScreen extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 children: [
                   // 1. Header: OURS + เดือนปัจจุบัน + ไอคอนค้นหาและตั้งค่า
-                  _buildHeader(context, now),
+                  _buildHeader(context, ref, now, data),
                   const SizedBox(height: 20),
 
                   // 2. Master Budget — Hero card เดียวของหน้า
@@ -154,7 +157,7 @@ class VaultHomeScreen extends ConsumerWidget {
   }
 
   // --- 1. Quiet Luxury Header ---
-  Widget _buildHeader(BuildContext context, DateTime now) {
+  Widget _buildHeader(BuildContext context, WidgetRef ref, DateTime now, _VaultHomeData data) {
     final l10n = AppLocalizations.of(context);
     final isThai = Localizations.localeOf(context).languageCode == 'th';
     final monthName = isThai
@@ -277,43 +280,248 @@ class VaultHomeScreen extends ConsumerWidget {
                           color: VaultTheme.primaryText(context),
                         ),
                       ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: VaultTheme.accent(context).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      'VAULT',
-                      style: TextStyle(
-                        fontFamily: VaultTheme.fontFamily,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.0,
-                        color: VaultTheme.accent(context),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: VaultTheme.accent(context).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'VAULT',
+                          style: TextStyle(
+                            fontFamily: VaultTheme.fontFamily,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.0,
+                            color: VaultTheme.accent(context),
+                          ),
+                        ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Our money, our journey. • $monthName $yearStr',
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: 12,
+                      letterSpacing: 0.3,
+                      color: VaultTheme.secondaryText(context),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 2),
-              Text(
-                'Our money, our journey. • $monthName $yearStr',
-                style: TextStyle(
-                  fontFamily: VaultTheme.fontFamily,
-                  fontSize: 12,
-                  letterSpacing: 0.3,
-                  color: VaultTheme.secondaryText(context),
-                ),
-              ),
             ],
           ),
-        ],
+        _buildNotificationBell(context, ref, data.unreadRecurringCount),
+      ],
+    );
+  }
+
+  Widget _buildNotificationBell(BuildContext context, WidgetRef ref, int unreadCount) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.notifications_outlined, size: 24),
+          tooltip: 'การแจ้งเตือนรายการประจำ',
+          onPressed: () => _showRecurringNotificationsSheet(context, ref),
+        ),
+        if (unreadCount > 0)
+          Positioned(
+            right: 6,
+            top: 6,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.redAccent,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: VaultTheme.surface(context), width: 1.5),
+              ),
+              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+              child: Text(
+                unreadCount > 9 ? '9+' : unreadCount.toString(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.bold,
+                  height: 1,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _showRecurringNotificationsSheet(BuildContext context, WidgetRef ref) {
+    final db = ref.read(databaseProvider);
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: VaultTheme.surface(context),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-    ],
-  );
-}
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.65,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (sheetCtx, scrollController) {
+            return FutureBuilder<List<Transaction>>(
+              future: (db.select(db.transactions)
+                    ..where((t) => t.tag.equals('recurring_auto') & t.deletedAt.isNull())
+                    ..orderBy([(t) => OrderingTerm.desc(t.transactionDate), (t) => OrderingTerm.desc(t.createdAt)])
+                    ..limit(50))
+                  .get(),
+              builder: (context, snapshot) {
+                final list = snapshot.data ?? [];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade400,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.notifications_active_rounded, color: Colors.amber, size: 22),
+                              const SizedBox(width: 8),
+                              Text(
+                                isThai ? 'การแจ้งเตือนรายการประจำ' : 'Recurring Notifications',
+                                style: TextStyle(
+                                  fontFamily: VaultTheme.fontFamily,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: VaultTheme.primaryText(context),
+                                ),
+                              ),
+                            ],
+                          ),
+                          TextButton(
+                            onPressed: () async {
+                              final prefs = await SharedPreferences.getInstance();
+                              await prefs.setString(
+                                'last_read_recurring_notification_time',
+                                DateTime.now().toIso8601String(),
+                              );
+                              ref.read(transactionsVersionProvider.notifier).state++;
+                              if (ctx.mounted) Navigator.pop(ctx);
+                            },
+                            child: Text(
+                              isThai ? 'รับทราบแล้ว' : 'Mark all read',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: VaultTheme.accent(context),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        isThai
+                            ? 'รายการธุรกรรมประจำที่ระบบบันทึกให้อัตโนมัติเมื่อถึงกำหนด'
+                            : 'Recurring transactions automatically posted by the system on schedule.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: VaultTheme.secondaryText(context),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Divider(height: 1),
+                      Expanded(
+                        child: snapshot.connectionState == ConnectionState.waiting
+                            ? const Center(child: CircularProgressIndicator())
+                            : list.isEmpty
+                                ? Center(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.notifications_none_rounded, size: 48, color: Colors.grey.shade400),
+                                        const SizedBox(height: 12),
+                                        Text(
+                                          isThai ? 'ยังไม่มีรายการประจำที่ถูกสร้างอัตโนมัติ' : 'No auto-created recurring items yet',
+                                          style: TextStyle(
+                                            color: VaultTheme.secondaryText(context),
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                : ListView.separated(
+                                    controller: scrollController,
+                                    itemCount: list.length,
+                                    separatorBuilder: (_, __) => const Divider(height: 1),
+                                    itemBuilder: (context, idx) {
+                                      final tx = list[idx];
+                                      final isIncome = tx.transactionType == 'income';
+                                      final amountStr = Money(tx.amountThbSatang).format(symbol: '฿');
+                                      final dateStr = DateFormat('dd/MM/yyyy').format(tx.transactionDate);
+
+                                      return ListTile(
+                                        contentPadding: const EdgeInsets.symmetric(vertical: 4),
+                                        leading: CircleAvatar(
+                                          backgroundColor: (isIncome ? Colors.green : Colors.redAccent).withValues(alpha: 0.12),
+                                          child: Icon(
+                                            isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                                            color: isIncome ? Colors.green : Colors.redAccent,
+                                            size: 20,
+                                          ),
+                                        ),
+                                        title: Text(
+                                          tx.note?.isNotEmpty == true
+                                              ? tx.note!
+                                              : (isThai ? 'รายการประจำอัตโนมัติ' : 'Auto Recurring Transaction'),
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                                        ),
+                                        subtitle: Text(
+                                          '$dateStr • ${isThai ? 'สร้างอัตโนมัติ' : 'Auto-posted'}',
+                                          style: TextStyle(fontSize: 11.5, color: VaultTheme.secondaryText(context)),
+                                        ),
+                                        trailing: Text(
+                                          '${isIncome ? '+' : '-'}$amountStr',
+                                          style: TextStyle(
+                                            fontFamily: VaultTheme.fontFamily,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                            color: isIncome ? Colors.green : Colors.redAccent,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
 
   // --- 2. Master Budget Hero Card ---
   Widget _buildMasterBudgetCard(BuildContext context, _VaultHomeData data, DateTime now) {
@@ -899,37 +1107,104 @@ class VaultHomeScreen extends ConsumerWidget {
           Divider(color: VaultTheme.border(context), height: 1),
           const SizedBox(height: 10),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                '${isThai ? 'เงินสด/เงินฝาก' : 'Cash & Bank'}: ${Money(data.totalCashSatang).format(symbol: '฿')}',
-                style: VaultTheme.tabular(
-                  fontSize: 12,
-                  color: VaultTheme.secondaryText(context),
+              Expanded(
+                child: FittedBox(
+                  alignment: Alignment.centerLeft,
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    '${isThai ? 'เงินสด/เงินฝาก' : 'Cash & Bank'}: ${Money(data.totalCashSatang).format(symbol: '฿')}',
+                    style: VaultTheme.tabular(
+                      fontSize: 12,
+                      color: VaultTheme.secondaryText(context),
+                    ),
+                  ),
                 ),
               ),
-              Text(
-                '${l10n?.portfolio ?? 'พอร์ตลงทุน'}: ${Money(data.portfolioValueSatang).format(symbol: '฿')}',
-                style: VaultTheme.tabular(
-                  fontSize: 12,
-                  color: VaultTheme.secondaryText(context),
+              const SizedBox(width: 8),
+              Expanded(
+                child: FittedBox(
+                  alignment: Alignment.centerRight,
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    '${l10n?.portfolio ?? 'พอร์ตลงทุน'}: ${Money(data.portfolioValueSatang).format(symbol: '฿')}',
+                    style: VaultTheme.tabular(
+                      fontSize: 12,
+                      color: VaultTheme.secondaryText(context),
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 6),
+          InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const AccruedIncomeScreen()),
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: FittedBox(
+                      alignment: Alignment.centerLeft,
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.pending_actions_rounded, size: 15, color: Colors.amber.shade700),
+                          const SizedBox(width: 5),
+                          Text(
+                            '${isThai ? 'เงินค้างรับ / ตกเบิก' : 'Accrued Income'}${data.accruedIncomeCount > 0 ? ' (${data.accruedIncomeCount})' : ''}: ${Money(data.accruedIncomeSatang).format(symbol: '฿')}',
+                            style: VaultTheme.tabular(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: data.accruedIncomeSatang > 0 ? Colors.amber.shade700 : VaultTheme.secondaryText(context),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${isThai ? 'ดูรายการ' : 'View'} ›',
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: VaultTheme.accent(context),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           if (data.insuranceSavingsSatang > 0) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  '${isThai ? 'เงินสะสมในประกัน' : 'Insurance Savings'}: ${Money(data.insuranceSavingsSatang).format(symbol: '฿')}',
-                  style: VaultTheme.tabular(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.green,
+                Expanded(
+                  child: FittedBox(
+                    alignment: Alignment.centerLeft,
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      '${isThai ? 'เงินสะสมในประกัน' : 'Insurance Savings'}: ${Money(data.insuranceSavingsSatang).format(symbol: '฿')}',
+                      style: VaultTheme.tabular(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.green,
+                      ),
+                    ),
                   ),
                 ),
+                const SizedBox(width: 8),
                 InkWell(
                   onTap: () {
                     Navigator.of(context).push(
@@ -1313,6 +1588,7 @@ class VaultHomeScreen extends ConsumerWidget {
   Future<_VaultHomeData> _loadHomeData(WidgetRef ref, DateTime now, BuildContext context) async {
     final l10n = AppLocalizations.of(context);
     final isThai = Localizations.localeOf(context).languageCode == 'th';
+    final db = ref.read(databaseProvider);
     final txDao = ref.read(transactionsDaoProvider);
     final accDao = ref.read(accountsDaoProvider);
     final bgDao = ref.read(budgetsDaoProvider);
@@ -1418,6 +1694,31 @@ class VaultHomeScreen extends ConsumerWidget {
     final upcomingPolicies = await insDao.getUpcomingDuePolicies(daysThreshold: 30);
     final insSavings = await insDao.getTotalInsuranceSavingsSatang();
 
+    // 9. Accrued Income (รายรับค้างตกเบิก)
+    final accruedList = await txDao.getAccruedIncomes();
+    int totalAccruedSatang = 0;
+    for (final a in accruedList) {
+      totalAccruedSatang += a.amountThbSatang;
+    }
+
+    // 10. Unread recurring transactions
+    int unreadRecurring = 0;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastReadStr = prefs.getString('last_read_recurring_notification_time');
+      final lastReadTime = lastReadStr != null ? DateTime.tryParse(lastReadStr) : null;
+
+      final recentRecurring = await (db.select(db.transactions)
+            ..where((t) => t.tag.equals('recurring_auto') & t.deletedAt.isNull())
+            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
+            ..limit(20))
+          .get();
+
+      unreadRecurring = lastReadTime == null
+          ? recentRecurring.length
+          : recentRecurring.where((t) => t.createdAt.isAfter(lastReadTime)).length;
+    } catch (_) {}
+
     return _VaultHomeData(
       netWorthSatang: netWorth,
       totalCashSatang: totalCash,
@@ -1436,6 +1737,9 @@ class VaultHomeScreen extends ConsumerWidget {
       attentionMessage: attentionMsg,
       attentionIsWarning: attentionWarn,
       upcomingDuePolicies: upcomingPolicies,
+      accruedIncomeSatang: totalAccruedSatang,
+      accruedIncomeCount: accruedList.length,
+      unreadRecurringCount: unreadRecurring,
     );
   }
 
@@ -1466,6 +1770,9 @@ class _VaultHomeData {
   final String attentionMessage;
   final bool attentionIsWarning;
   final List<PolicyProgress> upcomingDuePolicies;
+  final int accruedIncomeSatang;
+  final int accruedIncomeCount;
+  final int unreadRecurringCount;
 
   const _VaultHomeData({
     required this.netWorthSatang,
@@ -1485,5 +1792,8 @@ class _VaultHomeData {
     required this.attentionMessage,
     required this.attentionIsWarning,
     required this.upcomingDuePolicies,
+    required this.accruedIncomeSatang,
+    required this.accruedIncomeCount,
+    required this.unreadRecurringCount,
   });
 }

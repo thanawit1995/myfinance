@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/database/database_provider.dart';
+import '../../../../core/database/daos/credit_card_dao.dart';
 import '../../../../core/money/money.dart';
 import 'account_detail_screen.dart';
 import 'credit_card_summary_screen.dart';
@@ -191,7 +192,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
   }
 
   Widget _buildAccountTile(BuildContext context, Account account, bool isThai) {
-    return FutureBuilder(
+    return FutureBuilder<({int nativeBalanceSatang, int thbEquivalentSatang, Decimal fxRate})>(
       future: ref.read(accountsDaoProvider).getAccountBalanceBreakdown(account.id),
       builder: (context, snapshot) {
         final data = snapshot.data;

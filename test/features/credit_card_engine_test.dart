@@ -167,123 +167,9 @@ void main() {
       expect(summaryAfterPay!.totalDebtSatang, equals(0));
     });
 
-    test('settleHistoricalDebt clears all debt before 24 Aug 2026, keeping only 2 latest cycles', () async {
-      // 1. Create accounts
+    test('purgeHistoricalSettlements removes any obsolete historical settle transactions', () async {
       final cardAcc = AccountsCompanion.insert(
-        id: 'card-hist-test',
-        name: 'KBank Card',
-        accountType: 'credit_card',
-        currencyCode: 'THB',
-        isDomestic: true,
-        closingDay: const Value(23),
-        dueDay: const Value(10),
-        createdAt: DateTime(2023, 10, 1),
-        updatedAt: DateTime(2023, 10, 1),
-      );
-      await db.into(db.accounts).insert(cardAcc);
-
-      // 2. Insert historical charges:
-      // In 2023: 500.00 THB (50,000 satang)
-      await db.into(db.transactions).insert(
-        TransactionsCompanion.insert(
-          id: 'tx-2023',
-          transactionType: 'expense',
-          sourceAccountId: Value(cardAcc.id.value),
-          amountOriginalSatang: 50000,
-          currencyCode: 'THB',
-          amountThbSatang: 50000,
-          transactionDate: DateTime(2023, 10, 5),
-          createdAt: DateTime(2023, 10, 5),
-          updatedAt: DateTime(2023, 10, 5),
-        ),
-      );
-
-      // In early 2026 before cutoff (15 Aug 2026): 1,500.00 THB (150,000 satang)
-      await db.into(db.transactions).insert(
-        TransactionsCompanion.insert(
-          id: 'tx-pre-cutoff',
-          transactionType: 'expense',
-          sourceAccountId: Value(cardAcc.id.value),
-          amountOriginalSatang: 150000,
-          currencyCode: 'THB',
-          amountThbSatang: 150000,
-          transactionDate: DateTime(2026, 8, 15),
-          createdAt: DateTime(2026, 8, 15),
-          updatedAt: DateTime(2026, 8, 15),
-        ),
-      );
-
-      // In previous cycle (24 Aug - 23 Sep 2026): 2,000.00 THB (200,000 satang)
-      await db.into(db.transactions).insert(
-        TransactionsCompanion.insert(
-          id: 'tx-prev-cycle',
-          transactionType: 'expense',
-          sourceAccountId: Value(cardAcc.id.value),
-          amountOriginalSatang: 200000,
-          currencyCode: 'THB',
-          amountThbSatang: 200000,
-          transactionDate: DateTime(2026, 9, 10),
-          createdAt: DateTime(2026, 9, 10),
-          updatedAt: DateTime(2026, 9, 10),
-        ),
-      );
-
-      // In current cycle (24 Sep 2026 onwards): 1,000.00 THB (100,000 satang)
-      await db.into(db.transactions).insert(
-        TransactionsCompanion.insert(
-          id: 'tx-curr-cycle',
-          transactionType: 'expense',
-          sourceAccountId: Value(cardAcc.id.value),
-          amountOriginalSatang: 100000,
-          currencyCode: 'THB',
-          amountThbSatang: 100000,
-          transactionDate: DateTime(2026, 9, 25),
-          createdAt: DateTime(2026, 9, 25),
-          updatedAt: DateTime(2026, 9, 25),
-        ),
-      );
-
-      // Before settle:
-      // Historical debt should be 50,000 + 150,000 = 200,000 satang
-      final histDebt = await ccDao.getHistoricalDebtSatang(cardAcc.id.value);
-      expect(histDebt, equals(200000));
-
-      final initialSummary = await ccDao.getSummary(cardAcc.id.value, DateTime(2026, 9, 26));
-      expect(initialSummary!.totalDebtSatang, equals(500000)); // Total 5,000 THB across all 4 transactions
-
-      // Settle historical debt
-      final settledSatang = await ccDao.settleHistoricalDebt(cardAcc.id.value);
-      expect(settledSatang, equals(200000));
-
-      // After settle:
-      // Historical debt should be 0
-      final histDebtAfter = await ccDao.getHistoricalDebtSatang(cardAcc.id.value);
-      expect(histDebtAfter, equals(0));
-
-      // Total debt should now be exactly 300,000 satang (2,000 THB from prev cycle + 1,000 THB from current cycle)
-      final summaryAfter = await ccDao.getSummary(cardAcc.id.value, DateTime(2026, 9, 26));
-      expect(summaryAfter!.totalDebtSatang, equals(300000));
-      expect(summaryAfter.previousStatementDebtSatang, equals(200000));
-      expect(summaryAfter.currentCycleDebtSatang, equals(100000));
-
-      // In statement cycles: auto-settle MUST NOT be added to chargesSatang of cycle 2 (24 Jul - 23 Aug)
-      expect(summaryAfter.statementCycles[0].chargesSatang, equals(100000));
-      expect(summaryAfter.statementCycles[1].chargesSatang, equals(200000));
-      expect(summaryAfter.statementCycles[2].chargesSatang, equals(150000)); // Only the 1,500 THB purchase
-      expect(summaryAfter.statementCycles[2].paymentsSatang, equals(0));
-
-      // AccountsDao.getAccountBalanceSatang must reflect negative total debt (-300,000 satang)
-      final accBalance = await db.accountsDao.getAccountBalanceSatang(cardAcc.id.value);
-      expect(accBalance, equals(-300000));
-
-      // Calling settle again should return 0 since already settled
-      final reSettle = await ccDao.settleHistoricalDebt(cardAcc.id.value);
-      expect(reSettle, equals(0));
-    });
-
-    test('cleanupDuplicateHistoricalSettlements removes redundant auto-settle transactions', () async {
-      final cardAcc = AccountsCompanion.insert(
-        id: 'card-dup-settle-test',
+        id: 'card-purge-test',
         name: 'SCB Card',
         accountType: 'credit_card',
         currencyCode: 'THB',
@@ -295,7 +181,6 @@ void main() {
       );
       await db.into(db.accounts).insert(cardAcc);
 
-      // Create two duplicate auto-settle records
       await db.into(db.transactions).insert(
         TransactionsCompanion.insert(
           id: 'settle-tx-1',
@@ -311,30 +196,14 @@ void main() {
           updatedAt: DateTime(2026, 8, 24, 10, 0),
         ),
       );
-      await db.into(db.transactions).insert(
-        TransactionsCompanion.insert(
-          id: 'settle-tx-2',
-          transactionType: 'transfer',
-          destinationAccountId: Value(cardAcc.id.value),
-          amountOriginalSatang: 150000,
-          currencyCode: 'THB',
-          amountThbSatang: 150000,
-          transactionDate: DateTime(2026, 8, 23, 23, 59, 59),
-          note: const Value('ชำระหนี้ SCB Card รอบประวัติศาสตร์ก่อน 24 ส.ค. 2569 (Auto-settle)'),
-          tag: const Value('historical_settle'),
-          createdAt: DateTime(2026, 8, 24, 10, 5),
-          updatedAt: DateTime(2026, 8, 24, 10, 5),
-        ),
-      );
 
-      final removed = await ccDao.cleanupDuplicateHistoricalSettlements(cardAcc.id.value);
+      final removed = await ccDao.purgeHistoricalSettlements();
       expect(removed, equals(1));
 
       final remaining = await (db.select(db.transactions)
-            ..where((t) => t.destinationAccountId.equals(cardAcc.id.value) & t.tag.equals('historical_settle')))
+            ..where((t) => t.tag.equals('historical_settle')))
           .get();
-      expect(remaining.length, equals(1));
-      expect(remaining.first.id, equals('settle-tx-1'));
+      expect(remaining.isEmpty, isTrue);
     });
   });
 }

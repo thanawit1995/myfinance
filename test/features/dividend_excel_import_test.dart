@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:decimal/decimal.dart';
-import 'package:excel/excel.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:myfinance/core/database/app_database.dart';
 import 'package:myfinance/core/database/connection/connection.dart';

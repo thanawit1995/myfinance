@@ -55,7 +55,32 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
       await _checkAppLockOnStartup();
 
       try {
-        await ref.read(recurringTransactionsDaoProvider).processDueRules();
+        final posted = await ref.read(recurringTransactionsDaoProvider).processDueRules();
+        if (posted > 0 && mounted) {
+          ref.read(transactionsVersionProvider.notifier).state++;
+          final isThai = widget.currentLocale.languageCode == 'th';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.notifications_active_rounded, color: Colors.amber, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      isThai
+                          ? '🔔 บันทึกรายการประจำอัตโนมัติแล้ว $posted รายการ'
+                          : '🔔 $posted recurring transactions automatically created.',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: const Color(0xFF1E293B),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
       } catch (e) {
         debugPrint('Error processing recurring rules: $e');
       }

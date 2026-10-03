@@ -163,6 +163,8 @@ Future<BackupInspectionResult> inspectSqliteDatabaseFile(
       final assetsCount = getCount('assets');
       final insuranceCount = getCount('insurance_policies');
       final liabilitiesCount = getCount('liabilities');
+      final projectsCount = getCount('projects');
+      final recurringCount = getCount('recurring_rules');
 
       return BackupInspectionResult(
         isValid: true,
@@ -175,6 +177,8 @@ Future<BackupInspectionResult> inspectSqliteDatabaseFile(
         totalAssets: assetsCount,
         totalInsurance: insuranceCount,
         totalLiabilities: liabilitiesCount,
+        totalProjects: projectsCount,
+        totalRecurringRules: recurringCount,
         sizeBytes: fileSize,
         fileName: fileName,
       );

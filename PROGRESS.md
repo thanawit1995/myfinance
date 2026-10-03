@@ -2,6 +2,21 @@
 
 อัปเดตล่าสุด: 3 ตุลาคม 2026
 
+- [x] **Credit Transactions Architectural Realignment: Budget Deduction, Liquid Cash & Net Worth Protection (3 ต.ค. 2026)**:
+  - **1. ปรับการคำนวณกระแสเงินสด (Liquid Cash) และสินทรัพย์สุทธิ (Net Worth)**:
+    - ปรับปรุง `getTotalCashSatang()` ใน `AccountsDao` ให้รวมเฉพาะบัญชีเงินสด/เงินฝากจริงในมือและธนาคาร (SCB, Krungthai, Dime! Save, FCD, USD) โดยคัดกรองบัญชี `credit_card` ออก
+    - ส่งผลให้ยอดหนี้บัตรเครดิตที่รอชำระจะไม่ไปลดทอนกระแสเงินสด (Liquid Cash) หรือสินทรัพย์สุทธิ (Net Worth) ของผู้ใช้ จนกว่าจะมีการกดบันทึกชำระหนี้จริง
+    - การ์ด "กระแสเงินสด" ในหน้าบัญชีและหน้าแรกแสดงยอดเงินฝากจริงทั้งหมดเต็มจำนวน (**฿364,220.89**) ไม่ถูกหักลบด้วยหนี้บัตรเครดิตค้างจ่ายอีกต่อไป
+  - **2. รักษาวินัยการเงินและการตัดงบประมาณ (Budgets)**:
+    - รายการรูดบัตรเครดิตทุกรายการยังคงถูกนับเป็นรายจ่ายตามหมวดหมู่เพื่อไปตัดงบประมาณรายเดือน (Budget) และ Master Budget ตามปกติ ทำให้ผู้ใช้ควบคุมการใช้จ่ายได้ครบถ้วน
+  - **3. รองรับการชำระหนี้ด้วยตนเองตามรอบบิล**:
+    - หนี้บัตรเครดิตยังคงถูกจัดหมวดหมู่แยกตามรอบบิลใน `CreditCardSummaryScreen` ให้ผู้ใช้ตรวจสอบยอดและกด "บันทึกชำระหนี้บัตรเครดิต" ตัดเงินจากบัญชีจริงด้วยตนเองเมื่อพร้อม
+  - **4. การทดสอบและการรับรองคุณภาพ**:
+    - เพิ่ม Unit Test ใน `test/features/credit_card_engine_test.dart` ทดสอบว่ารายการรูดบัตรตัดงบประมาณจริง, ไม่ลดทอนเงินใน SCB, ไม่ลดทอน Liquid Cash และ Net Worth, และเมื่อกดชำระเงินจริง เงินใน SCB และหนี้บัตรเครดิตถึงจะลดลง
+    - `flutter test`: ผ่านทั้งหมด **182/182 tests passed** (100%)
+    - `dart analyze lib test`: **0 errors, 0 warnings**
+    - คอมไพล์ Web Release อัปเดตโฟลเดอร์ `docs/` สำหรับ GitHub Pages
+
 - [x] **Complete SQLite .db 25-Table Integrity, Historical CC Debt Removal, Quick Startup Sync, UI Redesign & Recurring Notification Center (3 ต.ค. 2026)**:
   - **1. ปรับปรุงระบบสำรอง/กู้คืนไฟล์ SQLite .db ให้สมบูรณ์ 25 ตาราง**:
     - แก้ปัญหา WAL checkpoint บน Web SQLite Wasm ด้วยคำสั่ง `PRAGMA wal_checkpoint(TRUNCATE);` ก่อนส่งออกไฟล์ .db ทำให้ข้อมูลล่าสุดที่ค้างใน memory/WAL ถูกเขียนลงไฟล์ .db จริง 100%

@@ -205,6 +205,98 @@ void main() {
           .get();
       expect(remaining.isEmpty, isTrue);
     });
+
+    test('Credit transactions reduce budget, do NOT reduce bank accounts, and do NOT reduce getTotalCashSatang / Net Worth', () async {
+      final cardAcc = (await db.accountsDao.getActiveAccounts())
+          .firstWhere((a) => a.accountType == 'credit_card');
+      final bankAcc = (await db.accountsDao.getActiveAccounts())
+          .firstWhere((a) => a.name == 'SCB');
+
+      // 1. Initial SCB balance: 10,000 THB (1,000,000 satang)
+      await db.transactionsDao.insertTransaction(
+        TransactionsCompanion.insert(
+          id: 'initial-scb',
+          transactionType: 'income',
+          sourceAccountId: Value(bankAcc.id),
+          amountOriginalSatang: 1000000,
+          currencyCode: 'THB',
+          amountThbSatang: 1000000,
+          isCleared: const Value(true),
+          transactionDate: DateTime(2026, 9, 1),
+          createdAt: DateTime(2026, 9, 1),
+          updatedAt: DateTime(2026, 9, 1),
+        ),
+      );
+
+      // Setup a monthly budget of 5,000 THB (500,000 satang) for Dining
+      const catDining = 'cat-exp-0000-4000-8000-000000000001';
+      await db.budgetsDao.setBudget(categoryId: catDining, limitSatang: 500000);
+
+      // Verify baseline:
+      final initialScbBal = await db.accountsDao.getAccountBalanceSatang(bankAcc.id);
+      final initialCash = await db.accountsDao.getTotalCashSatang();
+      final initialNetWorth = await db.accountsDao.getTotalNetWorthSatang();
+      expect(initialScbBal, equals(1000000)); // 10,000 THB
+      expect(initialCash, equals(1000000)); // 10,000 THB
+      expect(initialNetWorth, equals(1000000)); // 10,000 THB
+
+      // 2. Spend 2,000 THB on Credit Card (Dining category)
+      await db.transactionsDao.insertTransaction(
+        TransactionsCompanion.insert(
+          id: 'cc-swipe-1',
+          transactionType: 'expense',
+          sourceAccountId: Value(cardAcc.id),
+          categoryId: const Value(catDining),
+          amountOriginalSatang: 200000,
+          currencyCode: 'THB',
+          amountThbSatang: 200000,
+          transactionDate: DateTime(2026, 9, 10),
+          createdAt: DateTime(2026, 9, 10),
+          updatedAt: DateTime(2026, 9, 10),
+        ),
+      );
+
+      // (A) Check Budget: Dining budget MUST be deducted by 2,000 THB (Spent = 2,000, Remaining = 3,000)
+      final budgetStatus = await db.budgetsDao.getBudgetStatusForMonth(2026, 9);
+      final diningStatus = budgetStatus.firstWhere((b) => b.categoryId == catDining);
+      expect(diningStatus.spentSatang, equals(200000));
+      expect(diningStatus.remainingSatang, equals(300000));
+
+      // (B) Check SCB Bank Account: MUST NOT be deducted! (Still 10,000 THB)
+      final scbBalAfterSwipe = await db.accountsDao.getAccountBalanceSatang(bankAcc.id);
+      expect(scbBalAfterSwipe, equals(1000000));
+
+      // (C) Check Total Cash & Net Worth: MUST NOT be reduced by unpaid credit card debt! (Still 10,000 THB)
+      final cashAfterSwipe = await db.accountsDao.getTotalCashSatang();
+      final netWorthAfterSwipe = await db.accountsDao.getTotalNetWorthSatang();
+      expect(cashAfterSwipe, equals(1000000));
+      expect(netWorthAfterSwipe, equals(1000000));
+
+      // (D) Check Credit Card: Shows debt of 2,000 THB
+      final cardBal = await db.accountsDao.getAccountBalanceSatang(cardAcc.id);
+      expect(cardBal, equals(-200000));
+      final ccSummary = await ccDao.getSummary(cardAcc.id, DateTime(2026, 9, 15));
+      expect(ccSummary!.totalDebtSatang, equals(200000));
+
+      // 3. User manually pays credit card from SCB (Pay 2,000 THB)
+      await ccDao.recordCreditCardPayment(
+        fromAccountId: bankAcc.id,
+        creditCardAccountId: cardAcc.id,
+        amountSatang: 200000,
+        paymentDate: DateTime(2026, 9, 20),
+      );
+
+      // (E) After payment: SCB is deducted to 8,000 THB, Card debt is 0, Total Cash is 8,000 THB
+      final scbAfterPay = await db.accountsDao.getAccountBalanceSatang(bankAcc.id);
+      expect(scbAfterPay, equals(800000)); // 8,000 THB
+      final cardBalAfterPay = await db.accountsDao.getAccountBalanceSatang(cardAcc.id);
+      expect(cardBalAfterPay, equals(0)); // 0 THB
+      final cashAfterPay = await db.accountsDao.getTotalCashSatang();
+      expect(cashAfterPay, equals(800000)); // 8,000 THB
+      final netWorthAfterPay = await db.accountsDao.getTotalNetWorthSatang();
+      expect(netWorthAfterPay, equals(800000)); // 8,000 THB
+    });
   });
 }
+
 

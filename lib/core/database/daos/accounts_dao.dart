@@ -306,11 +306,12 @@ class AccountsDao extends DatabaseAccessor<AppDatabase> with _$AccountsDaoMixin 
     return (nativeBalanceSatang: nativeBalance, thbEquivalentSatang: thbEquivalent, fxRate: fxRate);
   }
 
-  /// Returns total liquid cash balance across all active bank, cash, fcd, and credit card accounts (excluding portfolio).
+  /// Returns total liquid cash balance across all active bank, cash, savings, and fcd accounts (excluding portfolio and credit card debt).
   Future<int> getTotalCashSatang() async {
     final active = await getActiveAccounts();
     int totalThb = 0;
     for (final acc in active) {
+      if (acc.accountType == 'credit_card') continue;
       final breakdown = await getAccountBalanceBreakdown(acc.id);
       totalThb += breakdown.thbEquivalentSatang;
     }

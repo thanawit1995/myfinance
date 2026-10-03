@@ -335,7 +335,7 @@ class VaultHomeScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Our money, our journey. • $monthName $yearStr',
+                        '$monthName $yearStr',
                         style: TextStyle(
                           fontFamily: VaultTheme.fontFamily,
                           fontSize: 12,

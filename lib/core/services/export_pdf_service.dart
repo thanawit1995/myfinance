@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
@@ -27,8 +28,8 @@ class ExportPdfService {
     );
   }
 
-  /// 1. Export Tax Preparation Bundle to A4 PDF
-  static Future<File> exportTaxReportToPdf(TaxPreparationReport report) async {
+  /// 1. Generate Tax Preparation Bundle PDF bytes
+  static Future<Uint8List> generateTaxReportPdfBytes(TaxPreparationReport report) async {
     final pdf = pw.Document();
     final theme = await _buildThaiTheme();
 
@@ -237,15 +238,20 @@ class ExportPdfService {
       ),
     );
 
+    return pdf.save();
+  }
+
+  static Future<File> exportTaxReportToPdf(TaxPreparationReport report) async {
+    final bytes = await generateTaxReportPdfBytes(report);
     final tempDir = await getTemporaryDirectory();
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final file = File(p.join(tempDir.path, 'MyFinance_Tax_${report.taxYear}_$timestamp.pdf'));
-    await file.writeAsBytes(await pdf.save());
+    await file.writeAsBytes(bytes);
     return file;
   }
 
-  /// 2. Export Monthly Summary to PDF
-  static Future<File> exportMonthlySummaryToPdf(MonthlySummaryReport report) async {
+  /// 2. Generate Monthly Summary PDF bytes
+  static Future<Uint8List> generateMonthlySummaryPdfBytes(MonthlySummaryReport report) async {
     final pdf = pw.Document();
     final theme = await _buildThaiTheme();
 
@@ -307,15 +313,20 @@ class ExportPdfService {
       ),
     );
 
+    return pdf.save();
+  }
+
+  static Future<File> exportMonthlySummaryToPdf(MonthlySummaryReport report) async {
+    final bytes = await generateMonthlySummaryPdfBytes(report);
     final tempDir = await getTemporaryDirectory();
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final file = File(p.join(tempDir.path, 'MyFinance_Monthly_${report.year}_${report.month}_$timestamp.pdf'));
-    await file.writeAsBytes(await pdf.save());
+    await file.writeAsBytes(bytes);
     return file;
   }
 
-  /// 3. Export Personal Balance Sheet to PDF
-  static Future<File> exportBalanceSheetToPdf(PersonalBalanceSheetReport report) async {
+  /// 3. Generate Personal Balance Sheet PDF bytes
+  static Future<Uint8List> generateBalanceSheetPdfBytes(PersonalBalanceSheetReport report) async {
     final pdf = pw.Document();
     final theme = await _buildThaiTheme();
 
@@ -372,10 +383,15 @@ class ExportPdfService {
       ),
     );
 
+    return pdf.save();
+  }
+
+  static Future<File> exportBalanceSheetToPdf(PersonalBalanceSheetReport report) async {
+    final bytes = await generateBalanceSheetPdfBytes(report);
     final tempDir = await getTemporaryDirectory();
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final file = File(p.join(tempDir.path, 'MyFinance_BalanceSheet_$timestamp.pdf'));
-    await file.writeAsBytes(await pdf.save());
+    await file.writeAsBytes(bytes);
     return file;
   }
 
@@ -464,23 +480,81 @@ class ExportPdfService {
     }
   }
 
-  /// Shares an exported PDF file using system share sheet.
+  /// Previews or shares a PDF cross-platform (Web, Windows, Android).
+  static Future<bool> previewOrSharePdf({
+    required Uint8List bytes,
+    required String filename,
+    String? subject,
+    BuildContext? context,
+  }) async {
+    try {
+      if (kIsWeb) {
+        return await Printing.layoutPdf(
+          onLayout: (format) async => bytes,
+          name: filename,
+        );
+      }
+
+      final ok = await Printing.sharePdf(
+        bytes: bytes,
+        filename: filename,
+        subject: subject ?? 'MyFinance PDF Report',
+      );
+      if (!ok) {
+        return await Printing.layoutPdf(
+          onLayout: (format) async => bytes,
+          name: filename,
+        );
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Error previewing/sharing pdf: $e');
+      try {
+        return await Printing.layoutPdf(
+          onLayout: (format) async => bytes,
+          name: filename,
+        );
+      } catch (_) {
+        if (context != null && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('ไม่สามารถส่งออก PDF ได้: $e')),
+          );
+        }
+        return false;
+      }
+    }
+  }
+
+  /// Shares an exported PDF file using system share sheet or print preview fallback.
   static Future<bool> shareFile(BuildContext context, File file, {String? subject}) async {
     try {
+      if (kIsWeb) {
+        final bytes = await file.readAsBytes();
+        return await previewOrSharePdf(bytes: bytes, filename: p.basename(file.path), subject: subject, context: context.mounted ? context : null);
+      }
       final xFile = XFile(file.path, mimeType: 'application/pdf');
       final result = await Share.shareXFiles(
         [xFile],
         subject: subject ?? 'MyFinance PDF Report',
       );
-      return result.status == ShareResultStatus.success;
+      if (result.status != ShareResultStatus.success) {
+        final bytes = await file.readAsBytes();
+        return await previewOrSharePdf(bytes: bytes, filename: p.basename(file.path), subject: subject, context: context.mounted ? context : null);
+      }
+      return true;
     } catch (e) {
       debugPrint('Error sharing pdf: $e');
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('ไม่สามารถแชร์ไฟล์ได้: $e')),
-        );
+      try {
+        final bytes = await file.readAsBytes();
+        return await previewOrSharePdf(bytes: bytes, filename: p.basename(file.path), subject: subject, context: context.mounted ? context : null);
+      } catch (_) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('ไม่สามารถแชร์ไฟล์ได้: $e')),
+          );
+        }
+        return false;
       }
-      return false;
     }
   }
 }

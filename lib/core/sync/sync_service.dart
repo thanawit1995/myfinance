@@ -415,22 +415,18 @@ class SyncService extends StateNotifier<SyncState> {
         // 3. ปลดล็อกและเขียนทับฐานข้อมูลในเครื่องด้วย snapshot 100%
         final ok = await CloudVaultSnapshotHelper.unpackCompressedBase64ToDatabase(base64Payload, _db);
         if (!ok) {
-          throw Exception(isThai ? 'ไม่สามารถกู้คืนฐานข้อมูลจากคลาวด์ได้' : 'Failed to restore database from cloud snapshot');
+          debugPrint('[Sync] Snapshot restore failed, falling back to full relational sync...');
+          await _executeFullSync(userId, forceFullSync: true);
+        } else {
+          // ดึง delta เพิ่มเติมหากมีรายการใหม่กว่า snapshot
+          try {
+            await _executeFullSync(userId, forceFullSync: false);
+          } catch (_) {}
         }
       } else {
         // Dual-Engine Fallback: หากไม่มี Snapshot blob ให้ดึงจากตารางจริงทั้งหมดบนคลาวด์
-        debugPrint('[Sync] Master snapshot blob not found, falling back to full relational sync...');
-        final txCheck = await _supabase
-            .from('transactions')
-            .select('id')
-            .eq('user_id', userId)
-            .limit(1);
-        if (txCheck.isEmpty) {
-          throw Exception(isThai
-              ? 'ไม่พบข้อมูลบนคลาวด์ กรุณากดส่งข้อมูลจากเครื่องหลักขึ้นไปก่อน'
-              : 'No Cloud data found. Please push from master device first.');
-        }
-        await syncAll(forceFullSync: true);
+        debugPrint('[Sync] Master snapshot blob not found, executing full relational sync...');
+        await _executeFullSync(userId, forceFullSync: true);
       }
 
       final now = DateTime.now();
@@ -514,7 +510,7 @@ class SyncService extends StateNotifier<SyncState> {
 
   // ─── Full Sync Across All Modules ──────────────────────────────────────────
 
-  Future<void> syncAll({bool forceFullSync = true}) async {
+  Future<void> syncAll({bool forceFullSync = false}) async {
     if (!_auth.isLoggedIn) return;
     if (state.status == SyncStatus.syncing) return;
 
@@ -522,80 +518,12 @@ class SyncService extends StateNotifier<SyncState> {
     state = state.copyWith(status: SyncStatus.syncing, errorMessage: null);
 
     try {
-      // Purge any legacy historical settle transactions before sync
-      await _db.creditCardDao.purgeHistoricalSettlements();
-      try {
-        await _supabase.from('transactions').delete().eq('user_id', userId).eq('tag', 'historical_settle');
-      } catch (_) {}
+      await _executeFullSync(userId, forceFullSync: forceFullSync);
 
-      // 0. Auto-clean duplicates before sync to ensure local is pristine
-      final preDups = await _db.transactionsDao.deduplicateTransactions();
-      if (preDups.isNotEmpty && _auth.isLoggedIn) {
-        const chunkSize = 150;
-        for (var i = 0; i < preDups.length; i += chunkSize) {
-          final chunk = preDups.sublist(i, math.min(i + chunkSize, preDups.length));
-          await _supabase.from('transactions').delete().inFilter('id', chunk);
-        }
-      }
-
-      final lastSync = forceFullSync ? null : state.lastSyncAt;
-
-      // 1. Sync Accounts & Currencies
-      await _syncAccounts(userId, lastSync);
-
-      // 2. Sync Categories (with sort order & parent_id)
-      await _syncCategories(userId, lastSync);
-
-      // 3. Sync Assets (Investments)
-      await _syncAssets(userId, lastSync);
-
-      // 4. Sync Insurance Policies
-      await _syncInsurance(userId, lastSync);
-
-      // 5. Sync Liabilities (Debts)
-      await _syncLiabilities(userId, lastSync);
-
-      // 6. Sync Budgets
-      await _syncBudgets(userId, lastSync);
-
-      // 7. Sync Recurring Rules
-      await _syncRecurring(userId, lastSync);
-
-      // 8. Sync Projects
-      await _syncProjects(userId, lastSync);
-
-      // 9. Sync Credit Card Installments
-      await _syncCreditCardInstallments(userId, lastSync);
-
-      // 10. Sync Transactions
-      await _syncTransactions(userId, lastSync);
-
-      // 9. Auto-clean duplicates after pull to guarantee zero duplicate rows
-      final postDups = await _db.transactionsDao.deduplicateTransactions();
-      if (postDups.isNotEmpty && _auth.isLoggedIn) {
-        const chunkSize = 150;
-        for (var i = 0; i < postDups.length; i += chunkSize) {
-          final chunk = postDups.sublist(i, math.min(i + chunkSize, postDups.length));
-          await _supabase.from('transactions').delete().inFilter('id', chunk);
-        }
-      }
-
-      // Update Device State on Supabase (Active Device Wins)
-      final deviceId = await _getOrCreateDeviceId();
       final devName = _getDeviceDisplayName();
       final txCount = await (_db.selectOnly(_db.transactions)..addColumns([_db.transactions.id.count()]))
           .map((row) => row.read(_db.transactions.id.count()))
           .getSingle();
-
-      try {
-        await _supabase.from('sync_device_state').upsert({
-          'user_id': userId,
-          'active_device_id': deviceId,
-          'active_device_name': devName,
-          'total_transactions': txCount ?? 0,
-          'updated_at': DateTime.now().toIso8601String(),
-        });
-      } catch (_) {}
 
       final now = DateTime.now();
       final prefs = await SharedPreferences.getInstance();
@@ -614,6 +542,82 @@ class SyncService extends StateNotifier<SyncState> {
         errorMessage: e.toString(),
       );
     }
+  }
+
+  Future<void> _executeFullSync(String userId, {bool forceFullSync = false}) async {
+    // Purge any legacy historical settle transactions before sync
+    await _db.creditCardDao.purgeHistoricalSettlements();
+    try {
+      await _supabase.from('transactions').delete().eq('user_id', userId).eq('tag', 'historical_settle');
+    } catch (_) {}
+
+    // 0. Auto-clean duplicates before sync to ensure local is pristine
+    final preDups = await _db.transactionsDao.deduplicateTransactions();
+    if (preDups.isNotEmpty && _auth.isLoggedIn) {
+      const chunkSize = 150;
+      for (var i = 0; i < preDups.length; i += chunkSize) {
+        final chunk = preDups.sublist(i, math.min(i + chunkSize, preDups.length));
+        await _supabase.from('transactions').delete().inFilter('id', chunk);
+      }
+    }
+
+    final lastSync = forceFullSync ? null : state.lastSyncAt;
+
+    // 1. Sync Accounts & Currencies
+    await _syncAccounts(userId, lastSync);
+
+    // 2. Sync Categories (with sort order & parent_id)
+    await _syncCategories(userId, lastSync);
+
+    // 3. Sync Assets (Investments)
+    await _syncAssets(userId, lastSync);
+
+    // 4. Sync Insurance Policies
+    await _syncInsurance(userId, lastSync);
+
+    // 5. Sync Liabilities (Debts)
+    await _syncLiabilities(userId, lastSync);
+
+    // 6. Sync Budgets
+    await _syncBudgets(userId, lastSync);
+
+    // 7. Sync Recurring Rules
+    await _syncRecurring(userId, lastSync);
+
+    // 8. Sync Projects
+    await _syncProjects(userId, lastSync);
+
+    // 9. Sync Credit Card Installments
+    await _syncCreditCardInstallments(userId, lastSync);
+
+    // 10. Sync Transactions
+    await _syncTransactions(userId, lastSync);
+
+    // 11. Auto-clean duplicates after pull to guarantee zero duplicate rows
+    final postDups = await _db.transactionsDao.deduplicateTransactions();
+    if (postDups.isNotEmpty && _auth.isLoggedIn) {
+      const chunkSize = 150;
+      for (var i = 0; i < postDups.length; i += chunkSize) {
+        final chunk = postDups.sublist(i, math.min(i + chunkSize, postDups.length));
+        await _supabase.from('transactions').delete().inFilter('id', chunk);
+      }
+    }
+
+    // Update Device State on Supabase (Active Device Wins)
+    try {
+      final deviceId = await _getOrCreateDeviceId();
+      final devName = _getDeviceDisplayName();
+      final txCount = await (_db.selectOnly(_db.transactions)..addColumns([_db.transactions.id.count()]))
+          .map((row) => row.read(_db.transactions.id.count()))
+          .getSingle();
+      await _supabase.from('sync_device_state').upsert({
+        'user_id': userId,
+        'active_device_id': deviceId,
+        'active_device_name': devName,
+        'total_transactions': txCount ?? 0,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      });
+    } catch (_) {}
   }
 
   // ─── 1. Accounts ────────────────────────────────────────────────────────────
@@ -646,7 +650,7 @@ class SyncService extends StateNotifier<SyncState> {
     if (pushOnly) return;
 
     var query = _supabase.from('accounts').select().eq('user_id', userId);
-    if (lastSync != null) query = query.gt('updated_at', lastSync.toIso8601String());
+    if (lastSync != null) query = query.gt('updated_at', lastSync.toUtc().toIso8601String());
     final cloudRows = await query as List<dynamic>;
 
     if (cloudRows.isNotEmpty) {
@@ -709,7 +713,7 @@ class SyncService extends StateNotifier<SyncState> {
     if (pushOnly) return;
 
     var query = _supabase.from('categories').select().eq('user_id', userId);
-    if (lastSync != null) query = query.gt('updated_at', lastSync.toIso8601String());
+    if (lastSync != null) query = query.gt('updated_at', lastSync.toUtc().toIso8601String());
     final cloudRows = await query as List<dynamic>;
 
     if (cloudRows.isNotEmpty) {
@@ -772,7 +776,7 @@ class SyncService extends StateNotifier<SyncState> {
       if (pushOnly) return;
 
       var query = _supabase.from('assets').select().eq('user_id', userId);
-      if (lastSync != null) query = query.gt('updated_at', lastSync.toIso8601String());
+      if (lastSync != null) query = query.gt('updated_at', lastSync.toUtc().toIso8601String());
       final cloudRows = await query as List<dynamic>;
 
       if (cloudRows.isNotEmpty) {
@@ -838,7 +842,7 @@ class SyncService extends StateNotifier<SyncState> {
       if (pushOnly) return;
 
       var query = _supabase.from('insurance_policies').select().eq('user_id', userId);
-      if (lastSync != null) query = query.gt('updated_at', lastSync.toIso8601String());
+      if (lastSync != null) query = query.gt('updated_at', lastSync.toUtc().toIso8601String());
       final cloudRows = await query as List<dynamic>;
 
       if (cloudRows.isNotEmpty) {
@@ -905,7 +909,7 @@ class SyncService extends StateNotifier<SyncState> {
       if (pushOnly) return;
 
       var query = _supabase.from('liabilities').select().eq('user_id', userId);
-      if (lastSync != null) query = query.gt('updated_at', lastSync.toIso8601String());
+      if (lastSync != null) query = query.gt('updated_at', lastSync.toUtc().toIso8601String());
       final cloudRows = await query as List<dynamic>;
 
       if (cloudRows.isNotEmpty) {
@@ -964,7 +968,7 @@ class SyncService extends StateNotifier<SyncState> {
       if (pushOnly) return;
 
       var query = _supabase.from('budgets').select().eq('user_id', userId);
-      if (lastSync != null) query = query.gt('updated_at', lastSync.toIso8601String());
+      if (lastSync != null) query = query.gt('updated_at', lastSync.toUtc().toIso8601String());
       final cloudRows = await query as List<dynamic>;
 
       if (cloudRows.isNotEmpty) {
@@ -1030,7 +1034,7 @@ class SyncService extends StateNotifier<SyncState> {
       if (pushOnly) return;
 
       var query = _supabase.from('recurring_rules').select().eq('user_id', userId);
-      if (lastSync != null) query = query.gt('updated_at', lastSync.toIso8601String());
+      if (lastSync != null) query = query.gt('updated_at', lastSync.toUtc().toIso8601String());
       final cloudRows = await query as List<dynamic>;
 
       if (cloudRows.isNotEmpty) {
@@ -1102,7 +1106,7 @@ class SyncService extends StateNotifier<SyncState> {
       if (pushOnly) return;
 
       var query = _supabase.from('projects').select().eq('user_id', userId);
-      if (lastSync != null) query = query.gt('updated_at', lastSync.toIso8601String());
+      if (lastSync != null) query = query.gt('updated_at', lastSync.toUtc().toIso8601String());
       final cloudRows = await query as List<dynamic>;
 
       if (cloudRows.isNotEmpty) {
@@ -1166,7 +1170,7 @@ class SyncService extends StateNotifier<SyncState> {
       if (pushOnly) return;
 
       var query = _supabase.from('credit_card_installments').select().eq('user_id', userId);
-      if (lastSync != null) query = query.gt('updated_at', lastSync.toIso8601String());
+      if (lastSync != null) query = query.gt('updated_at', lastSync.toUtc().toIso8601String());
       final cloudRows = await query as List<dynamic>;
 
       if (cloudRows.isNotEmpty) {
@@ -1221,7 +1225,7 @@ class SyncService extends StateNotifier<SyncState> {
 
     while (true) {
       var filter = _supabase.from('transactions').select().eq('user_id', userId);
-      if (lastSync != null) filter = filter.gt('updated_at', lastSync.toIso8601String());
+      if (lastSync != null) filter = filter.gt('updated_at', lastSync.toUtc().toIso8601String());
       final query = filter.order('id', ascending: true);
 
       final page = await query.range(offset, offset + pageSize - 1) as List<dynamic>;

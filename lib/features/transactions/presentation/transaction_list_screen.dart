@@ -8,6 +8,7 @@ import '../../../../core/database/daos/transactions_dao.dart';
 import '../../../../core/money/money.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/category_name_helper.dart';
+import '../../investments/presentation/portfolio_screen.dart';
 import 'edit_transaction_dialog.dart';
 
 class TransactionListScreen extends ConsumerStatefulWidget {
@@ -523,7 +524,16 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
       final cleanTags = tx.tag!
           .split(',')
           .map((t) => t.trim())
-          .where((t) => !t.startsWith('project:') && !t.startsWith('policy:') && !t.startsWith('deduction:'))
+          .where((t) =>
+              !t.startsWith('project:') &&
+              !t.startsWith('policy:') &&
+              !t.startsWith('deduction:') &&
+              !t.startsWith('investment_buy:') &&
+              !t.startsWith('investment_sell:') &&
+              !t.startsWith('investment_income:') &&
+              !t.startsWith('recurring_auto') &&
+              !t.startsWith('historical_settle') &&
+              !t.startsWith('debt_payment:'))
           .toList();
       if (cleanTags.isNotEmpty) {
         for (final t in cleanTags.take(2)) {
@@ -559,6 +569,11 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
       );
     }
 
+    final isInvestTrade = tx.tag != null &&
+        (tx.tag!.startsWith('investment_buy:') ||
+         tx.tag!.startsWith('investment_sell:') ||
+         tx.tag!.startsWith('investment_income:'));
+
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
       leading: Container(
@@ -591,12 +606,133 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
         ],
       ),
       onTap: () async {
+        if (isInvestTrade) {
+          await _showInvestmentTradeReadOnlyDialog(tx, isThai);
+          return;
+        }
         final changed = await EditTransactionDialog.show(context, tx);
         if (changed == true && mounted) {
           _loadTransactions();
         }
       },
       onLongPress: () => _confirmDelete(tx, isThai),
+    );
+  }
+
+  Future<void> _showInvestmentTradeReadOnlyDialog(Transaction tx, bool isThai) async {
+    final isBuy = tx.tag?.startsWith('investment_buy:') == true;
+    final isSell = tx.tag?.startsWith('investment_sell:') == true;
+
+    final typeLabel = isBuy
+        ? (isThai ? 'ซื้อสินทรัพย์ลงทุน' : 'Buy Asset')
+        : (isSell
+            ? (isThai ? 'ขายสินทรัพย์ลงทุน' : 'Sell Asset')
+            : (isThai ? 'เงินปันผล/ดอกเบี้ย' : 'Dividend / Interest'));
+
+    final dateStr = DateFormat('dd/MM/yyyy HH:mm').format(tx.transactionDate);
+    final originalAmount = '${(tx.amountOriginalSatang / 100).toStringAsFixed(2)} ${tx.currencyCode}';
+    final thbAmount = Money(tx.amountThbSatang).format(symbol: '฿');
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.show_chart, color: Colors.blueAccent),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                typeLabel,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                tx.note ?? '',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              const SizedBox(height: 12),
+              _buildDetailRow(isThai ? 'วันที่ทำรายการ' : 'Date', dateStr),
+              _buildDetailRow(isThai ? 'มูลค่าเดิม' : 'Original Amount', originalAmount),
+              if (tx.currencyCode != 'THB') ...[
+                _buildDetailRow(isThai ? 'อัตราแลกเปลี่ยน' : 'Exchange Rate', tx.fxRate),
+                _buildDetailRow(isThai ? 'มูลค่าเงินบาท' : 'THB Amount', thbAmount),
+              ],
+              if (tx.feeThbSatang > 0)
+                _buildDetailRow(isThai ? 'ค่าธรรมเนียม' : 'Fee', Money(tx.feeThbSatang).format(symbol: '฿')),
+              if (tx.withholdingTaxSatang > 0)
+                _buildDetailRow(isThai ? 'ภาษีหัก ณ ที่จ่าย' : 'Withholding Tax', Money(tx.withholdingTaxSatang).format(symbol: '฿')),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.info_outline, color: Colors.blue, size: 16),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        isThai
+                            ? '💡 รายการนี้เชื่อมโยงกับระบบพอร์ตการลงทุน เพื่อรักษาความถูกต้องของข้อมูล FIFO และกำไร/ขาดทุน หากต้องการแก้ไขเชิงลึก กรุณาทำผ่านเมนู "การลงทุน"'
+                            : '💡 This transaction is linked to your investment portfolio. To edit units or prices, please manage it directly from the Investments menu.',
+                        style: const TextStyle(fontSize: 11.5, height: 1.3),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(isThai ? 'ปิด' : 'Close'),
+          ),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
+            label: Text(isThai ? 'ลบรายการ' : 'Delete', style: const TextStyle(color: Colors.red)),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await _confirmDelete(tx, isThai);
+            },
+          ),
+          FilledButton.icon(
+            icon: const Icon(Icons.open_in_new, size: 16),
+            label: Text(isThai ? 'ไปที่เมนูลงทุน' : 'Open Investments'),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const PortfolioScreen()),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.5),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        ],
+      ),
     );
   }
 

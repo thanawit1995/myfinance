@@ -130,20 +130,48 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       );
 
       if (_selectedReportIndex == 0 && _monthlyReport != null) {
-        final file = await ExportPdfService.exportMonthlySummaryToPdf(_monthlyReport!);
-        if (mounted) await ExportPdfService.shareFile(context, file, subject: 'Monthly Summary Report');
+        final bytes = await ExportPdfService.generateMonthlySummaryPdfBytes(_monthlyReport!);
+        if (mounted) {
+          await ExportPdfService.previewOrSharePdf(
+            bytes: bytes,
+            filename: 'MyFinance_Monthly_${_monthlyReport!.year}_${_monthlyReport!.month}.pdf',
+            subject: 'Monthly Summary Report',
+            context: context,
+          );
+        }
       } else if (_selectedReportIndex == 3 && _balanceSheetReport != null) {
-        final file = await ExportPdfService.exportBalanceSheetToPdf(_balanceSheetReport!);
-        if (mounted) await ExportPdfService.shareFile(context, file, subject: 'Balance Sheet Report');
+        final bytes = await ExportPdfService.generateBalanceSheetPdfBytes(_balanceSheetReport!);
+        if (mounted) {
+          await ExportPdfService.previewOrSharePdf(
+            bytes: bytes,
+            filename: 'MyFinance_BalanceSheet_${_balanceSheetReport!.asOfDate.year}.pdf',
+            subject: 'Balance Sheet Report',
+            context: context,
+          );
+        }
       } else if (_selectedReportIndex == 5 && _taxReport != null) {
-        final file = await ExportPdfService.exportTaxReportToPdf(_taxReport!);
-        if (mounted) await ExportPdfService.shareFile(context, file, subject: 'Tax Preparation Report');
+        final bytes = await ExportPdfService.generateTaxReportPdfBytes(_taxReport!);
+        if (mounted) {
+          await ExportPdfService.previewOrSharePdf(
+            bytes: bytes,
+            filename: 'MyFinance_Tax_${_taxReport!.taxYear}.pdf',
+            subject: 'Tax Preparation Report',
+            context: context,
+          );
+        }
       } else {
         // Default to tax or monthly PDF
         final service = ref.read(financialReportsServiceProvider);
         final report = await service.generateTaxPreparationReport(_selectedYear);
-        final file = await ExportPdfService.exportTaxReportToPdf(report);
-        if (mounted) await ExportPdfService.shareFile(context, file, subject: 'MyFinance Report');
+        final bytes = await ExportPdfService.generateTaxReportPdfBytes(report);
+        if (mounted) {
+          await ExportPdfService.previewOrSharePdf(
+            bytes: bytes,
+            filename: 'MyFinance_Report_$_selectedYear.pdf',
+            subject: 'MyFinance Report',
+            context: context,
+          );
+        }
       }
     } catch (e) {
       if (mounted) {

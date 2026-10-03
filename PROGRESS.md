@@ -1,6 +1,36 @@
 # บันทึกความคืบหน้าโครงการ MyFinance (PROGRESS.md)
 
-อัปเดตล่าสุด: 3 ตุลาคม 2026 (รอบค่ำ)
+อัปเดตล่าสุด: 3 ตุลาคม 2026 (รอบดึก)
+
+- [x] **Full Cloud Sync Engine, Debt Registry Auto-Pay & Reactive Refresh, Investment Trade Inspection, Cross-Currency Transfer & Accrued WorkPeriod Edit (3 ต.ค. 2026)**:
+  - **1. แก้ไขและยกระดับระบบ Cloud Sync ให้แม่นยำ 100% (`sync_service.dart`)**:
+    - **Timezone Delta Query Fix**: แก้ไข Query ดึงข้อมูล 10 ตารางใน Supabase ให้ส่งค่า `lastSync.toUtc().toIso8601String()` แทน Local Time ป้องกันการเปรียบเทียบผิดเพี้ยนจาก Timezone Offset +07:00 ที่ทำให้ Quick Sync มองข้ามรายการใหม่
+    - **Master Pull Lock Guard Fix**: ปรับ `pullMasterSnapshotFromCloud` ให้สั่งรัน `_executeFullSync(userId, forceFullSync: true)` โดยตรง ไม่ถูกบล็อกค้างจากสถานะ `SyncStatus.syncing` ทำให้การดาวน์โหลด Master Snapshot ลงมือถือทำงานได้ทันที 100%
+  - **2. คลีนหน้าจอสุขภาพการเงิน (`financial_health_screen.dart`)**:
+    - นำปุ่มไอคอนรูปโล่ (ทะเบียนหนี้สินและประกัน) ที่มุมขวาบน และการ์ดเมนูด้านล่างสุดออกตามคำขอ
+  - **3. ทะเบียนหนี้สิน: อัปเดตทันที, ปุ่มชำระค่างวด, และผูกตัดบัญชีอัตโนมัติ (`liabilities_insurance_screen.dart`, `liability_form_dialog.dart`)**:
+    - แปลง `_LiabilitiesTab` ให้รองรับ Reactive Reload ทันทีเมื่อสร้าง/แก้ไข/ลบ โดยไม่ต้องออกจากหน้าจอแล้วเข้าใหม่
+    - เพิ่มปุ่ม `[ 💳 บันทึกชำระค่างวด ]` ในการ์ดหนี้สินแต่ละรายการ พร้อม Dialog เลือกบัญชีที่ตัดเงิน, วันที่, และตัดยอดหนี้คงเหลืออัตโนมัติ
+    - เพิ่มตัวเลือก "วันที่ครบกำหนดชำระรายเดือน (1-31)" และสวิตช์ "ตัดจ่ายอัตโนมัติรายเดือน (Auto-pay)" เชื่อมกับ Recurring Engine อัตโนมัติ
+  - **4. รายการซื้อขายสินทรัพย์ลงทุนในหน้าการเงิน (`transaction_list_screen.dart`)**:
+    - เปลี่ยนการกดที่รายการซื้อขายสินทรัพย์ในหน้ารายการการเงิน เป็นหน้าต่างตรวจสอบข้อมูล (Read-Only Trade Inspection Dialog) ป้องกันการแก้ตัวเลขต้นทุน/จำนวนหน่วย/ค่าธรรมเนียมจนกระทบ FIFO
+    - เพิ่มปุ่มนำทางไปยัง "พอร์ตการลงทุน" และปุ่ม "ลบรายการ" ที่เชื่อมต่อกับ `handleInvestmentTransactionDeleted()` และคำนวณ FIFO ใหม่แบบสมบูรณ์
+  - **5. การส่งออกรายงาน PDF รองรับทุกแพลตฟอร์ม (`export_pdf_service.dart`, `reports_screen.dart`)**:
+    - เขียนฟังก์ชันสร้าง PDF Bytes และใช้ `Printing.layoutPdf` / `Printing.sharePdf` ทำงานได้ลื่นไหลทั้งบน Web, Windows Desktop และ Android โดยไม่มีปัญหา `dart:io File` crash
+  - **6. แก้ไขข้อความหัวข้อในธีม VAULT (`vault_home_screen.dart`)**:
+    - ปรับ Subtitle ให้กระชับเหลือเฉพาะ `เดือน ปี` (เช่น "ตุลาคม 2026") ป้องกันข้อความยาวจนโดนตัดทอนบนหน้าจอมือถือ
+  - **7. ซ่อน System Tags และปกป้องไม่ให้ถูกลบ (`transaction_list_screen.dart`, `edit_transaction_dialog.dart`)**:
+    - ซ่อน System Tags (เช่น `investment_buy:`, `investment_sell:`, `investment_income:`, `project:`, `policy:`, `debt_payment:`) จากป้าย Tag Badges และช่องกรอก Tag ในหน้าแก้ไข เพื่อให้ UI สะอาดตา และคงค่าเดิมไว้เสมอเมื่อบันทึก
+  - **8. แก้ไขรายการ Accrued Income ในหน้า Transaction (`edit_transaction_dialog.dart`)**:
+    - เพิ่มแถบเลือกรอบเดือนของผลงาน (Accrued Work Period) พร้อมป้ายชื่อเดือนภาษาไทย (เช่น `รายได้ ก.ย. 2026`) ที่อัปเดต Tag อัตโนมัติ
+    - เพิ่มป้ายและปุ่ม `[ 💰 รับแล้ว ]` สำหรับรายการที่ยังค้างรับ เพื่อบันทึกว่าได้รับเงินเข้าบัญชีจริงแล้ว
+  - **9. แก้ไขการโอนเงินข้ามสกุลเงิน (Dual-Amount Cross-Currency Transfer) (`edit_transaction_dialog.dart`)**:
+    - รองรับการกรอกทั้งยอดเงินต้นทางและยอดเงินปลายทาง พร้อมแสดงอัตราแลกเปลี่ยนคำนวณสด (`1 USD ≈ xx.xxxx THB`) บันทึก `amountOriginalSatang`, `amountThbSatang` และ `fxRate` แม่นยำตามกฎการเงิน
+  - **10. การทดสอบและการรับรองคุณภาพ**:
+    - `flutter test`: ผ่านทั้งหมด **188/188 tests passed** (100%)
+    - `flutter analyze`: **0 errors, 0 warnings**
+    - `flutter build web`: คอมไพล์ผ่านสมบูรณ์ และคัดลอกไฟล์ไปยัง `docs/` สำหรับ GitHub Pages เรียบร้อย
+
 
 - [x] **Budget Title Cleanup, Financial Position Clean Layout, Monthly Summary via Expense Trend & Accrued Income Month Tagging (3 ต.ค. 2026)**:
   - **1. ลบคำว่า "ไม่ Rollover" ในหน้า Budget (`budget_screen.dart`, `app_th.arb`, `app_en.arb`)**:

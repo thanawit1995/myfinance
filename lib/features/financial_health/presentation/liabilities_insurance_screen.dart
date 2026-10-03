@@ -1,5 +1,9 @@
+import 'dart:math' as math;
+import 'package:drift/drift.dart' as drift;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/database/database_provider.dart';
 import '../../../../core/money/money.dart';
@@ -24,13 +28,23 @@ class LiabilitiesInsuranceScreen extends ConsumerWidget {
   }
 }
 
-class _LiabilitiesTab extends ConsumerWidget {
+class _LiabilitiesTab extends ConsumerStatefulWidget {
   final VoidCallback onChanged;
 
   const _LiabilitiesTab({required this.onChanged});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_LiabilitiesTab> createState() => _LiabilitiesTabState();
+}
+
+class _LiabilitiesTabState extends ConsumerState<_LiabilitiesTab> {
+  void _reload() {
+    setState(() {});
+    widget.onChanged();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final dao = ref.watch(liabilitiesDaoProvider);
     final theme = Theme.of(context);
     final isThai = Localizations.localeOf(context).languageCode == 'th';
@@ -64,7 +78,7 @@ class _LiabilitiesTab extends ConsumerWidget {
           floatingActionButton: FloatingActionButton.extended(
             onPressed: () async {
               final created = await LiabilityFormDialog.show(context);
-              if (created == true) onChanged();
+              if (created == true) _reload();
             },
             icon: const Icon(Icons.add),
             label: Text(isThai ? 'เพิ่มหนี้สิน' : 'Add Debt'),
@@ -225,7 +239,7 @@ class _LiabilitiesTab extends ConsumerWidget {
                                 icon: const Icon(Icons.edit_outlined, size: 18),
                                 onPressed: () async {
                                   final edited = await LiabilityFormDialog.show(context, liability: item);
-                                  if (edited == true) onChanged();
+                                  if (edited == true) _reload();
                                 },
                               ),
                               IconButton(
@@ -256,7 +270,7 @@ class _LiabilitiesTab extends ConsumerWidget {
 
                                   if (confirm == true) {
                                     await dao.deleteLiability(item.id);
-                                    onChanged();
+                                    _reload();
                                   }
                                 },
                               ),
@@ -334,6 +348,22 @@ class _LiabilitiesTab extends ConsumerWidget {
                               style: TextStyle(fontSize: 11.5, color: VaultTheme.secondaryText(context)),
                             ),
                           ],
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  icon: const Icon(Icons.payment, size: 16),
+                                  label: Text(isThai ? '💳 บันทึกชำระค่างวด' : '💳 Pay Installment'),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    side: BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.5)),
+                                  ),
+                                  onPressed: () => _showPaymentDialog(item, accounts, isThai),
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
@@ -345,6 +375,161 @@ class _LiabilitiesTab extends ConsumerWidget {
         );
       },
     );
+  }
+
+  Future<void> _showPaymentDialog(Liability item, List<Account> accounts, bool isThai) async {
+    final defaultAccount = accounts.where((a) => a.id == item.linkedAccountId).firstOrNull ?? (accounts.isNotEmpty ? accounts.first : null);
+    String? selectedAccountId = defaultAccount?.id;
+    final amountController = TextEditingController(text: (item.monthlyPaymentSatang / 100).toStringAsFixed(2));
+    final noteController = TextEditingController(text: isThai ? 'ชำระค่างวด: ${item.name}' : 'Installment payment: ${item.name}');
+    DateTime paymentDate = DateTime.now();
+    bool deductPrincipal = true;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return AlertDialog(
+            title: Text(isThai ? 'บันทึกชำระค่างวด' : 'Record Installment Payment'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${isThai ? "ยอดหนี้คงเหลือ" : "Remaining balance"}: ${Money(item.remainingPrincipalSatang).format(symbol: "฿")}',
+                    style: TextStyle(fontSize: 12, color: VaultTheme.secondaryText(ctx)),
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedAccountId,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      labelText: isThai ? 'ตัดจ่ายจากบัญชี' : 'Pay from Account',
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    items: accounts.map((a) => DropdownMenuItem(
+                      value: a.id,
+                      child: Text('${a.name} (${a.currencyCode})'),
+                    )).toList(),
+                    onChanged: (val) => setDialogState(() => selectedAccountId = val),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: amountController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: isThai ? 'จำนวนเงินที่ชำระ (บาท)' : 'Payment Amount (THB)',
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                      prefixText: '฿ ',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: Text(isThai ? 'วันที่ชำระ' : 'Payment Date'),
+                    subtitle: Text(DateFormat('dd/MM/yyyy').format(paymentDate)),
+                    trailing: const Icon(Icons.calendar_today, size: 18),
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: ctx,
+                        initialDate: paymentDate,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2030),
+                      );
+                      if (picked != null) {
+                        setDialogState(() => paymentDate = picked);
+                      }
+                    },
+                  ),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    value: deductPrincipal,
+                    title: Text(isThai ? 'หักลดยอดหนี้คงเหลืออัตโนมัติ' : 'Auto-deduct from remaining debt'),
+                    onChanged: (val) => setDialogState(() => deductPrincipal = val ?? true),
+                  ),
+                  TextField(
+                    controller: noteController,
+                    decoration: InputDecoration(
+                      labelText: isThai ? 'บันทึกช่วยจำ' : 'Note',
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: Text(isThai ? 'ยืนยันการชำระ' : 'Confirm Payment'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (confirmed == true && selectedAccountId != null) {
+      final amountDouble = double.tryParse(amountController.text.trim()) ?? 0.0;
+      if (amountDouble <= 0) return;
+      final satang = (amountDouble * 100).round();
+      final now = DateTime.now();
+
+      // 1. Insert expense transaction
+      final txDao = ref.read(transactionsDaoProvider);
+      await txDao.insertTransaction(
+        TransactionsCompanion.insert(
+          id: const Uuid().v4(),
+          transactionType: 'expense',
+          sourceAccountId: drift.Value(selectedAccountId),
+          amountOriginalSatang: satang,
+          currencyCode: 'THB',
+          amountThbSatang: satang,
+          note: drift.Value(noteController.text.trim()),
+          tag: drift.Value('debt_payment:${item.id}'),
+          transactionDate: paymentDate,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      // 2. Deduct principal if selected
+      if (deductPrincipal) {
+        final newPrincipal = math.max(0, item.remainingPrincipalSatang - satang);
+        await ref.read(liabilitiesDaoProvider).updateLiability(
+          LiabilitiesCompanion(
+            id: drift.Value(item.id),
+            remainingPrincipalSatang: drift.Value(newPrincipal),
+            updatedAt: drift.Value(now),
+          ),
+        );
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isThai
+                ? 'บันทึกการชำระค่างวดเรียบร้อยแล้ว (${Money(satang).format(symbol: "฿")})'
+                : 'Payment of ${Money(satang).format(symbol: "฿")} recorded successfully'),
+          ),
+        );
+        _reload();
+      }
+    }
   }
 
   String _getTypeLabel(String type, bool isThai) {

@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -34,6 +35,9 @@ class _LiabilityFormDialogState extends ConsumerState<LiabilityFormDialog> {
   String _liabilityType = 'personal_loan';
   bool _isShortTerm = false;
   String? _linkedAccountId;
+  int _dueDay = 5;
+  bool _autoPay = false;
+  String? _autoPayAccountId;
 
   List<Account> _availableAccounts = [];
   bool _isLoading = true;
@@ -81,9 +85,26 @@ class _LiabilityFormDialogState extends ConsumerState<LiabilityFormDialog> {
 
   Future<void> _loadAccounts() async {
     final accs = await ref.read(accountsDaoProvider).getActiveAccounts();
+    int loadedDueDay = 5;
+    bool loadedAutoPay = false;
+    String? loadedAutoPayAccountId;
+
+    if (widget.liabilityToEdit != null) {
+      final rules = await ref.read(recurringTransactionsDaoProvider).getAllRules();
+      final existingRule = rules.where((r) => r.note?.contains('liability:${widget.liabilityToEdit!.id}') == true && r.isActive).firstOrNull;
+      if (existingRule != null) {
+        loadedAutoPay = true;
+        loadedDueDay = existingRule.dayOfMonth ?? 5;
+        loadedAutoPayAccountId = existingRule.sourceAccountId;
+      }
+    }
+
     if (mounted) {
       setState(() {
         _availableAccounts = accs;
+        _dueDay = loadedDueDay;
+        _autoPay = loadedAutoPay;
+        _autoPayAccountId = loadedAutoPayAccountId ?? _linkedAccountId ?? (accs.isNotEmpty ? accs.first.id : null);
         _isLoading = false;
       });
     }
@@ -99,12 +120,13 @@ class _LiabilityFormDialogState extends ConsumerState<LiabilityFormDialog> {
 
     final principalSatang = (principalBaht * 100).round();
     final monthlyPaymentSatang = (monthlyPaymentBaht * 100).round();
+    final liabilityId = widget.liabilityToEdit?.id ?? const Uuid().v4();
 
     if (widget.liabilityToEdit == null) {
       // Create new
       await dao.createLiability(
         LiabilitiesCompanion.insert(
-          id: const Uuid().v4(),
+          id: liabilityId,
           name: _nameController.text.trim(),
           liabilityType: _liabilityType,
           remainingPrincipalSatang: principalSatang,
@@ -121,7 +143,7 @@ class _LiabilityFormDialogState extends ConsumerState<LiabilityFormDialog> {
       // Update existing
       await dao.updateLiability(
         LiabilitiesCompanion(
-          id: drift.Value(widget.liabilityToEdit!.id),
+          id: drift.Value(liabilityId),
           name: drift.Value(_nameController.text.trim()),
           liabilityType: drift.Value(_liabilityType),
           remainingPrincipalSatang: drift.Value(principalSatang),
@@ -134,6 +156,65 @@ class _LiabilityFormDialogState extends ConsumerState<LiabilityFormDialog> {
         ),
       );
     }
+
+    // Handle Auto-Pay recurring rule
+    try {
+      final recurringDao = ref.read(recurringTransactionsDaoProvider);
+      final rules = await recurringDao.getAllRules();
+      final existingRule = rules.where((r) => r.note?.contains('liability:$liabilityId') == true).firstOrNull;
+      final payAccId = _autoPayAccountId ?? _linkedAccountId ?? (_availableAccounts.isNotEmpty ? _availableAccounts.first.id : null);
+
+      if (_autoPay && payAccId != null && monthlyPaymentSatang > 0) {
+        final now = DateTime.now();
+        var nextRun = DateTime(now.year, now.month, math.min(_dueDay, 28));
+        if (nextRun.isBefore(now)) {
+          nextRun = DateTime(now.year, now.month + 1, math.min(_dueDay, 28));
+        }
+
+        if (existingRule != null) {
+          await recurringDao.updateRule(
+            RecurringRulesCompanion(
+              id: drift.Value(existingRule.id),
+              title: drift.Value('ชำระค่างวด: ${_nameController.text.trim()}'),
+              sourceAccountId: drift.Value(payAccId),
+              amountSatang: drift.Value(monthlyPaymentSatang),
+              dayOfMonth: drift.Value(_dueDay),
+              nextRunDate: drift.Value(nextRun),
+              autoPost: const drift.Value(true),
+              isActive: const drift.Value(true),
+              note: drift.Value('ตัดค่างวดหนี้สินอัตโนมัติ liability:$liabilityId'),
+              updatedAt: drift.Value(now),
+            ),
+          );
+        } else {
+          await recurringDao.createRule(
+            RecurringRulesCompanion.insert(
+              id: const Uuid().v4(),
+              title: 'ชำระค่างวด: ${_nameController.text.trim()}',
+              transactionType: 'expense',
+              sourceAccountId: payAccId,
+              amountSatang: monthlyPaymentSatang,
+              currencyCode: 'THB',
+              frequency: 'monthly',
+              dayOfMonth: drift.Value(_dueDay),
+              nextRunDate: nextRun,
+              autoPost: const drift.Value(true),
+              note: drift.Value('ตัดค่างวดหนี้สินอัตโนมัติ liability:$liabilityId'),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+        }
+      } else if (!_autoPay && existingRule != null) {
+        await recurringDao.updateRule(
+          RecurringRulesCompanion(
+            id: drift.Value(existingRule.id),
+            isActive: const drift.Value(false),
+            updatedAt: drift.Value(DateTime.now()),
+          ),
+        );
+      }
+    } catch (_) {}
 
     if (mounted) {
       Navigator.of(context).pop(true);
@@ -315,6 +396,56 @@ class _LiabilityFormDialogState extends ConsumerState<LiabilityFormDialog> {
                         ],
                       ),
                       const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<int>(
+                              initialValue: _dueDay,
+                              decoration: InputDecoration(
+                                labelText: isThai ? 'วันที่ครบกำหนดชำระของทุกเดือน' : 'Monthly Due Day',
+                                border: const OutlineInputBorder(),
+                                isDense: true,
+                              ),
+                              items: List.generate(31, (i) => i + 1)
+                                  .map((d) => DropdownMenuItem(
+                                        value: d,
+                                        child: Text(isThai ? 'ทุกวันที่ $d ของเดือน' : 'Every $d of month'),
+                                      ))
+                                  .toList(),
+                              onChanged: (v) {
+                                if (v != null) setState(() => _dueDay = v);
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(isThai ? 'ตัดบัญชีอัตโนมัติทุกเดือน (Auto-pay)' : 'Monthly Auto-Pay'),
+                        subtitle: Text(isThai ? 'บันทึกค่าใช้จ่ายและตัดยอดหนี้อัตโนมัติตามวันที่กำหนด' : 'Auto post expense and reduce debt on due day'),
+                        value: _autoPay,
+                        onChanged: (val) => setState(() => _autoPay = val),
+                      ),
+                      if (_autoPay) ...[
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          initialValue: _autoPayAccountId,
+                          decoration: InputDecoration(
+                            labelText: isThai ? 'บัญชีที่ใช้ตัดชำระอัตโนมัติ' : 'Auto-pay Account',
+                            border: const OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          items: _availableAccounts
+                              .map((a) => DropdownMenuItem(
+                                    value: a.id,
+                                    child: Text(a.name),
+                                  ))
+                              .toList(),
+                          onChanged: (val) => setState(() => _autoPayAccountId = val),
+                        ),
+                      ],
+                      const SizedBox(height: 8),
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
                         title: Text(isThai ? 'หนี้สินระยะสั้น (ไม่เกิน 1 ปี)' : 'Short-term Debt (<= 1 year)'),

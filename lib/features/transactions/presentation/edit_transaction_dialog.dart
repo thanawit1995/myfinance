@@ -5,8 +5,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/database/app_database.dart';
+import '../../../../core/database/daos/transactions_dao.dart';
 import '../../../../core/database/database_provider.dart';
 import '../../../../core/services/widget_service.dart';
+import '../../../../core/theme/vault_theme.dart';
 import '../../../../core/widgets/category_icon_helper.dart';
 import '../../categories/presentation/category_picker_sheet.dart';
 
@@ -29,7 +31,8 @@ class EditTransactionDialog extends ConsumerStatefulWidget {
 class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
   final _formKey = GlobalKey<FormState>();
 
-  late TextEditingController _amountController;
+  late TextEditingController _sourceAmountController;
+  late TextEditingController _destinationAmountController;
   late TextEditingController _noteController;
   late TextEditingController _tagController;
   late TextEditingController _feeController;
@@ -41,6 +44,12 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
   late String? _selectedCategoryId;
   late String? _selectedTaxCategory;
   late DateTime _transactionDate;
+  String? _workPeriod;
+  bool _isCleared = true;
+
+  List<String> _systemTags = [];
+  List<Account> _accounts = [];
+  bool _loadingAccounts = true;
 
   @override
   void initState() {
@@ -52,13 +61,42 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
     _selectedCategoryId = tx.categoryId;
     _selectedTaxCategory = tx.taxCategory;
     _transactionDate = tx.transactionDate;
+    _workPeriod = tx.workPeriod;
+    _isCleared = tx.isCleared;
+
+    // Filter system tags from user-editable tag input so user doesn't accidentally delete internal keys
+    final rawTag = tx.tag ?? '';
+    final allTags = rawTag.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+    final userTags = <String>[];
+    _systemTags = [];
+    for (final t in allTags) {
+      if (t.startsWith('project:') ||
+          t.startsWith('policy:') ||
+          t.startsWith('deduction:') ||
+          t.startsWith('investment_buy:') ||
+          t.startsWith('investment_sell:') ||
+          t.startsWith('investment_income:') ||
+          t.startsWith('recurring_auto') ||
+          t.startsWith('historical_settle') ||
+          t.startsWith('debt_payment:') ||
+          t.startsWith('รายได้ ') ||
+          t.startsWith('รายได้รอบ ')) {
+        if (!t.startsWith('รายได้ ') && !t.startsWith('รายได้รอบ ')) {
+          _systemTags.add(t);
+        }
+      } else {
+        userTags.add(t);
+      }
+    }
+    _tagController = TextEditingController(text: userTags.join(', '));
+    _noteController = TextEditingController(text: tx.note ?? '');
 
     final amountDouble = tx.amountOriginalSatang / 100.0;
-    _amountController = TextEditingController(
+    _sourceAmountController = TextEditingController(
       text: amountDouble.toStringAsFixed(2).replaceAll(RegExp(r'\.00$'), ''),
     );
-    _noteController = TextEditingController(text: tx.note ?? '');
-    _tagController = TextEditingController(text: tx.tag ?? '');
+    _destinationAmountController = TextEditingController();
+
     final feeDouble = tx.feeThbSatang / 100.0;
     _feeController = TextEditingController(
       text: feeDouble > 0 ? feeDouble.toStringAsFixed(2).replaceAll(RegExp(r'\.00$'), '') : '',
@@ -67,11 +105,42 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
     _whtController = TextEditingController(
       text: whtDouble > 0 ? whtDouble.toStringAsFixed(2).replaceAll(RegExp(r'\.00$'), '') : '',
     );
+
+    _sourceAmountController.addListener(() => setState(() {}));
+    _destinationAmountController.addListener(() => setState(() {}));
+
+    _loadAccounts();
+  }
+
+  Future<void> _loadAccounts() async {
+    final accs = await ref.read(accountsDaoProvider).getActiveAccounts();
+    if (!mounted) return;
+    setState(() {
+      _accounts = accs;
+      _loadingAccounts = false;
+
+      final tx = widget.transaction;
+      if (tx.transactionType == 'transfer') {
+        final src = accs.where((a) => a.id == _selectedAccountId).firstOrNull;
+        final dst = accs.where((a) => a.id == _selectedDestinationAccountId).firstOrNull;
+        if (src?.currencyCode == 'THB' && dst?.currencyCode == 'USD') {
+          _sourceAmountController.text = (tx.amountThbSatang / 100.0).toStringAsFixed(2).replaceAll(RegExp(r'\.00$'), '');
+          _destinationAmountController.text = (tx.amountOriginalSatang / 100.0).toStringAsFixed(2).replaceAll(RegExp(r'\.00$'), '');
+        } else if (src?.currencyCode == 'USD' && dst?.currencyCode == 'THB') {
+          _sourceAmountController.text = (tx.amountOriginalSatang / 100.0).toStringAsFixed(2).replaceAll(RegExp(r'\.00$'), '');
+          _destinationAmountController.text = (tx.amountThbSatang / 100.0).toStringAsFixed(2).replaceAll(RegExp(r'\.00$'), '');
+        } else {
+          _sourceAmountController.text = (tx.amountOriginalSatang / 100.0).toStringAsFixed(2).replaceAll(RegExp(r'\.00$'), '');
+          _destinationAmountController.text = (tx.amountOriginalSatang / 100.0).toStringAsFixed(2).replaceAll(RegExp(r'\.00$'), '');
+        }
+      }
+    });
   }
 
   @override
   void dispose() {
-    _amountController.dispose();
+    _sourceAmountController.dispose();
+    _destinationAmountController.dispose();
     _noteController.dispose();
     _tagController.dispose();
     _feeController.dispose();
@@ -109,36 +178,143 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
     }
   }
 
+  Future<void> _pickWorkPeriod() async {
+    final now = DateTime.now();
+    int curYear = now.year;
+    int curMonth = now.month;
+    if (_workPeriod != null && _workPeriod!.contains('-')) {
+      final parts = _workPeriod!.split('-');
+      curYear = int.tryParse(parts[0]) ?? now.year;
+      curMonth = int.tryParse(parts[1]) ?? now.month;
+    }
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime(curYear, curMonth),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      helpText: 'เลือกรอบเดือนของรายได้ (Work Period)',
+    );
+
+    if (picked != null && mounted) {
+      setState(() {
+        _workPeriod = '${picked.year}-${picked.month.toString().padLeft(2, '0')}';
+      });
+    }
+  }
+
+  String _getCalculatedFxRateText(String srcCurrency, String dstCurrency) {
+    final src = double.tryParse(_sourceAmountController.text.trim()) ?? 0.0;
+    final dst = double.tryParse(_destinationAmountController.text.trim()) ?? 0.0;
+    if (src <= 0 || dst <= 0) return '';
+    if (srcCurrency == 'THB' && dstCurrency == 'USD') {
+      final rate = src / dst;
+      return '1 USD ≈ ${rate.toStringAsFixed(4)} THB';
+    } else if (srcCurrency == 'USD' && dstCurrency == 'THB') {
+      final rate = dst / src;
+      return '1 USD ≈ ${rate.toStringAsFixed(4)} THB';
+    } else {
+      final rate = src / dst;
+      return '1 $dstCurrency ≈ ${rate.toStringAsFixed(4)} $srcCurrency';
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final amountDouble = double.tryParse(_amountController.text.trim()) ?? 0.0;
-    if (amountDouble <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณาระบุจำนวนเงินที่มากกว่า 0')),
-      );
-      return;
+    final srcAccount = _accounts.where((a) => a.id == _selectedAccountId).firstOrNull;
+    final dstAccount = _transactionType == 'transfer'
+        ? _accounts.where((a) => a.id == _selectedDestinationAccountId).firstOrNull
+        : null;
+
+    final srcCurrency = srcAccount?.currencyCode ?? widget.transaction.currencyCode;
+    final dstCurrency = dstAccount?.currencyCode ?? srcCurrency;
+
+    int amountOriginalSatang;
+    int amountThbSatang;
+    String currencyCode;
+    String fxRate;
+
+    if (_transactionType == 'transfer' && srcCurrency != dstCurrency) {
+      final srcDouble = double.tryParse(_sourceAmountController.text.trim()) ?? 0.0;
+      final dstDouble = double.tryParse(_destinationAmountController.text.trim()) ?? 0.0;
+      if (srcDouble <= 0 || dstDouble <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('กรุณาระบุจำนวนเงินทั้งต้นทางและปลายทางให้มากกว่า 0')),
+        );
+        return;
+      }
+
+      if (srcCurrency == 'THB' && dstCurrency == 'USD') {
+        currencyCode = 'USD';
+        amountOriginalSatang = (dstDouble * 100).round();
+        amountThbSatang = (srcDouble * 100).round();
+        final calculatedRate = srcDouble / dstDouble;
+        fxRate = Decimal.parse(calculatedRate.toStringAsFixed(6)).toString();
+      } else if (srcCurrency == 'USD' && dstCurrency == 'THB') {
+        currencyCode = 'USD';
+        amountOriginalSatang = (srcDouble * 100).round();
+        amountThbSatang = (dstDouble * 100).round();
+        final calculatedRate = dstDouble / srcDouble;
+        fxRate = Decimal.parse(calculatedRate.toStringAsFixed(6)).toString();
+      } else {
+        currencyCode = dstCurrency != 'THB' ? dstCurrency : srcCurrency;
+        amountOriginalSatang = (dstDouble * 100).round();
+        amountThbSatang = (srcDouble * 100).round();
+        final calculatedRate = srcDouble / dstDouble;
+        fxRate = Decimal.parse(calculatedRate.toStringAsFixed(6)).toString();
+      }
+    } else {
+      final amountDouble = double.tryParse(_sourceAmountController.text.trim()) ?? 0.0;
+      if (amountDouble <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('กรุณาระบุจำนวนเงินที่มากกว่า 0')),
+        );
+        return;
+      }
+      amountOriginalSatang = (amountDouble * 100).round();
+      currencyCode = srcCurrency;
+      if (currencyCode == 'THB') {
+        amountThbSatang = amountOriginalSatang;
+        fxRate = '1.000000';
+      } else {
+        fxRate = widget.transaction.fxRate;
+        final fxDecimal = Decimal.tryParse(fxRate) ?? Decimal.one;
+        amountThbSatang = (Decimal.fromInt(amountOriginalSatang) * fxDecimal).round().toBigInt().toInt();
+      }
     }
 
-    final satang = (amountDouble * 100).round();
     final feeDouble = double.tryParse(_feeController.text.trim()) ?? 0.0;
     final feeSatang = _transactionType == 'transfer' ? (feeDouble * 100).round() : 0;
 
-    final sourceAccount = _selectedAccountId != null
-        ? await ref.read(accountsDaoProvider).getAccountById(_selectedAccountId!)
-        : null;
-
-    final currency = sourceAccount?.currencyCode ?? widget.transaction.currencyCode;
     final note = _noteController.text.trim();
-    final tag = _tagController.text.trim();
+    final userEnteredTags = _tagController.text
+        .split(',')
+        .map((t) => t.trim())
+        .where((t) => t.isNotEmpty)
+        .toList();
+
+    final combinedTags = <String>[...userEnteredTags];
+
+    // If income has workPeriod, format period tag
+    if (_transactionType == 'income' && _workPeriod != null && _workPeriod!.trim().isNotEmpty) {
+      final periodTag = TransactionsDao.formatPeriodToTag(_workPeriod!);
+      if (!combinedTags.contains(periodTag)) {
+        combinedTags.add(periodTag);
+      }
+    }
+
+    // Preserve system tags
+    for (final st in _systemTags) {
+      if (!combinedTags.contains(st)) {
+        combinedTags.add(st);
+      }
+    }
+
+    final finalTag = combinedTags.isEmpty ? null : combinedTags.join(', ');
 
     final whtDouble = double.tryParse(_whtController.text.trim()) ?? 0.0;
     final whtSatang = (whtDouble * 100).round();
-
-    final fxDecimal = Decimal.tryParse(widget.transaction.fxRate) ?? Decimal.one;
-    final thbSatang = currency == 'THB'
-        ? satang
-        : (Decimal.fromInt(satang) * fxDecimal).round().toBigInt().toInt();
 
     final resolvedAccountId = _selectedAccountId ?? widget.transaction.sourceAccountId ?? widget.transaction.destinationAccountId;
 
@@ -148,18 +324,19 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
       sourceAccountId: Value(resolvedAccountId),
       destinationAccountId: _transactionType == 'transfer' ? Value(_selectedDestinationAccountId) : Value(resolvedAccountId),
       categoryId: _transactionType != 'transfer' ? Value(_selectedCategoryId) : const Value(null),
-      amountOriginalSatang: Value(satang),
-      currencyCode: Value(currency),
-      amountThbSatang: Value(thbSatang),
+      amountOriginalSatang: Value(amountOriginalSatang),
+      currencyCode: Value(currencyCode),
+      amountThbSatang: Value(amountThbSatang),
+      fxRate: Value(fxRate),
       feeThbSatang: Value(feeSatang),
       taxCategory: Value(_transactionType == 'income' ? _selectedTaxCategory : null),
       withholdingTaxSatang: Value(_transactionType == 'income' ? whtSatang : 0),
-      tag: Value(tag.isEmpty ? null : tag),
+      tag: Value(finalTag),
       note: Value(note.isEmpty ? null : note),
       transactionDate: Value(_transactionDate),
-      workPeriod: Value(_transactionType == 'income' ? widget.transaction.workPeriod : null),
+      workPeriod: Value(_transactionType == 'income' ? _workPeriod : null),
       expectedAmountSatang: Value(_transactionType == 'income' ? widget.transaction.expectedAmountSatang : null),
-      isCleared: Value(_transactionType == 'income' ? widget.transaction.isCleared : true),
+      isCleared: Value(_transactionType == 'income' ? _isCleared : true),
       updatedAt: Value(DateTime.now()),
     );
 
@@ -332,6 +509,22 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    if (_loadingAccounts) {
+      return const AlertDialog(
+        content: SizedBox(
+          height: 100,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+
+    final srcAcc = _accounts.where((a) => a.id == _selectedAccountId).firstOrNull;
+    final dstAcc = _accounts.where((a) => a.id == _selectedDestinationAccountId).firstOrNull;
+    final isCrossCurrencyTransfer = _transactionType == 'transfer' &&
+        srcAcc != null &&
+        dstAcc != null &&
+        srcAcc.currencyCode != dstAcc.currencyCode;
+
     return AlertDialog(
       title: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -353,7 +546,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
         ],
       ),
       content: SizedBox(
-        width: 440,
+        width: 460,
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -374,30 +567,135 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                 ),
                 const SizedBox(height: 8),
 
-                // 2. Amount
-                TextFormField(
-                  controller: _amountController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                  ],
-                  decoration: InputDecoration(
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    labelText: 'จำนวนเงิน *',
-                    prefixText: widget.transaction.currencyCode == 'USD' ? r'$ ' : '฿ ',
-                    border: const OutlineInputBorder(),
+                // 2. Transfer Accounts Dropdowns (Placed above Amount for transfers so dual-currency reacts)
+                if (_transactionType == 'transfer') ...[
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      labelText: 'จากบัญชีต้นทาง',
+                      border: OutlineInputBorder(),
+                    ),
+                    initialValue: _accounts.any((a) => a.id == _selectedAccountId) ? _selectedAccountId : null,
+                    items: _accounts.map((a) => DropdownMenuItem(value: a.id, child: Text('${a.name} (${a.currencyCode})'))).toList(),
+                    onChanged: (val) {
+                      setState(() {
+                        _selectedAccountId = val;
+                        if (_selectedDestinationAccountId == val) {
+                          final remaining = _accounts.where((a) => a.id != val).toList();
+                          _selectedDestinationAccountId = remaining.isNotEmpty ? remaining.first.id : null;
+                        }
+                      });
+                    },
                   ),
-                  validator: (val) {
-                    if (val == null || val.trim().isEmpty) return 'กรุณากรอกจำนวนเงิน';
-                    final d = double.tryParse(val.trim());
-                    if (d == null || d <= 0) return 'จำนวนเงินต้องมากกว่า 0';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 8),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      labelText: 'ไปยังบัญชีปลายทาง',
+                      border: OutlineInputBorder(),
+                    ),
+                    initialValue: _accounts.any((a) => a.id == _selectedDestinationAccountId) ? _selectedDestinationAccountId : null,
+                    items: _accounts.where((a) => a.id != _selectedAccountId).map((a) => DropdownMenuItem(value: a.id, child: Text('${a.name} (${a.currencyCode})'))).toList(),
+                    onChanged: (val) => setState(() => _selectedDestinationAccountId = val),
+                  ),
+                  const SizedBox(height: 8),
+                ],
 
-                // 3. Category / Destination Account
+                // 3. Amount Field(s)
+                if (isCrossCurrencyTransfer) ...[
+                  // Dual currency amount inputs
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _sourceAmountController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                          ],
+                          decoration: InputDecoration(
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            labelText: 'เงินต้นทาง (${srcAcc.currencyCode}) *',
+                            prefixText: srcAcc.currencyCode == 'USD' ? r'$ ' : '฿ ',
+                            border: const OutlineInputBorder(),
+                          ),
+                          validator: (val) {
+                            if (val == null || val.trim().isEmpty) return 'กรุณาระบุ';
+                            final d = double.tryParse(val.trim());
+                            if (d == null || d <= 0) return '> 0';
+                            return null;
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _destinationAmountController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                          ],
+                          decoration: InputDecoration(
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            labelText: 'เงินปลายทาง (${dstAcc.currencyCode}) *',
+                            prefixText: dstAcc.currencyCode == 'USD' ? r'$ ' : '฿ ',
+                            border: const OutlineInputBorder(),
+                          ),
+                          validator: (val) {
+                            if (val == null || val.trim().isEmpty) return 'กรุณาระบุ';
+                            final d = double.tryParse(val.trim());
+                            if (d == null || d <= 0) return '> 0';
+                            return null;
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_getCalculatedFxRateText(srcAcc.currencyCode, dstAcc.currencyCode).isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: Text(
+                        '💱 เรตคำนวณ: ${_getCalculatedFxRateText(srcAcc.currencyCode, dstAcc.currencyCode)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                ] else ...[
+                  // Single Amount field
+                  TextFormField(
+                    controller: _sourceAmountController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                    ],
+                    decoration: InputDecoration(
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      labelText: 'จำนวนเงิน *',
+                      prefixText: (srcAcc?.currencyCode ?? widget.transaction.currencyCode) == 'USD' ? r'$ ' : '฿ ',
+                      border: const OutlineInputBorder(),
+                    ),
+                    validator: (val) {
+                      if (val == null || val.trim().isEmpty) return 'กรุณากรอกจำนวนเงิน';
+                      final d = double.tryParse(val.trim());
+                      if (d == null || d <= 0) return 'จำนวนเงินต้องมากกว่า 0';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                ],
+
+                // 4. Category (Non-transfer)
                 if (_transactionType != 'transfer') ...[
                   FutureBuilder<List<Category>>(
                     future: ref.read(categoriesDaoProvider).getActiveCategories(_transactionType),
@@ -424,12 +722,12 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                                     _selectedTaxCategory = chosen.taxIncomeType;
                                   }
                                 } else {
-                                  final name = '${chosen.nameTh} ${chosen.nameEn}'.toLowerCase();
-                                  if (name.contains('รับจ้าง') || name.contains('เวร') || name.contains('เงินเดือน')) {
+                                  final catName = '${chosen.nameTh} ${chosen.nameEn}'.toLowerCase();
+                                  if (catName.contains('รับจ้าง') || catName.contains('เวร') || catName.contains('เงินเดือน')) {
                                     _selectedTaxCategory = '40_1';
-                                  } else if (name.contains('ดอกเบี้ย') || name.contains('ปันผล')) {
+                                  } else if (catName.contains('ดอกเบี้ย') || catName.contains('ปันผล')) {
                                     _selectedTaxCategory = '40_4_interest';
-                                  } else if (name.contains('รายรับอื่นๆ')) {
+                                  } else if (catName.contains('รายรับอื่นๆ')) {
                                     _selectedTaxCategory = 'non_taxable';
                                   }
                                 }
@@ -460,86 +758,161 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                     },
                   ),
                   const SizedBox(height: 8),
+
+                  // Account Selector for Non-transfer
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      labelText: 'บัญชี',
+                      border: OutlineInputBorder(),
+                    ),
+                    initialValue: _accounts.any((a) => a.id == _selectedAccountId) ? _selectedAccountId : null,
+                    items: _accounts.map((a) => DropdownMenuItem(value: a.id, child: Text('${a.name} (${a.currencyCode})'))).toList(),
+                    onChanged: (val) => setState(() => _selectedAccountId = val),
+                  ),
+                  const SizedBox(height: 8),
                 ],
-
-                // 4. Account Selector
-                FutureBuilder<List<Account>>(
-                  future: ref.read(accountsDaoProvider).getActiveAccounts(),
-                  builder: (context, snapshot) {
-                    final accounts = snapshot.data ?? [];
-                    if (_transactionType == 'transfer') {
-                      final destAccounts = accounts.where((a) => a.id != _selectedAccountId).toList();
-                      final effectiveDestId = destAccounts.any((a) => a.id == _selectedDestinationAccountId)
-                          ? _selectedDestinationAccountId
-                          : (destAccounts.isNotEmpty ? destAccounts.first.id : null);
-
-                      return Column(
-                        children: [
-                          DropdownButtonFormField<String>(
-                            key: ValueKey('dest_$effectiveDestId'),
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                              labelText: 'ไปยังบัญชีปลายทาง',
-                              border: OutlineInputBorder(),
-                            ),
-                            initialValue: effectiveDestId,
-                            items: destAccounts.map((a) => DropdownMenuItem(value: a.id, child: Text('${a.name} (${a.currencyCode})'))).toList(),
-                            onChanged: (val) => setState(() => _selectedDestinationAccountId = val),
-                          ),
-                          const SizedBox(height: 8),
-                          DropdownButtonFormField<String>(
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                              labelText: 'จากบัญชีต้นทาง',
-                              border: OutlineInputBorder(),
-                            ),
-                            initialValue: accounts.any((a) => a.id == _selectedAccountId) ? _selectedAccountId : null,
-                            items: accounts.map((a) => DropdownMenuItem(value: a.id, child: Text('${a.name} (${a.currencyCode})'))).toList(),
-                            onChanged: (val) {
-                              setState(() {
-                                _selectedAccountId = val;
-                                if (_selectedDestinationAccountId == val) {
-                                  final remaining = accounts.where((a) => a.id != val).toList();
-                                  _selectedDestinationAccountId = remaining.isNotEmpty ? remaining.first.id : null;
-                                }
-                              });
-                            },
-                          ),
-                        ],
-                      );
-                    } else {
-                      final effectiveAccountId = accounts.any((a) => a.id == _selectedAccountId)
-                          ? _selectedAccountId
-                          : (accounts.any((a) => a.id == widget.transaction.destinationAccountId)
-                              ? widget.transaction.destinationAccountId
-                              : (accounts.where((a) => a.currencyCode == widget.transaction.currencyCode).firstOrNull?.id ??
-                                  (accounts.isNotEmpty ? accounts.first.id : null)));
-
-                      return DropdownButtonFormField<String>(
-                        key: ValueKey('acc_${effectiveAccountId}_${accounts.length}'),
-                        decoration: const InputDecoration(
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          labelText: 'บัญชี',
-                          border: OutlineInputBorder(),
-                        ),
-                        value: effectiveAccountId,
-                        items: accounts.map((a) => DropdownMenuItem(value: a.id, child: Text('${a.name} (${a.currencyCode})'))).toList(),
-                        onChanged: (val) => setState(() => _selectedAccountId = val),
-                      );
-                    }
-                  },
-                ),
-                const SizedBox(height: 8),
 
                 // 5. Date & Time Picker
                 _buildDatePicker(theme),
                 const SizedBox(height: 8),
 
-                // Income-specific fields: Tax Category, WHT & Fee in a compact row
+                // 6. Income-specific Section: Accrued status, Work Period, Tax & WHT
                 if (_transactionType == 'income') ...[
+                  // Accrued Received / Pending Status Card
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: _isCleared
+                          ? VaultTheme.positive(context).withValues(alpha: 0.08)
+                          : Colors.amber.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: _isCleared
+                            ? VaultTheme.positive(context).withValues(alpha: 0.3)
+                            : Colors.amber.shade700,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _isCleared ? Icons.check_circle : Icons.pending_actions,
+                          size: 20,
+                          color: _isCleared ? VaultTheme.positive(context) : Colors.amber.shade800,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _isCleared ? 'สถานะ: ได้รับเงินแล้ว (Cleared)' : 'สถานะ: ค้างรับ (ยังไม่ได้รับเงินจริง)',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: _isCleared ? VaultTheme.positive(context) : Colors.amber.shade900,
+                                ),
+                              ),
+                              if (!_isCleared)
+                                const Text(
+                                  'เงินยังไม่เข้าบัญชีจริงจนกว่าจะกดรับเงิน',
+                                  style: TextStyle(fontSize: 11, color: Colors.black54),
+                                ),
+                            ],
+                          ),
+                        ),
+                        if (!_isCleared)
+                          FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: VaultTheme.positive(context),
+                              foregroundColor: Colors.white,
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _isCleared = true;
+                              });
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('เปลี่ยนสถานะเป็น "รับเงินแล้ว" (กดบันทึกการแก้ไขเพื่อยืนยัน)')),
+                              );
+                            },
+                            icon: const Icon(Icons.check, size: 16),
+                            label: const Text('รับแล้ว', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          )
+                        else
+                          TextButton(
+                            style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                            onPressed: () {
+                              setState(() {
+                                _isCleared = false;
+                              });
+                            },
+                            child: const Text('เปลี่ยนเป็นค้างรับ', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Accrued Work Period Selector
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: theme.dividerColor),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.calendar_month_outlined, size: 20, color: Colors.blueGrey),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('รอบเดือนของรายได้ (Work Period)', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                              const SizedBox(height: 2),
+                              Text(
+                                _workPeriod != null && _workPeriod!.trim().isNotEmpty
+                                    ? TransactionsDao.formatPeriodToTag(_workPeriod!)
+                                    : 'ไม่ได้ระบุรอบเดือน (นับตามวันทำรายการ)',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: _workPeriod != null && _workPeriod!.trim().isNotEmpty
+                                      ? theme.colorScheme.primary
+                                      : Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (_workPeriod != null && _workPeriod!.trim().isNotEmpty) ...[
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 16, color: Colors.red),
+                            tooltip: 'ล้างรอบเดือน',
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () => setState(() => _workPeriod = null),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.edit_calendar, size: 18),
+                            tooltip: 'เปลี่ยนรอบเดือน',
+                            visualDensity: VisualDensity.compact,
+                            onPressed: _pickWorkPeriod,
+                          ),
+                        ] else ...[
+                          FilledButton.tonal(
+                            style: FilledButton.styleFrom(visualDensity: VisualDensity.compact),
+                            onPressed: _pickWorkPeriod,
+                            child: const Text('ระบุรอบเดือน', style: TextStyle(fontSize: 12)),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
                   DropdownButtonFormField<String>(
                     decoration: const InputDecoration(
                       isDense: true,
@@ -547,7 +920,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                       labelText: 'ประเภทภาษีเงินได้บุคคลธรรมดา (ภ.ง.ด.)',
                       border: OutlineInputBorder(),
                     ),
-                    value: _selectedTaxCategory,
+                    initialValue: _selectedTaxCategory,
                     items: const [
                       DropdownMenuItem(value: '40_1', child: Text('40(1) เงินเดือน / โบนัส')),
                       DropdownMenuItem(value: '40_2', child: Text('40(2) ค่าจ้าง / ฟรีแลนซ์')),

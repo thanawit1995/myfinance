@@ -5,7 +5,6 @@ import '../../../../core/money/money.dart';
 import '../domain/models/health_metric_result.dart';
 import '../domain/run_rate_calculator.dart';
 import 'health_settings_dialog.dart';
-import 'liabilities_insurance_screen.dart';
 import 'metric_detail_sheet.dart';
 
 class FinancialHealthScreen extends ConsumerStatefulWidget {
@@ -35,15 +34,6 @@ class _FinancialHealthScreenState extends ConsumerState<FinancialHealthScreen> {
           softWrap: true,
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.shield_outlined),
-            tooltip: isThai ? 'ทะเบียนหนี้สินและประกัน' : 'Debts & Insurance',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const LiabilitiesInsuranceScreen()),
-              ).then((_) => _refresh());
-            },
-          ),
           IconButton(
             icon: const Icon(Icons.tune),
             tooltip: isThai ? 'ตั้งค่าเกณฑ์สุขภาพการเงิน' : 'Health Metric Settings',
@@ -112,27 +102,7 @@ class _FinancialHealthScreenState extends ConsumerState<FinancialHealthScreen> {
                   const SizedBox(height: 24),
                 ],
 
-                // 6. Navigation shortcut to Liabilities & Insurance
-                Card(
-                  elevation: 0,
-                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  child: ListTile(
-                    leading: const Icon(Icons.assignment_outlined, color: Colors.indigo),
-                    title: Text(
-                      isThai ? 'จัดการทะเบียนหนี้สินและกรมธรรม์ประกัน' : 'Manage Debts & Insurance Policies',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                    ),
-                    subtitle: Text(isThai ? 'บันทึกยอดหนี้ วงเงินบัตร และความคุ้มครองประกันภัย' : 'Track loan balances, credit limits and coverage'),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const LiabilitiesInsuranceScreen()),
-                      ).then((_) => _refresh());
-                    },
-                  ),
-                ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 24),
               ],
             );
           },

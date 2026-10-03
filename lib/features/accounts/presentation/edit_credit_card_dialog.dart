@@ -110,9 +110,10 @@ class _EditCreditCardDialogState extends ConsumerState<EditCreditCardDialog> {
 
     return Dialog(
       backgroundColor: surface,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 32),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
+        constraints: const BoxConstraints(maxWidth: 480),
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(22),
           child: Form(
@@ -121,7 +122,7 @@ class _EditCreditCardDialogState extends ConsumerState<EditCreditCardDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Header
+                // ── Header ──
                 Row(
                   children: [
                     Container(
@@ -162,7 +163,7 @@ class _EditCreditCardDialogState extends ConsumerState<EditCreditCardDialog> {
                 ),
                 const SizedBox(height: 20),
 
-                // Card Name
+                // ── ชื่อบัตร ──
                 TextFormField(
                   controller: _nameController,
                   decoration: InputDecoration(
@@ -179,74 +180,63 @@ class _EditCreditCardDialogState extends ConsumerState<EditCreditCardDialog> {
                 ),
                 const SizedBox(height: 16),
 
-                // Days Row: Closing Day & Payment Due Day
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Closing Day
-                    Expanded(
-                      child: TextFormField(
-                        controller: _closingDayController,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(2),
-                        ],
-                        onChanged: (_) => setState(() {}),
-                        decoration: InputDecoration(
-                          labelText: isThai ? 'วันตัดรอบ (1-31)' : 'Closing Day (1-31)',
-                          hintText: '23',
-                          prefixIcon: const Icon(Icons.calendar_month_outlined, size: 20),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          helperText: isThai ? 'สรุปยอดทุกวันที่' : 'Closes on day',
-                        ),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) {
-                            return isThai ? 'โปรดระบุ' : 'Required';
-                          }
-                          final d = int.tryParse(v.trim());
-                          if (d == null || d < 1 || d > 31) {
-                            return isThai ? '1-31 เท่านั้น' : '1-31 only';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    // Payment Due Day
-                    Expanded(
-                      child: TextFormField(
-                        controller: _dueDayController,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(2),
-                        ],
-                        onChanged: (_) => setState(() {}),
-                        decoration: InputDecoration(
-                          labelText: isThai ? 'วันชำระ (1-31)' : 'Due Day (1-31)',
-                          hintText: '10',
-                          prefixIcon: const Icon(Icons.event_available_outlined, size: 20),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          helperText: isThai ? 'ครบชำระวันที่' : 'Due on day',
-                        ),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) {
-                            return isThai ? 'โปรดระบุ' : 'Required';
-                          }
-                          final d = int.tryParse(v.trim());
-                          if (d == null || d < 1 || d > 31) {
-                            return isThai ? '1-31 เท่านั้น' : '1-31 only';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
+                // ── วันตัดรอบบิล (แถวเดียว เต็มความกว้าง) ──
+                TextFormField(
+                  controller: _closingDayController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(2),
                   ],
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    labelText: isThai ? 'วันตัดรอบบิล (1-31)' : 'Statement Closing Day (1-31)',
+                    hintText: '23',
+                    prefixIcon: const Icon(Icons.calendar_month_outlined, size: 20),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return isThai ? 'โปรดระบุวันตัดรอบ' : 'Required';
+                    }
+                    final d = int.tryParse(v.trim());
+                    if (d == null || d < 1 || d > 31) {
+                      return isThai ? 'กรอก 1-31 เท่านั้น' : 'Enter 1-31 only';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 16),
 
-                // Credit Limit (Optional)
+                // ── วันครบกำหนดชำระ (แถวเดียว เต็มความกว้าง) ──
+                TextFormField(
+                  controller: _dueDayController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(2),
+                  ],
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    labelText: isThai ? 'วันครบกำหนดชำระ (1-31)' : 'Payment Due Day (1-31)',
+                    hintText: '10',
+                    prefixIcon: const Icon(Icons.event_available_outlined, size: 20),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return isThai ? 'โปรดระบุวันชำระ' : 'Required';
+                    }
+                    final d = int.tryParse(v.trim());
+                    if (d == null || d < 1 || d > 31) {
+                      return isThai ? 'กรอก 1-31 เท่านั้น' : 'Enter 1-31 only';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // ── วงเงินบัตร (ไม่บังคับ) ──
                 TextFormField(
                   controller: _creditLimitController,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -259,9 +249,9 @@ class _EditCreditCardDialogState extends ConsumerState<EditCreditCardDialog> {
                 ),
                 const SizedBox(height: 18),
 
-                // Realtime Preview Box
+                // ── Preview Box ──
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: accent.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
@@ -271,17 +261,18 @@ class _EditCreditCardDialogState extends ConsumerState<EditCreditCardDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Icon(Icons.info_outline_rounded, color: accent, size: 18),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           isThai
-                              ? 'ตัดรอบบิลทุกวันที่ $currentClosingDay ของเดือน และครบกำหนดชำระวันที่ $currentDueDay ของเดือนถัดไป'
-                              : 'Statement closes on day $currentClosingDay and payment is due on day $currentDueDay of next month.',
+                              ? 'ตัดรอบบิลทุกวันที่ $currentClosingDay และครบกำหนดชำระวันที่ $currentDueDay ของเดือนถัดไป'
+                              : 'Statement closes on day $currentClosingDay · payment due on day $currentDueDay of next month.',
                           style: TextStyle(
                             fontFamily: VaultTheme.fontFamily,
-                            fontSize: 12.5,
+                            fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: primaryText,
+                            height: 1.5,
                           ),
                         ),
                       ),
@@ -290,7 +281,7 @@ class _EditCreditCardDialogState extends ConsumerState<EditCreditCardDialog> {
                 ),
                 const SizedBox(height: 24),
 
-                // Action Buttons
+                // ── ปุ่ม ──
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
@@ -304,7 +295,7 @@ class _EditCreditCardDialogState extends ConsumerState<EditCreditCardDialog> {
                       style: FilledButton.styleFrom(
                         backgroundColor: accent,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       child: _isSaving

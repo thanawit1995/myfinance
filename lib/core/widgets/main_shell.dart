@@ -13,6 +13,8 @@ import '../../features/investments/presentation/portfolio_screen.dart';
 import '../../features/plan/presentation/plan_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/transactions/presentation/quick_add_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../features/onboarding/presentation/partner_welcome_tutorial_dialog.dart';
 import '../../l10n/app_localizations.dart';
 
 class MainShell extends ConsumerStatefulWidget {
@@ -53,6 +55,19 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
     // Check PIN / Biometrics on app launch and process recurring rules
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _checkAppLockOnStartup();
+
+      // Check if this is a partner gift open or first-time onboarding
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final shouldShow = prefs.getBool('should_show_partner_welcome') == true;
+        final hasSeen = prefs.getBool('has_seen_partner_tutorial') == true;
+        if ((shouldShow || (!hasSeen && widget.currentThemeStyle == AppThemeStyle.lumi)) && mounted) {
+          final partnerName = prefs.getString('partner_name') ?? 'Pealpeal';
+          await PartnerWelcomeTutorialDialog.show(context, partnerName: partnerName);
+        }
+      } catch (e) {
+        debugPrint('Error showing partner welcome tutorial: $e');
+      }
 
       try {
         final posted = await ref.read(recurringTransactionsDaoProvider).processDueRules();

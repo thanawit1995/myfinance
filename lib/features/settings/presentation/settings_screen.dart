@@ -18,6 +18,8 @@ import '../../../core/theme/app_theme_style.dart';
 import '../../reports/presentation/reports_screen.dart';
 import '../../backup/presentation/backup_restore_screen.dart';
 import '../../import/presentation/import_wizard_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../onboarding/presentation/partner_welcome_tutorial_dialog.dart';
 import 'trash_bin_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -153,6 +155,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ],
               onChanged: (m) {
                 if (m != null) widget.onThemeModeChanged(m);
+              },
+            ),
+            _buildDivider(),
+            _buildTile(
+              icon: Icons.auto_awesome_rounded,
+              iconColor: const Color(0xFFFF5B9A),
+              title: isThai ? 'คู่มือแนะนำการใช้งาน (App Tour)' : 'App Tour & Guide',
+              subtitle: isThai ? 'ดูคำแนะนำสั้นๆ และวิธีติดตั้งลงหน้าจอโฮม' : 'View quick guide & Add to Home Screen tips',
+              onTap: () async {
+                final prefs = await SharedPreferences.getInstance();
+                final partnerName = prefs.getString('partner_name') ?? 'Pealpeal';
+                if (context.mounted) {
+                  await PartnerWelcomeTutorialDialog.show(context, partnerName: partnerName);
+                }
               },
             ),
           ]),

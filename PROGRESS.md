@@ -1,6 +1,31 @@
 # บันทึกความคืบหน้าโครงการ MyFinance (PROGRESS.md)
 
-อัปเดตล่าสุด: 3 ตุลาคม 2026 (รอบดึกพิเศษ)
+อัปเดตล่าสุด: 3 ตุลาคม 2026 (รอบดึกส่งท้าย)
+
+- [x] **Partner Gifting Edition (Pealpeal) & iPhone 14 Pro Onboarding Experience (3 ต.ค. 2026)**:
+  - **1. ระบบ Smart Gift Link ตรวจจับพารามิเตอร์อัตโนมัติ (`main.dart`)**:
+    - รองรับ URL พารามิเตอร์ เช่น `?to=Pealpeal&preset=lumi_en` หรือ `?to=Pealpeal`
+    - เมื่อภรรยาแตะเปิดลิงก์ ระบบจะตั้งค่าเฉพาะเครื่อง iPhone ของเธออัตโนมัติทันที:
+      - ภาษา: **English (EN)**
+      - สไตล์ดีไซน์: **Lumi (Sunny Bloom Pastel)**
+      - ธีมสี: **Follow System (สว่าง/มืดตามการตั้งค่าของ iOS)**
+      - บันทึกชื่อ *"Pealpeal"* ลงใน SharedPreferences ประจำเครื่องของเธอ โดยไม่ส่งผลกระทบใดๆ ต่อเครื่อง PC หรือ Android ของคุณ 100%
+  - **2. Interactive Welcome & Mini Tutorial Dialog (`partner_welcome_tutorial_dialog.dart`)**:
+    - สร้างหน้าต่างต้อนรับสุดประทับใจสไตล์พาสเทล Lumi พร้อมลูกเล่น Carousel 4 สไลด์:
+      - **Slide 1 — Welcome, Pealpeal 💕**: ข้อความต้อนรับสุดอบอุ่น สร้างขึ้นด้วยความรัก พร้อมการันตีความปลอดภัยของสมุดบัญชีส่วนตัว 100%
+      - **Slide 2 — Gentle & Uplifting Design 🌸**: แนะนำดีไซน์ Sunny Bloom เน้นความสบายตา สดใส เรียบง่าย และสบายใจในทุกๆ วัน
+      - **Slide 3 — Effortless Daily Moments ☕**: แนะนำปุ่ม (+) บันทึกค่ากาแฟ ช้อปปิ้ง หรือช่วงเวลาดีๆ ใน 3 วินาที
+      - **Slide 4 — Add to Your Home Screen 📱**: แนะนำขั้นตอนกดปุ่ม Share (📤) และ "Add to Home Screen" (➕) ใน Safari เพื่อให้ใช้งานได้เสมือน Native iOS App เต็มหน้าจอ ไร้ URL Bar
+    - รองรับการกด Skip เพื่อเข้าใช้งานทันที และปุ่มเปิดดูซ้ำได้จากหน้า Settings ("App Tour & Guide 🌸")
+  - **3. ปกป้องความสมบูรณ์แบบบน iPhone 14 Pro & Dynamic Island**:
+    - ตรวจสอบ Safe Area ด้านบน (54 pt) ไม่ให้ Dynamic Island บดบังเนื้อหาหรือปุ่ม
+    - ตรวจสอบ Safe Area ด้านล่าง (34 pt) และเผื่อระยะห่าง 80 pt ในหน้าจอหลัก ป้องกันไม่ให้แถบ Home Indicator หรือปุ่มลอยทับซ้อนรายการ
+    - ป้องกันปัญหาข้อความล้น (RenderFlex Overflow) ด้วย `Wrap` และ `Flexible` ในทุกองค์ประกอบ
+  - **4. การทดสอบและการรับรองคุณภาพ**:
+    - เพิ่ม Unit & Widget Test: `test/features/partner_welcome_tutorial_test.dart`
+    - `flutter test`: ผ่านทั้งหมด **190/190 tests passed** (100%)
+    - `flutter analyze --no-fatal-infos`: **0 errors, 0 warnings**
+    - `flutter build web`: คอมไพล์ผ่านสมบูรณ์ และคัดลอกไฟล์ขึ้น `docs/` สำหรับ GitHub Pages เรียบร้อย
 
 - [x] **Master Cloud Sync Reliability & Accrued Income Date Preservation (3 ต.ค. 2026)**:
   - **1. แก้ไขปัญหาวันที่ของรายการ Accrued Income เลื่อนเพี้ยนเอง (`app_database.dart`)**:

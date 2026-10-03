@@ -79,6 +79,29 @@ class _MyFinanceAppState extends State<MyFinanceApp> {
 
   Future<void> _loadPreferences() async {
     final prefs = await SharedPreferences.getInstance();
+
+    // Check URL query parameters for gift / partner link (e.g. ?to=Pealpeal or ?preset=lumi_en)
+    if (kIsWeb) {
+      final uri = Uri.base;
+      final toParam = uri.queryParameters['to'] ?? uri.queryParameters['name'] ?? uri.queryParameters['gift'];
+      final presetParam = uri.queryParameters['preset'];
+      final themeParam = uri.queryParameters['theme'];
+      final langParam = uri.queryParameters['lang'];
+
+      final isPartnerLink = toParam != null ||
+          presetParam == 'lumi_en' ||
+          (themeParam == 'lumi' && langParam == 'en');
+
+      if (isPartnerLink) {
+        final partnerName = (toParam != null && toParam.trim().isNotEmpty) ? toParam.trim() : 'Pealpeal';
+        await prefs.setString('partner_name', partnerName);
+        await prefs.setString('app_language', 'en');
+        await prefs.setString('app_theme_style', 'lumi');
+        await prefs.setString('app_theme_mode', 'system');
+        await prefs.setBool('should_show_partner_welcome', true);
+      }
+    }
+
     final lang = prefs.getString('app_language');
     final themeStr = prefs.getString('app_theme_mode');
     final styleStr = prefs.getString('app_theme_style');

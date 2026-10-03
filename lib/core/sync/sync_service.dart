@@ -350,17 +350,12 @@ class SyncService extends StateNotifier<SyncState> {
         await _supabase.from('projects').upsert({
           'id': '__cloud_vault_master_backup__',
           'user_id': userId,
-          'name': '__cloud_vault_master_backup__',
+          'name': '__cloud_vault_master_backup__ | $devName | $txCount tx',
           'description': packResult.base64Payload,
-          'target_budget_satang': packResult.rawSizeBytes,
-          'start_date': now.toIso8601String(),
-          'end_date': now.toIso8601String(),
-          'icon': devName,
-          'color': '$txCount',
-          'is_active': false,
-          'sync_version': 1,
-          'created_at': now.toIso8601String(),
-          'updated_at': now.toIso8601String(),
+          'start_date': now.toUtc().toIso8601String(),
+          'end_date': now.toUtc().toIso8601String(),
+          'created_at': now.toUtc().toIso8601String(),
+          'updated_at': now.toUtc().toIso8601String(),
         }, onConflict: 'id');
         debugPrint('[Sync] Master snapshot saved to projects fallback (${packResult.compressedSizeBytes} bytes).');
       }
@@ -416,17 +411,17 @@ class SyncService extends StateNotifier<SyncState> {
         final ok = await CloudVaultSnapshotHelper.unpackCompressedBase64ToDatabase(base64Payload, _db);
         if (!ok) {
           debugPrint('[Sync] Snapshot restore failed, falling back to full relational sync...');
-          await _executeFullSync(userId, forceFullSync: true);
+          await _executeFullSync(userId, forceFullSync: true, pullOnly: true);
         } else {
-          // ดึง delta เพิ่มเติมหากมีรายการใหม่กว่า snapshot
+          // ดึง delta เพิ่มเติมหากมีรายการใหม่กว่า snapshot (แบบ Pull-Only ไม่ส่งข้อมูลเครื่องขึ้นทับคลาวด์)
           try {
-            await _executeFullSync(userId, forceFullSync: false);
+            await _executeFullSync(userId, forceFullSync: false, pullOnly: true);
           } catch (_) {}
         }
       } else {
-        // Dual-Engine Fallback: หากไม่มี Snapshot blob ให้ดึงจากตารางจริงทั้งหมดบนคลาวด์
+        // Dual-Engine Fallback: หากไม่มี Snapshot blob ให้ดึงจากตารางจริงทั้งหมดบนคลาวด์ (แบบ Pull-Only)
         debugPrint('[Sync] Master snapshot blob not found, executing full relational sync...');
-        await _executeFullSync(userId, forceFullSync: true);
+        await _executeFullSync(userId, forceFullSync: true, pullOnly: true);
       }
 
       final now = DateTime.now();
@@ -475,16 +470,25 @@ class SyncService extends StateNotifier<SyncState> {
     try {
       final res = await _supabase
           .from('projects')
-          .select('icon, updated_at, target_budget_satang, color')
+          .select('name, updated_at, description')
           .eq('user_id', userId)
           .eq('id', '__cloud_vault_master_backup__')
           .maybeSingle();
       if (res != null) {
+        final name = res['name'] as String? ?? '';
+        final parts = name.split('|');
+        final devName = parts.length > 1 ? parts[1].trim() : 'Cloud Vault Master Backup';
+        int txCount = 0;
+        if (parts.length > 2) {
+          final txPart = parts[2].replaceAll(RegExp(r'[^0-9]'), '');
+          txCount = int.tryParse(txPart) ?? 0;
+        }
+        final desc = res['description'] as String? ?? '';
         return {
-          'device_name': res['icon'] as String? ?? 'Cloud Vault',
+          'device_name': devName,
           'updated_at': res['updated_at'] != null ? DateTime.tryParse(res['updated_at'] as String) : null,
-          'size_bytes': (res['target_budget_satang'] as num?)?.toInt() ?? 0,
-          'total_transactions': int.tryParse(res['color'] as String? ?? '0') ?? 0,
+          'size_bytes': desc.length,
+          'total_transactions': txCount,
         };
       }
     } catch (_) {}
@@ -544,107 +548,106 @@ class SyncService extends StateNotifier<SyncState> {
     }
   }
 
-  Future<void> _executeFullSync(String userId, {bool forceFullSync = false}) async {
+  Future<void> _executeFullSync(String userId, {bool forceFullSync = false, bool pullOnly = false}) async {
     // Purge any legacy historical settle transactions before sync
     await _db.creditCardDao.purgeHistoricalSettlements();
-    try {
-      await _supabase.from('transactions').delete().eq('user_id', userId).eq('tag', 'historical_settle');
-    } catch (_) {}
+    if (!pullOnly) {
+      try {
+        await _supabase.from('transactions').delete().eq('user_id', userId).eq('tag', 'historical_settle');
+      } catch (_) {}
 
-    // 0. Auto-clean duplicates before sync to ensure local is pristine
-    final preDups = await _db.transactionsDao.deduplicateTransactions();
-    if (preDups.isNotEmpty && _auth.isLoggedIn) {
-      const chunkSize = 150;
-      for (var i = 0; i < preDups.length; i += chunkSize) {
-        final chunk = preDups.sublist(i, math.min(i + chunkSize, preDups.length));
-        await _supabase.from('transactions').delete().inFilter('id', chunk);
+      // 0. Auto-clean duplicates before sync to ensure local is pristine
+      final preDups = await _db.transactionsDao.deduplicateTransactions();
+      if (preDups.isNotEmpty && _auth.isLoggedIn) {
+        const chunkSize = 150;
+        for (var i = 0; i < preDups.length; i += chunkSize) {
+          final chunk = preDups.sublist(i, math.min(i + chunkSize, preDups.length));
+          await _supabase.from('transactions').delete().inFilter('id', chunk);
+        }
       }
     }
 
     final lastSync = forceFullSync ? null : state.lastSyncAt;
 
     // 1. Sync Accounts & Currencies
-    await _syncAccounts(userId, lastSync);
+    await _syncAccounts(userId, lastSync, pullOnly: pullOnly);
 
     // 2. Sync Categories (with sort order & parent_id)
-    await _syncCategories(userId, lastSync);
+    await _syncCategories(userId, lastSync, pullOnly: pullOnly);
 
     // 3. Sync Assets (Investments)
-    await _syncAssets(userId, lastSync);
+    await _syncAssets(userId, lastSync, pullOnly: pullOnly);
 
     // 4. Sync Insurance Policies
-    await _syncInsurance(userId, lastSync);
+    await _syncInsurance(userId, lastSync, pullOnly: pullOnly);
 
     // 5. Sync Liabilities (Debts)
-    await _syncLiabilities(userId, lastSync);
+    await _syncLiabilities(userId, lastSync, pullOnly: pullOnly);
 
     // 6. Sync Budgets
-    await _syncBudgets(userId, lastSync);
+    await _syncBudgets(userId, lastSync, pullOnly: pullOnly);
 
     // 7. Sync Recurring Rules
-    await _syncRecurring(userId, lastSync);
+    await _syncRecurring(userId, lastSync, pullOnly: pullOnly);
 
     // 8. Sync Projects
-    await _syncProjects(userId, lastSync);
+    await _syncProjects(userId, lastSync, pullOnly: pullOnly);
 
     // 9. Sync Credit Card Installments
-    await _syncCreditCardInstallments(userId, lastSync);
+    await _syncCreditCardInstallments(userId, lastSync, pullOnly: pullOnly);
 
     // 10. Sync Transactions
-    await _syncTransactions(userId, lastSync);
+    await _syncTransactions(userId, lastSync, pullOnly: pullOnly);
 
     // 11. Auto-clean duplicates after pull to guarantee zero duplicate rows
-    final postDups = await _db.transactionsDao.deduplicateTransactions();
-    if (postDups.isNotEmpty && _auth.isLoggedIn) {
-      const chunkSize = 150;
-      for (var i = 0; i < postDups.length; i += chunkSize) {
-        final chunk = postDups.sublist(i, math.min(i + chunkSize, postDups.length));
-        await _supabase.from('transactions').delete().inFilter('id', chunk);
-      }
-    }
+    await _db.transactionsDao.deduplicateTransactions();
 
     // Update Device State on Supabase (Active Device Wins)
-    try {
-      final deviceId = await _getOrCreateDeviceId();
-      final devName = _getDeviceDisplayName();
-      final txCount = await (_db.selectOnly(_db.transactions)..addColumns([_db.transactions.id.count()]))
-          .map((row) => row.read(_db.transactions.id.count()))
-          .getSingle();
-      await _supabase.from('sync_device_state').upsert({
-        'user_id': userId,
-        'active_device_id': deviceId,
-        'active_device_name': devName,
-        'total_transactions': txCount ?? 0,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      });
-    } catch (_) {}
+    if (!pullOnly) {
+      try {
+        final deviceId = await _getOrCreateDeviceId();
+        final devName = _getDeviceDisplayName();
+        final txCount = await (_db.selectOnly(_db.transactions)..addColumns([_db.transactions.id.count()]))
+            .map((row) => row.read(_db.transactions.id.count()))
+            .getSingle();
+        await _supabase.from('sync_device_state').upsert({
+          'user_id': userId,
+          'active_device_id': deviceId,
+          'active_device_name': devName,
+          'total_transactions': txCount ?? 0,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        });
+      } catch (_) {}
+    }
   }
 
   // ─── 1. Accounts ────────────────────────────────────────────────────────────
 
-  Future<void> _syncAccounts(String userId, DateTime? lastSync, {bool pushOnly = false}) async {
-    final q = _db.select(_db.accounts);
-    if (lastSync != null) q.where((t) => t.updatedAt.isBiggerThanValue(lastSync));
-    final localRows = await q.get();
+  Future<void> _syncAccounts(String userId, DateTime? lastSync, {bool pushOnly = false, bool pullOnly = false}) async {
+    if (!pullOnly) {
+      final q = _db.select(_db.accounts);
+      if (lastSync != null) q.where((t) => t.updatedAt.isBiggerThanValue(lastSync));
+      final localRows = await q.get();
 
-    if (localRows.isNotEmpty) {
-      final payload = localRows.map((a) => {
-        'id': a.id,
-        'user_id': userId,
-        'name': a.name,
-        'account_type': a.accountType,
-        'currency_code': a.currencyCode,
-        'is_domestic': a.isDomestic,
-        'closing_day': a.closingDay,
-        'due_day': a.dueDay,
-        'credit_limit_satang': a.creditLimitSatang,
-        'is_active': a.isActive,
-        'sync_version': a.syncVersion,
-        'created_at': a.createdAt.toUtc().toIso8601String(),
-        'updated_at': a.updatedAt.toUtc().toIso8601String(),
-        'deleted_at': a.deletedAt?.toUtc().toIso8601String(),
-      }).toList();
-      await _supabase.from('accounts').upsert(payload, onConflict: 'id');
+      if (localRows.isNotEmpty) {
+        final payload = localRows.map((a) => {
+          'id': a.id,
+          'user_id': userId,
+          'name': a.name,
+          'account_type': a.accountType,
+          'currency_code': a.currencyCode,
+          'is_domestic': a.isDomestic,
+          'closing_day': a.closingDay,
+          'due_day': a.dueDay,
+          'credit_limit_satang': a.creditLimitSatang,
+          'is_active': a.isActive,
+          'sync_version': a.syncVersion,
+          'created_at': a.createdAt.toUtc().toIso8601String(),
+          'updated_at': a.updatedAt.toUtc().toIso8601String(),
+          'deleted_at': a.deletedAt?.toUtc().toIso8601String(),
+        }).toList();
+        await _supabase.from('accounts').upsert(payload, onConflict: 'id');
+      }
     }
 
     if (pushOnly) return;
@@ -683,31 +686,33 @@ class SyncService extends StateNotifier<SyncState> {
 
   // ─── 2. Categories ──────────────────────────────────────────────────────────
 
-  Future<void> _syncCategories(String userId, DateTime? lastSync, {bool pushOnly = false}) async {
-    final q = _db.select(_db.categories);
-    if (lastSync != null) q.where((c) => c.updatedAt.isBiggerThanValue(lastSync));
-    final localRows = await q.get();
+  Future<void> _syncCategories(String userId, DateTime? lastSync, {bool pushOnly = false, bool pullOnly = false}) async {
+    if (!pullOnly) {
+      final q = _db.select(_db.categories);
+      if (lastSync != null) q.where((c) => c.updatedAt.isBiggerThanValue(lastSync));
+      final localRows = await q.get();
 
-    if (localRows.isNotEmpty) {
-      final payload = localRows.map((c) => {
-        'id': c.id,
-        'user_id': userId,
-        'name_th': c.nameTh,
-        'name_en': c.nameEn,
-        'category_type': c.categoryType,
-        'parent_id': c.parentId,
-        'tax_income_type': c.taxIncomeType,
-        'icon': c.icon,
-        'color': c.color,
-        'is_system': c.isSystem,
-        'is_active': c.isActive,
-        'sort_order': c.sortOrder,
-        'sync_version': c.syncVersion,
-        'created_at': c.createdAt.toUtc().toIso8601String(),
-        'updated_at': c.updatedAt.toUtc().toIso8601String(),
-        'deleted_at': c.deletedAt?.toUtc().toIso8601String(),
-      }).toList();
-      await _supabase.from('categories').upsert(payload, onConflict: 'id');
+      if (localRows.isNotEmpty) {
+        final payload = localRows.map((c) => {
+          'id': c.id,
+          'user_id': userId,
+          'name_th': c.nameTh,
+          'name_en': c.nameEn,
+          'category_type': c.categoryType,
+          'parent_id': c.parentId,
+          'tax_income_type': c.taxIncomeType,
+          'icon': c.icon,
+          'color': c.color,
+          'is_system': c.isSystem,
+          'is_active': c.isActive,
+          'sort_order': c.sortOrder,
+          'sync_version': c.syncVersion,
+          'created_at': c.createdAt.toUtc().toIso8601String(),
+          'updated_at': c.updatedAt.toUtc().toIso8601String(),
+          'deleted_at': c.deletedAt?.toUtc().toIso8601String(),
+        }).toList();
+        await _supabase.from('categories').upsert(payload, onConflict: 'id');
+      }
     }
 
     if (pushOnly) return;
@@ -748,29 +753,28 @@ class SyncService extends StateNotifier<SyncState> {
 
   // ─── 3. Assets (Investments) ────────────────────────────────────────────────
 
-  Future<void> _syncAssets(String userId, DateTime? lastSync, {bool pushOnly = false}) async {
+  Future<void> _syncAssets(String userId, DateTime? lastSync, {bool pushOnly = false, bool pullOnly = false}) async {
     try {
-      final q = _db.select(_db.assets);
-      if (lastSync != null) q.where((t) => t.updatedAt.isBiggerThanValue(lastSync));
-      final localRows = await q.get();
+      if (!pullOnly) {
+        final q = _db.select(_db.assets);
+        if (lastSync != null) q.where((t) => t.updatedAt.isBiggerThanValue(lastSync));
+        final localRows = await q.get();
 
-      if (localRows.isNotEmpty) {
-        final payload = localRows.map((a) => {
-          'id': a.id,
-          'user_id': userId,
-          'symbol': a.symbol,
-          'name': a.name,
-          'asset_type': a.assetType,
-          'currency_code': a.currencyCode,
-          'default_account_id': a.defaultAccountId,
-          'market': a.market,
-          'note': a.note,
-          'extra_details_json': a.extraDetailsJson,
-          'created_at': a.createdAt.toUtc().toIso8601String(),
-          'updated_at': a.updatedAt.toUtc().toIso8601String(),
-          'deleted_at': a.deletedAt?.toUtc().toIso8601String(),
-        }).toList();
-        await _supabase.from('assets').upsert(payload, onConflict: 'id');
+        if (localRows.isNotEmpty) {
+          final payload = localRows.map((a) => {
+            'id': a.id,
+            'user_id': userId,
+            'symbol': a.symbol,
+            'name': a.name,
+            'asset_type': a.assetType,
+            'currency_code': a.currencyCode,
+            'note': a.note,
+            'created_at': a.createdAt.toUtc().toIso8601String(),
+            'updated_at': a.updatedAt.toUtc().toIso8601String(),
+            'deleted_at': a.deletedAt?.toUtc().toIso8601String(),
+          }).toList();
+          await _supabase.from('assets').upsert(payload, onConflict: 'id');
+        }
       }
 
       if (pushOnly) return;
@@ -811,32 +815,34 @@ class SyncService extends StateNotifier<SyncState> {
 
   // ─── 4. Insurance Policies ──────────────────────────────────────────────────
 
-  Future<void> _syncInsurance(String userId, DateTime? lastSync, {bool pushOnly = false}) async {
+  Future<void> _syncInsurance(String userId, DateTime? lastSync, {bool pushOnly = false, bool pullOnly = false}) async {
     try {
-      final q = _db.select(_db.insurancePolicies);
-      if (lastSync != null) q.where((t) => t.updatedAt.isBiggerThanValue(lastSync));
-      final localRows = await q.get();
+      if (!pullOnly) {
+        final q = _db.select(_db.insurancePolicies);
+        if (lastSync != null) q.where((t) => t.updatedAt.isBiggerThanValue(lastSync));
+        final localRows = await q.get();
 
-      if (localRows.isNotEmpty) {
-        final payload = localRows.map((p) => {
-          'id': p.id,
-          'user_id': userId,
-          'policy_name': p.policyName,
-          'insurance_type': p.insuranceType,
-          'sum_insured_satang': p.sumInsuredSatang,
-          'medical_coverage_satang': p.medicalCoverageSatang,
-          'annual_premium_satang': p.annualPremiumSatang,
-          'due_date': p.dueDate?.toUtc().toIso8601String(),
-          'total_periods': p.totalPeriods,
-          'payment_due_day': p.paymentDueDay,
-          'payment_due_month': p.paymentDueMonth,
-          'note': p.note,
-          'sync_version': p.syncVersion,
-          'created_at': p.createdAt.toUtc().toIso8601String(),
-          'updated_at': p.updatedAt.toUtc().toIso8601String(),
-          'deleted_at': p.deletedAt?.toUtc().toIso8601String(),
-        }).toList();
-        await _supabase.from('insurance_policies').upsert(payload, onConflict: 'id');
+        if (localRows.isNotEmpty) {
+          final payload = localRows.map((p) => {
+            'id': p.id,
+            'user_id': userId,
+            'policy_name': p.policyName,
+            'insurance_type': p.insuranceType,
+            'sum_insured_satang': p.sumInsuredSatang,
+            'medical_coverage_satang': p.medicalCoverageSatang,
+            'annual_premium_satang': p.annualPremiumSatang,
+            'due_date': p.dueDate?.toUtc().toIso8601String(),
+            'total_periods': p.totalPeriods,
+            'payment_due_day': p.paymentDueDay,
+            'payment_due_month': p.paymentDueMonth,
+            'note': p.note,
+            'sync_version': p.syncVersion,
+            'created_at': p.createdAt.toUtc().toIso8601String(),
+            'updated_at': p.updatedAt.toUtc().toIso8601String(),
+            'deleted_at': p.deletedAt?.toUtc().toIso8601String(),
+          }).toList();
+          await _supabase.from('insurance_policies').upsert(payload, onConflict: 'id');
+        }
       }
 
       if (pushOnly) return;
@@ -880,30 +886,32 @@ class SyncService extends StateNotifier<SyncState> {
 
   // ─── 5. Liabilities (Debts) ─────────────────────────────────────────────────
 
-  Future<void> _syncLiabilities(String userId, DateTime? lastSync, {bool pushOnly = false}) async {
+  Future<void> _syncLiabilities(String userId, DateTime? lastSync, {bool pushOnly = false, bool pullOnly = false}) async {
     try {
-      final q = _db.select(_db.liabilities);
-      if (lastSync != null) q.where((t) => t.updatedAt.isBiggerThanValue(lastSync));
-      final localRows = await q.get();
+      if (!pullOnly) {
+        final q = _db.select(_db.liabilities);
+        if (lastSync != null) q.where((t) => t.updatedAt.isBiggerThanValue(lastSync));
+        final localRows = await q.get();
 
-      if (localRows.isNotEmpty) {
-        final payload = localRows.map((l) => {
-          'id': l.id,
-          'user_id': userId,
-          'name': l.name,
-          'liability_type': l.liabilityType,
-          'remaining_principal_satang': l.remainingPrincipalSatang,
-          'monthly_payment_satang': l.monthlyPaymentSatang,
-          'interest_rate_percent': l.interestRatePercent,
-          'is_short_term': l.isShortTerm,
-          'linked_account_id': l.linkedAccountId,
-          'note': l.note,
-          'sync_version': l.syncVersion,
-          'created_at': l.createdAt.toUtc().toIso8601String(),
-          'updated_at': l.updatedAt.toUtc().toIso8601String(),
-          'deleted_at': l.deletedAt?.toUtc().toIso8601String(),
-        }).toList();
-        await _supabase.from('liabilities').upsert(payload, onConflict: 'id');
+        if (localRows.isNotEmpty) {
+          final payload = localRows.map((l) => {
+            'id': l.id,
+            'user_id': userId,
+            'name': l.name,
+            'liability_type': l.liabilityType,
+            'remaining_principal_satang': l.remainingPrincipalSatang,
+            'monthly_payment_satang': l.monthlyPaymentSatang,
+            'interest_rate_percent': l.interestRatePercent,
+            'is_short_term': l.isShortTerm,
+            'linked_account_id': l.linkedAccountId,
+            'note': l.note,
+            'sync_version': l.syncVersion,
+            'created_at': l.createdAt.toUtc().toIso8601String(),
+            'updated_at': l.updatedAt.toUtc().toIso8601String(),
+            'deleted_at': l.deletedAt?.toUtc().toIso8601String(),
+          }).toList();
+          await _supabase.from('liabilities').upsert(payload, onConflict: 'id');
+        }
       }
 
       if (pushOnly) return;
@@ -945,24 +953,25 @@ class SyncService extends StateNotifier<SyncState> {
 
   // ─── 6. Budgets ─────────────────────────────────────────────────────────────
 
-  Future<void> _syncBudgets(String userId, DateTime? lastSync, {bool pushOnly = false}) async {
+  Future<void> _syncBudgets(String userId, DateTime? lastSync, {bool pushOnly = false, bool pullOnly = false}) async {
     try {
-      final q = _db.select(_db.budgets);
-      if (lastSync != null) q.where((t) => t.updatedAt.isBiggerThanValue(lastSync));
-      final localRows = await q.get();
+      if (!pullOnly) {
+        final q = _db.select(_db.budgets);
+        if (lastSync != null) q.where((t) => t.updatedAt.isBiggerThanValue(lastSync));
+        final localRows = await q.get();
 
-      if (localRows.isNotEmpty) {
-        final payload = localRows.map((b) => {
-          'id': b.id,
-          'user_id': userId,
-          'category_id': b.categoryId,
-          'limit_satang': b.limitSatang,
-          'is_active': b.isActive,
-          'created_at': b.createdAt.toUtc().toIso8601String(),
-          'updated_at': b.updatedAt.toUtc().toIso8601String(),
-          'deleted_at': b.deletedAt?.toUtc().toIso8601String(),
-        }).toList();
-        await _supabase.from('budgets').upsert(payload, onConflict: 'id');
+        if (localRows.isNotEmpty) {
+          final payload = localRows.map((b) => {
+            'id': b.id,
+            'user_id': userId,
+            'category_id': b.categoryId,
+            'limit_satang': b.limitSatang,
+            'created_at': b.createdAt.toUtc().toIso8601String(),
+            'updated_at': b.updatedAt.toUtc().toIso8601String(),
+            'deleted_at': b.deletedAt?.toUtc().toIso8601String(),
+          }).toList();
+          await _supabase.from('budgets').upsert(payload, onConflict: 'id');
+        }
       }
 
       if (pushOnly) return;
@@ -998,37 +1007,31 @@ class SyncService extends StateNotifier<SyncState> {
 
   // ─── 7. Recurring Rules ─────────────────────────────────────────────────────
 
-  Future<void> _syncRecurring(String userId, DateTime? lastSync, {bool pushOnly = false}) async {
+  Future<void> _syncRecurring(String userId, DateTime? lastSync, {bool pushOnly = false, bool pullOnly = false}) async {
     try {
-      final q = _db.select(_db.recurringRules);
-      if (lastSync != null) q.where((t) => t.updatedAt.isBiggerThanValue(lastSync));
-      final localRows = await q.get();
+      if (!pullOnly) {
+        final q = _db.select(_db.recurringRules);
+        if (lastSync != null) q.where((t) => t.updatedAt.isBiggerThanValue(lastSync));
+        final localRows = await q.get();
 
-      if (localRows.isNotEmpty) {
-        final payload = localRows.map((r) => {
-          'id': r.id,
-          'user_id': userId,
-          'title': r.title,
-          'transaction_type': r.transactionType,
-          'source_account_id': r.sourceAccountId,
-          'destination_account_id': r.destinationAccountId,
-          'category_id': r.categoryId,
-          'amount_satang': r.amountSatang,
-          'currency_code': r.currencyCode,
-          'frequency': r.frequency,
-          'day_of_month': r.dayOfMonth,
-          'next_run_date': r.nextRunDate.toUtc().toIso8601String(),
-          'end_date': r.endDate?.toUtc().toIso8601String(),
-          'is_active': r.isActive,
-          'interval_units': r.intervalUnits,
-          'auto_post': r.autoPost,
-          'last_posted_date': r.lastPostedDate?.toUtc().toIso8601String(),
-          'note': r.note,
-          'created_at': r.createdAt.toUtc().toIso8601String(),
-          'updated_at': r.updatedAt.toUtc().toIso8601String(),
-          'deleted_at': r.deletedAt?.toUtc().toIso8601String(),
-        }).toList();
-        await _supabase.from('recurring_rules').upsert(payload, onConflict: 'id');
+        if (localRows.isNotEmpty) {
+          final payload = localRows.map((r) => {
+            'id': r.id,
+            'user_id': userId,
+            'name': r.title,
+            'transaction_type': r.transactionType,
+            'account_id': r.sourceAccountId,
+            'category_id': r.categoryId,
+            'amount_satang': r.amountSatang,
+            'frequency': r.frequency,
+            'is_active': r.isActive,
+            'note': r.note,
+            'created_at': r.createdAt.toUtc().toIso8601String(),
+            'updated_at': r.updatedAt.toUtc().toIso8601String(),
+            'deleted_at': r.deletedAt?.toUtc().toIso8601String(),
+          }).toList();
+          await _supabase.from('recurring_rules').upsert(payload, onConflict: 'id');
+        }
       }
 
       if (pushOnly) return;
@@ -1045,16 +1048,16 @@ class SyncService extends StateNotifier<SyncState> {
               _db.recurringRules,
               RecurringRulesCompanion(
                 id: Value(row['id'] as String),
-                title: Value(row['title'] as String),
-                transactionType: Value(row['transaction_type'] as String),
-                sourceAccountId: Value(row['source_account_id'] as String),
+                title: Value(row['title'] as String? ?? row['name'] as String? ?? ''),
+                transactionType: Value(row['transaction_type'] as String? ?? 'expense'),
+                sourceAccountId: Value(row['source_account_id'] as String? ?? row['account_id'] as String? ?? ''),
                 destinationAccountId: Value(row['destination_account_id'] as String?),
                 categoryId: Value(row['category_id'] as String?),
-                amountSatang: Value((row['amount_satang'] as num).toInt()),
+                amountSatang: Value((row['amount_satang'] as num?)?.toInt() ?? 0),
                 currencyCode: Value(row['currency_code'] as String? ?? 'THB'),
-                frequency: Value(row['frequency'] as String),
+                frequency: Value(row['frequency'] as String? ?? 'monthly'),
                 dayOfMonth: Value(row['day_of_month'] as int?),
-                nextRunDate: Value(DateTime.parse(row['next_run_date'] as String).toLocal()),
+                nextRunDate: Value(row['next_run_date'] != null ? DateTime.parse(row['next_run_date'] as String).toLocal() : DateTime.now()),
                 endDate: Value(row['end_date'] != null ? DateTime.parse(row['end_date'] as String).toLocal() : null),
                 isActive: Value(row['is_active'] as bool? ?? true),
                 intervalUnits: Value(row['interval_units'] as int? ?? 1),
@@ -1077,30 +1080,28 @@ class SyncService extends StateNotifier<SyncState> {
 
   // ─── 8. Projects ────────────────────────────────────────────────────────────
 
-  Future<void> _syncProjects(String userId, DateTime? lastSync, {bool pushOnly = false}) async {
+  Future<void> _syncProjects(String userId, DateTime? lastSync, {bool pushOnly = false, bool pullOnly = false}) async {
     try {
-      final q = _db.select(_db.projects);
-      if (lastSync != null) q.where((p) => p.updatedAt.isBiggerThanValue(lastSync));
-      final localRows = await q.get();
+      if (!pullOnly) {
+        final q = _db.select(_db.projects);
+        if (lastSync != null) q.where((p) => p.updatedAt.isBiggerThanValue(lastSync));
+        final localRows = await q.get();
 
-      if (localRows.isNotEmpty) {
-        final payload = localRows.map((p) => {
-          'id': p.id,
-          'user_id': userId,
-          'name': p.name,
-          'description': p.description,
-          'target_budget_satang': p.targetBudgetSatang,
-          'start_date': p.startDate.toUtc().toIso8601String(),
-          'end_date': p.endDate.toUtc().toIso8601String(),
-          'icon': p.icon,
-          'color': p.color,
-          'is_active': p.isActive,
-          'sync_version': p.syncVersion,
-          'created_at': p.createdAt.toUtc().toIso8601String(),
-          'updated_at': p.updatedAt.toUtc().toIso8601String(),
-          'deleted_at': p.deletedAt?.toUtc().toIso8601String(),
-        }).toList();
-        await _supabase.from('projects').upsert(payload, onConflict: 'id');
+        if (localRows.isNotEmpty) {
+          final payload = localRows.where((p) => p.id != '__cloud_vault_master_backup__').map((p) => {
+            'id': p.id,
+            'user_id': userId,
+            'name': p.name,
+            'description': p.description,
+            'start_date': p.startDate.toUtc().toIso8601String(),
+            'end_date': p.endDate.toUtc().toIso8601String(),
+            'created_at': p.createdAt.toUtc().toIso8601String(),
+            'updated_at': p.updatedAt.toUtc().toIso8601String(),
+          }).toList();
+          if (payload.isNotEmpty) {
+            await _supabase.from('projects').upsert(payload, onConflict: 'id');
+          }
+        }
       }
 
       if (pushOnly) return;
@@ -1120,9 +1121,9 @@ class SyncService extends StateNotifier<SyncState> {
                 id: Value(row['id'] as String),
                 name: Value(row['name'] as String),
                 description: Value(row['description'] as String?),
-                targetBudgetSatang: Value((row['target_budget_satang'] as num).toInt()),
-                startDate: Value(DateTime.parse(row['start_date'] as String).toLocal()),
-                endDate: Value(DateTime.parse(row['end_date'] as String).toLocal()),
+                targetBudgetSatang: Value((row['target_budget_satang'] as num?)?.toInt() ?? 0),
+                startDate: Value(row['start_date'] != null ? DateTime.parse(row['start_date'] as String).toLocal() : DateTime.now()),
+                endDate: Value(row['end_date'] != null ? DateTime.parse(row['end_date'] as String).toLocal() : DateTime.now()),
                 icon: Value(row['icon'] as String?),
                 color: Value(row['color'] as String?),
                 isActive: Value(row['is_active'] as bool? ?? true),
@@ -1143,28 +1144,30 @@ class SyncService extends StateNotifier<SyncState> {
 
   // ─── 9. Credit Card Installments ────────────────────────────────────────────
 
-  Future<void> _syncCreditCardInstallments(String userId, DateTime? lastSync, {bool pushOnly = false}) async {
+  Future<void> _syncCreditCardInstallments(String userId, DateTime? lastSync, {bool pushOnly = false, bool pullOnly = false}) async {
     try {
-      final q = _db.select(_db.creditCardInstallments);
-      if (lastSync != null) q.where((i) => i.updatedAt.isBiggerThanValue(lastSync));
-      final localRows = await q.get();
+      if (!pullOnly) {
+        final q = _db.select(_db.creditCardInstallments);
+        if (lastSync != null) q.where((i) => i.updatedAt.isBiggerThanValue(lastSync));
+        final localRows = await q.get();
 
-      if (localRows.isNotEmpty) {
-        final payload = localRows.map((i) => {
-          'id': i.id,
-          'user_id': userId,
-          'transaction_id': i.transactionId,
-          'account_id': i.accountId,
-          'total_amount_satang': i.totalAmountSatang,
-          'monthly_amount_satang': i.monthlyAmountSatang,
-          'total_tenor_months': i.totalTenorMonths,
-          'remaining_tenor_months': i.remainingTenorMonths,
-          'start_date': i.startDate.toUtc().toIso8601String(),
-          'created_at': i.createdAt.toUtc().toIso8601String(),
-          'updated_at': i.updatedAt.toUtc().toIso8601String(),
-          'deleted_at': i.deletedAt?.toUtc().toIso8601String(),
-        }).toList();
-        await _supabase.from('credit_card_installments').upsert(payload, onConflict: 'id');
+        if (localRows.isNotEmpty) {
+          final payload = localRows.map((i) => {
+            'id': i.id,
+            'user_id': userId,
+            'transaction_id': i.transactionId,
+            'account_id': i.accountId,
+            'total_amount_satang': i.totalAmountSatang,
+            'monthly_amount_satang': i.monthlyAmountSatang,
+            'total_tenor_months': i.totalTenorMonths,
+            'remaining_tenor_months': i.remainingTenorMonths,
+            'start_date': i.startDate.toUtc().toIso8601String(),
+            'created_at': i.createdAt.toUtc().toIso8601String(),
+            'updated_at': i.updatedAt.toUtc().toIso8601String(),
+            'deleted_at': i.deletedAt?.toUtc().toIso8601String(),
+          }).toList();
+          await _supabase.from('credit_card_installments').upsert(payload, onConflict: 'id');
+        }
       }
 
       if (pushOnly) return;
@@ -1204,20 +1207,24 @@ class SyncService extends StateNotifier<SyncState> {
 
   // ─── 10. Transactions ────────────────────────────────────────────────────────
 
-  Future<void> _syncTransactions(String userId, DateTime? lastSync) async {
+  Future<void> _syncTransactions(String userId, DateTime? lastSync, {bool pushOnly = false, bool pullOnly = false}) async {
     // 1. PUSH
-    final q = _db.select(_db.transactions);
-    if (lastSync != null) q.where((t) => t.updatedAt.isBiggerThanValue(lastSync));
-    final localRows = await q.get();
+    if (!pullOnly) {
+      final q = _db.select(_db.transactions);
+      if (lastSync != null) q.where((t) => t.updatedAt.isBiggerThanValue(lastSync));
+      final localRows = await q.get();
 
-    if (localRows.isNotEmpty) {
-      const chunkSize = 200;
-      for (var i = 0; i < localRows.length; i += chunkSize) {
-        final chunk = localRows.sublist(i, math.min(i + chunkSize, localRows.length));
-        final payload = chunk.map((tx) => _txToJson(tx, userId)).toList();
-        await _supabase.from('transactions').upsert(payload, onConflict: 'id');
+      if (localRows.isNotEmpty) {
+        const chunkSize = 200;
+        for (var i = 0; i < localRows.length; i += chunkSize) {
+          final chunk = localRows.sublist(i, math.min(i + chunkSize, localRows.length));
+          final payload = chunk.map((tx) => _txToJson(tx, userId)).toList();
+          await _supabase.from('transactions').upsert(payload, onConflict: 'id');
+        }
       }
     }
+
+    if (pushOnly) return;
 
     // 2. PULL: with deterministic ordering and batch inserts
     int offset = 0;

@@ -1939,7 +1939,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                     'assets/images/google_logo.png',
                     width: 18,
                     height: 18,
-                    errorBuilder: (_, __, ___) => const Icon(Icons.login_rounded, size: 18, color: Colors.black87),
+                    errorBuilder: (_, _, _) => const Icon(Icons.login_rounded, size: 18, color: Colors.black87),
                   ),
                   label: Text(
                     isThai ? 'เข้าสู่ระบบด้วย Google เพื่อเริ่มซิงค์' : 'Sign In with Google to Sync',

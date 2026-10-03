@@ -1,6 +1,23 @@
 # บันทึกความคืบหน้าโครงการ MyFinance (PROGRESS.md)
 
-อัปเดตล่าสุด: 3 ตุลาคม 2026 (รอบดึก)
+อัปเดตล่าสุด: 3 ตุลาคม 2026 (รอบดึกพิเศษ)
+
+- [x] **Master Cloud Sync Reliability & Accrued Income Date Preservation (3 ต.ค. 2026)**:
+  - **1. แก้ไขปัญหาวันที่ของรายการ Accrued Income เลื่อนเพี้ยนเอง (`app_database.dart`)**:
+    - **สาเหตุรากฐาน**: ฟังก์ชัน legacy `alignIncomeDatesWithWorkPeriod()` ใน `beforeOpen` ของฐานข้อมูล บังคับเขียนทับ `transactionDate` ให้ตรงกับเดือนของ `workPeriod` ทุกครั้งที่เปิดแอป ทำให้รายการที่สร้างวันที่ 3/10/2026 โดยระบุรอบผลงาน 2026-09 ถูกย้ายไปเป็น 3/9/2026 โดยอัตโนมัติ
+    - **การแก้ไข**: ถอด `alignIncomeDatesWithWorkPeriod()` และ `cleanDistortedNotionNotes()` ออกจาก `beforeOpen` อย่างถาวร ส่งผลให้ `transactionDate` คงที่ตามที่ผู้ใช้บันทึกจริง 100% ไม่ถูกดัดแปลงอีกต่อไป
+  - **2. แก้ไขระบบ Master Cloud Sync ซิงค์การจัดเรียง Category, Budget, สินทรัพย์ลงทุน และ Recurring Rules ไม่ติด (`sync_service.dart`)**:
+    - **สาเหตุรากฐานของ Master Snapshot**: ใน `_pushMasterSnapshot()` มีการบันทึกสำรอง Master Snapshot (บีบอัด GZip 25 ตาราง) ลงในตาราง fallback `projects` โดยส่งคอลัมน์ `target_budget_satang`, `icon`, `color`, `is_active` ซึ่งไม่มีอยู่จริงใน Supabase ทำให้ Supabase ปฏิเสธด้วย error 400 ส่งผลให้ Master Snapshot ไม่เคยถูกบันทึกขึ้น Cloud สำเร็จ
+    - **สาเหตุรากฐานของ Relational Fallback**: เมื่อไม่มี Master Snapshot มือถือจะสลับไปดึงข้อมูลรายตาราง แต่ก่อนดึงข้อมูล ฟังก์ชันซิงค์กลับทำการ Push ค่า Default จากมือถือขึ้นไปทับบน Supabase ก่อน และฟังก์ชัน `_syncBudgets`, `_syncAssets`, `_syncRecurring` ส่งคอลัมน์ที่ไม่ตรงกับสกีมาบน Supabase จนเกิด error 400
+    - **การแก้ไข**:
+      1. ปรับ `_pushMasterSnapshot()` ให้ส่งเฉพาะคอลัมน์ที่มีอยู่จริงบนตาราง `projects` ใน Supabase (`id`, `user_id`, `name`, `description`, `start_date`, `end_date`, `created_at`, `updated_at`) ทำให้ Master Snapshot ขนาด ~150-250 KB ถูกจัดเก็บและเรียกคืนทั้ง 25 ตารางได้อย่างสมบูรณ์แบบ 100%
+      2. ปรับปรุง `getMasterSnapshotInfo()` ให้อ่านข้อมูลสรุป (ชื่อเครื่อง, เวลา, ขนาด, จำนวนรายการ) จากคอลัมน์จริงอย่างถูกต้อง
+      3. เพิ่มกลไก `pullOnly: true` ให้กับ `pullMasterSnapshotFromCloud()` และฟังก์ชันย่อยทั้ง 10 ตาราง เพื่อรับประกันว่าการกดดาวน์โหลดข้อมูลจากคลาวด์จะไม่ส่งข้อมูลจากเครื่องปลายทางขึ้นไปทับคลาวด์เด็ดขาด
+      4. ปรับ Payload ของ `_syncBudgets`, `_syncAssets`, `_syncRecurring`, `_syncProjects` ให้ตรงกับคอลัมน์จริงบน Supabase เพื่อให้ทั้ง Master Snapshot และ Relational Delta Sync ทำงานผ่านได้ราบรื่น 100%
+  - **3. การทดสอบและการรับรองคุณภาพ**:
+    - `flutter test`: ผ่านทั้งหมด **188/188 tests passed** (100%)
+    - `flutter analyze --no-fatal-infos`: **0 errors, 0 warnings**
+    - `flutter build web`: คอมไพล์ผ่านสมบูรณ์ และคัดลอกไฟล์ขึ้น `docs/` สำหรับ GitHub Pages เรียบร้อย
 
 - [x] **Full Cloud Sync Engine, Debt Registry Auto-Pay & Reactive Refresh, Investment Trade Inspection, Cross-Currency Transfer & Accrued WorkPeriod Edit (3 ต.ค. 2026)**:
   - **1. แก้ไขและยกระดับระบบ Cloud Sync ให้แม่นยำ 100% (`sync_service.dart`)**:

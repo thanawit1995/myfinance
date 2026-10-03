@@ -93,7 +93,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             'assets/images/google_logo.png',
                             width: 20,
                             height: 20,
-                            errorBuilder: (_, __, ___) =>
+                            errorBuilder: (_, _, _) =>
                                 const Icon(Icons.login, size: 20),
                           ),
                     label: Text(

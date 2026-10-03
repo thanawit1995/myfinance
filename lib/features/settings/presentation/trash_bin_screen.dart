@@ -312,7 +312,7 @@ class _TrashBinScreenState extends ConsumerState<TrashBinScreen> with SingleTick
               child: ListView.separated(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                 itemCount: deletedTxs.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                separatorBuilder: (_, _) => const SizedBox(height: 10),
                 itemBuilder: (context, index) {
                   final tx = deletedTxs[index];
                   final deletedDate = tx.deletedAt ?? now;
@@ -435,14 +435,14 @@ class _TrashBinScreenState extends ConsumerState<TrashBinScreen> with SingleTick
                                 label: Text(isThai ? 'กู้คืน' : 'Restore', style: const TextStyle(fontSize: 12)),
                                 onPressed: () async {
                                   await txDao.restoreTransaction(tx.id);
-                                  if (mounted) {
+                                  if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(isThai ? 'กู้คืนรายการเรียบร้อยแล้ว' : 'Transaction restored'),
                                         backgroundColor: Colors.green.shade700,
                                       ),
                                     );
-                                    setState(() {});
+                                    if (mounted) setState(() {});
                                   }
                                 },
                               ),

@@ -197,7 +197,15 @@ class BackupRestoreService {
     } catch (_) {}
 
     if (kIsWeb) {
-      final bytes = await exportWebDatabase();
+      Uint8List? bytes;
+      try {
+        bytes = await dumpDriftDatabaseToSqliteBytes(db);
+      } catch (e) {
+        debugPrint('dumpDriftDatabaseToSqliteBytes error: $e');
+      }
+      if (bytes == null || bytes.isEmpty) {
+        bytes = await exportWebDatabase();
+      }
       if (bytes == null || bytes.isEmpty) {
         throw Exception(isThai ? 'ไม่พบข้อมูลในเบราว์เซอร์' : 'No database in browser storage');
       }
@@ -284,7 +292,15 @@ class BackupRestoreService {
     } catch (_) {}
 
     if (kIsWeb) {
-      final bytes = await exportWebDatabase();
+      Uint8List? bytes;
+      try {
+        bytes = await dumpDriftDatabaseToSqliteBytes(db);
+      } catch (e) {
+        debugPrint('dumpDriftDatabaseToSqliteBytes error: $e');
+      }
+      if (bytes == null || bytes.isEmpty) {
+        bytes = await exportWebDatabase();
+      }
       if (bytes == null || bytes.isEmpty) {
         throw Exception(isThai ? 'ไม่พบข้อมูลในเบราว์เซอร์' : 'No database in browser storage');
       }

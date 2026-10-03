@@ -142,7 +142,7 @@ void downloadFileWeb(Uint8List bytes, String fileName) {
   }
 }
 
-Future<String?> saveDatabaseWithPickerWeb(String fileName) async {
+Future<String?> saveDatabaseWithPickerWeb(String fileName, [Uint8List? customBytes]) async {
   try {
     if (globalContext.has('showSaveFilePicker')) {
       final options = JSObject();
@@ -156,7 +156,7 @@ Future<String?> saveDatabaseWithPickerWeb(String fileName) async {
       final handle = await handlePromise.toDart;
 
       // 2. Export database bytes
-      final bytes = await exportWebDatabase();
+      final bytes = customBytes ?? await exportWebDatabase();
       if (bytes == null || bytes.isEmpty) {
         throw Exception('Database is empty or could not be read');
       }
@@ -181,7 +181,7 @@ Future<String?> saveDatabaseWithPickerWeb(String fileName) async {
   }
 
   // Fallback for browsers that do not support showSaveFilePicker
-  final bytes = await exportWebDatabase();
+  final bytes = customBytes ?? await exportWebDatabase();
   if (bytes != null && bytes.isNotEmpty) {
     downloadFileWeb(bytes, fileName);
     return fileName;

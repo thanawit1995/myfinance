@@ -8,4 +8,4 @@ void reloadWebPage() {}
 
 void downloadFileWeb(Uint8List bytes, String fileName) {}
 
-Future<String?> saveDatabaseWithPickerWeb(String fileName) async => null;
+Future<String?> saveDatabaseWithPickerWeb(String fileName, [Uint8List? customBytes]) async => null;

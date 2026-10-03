@@ -96,3 +96,76 @@ Future<SqliteBackupData> readSqliteBackupData(Uint8List sqliteBytes) async {
     allTables: allTables,
   );
 }
+
+Future<Uint8List> dumpDriftDatabaseToSqliteBytes(dynamic db) async {
+  try {
+    await db.customStatement('PRAGMA wal_checkpoint(TRUNCATE);');
+  } catch (_) {}
+
+  Directory tempDir;
+  try {
+    tempDir = await getTemporaryDirectory();
+  } catch (_) {
+    tempDir = Directory.systemTemp;
+  }
+  final tempFile = File(p.join(tempDir.path, 'dump_temp_${DateTime.now().millisecondsSinceEpoch}.db'));
+  if (await tempFile.exists()) await tempFile.delete();
+
+  final exportDb = sqlite.sqlite3.open(tempFile.path);
+  try {
+    exportDb.execute('PRAGMA foreign_keys = OFF;');
+
+    final tables = await db.customSelect(
+      "SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_drift_%' AND sql IS NOT NULL ORDER BY name;",
+    ).get();
+
+    for (final t in tables) {
+      final tableName = t.data['name'] as String;
+      final tableSql = t.data['sql'] as String;
+      exportDb.execute(tableSql);
+
+      final rows = await db.customSelect('SELECT * FROM "$tableName";').get();
+      if (rows.isEmpty) continue;
+
+      final firstRow = rows.first.data;
+      final cols = firstRow.keys.map((c) => '"$c"').join(', ');
+      final placeholders = firstRow.keys.map((_) => '?').join(', ');
+      final stmt = exportDb.prepare('INSERT INTO "$tableName" ($cols) VALUES ($placeholders);');
+
+      for (final r in rows) {
+        final values = firstRow.keys.map((c) => r.data[c]).toList();
+        stmt.execute(values);
+      }
+      stmt.dispose();
+    }
+
+    final indices = await db.customSelect(
+      "SELECT name, sql FROM sqlite_master WHERE type='index' AND sql IS NOT NULL;",
+    ).get();
+    for (final idx in indices) {
+      final idxSql = idx.data['sql'] as String;
+      try {
+        exportDb.execute(idxSql);
+      } catch (_) {}
+    }
+
+    final views = await db.customSelect(
+      "SELECT name, sql FROM sqlite_master WHERE type='view' AND sql IS NOT NULL;",
+    ).get();
+    for (final v in views) {
+      final viewSql = v.data['sql'] as String;
+      try {
+        exportDb.execute(viewSql);
+      } catch (_) {}
+    }
+  } finally {
+    exportDb.dispose();
+  }
+
+  final bytes = await tempFile.readAsBytes();
+  try {
+    await tempFile.delete();
+  } catch (_) {}
+  return bytes;
+}
+

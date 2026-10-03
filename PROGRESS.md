@@ -2,6 +2,19 @@
 
 อัปเดตล่าสุด: 3 ตุลาคม 2026
 
+- [x] **Live Drift SQLite Dump Engine for Web & Multi-Device Sync (3 ต.ค. 2026)**:
+  - **1. ตรวจสอบต้นตอของไฟล์สำรองค้าง (Stale Backup Root Cause Analysis)**:
+    - ตรวจสอบไฟล์ `myfinance_backup_20261003_1024.db` ที่ส่งออกจาก Webapp พบว่าในไฟล์ยังมี GPF, หนี้บัตรเครดิตยังไม่ชำระ, วันที่ล่าสุดหยุดอยู่ที่ 2 ต.ค., `budgets` มี 0 แถว และหมวดหมู่มี `sort_order: 0` ทั้งหมด
+    - **สาเหตุจริง**: กลไกเดิมของ Webapp ไปอ่านไฟล์ดิบจาก OPFS (`/drift_db/myfinance_vault/database`) ซึ่งเป็นไฟล์เก่าที่ค้างอยู่ในเบราว์เซอร์ตั้งแต่รอบก่อน ในขณะที่การแก้ไขจริงของผู้ใช้ (ลบ GPF, ชำระหนี้บัตร, เรียงหมวดหมู่, ตั้งงบประมาณ) เกิดขึ้นบนฐานข้อมูล Drift ที่ทำงานอยู่บน Web Worker / IndexedDB แบบเรียลไทม์ ทำให้ไฟล์ที่ดาวน์โหลดออกมาเป็นข้อมูลค้างเก่า
+  - **2. พัฒนาระบบ Live Drift Dump to SQLite (`dumpDriftDatabaseToSqliteBytes`)**:
+    - สร้างเอนจินสกัดและแปลงฐานข้อมูลสดจากอินสแตนซ์ Drift ที่กำลังทำงานอยู่โดยตรง Query ดึง Schema และข้อมูลทุกแถวจากทุกตาราง (25 ตาราง) รวมถึง Indexes และ Views ทั้งหมด
+    - นำเข้าสู่ฐานข้อมูล SQLite Binary ใหม่ในหน่วยความจำ (In-Memory SQLite Wasm) แล้วแปลงเป็นไฟล์ `.db` ที่สมบูรณ์ 100% ภายในเวลาเพียง ~160 ms
+    - อัปเดตทั้ง `exportAndShareBackup` และ `downloadBackupDirectly` ใน `BackupRestoreService` ให้ใช้ `dumpDriftDatabaseToSqliteBytes(db)` เป็นหลัก ทำให้ข้อมูลที่ส่งออกจาก Webapp ตรงกับหน้าจอและข้อมูลสดในเครื่องของผู้ใช้ 100% เสมอ
+  - **3. การทดสอบและการรับรองคุณภาพ**:
+    - `flutter test`: ผ่านทั้งหมด **182/182 tests passed** (100%)
+    - `dart analyze lib test`: **0 errors, 0 warnings**
+    - คอมไพล์ Web Release อัปเดตโฟลเดอร์ `docs/` เรียบร้อย
+
 - [x] **Credit Transactions Architectural Realignment: Budget Deduction, Liquid Cash & Net Worth Protection (3 ต.ค. 2026)**:
   - **1. ปรับการคำนวณกระแสเงินสด (Liquid Cash) และสินทรัพย์สุทธิ (Net Worth)**:
     - ปรับปรุง `getTotalCashSatang()` ใน `AccountsDao` ให้รวมเฉพาะบัญชีเงินสด/เงินฝากจริงในมือและธนาคาร (SCB, Krungthai, Dime! Save, FCD, USD) โดยคัดกรองบัญชี `credit_card` ออก

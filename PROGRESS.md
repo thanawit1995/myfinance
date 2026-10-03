@@ -2,6 +2,22 @@
 
 อัปเดตล่าสุด: 3 ตุลาคม 2026 (รอบดึกส่งท้าย)
 
+- [x] **Safari iOS Bottom Navigation Touch & Gesture Bar Clearance Fix (3 ต.ค. 2026)**:
+  - **1. ยกระดับแถบเมนูพ้นระยะ iPhone Gesture Bar & Safari Toolbar (`main_shell.dart`)**:
+    - คำนวณ `safeBottom = math.max(mediaBottom, kIsWeb ? 22.0 : 8.0)` พร้อม `Padding(padding: EdgeInsets.only(bottom: safeBottom))` เพื่อยกแถบเมนูขึ้นพ้นขีด Home Indicator และ Floating Toolbar ของ Safari อย่างเด็ดขาด
+    - เพิ่มความสูงแถบเมนูจาก 60px เป็น 66px
+  - **2. ขยายขนาดปุ่มและ Touch Target ป้องกันการ Drop Events (`main_shell.dart`)**:
+    - ใช้ `GestureDetector(behavior: HitTestBehavior.opaque, onTap: ...)` เต็มพื้นที่แต่ละช่องแท็บ (Expanded) ป้องกัน Safari สับสนระหว่างการแตะกับการปัดหน้าจอ
+    - ขยายปุ่มกลาง (+) Quick Add จาก 46px เป็น 50px พร้อม Hit Target กว้างขึ้น
+    - ขยายไอคอนแท็บเป็น 24px และเพิ่ม Padding ให้เห็นชัดเจนและกดง่าย
+  - **3. ปรับ CSS WebKit Touch Optimization (`web/index.html`)**:
+    - เพิ่ม `touch-action: manipulation;` ปิด Tap Delay 300ms บน Safari และป้องกัน Gesture Conflict
+    - เพิ่ม `height: 100dvh;` ป้องกัน Layout ดันลงใต้ Floating Bar บน iOS Safari
+  - **4. การทดสอบและการรับรองคุณภาพ**:
+    - `flutter analyze --no-fatal-infos`: **0 errors, 0 warnings**
+    - `flutter test`: ผ่านทั้งหมด **190/190 tests passed** (100%)
+    - `flutter build web`: คอมไพล์และอัปเดตไฟล์ใน `docs/` เรียบร้อย
+
 - [x] **Partner Gifting Edition (Pealpeal) & iPhone 14 Pro Onboarding Experience (3 ต.ค. 2026)**:
   - **1. ระบบ Smart Gift Link ตรวจจับพารามิเตอร์อัตโนมัติ (`main.dart`)**:
     - รองรับ URL พารามิเตอร์ เช่น `?to=Pealpeal&preset=lumi_en` หรือ `?to=Pealpeal`

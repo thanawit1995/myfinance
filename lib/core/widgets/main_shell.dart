@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -198,6 +200,8 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
     final isDark = VaultTheme.isDark(context);
 
     final isLumi = VaultTheme.isLumi(context);
+    final mediaBottom = MediaQuery.paddingOf(context).bottom;
+    final safeBottom = math.max(mediaBottom, kIsWeb ? 22.0 : 8.0);
 
     final screens = [
       VaultHomeScreen(
@@ -434,31 +438,33 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
             ),
             child: SafeArea(
               top: false,
-              child: SizedBox(
-                height: 60,
-                child: Row(
-                  children: [
-                    _buildNavItem(
-                      context,
-                      icon: Icons.home_outlined,
-                      selectedIcon: Icons.home_rounded,
-                      label: l10n?.home ?? 'Home',
-                      isSelected: _currentIndex == 0,
-                      onTap: () => _onTabSelected(0),
-                    ),
-                    _buildNavItem(
-                      context,
-                      icon: Icons.account_balance_wallet_outlined,
-                      selectedIcon: Icons.account_balance_wallet_rounded,
-                      label: l10n?.money ?? 'Money',
-                      isSelected: _currentIndex == 1,
-                      onTap: () => _onTabSelected(1),
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
+              bottom: false,
+              child: Padding(
+                padding: EdgeInsets.only(bottom: safeBottom),
+                child: SizedBox(
+                  height: 66,
+                  child: Row(
+                    children: [
+                      _buildNavItem(
+                        context,
+                        icon: Icons.home_outlined,
+                        selectedIcon: Icons.home_rounded,
+                        label: l10n?.home ?? 'Home',
+                        isSelected: _currentIndex == 0,
+                        onTap: () => _onTabSelected(0),
+                      ),
+                      _buildNavItem(
+                        context,
+                        icon: Icons.account_balance_wallet_outlined,
+                        selectedIcon: Icons.account_balance_wallet_rounded,
+                        label: l10n?.money ?? 'Money',
+                        isSelected: _currentIndex == 1,
+                        onTap: () => _onTabSelected(1),
+                      ),
+                      Expanded(
+                        child: Center(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
                             onTap: () async {
                               await Navigator.of(context).push(
                                 MaterialPageRoute(
@@ -467,48 +473,47 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
                               );
                               if (mounted) setState(() {});
                             },
-                            borderRadius: BorderRadius.circular(24),
                             child: Container(
-                              width: 46,
-                              height: 46,
+                              width: 50,
+                              height: 50,
                               decoration: BoxDecoration(
                                 color: isLumi ? const Color(0xFFFF5B9A) : accentCol,
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
                                     color: (isLumi ? const Color(0xFFFF5B9A) : accentCol).withValues(alpha: 0.35),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 3),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
                                   ),
                                 ],
                               ),
                               child: const Icon(
                                 Icons.add,
                                 color: Colors.white,
-                                size: 26,
+                                size: 28,
                               ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                    _buildNavItem(
-                      context,
-                      icon: Icons.show_chart_rounded,
-                      selectedIcon: Icons.show_chart_rounded,
-                      label: l10n?.invest ?? 'Invest',
-                      isSelected: _currentIndex == 2,
-                      onTap: () => _onTabSelected(2),
-                    ),
-                    _buildNavItem(
-                      context,
-                      icon: Icons.more_horiz_rounded,
-                      selectedIcon: Icons.more_horiz_rounded,
-                      label: l10n?.more ?? 'More',
-                      isSelected: _currentIndex == 3,
-                      onTap: () => _onTabSelected(3),
-                    ),
-                  ],
+                      _buildNavItem(
+                        context,
+                        icon: Icons.show_chart_rounded,
+                        selectedIcon: Icons.show_chart_rounded,
+                        label: l10n?.invest ?? 'Invest',
+                        isSelected: _currentIndex == 2,
+                        onTap: () => _onTabSelected(2),
+                      ),
+                      _buildNavItem(
+                        context,
+                        icon: Icons.more_horiz_rounded,
+                        selectedIcon: Icons.more_horiz_rounded,
+                        label: l10n?.more ?? 'More',
+                        isSelected: _currentIndex == 3,
+                        onTap: () => _onTabSelected(3),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -557,39 +562,41 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
     final inactiveColor = VaultTheme.secondaryText(context);
 
     return Expanded(
-      child: InkWell(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        splashColor: activeColor.withValues(alpha: 0.1),
-        highlightColor: Colors.transparent,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
-              decoration: BoxDecoration(
-                color: isSelected ? activeColor.withValues(alpha: 0.15) : Colors.transparent,
-                borderRadius: BorderRadius.circular(14),
+        child: SizedBox(
+          height: double.infinity,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isSelected ? activeColor.withValues(alpha: 0.15) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(
+                  isSelected ? selectedIcon : icon,
+                  size: 24,
+                  color: isSelected ? activeColor : inactiveColor,
+                ),
               ),
-              child: Icon(
-                isSelected ? selectedIcon : icon,
-                size: 22,
-                color: isSelected ? activeColor : inactiveColor,
+              const SizedBox(height: 3),
+              Text(
+                label,
+                style: TextStyle(
+                  fontFamily: VaultTheme.fontFamily,
+                  fontSize: 11.5,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected ? activeColor : inactiveColor,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                fontFamily: VaultTheme.fontFamily,
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
-                color: isSelected ? activeColor : inactiveColor,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

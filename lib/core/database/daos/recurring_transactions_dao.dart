@@ -332,6 +332,43 @@ class RecurringTransactionsDao extends DatabaseAccessor<AppDatabase> with _$Recu
     final now = DateTime.now();
     final txId = _uuid.v4();
 
+    String? workPeriod;
+    bool isCleared = true;
+    int? expectedAmountSatang;
+    String? taxCat;
+
+    final ruleNote = rule.note ?? '';
+    final hasPrevMonth = ruleNote.contains('[work_period:prev_month]');
+    final hasSameMonth = ruleNote.contains('[work_period:same_month]');
+    final isAccruedRule = ruleNote.contains('[accrued]');
+
+    if (rule.transactionType == 'income') {
+      if (hasPrevMonth || isAccruedRule) {
+        final prevMonthDate = DateTime(scheduledDueDate.year, scheduledDueDate.month - 1, 1);
+        workPeriod = '${prevMonthDate.year}-${prevMonthDate.month.toString().padLeft(2, '0')}';
+        if (isAccruedRule) {
+          isCleared = false;
+          expectedAmountSatang = amountSatang;
+        }
+      } else if (hasSameMonth) {
+        workPeriod = '${scheduledDueDate.year}-${scheduledDueDate.month.toString().padLeft(2, '0')}';
+      }
+
+      final taxMatch = RegExp(r'\[tax_cat:([a-zA-Z0-9_]+)\]').firstMatch(ruleNote);
+      if (taxMatch != null) {
+        taxCat = taxMatch.group(1);
+      }
+    }
+
+    String cleanNote = (note ?? rule.title)
+        .replaceAll(RegExp(r'\[work_period:(prev_month|same_month)\]'), '')
+        .replaceAll(RegExp(r'\[tax_cat:[a-zA-Z0-9_]+\]'), '')
+        .replaceAll('[accrued]', '')
+        .trim();
+    if (cleanNote.isEmpty) {
+      cleanNote = rule.title;
+    }
+
     await into(transactions).insert(
       TransactionsCompanion.insert(
         id: txId,
@@ -343,8 +380,11 @@ class RecurringTransactionsDao extends DatabaseAccessor<AppDatabase> with _$Recu
         destinationAccountId: Value(destinationAccountId ?? rule.destinationAccountId),
         categoryId: Value(categoryId ?? rule.categoryId),
         transactionDate: actualDate,
-        isCleared: const Value(true),
-        note: Value(note ?? rule.title),
+        workPeriod: Value(workPeriod),
+        expectedAmountSatang: Value(expectedAmountSatang),
+        isCleared: Value(isCleared),
+        taxCategory: Value(taxCat),
+        note: Value(cleanNote),
         tag: const Value('recurring_early_posted'),
         createdAt: now,
         updatedAt: now,

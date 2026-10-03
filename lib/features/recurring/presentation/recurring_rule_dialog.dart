@@ -40,6 +40,9 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
   DateTime _nextRunDate = DateTime.now();
   DateTime? _endDate;
   bool _autoPost = true;
+  bool _isAccrued = false;
+  String _workPeriodMode = 'prev_month';
+  String? _taxCategory;
 
   List<Account> _accounts = [];
   List<Category> _categories = [];
@@ -49,6 +52,26 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
   void initState() {
     super.initState();
     final item = widget.ruleToEdit;
+    final rawNote = item?.note ?? '';
+    _isAccrued = rawNote.contains('[accrued]');
+    if (rawNote.contains('[work_period:prev_month]')) {
+      _workPeriodMode = 'prev_month';
+    } else if (rawNote.contains('[work_period:same_month]')) {
+      _workPeriodMode = 'same_month';
+    } else {
+      _workPeriodMode = _isAccrued ? 'prev_month' : 'same_month';
+    }
+    final taxMatch = RegExp(r'\[tax_cat:([^\]]+)\]').firstMatch(rawNote);
+    if (taxMatch != null) {
+      _taxCategory = taxMatch.group(1);
+    }
+    final cleanNote = rawNote
+        .replaceAll('[accrued]', '')
+        .replaceAll(RegExp(r'\[work_period:[^\]]+\]'), '')
+        .replaceAll(RegExp(r'\[tax_cat:[^\]]+\]'), '')
+        .trim();
+    _noteController = TextEditingController(text: cleanNote);
+
     _titleController = TextEditingController(text: item?.title ?? '');
     _amountController = TextEditingController(
       text: item != null ? (item.amountSatang / 100).toStringAsFixed(2) : '',
@@ -59,7 +82,6 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
     _dayOfMonthController = TextEditingController(
       text: item?.dayOfMonth != null ? item!.dayOfMonth.toString() : DateTime.now().day.toString(),
     );
-    _noteController = TextEditingController(text: item?.note ?? '');
 
     _transactionType = item?.transactionType ?? 'expense';
     _frequency = item?.frequency ?? 'monthly';
@@ -153,6 +175,22 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
     final intervalUnits = int.tryParse(_intervalController.text.trim()) ?? 1;
     final dayOfMonth = int.tryParse(_dayOfMonthController.text.trim());
 
+    String noteText = _noteController.text.trim();
+    if (_transactionType == 'income') {
+      if (_isAccrued) {
+        noteText = '$noteText [accrued]'.trim();
+      }
+      if (_workPeriodMode == 'prev_month') {
+        noteText = '$noteText [work_period:prev_month]'.trim();
+      } else if (_workPeriodMode == 'same_month') {
+        noteText = '$noteText [work_period:same_month]'.trim();
+      }
+      if (_taxCategory != null && _taxCategory!.isNotEmpty) {
+        noteText = '$noteText [tax_cat:$_taxCategory]'.trim();
+      }
+    }
+    final finalNote = noteText.isEmpty ? null : noteText;
+
     if (widget.ruleToEdit == null) {
       // Create new
       await dao.createRule(
@@ -171,7 +209,7 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
           sourceAccountId: _sourceAccountId!,
           destinationAccountId: drift.Value(_transactionType == 'transfer' ? _destinationAccountId : null),
           categoryId: drift.Value(_categoryId),
-          note: drift.Value(_noteController.text.trim().isEmpty ? null : _noteController.text.trim()),
+          note: drift.Value(finalNote),
           isActive: const drift.Value(true),
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
@@ -194,7 +232,7 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
           sourceAccountId: drift.Value(_sourceAccountId!),
           destinationAccountId: drift.Value(_transactionType == 'transfer' ? _destinationAccountId : null),
           categoryId: drift.Value(_categoryId),
-          note: drift.Value(_noteController.text.trim().isEmpty ? null : _noteController.text.trim()),
+          note: drift.Value(finalNote),
           updatedAt: drift.Value(DateTime.now()),
         ),
       );
@@ -476,6 +514,107 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
                             ),
                         ],
                       ),
+                      if (_transactionType == 'income') ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.pending_actions_rounded, size: 18, color: Colors.amber.shade800),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    isThai ? 'การตั้งค่ารายรับค้างรับ & ภาษี' : 'Accrued Income & Tax Settings',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      color: Colors.amber.shade900,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              SwitchListTile(
+                                contentPadding: EdgeInsets.zero,
+                                dense: true,
+                                title: Text(
+                                  isThai ? 'บันทึกเป็นรายรับค้างรับ (Accrued)' : 'Record as Accrued Income',
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                ),
+                                subtitle: Text(
+                                  isThai
+                                      ? 'ระบบจะตั้งเป็นเงินค้างรับไว้ก่อน (ยังไม่นับยอดเงินเข้าบัญชีจริง จนกว่าจะกดเคลียร์ยอดเงินเข้า)'
+                                      : 'Recorded as uncleared accrued income until cleared',
+                                  style: const TextStyle(fontSize: 11),
+                                ),
+                                value: _isAccrued,
+                                onChanged: (val) => setState(() => _isAccrued = val),
+                              ),
+                              const SizedBox(height: 6),
+                              DropdownButtonFormField<String>(
+                                initialValue: _workPeriodMode,
+                                decoration: InputDecoration(
+                                  labelText: isThai ? 'รอบเดือนทำงาน (Work Period)' : 'Work Period',
+                                  isDense: true,
+                                  border: const OutlineInputBorder(),
+                                ),
+                                items: [
+                                  DropdownMenuItem(
+                                    value: 'prev_month',
+                                    child: Text(isThai ? 'เดือนก่อนหน้า (N-1) เช่น เงินเดือน/P4P' : 'Previous Month (N-1)'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'same_month',
+                                    child: Text(isThai ? 'เดือนเดียวกัน (N)' : 'Same Month (N)'),
+                                  ),
+                                ],
+                                onChanged: (val) {
+                                  if (val != null) setState(() => _workPeriodMode = val);
+                                },
+                              ),
+                              const SizedBox(height: 10),
+                              DropdownButtonFormField<String?>(
+                                initialValue: _taxCategory,
+                                decoration: InputDecoration(
+                                  labelText: isThai ? 'ประเภทเงินได้พึงประเมิน (ภาษี)' : 'Tax Category',
+                                  isDense: true,
+                                  border: const OutlineInputBorder(),
+                                ),
+                                items: [
+                                  DropdownMenuItem<String?>(
+                                    value: null,
+                                    child: Text(isThai ? '-- ไม่ระบุภาษี / เงินได้ทั่วไป --' : '-- General / None --'),
+                                  ),
+                                  DropdownMenuItem<String?>(
+                                    value: '40_1',
+                                    child: Text(isThai ? '40(1) เงินเดือน / โบนัส / ค่าจ้างประจำ' : '40(1) Salary / Bonus'),
+                                  ),
+                                  DropdownMenuItem<String?>(
+                                    value: '40_2',
+                                    child: Text(isThai ? '40(2) ค่าจ้างทั่วไป / เบี้ยเลี้ยง / ฟรีแลนซ์' : '40(2) Freelance / Allowance'),
+                                  ),
+                                  DropdownMenuItem<String?>(
+                                    value: '40_4',
+                                    child: Text(isThai ? '40(4) ดอกเบี้ย / เงินปันผล' : '40(4) Dividend / Interest'),
+                                  ),
+                                  DropdownMenuItem<String?>(
+                                    value: 'exempt',
+                                    child: Text(isThai ? 'เงินได้ที่ได้รับยกเว้นภาษี' : 'Tax Exempt'),
+                                  ),
+                                ],
+                                onChanged: (val) => setState(() => _taxCategory = val),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,

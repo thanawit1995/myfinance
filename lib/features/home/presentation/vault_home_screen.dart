@@ -614,11 +614,13 @@ class VaultHomeScreen extends ConsumerWidget {
                                           final rule = item.rule;
                                           final dueDate = item.projectedDate;
                                           final daysDiff = dueDate.difference(DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day)).inDays;
-                                          final daysText = daysDiff == 0
-                                              ? (isThai ? 'วันนี้' : 'Today')
-                                              : daysDiff == 1
-                                                  ? (isThai ? 'พรุ่งนี้' : 'Tomorrow')
-                                                  : (isThai ? 'อีก $daysDiff วัน' : 'in $daysDiff days');
+                                          final daysText = daysDiff < 0
+                                              ? (isThai ? 'เลยกำหนด ${-daysDiff} วัน' : '${-daysDiff}d overdue')
+                                              : daysDiff == 0
+                                                  ? (isThai ? 'วันนี้' : 'Today')
+                                                  : daysDiff == 1
+                                                      ? (isThai ? 'พรุ่งนี้' : 'Tomorrow')
+                                                      : (isThai ? 'อีก $daysDiff วัน' : 'in $daysDiff days');
                                           final dateFormatted = DateFormat('d MMM', isThai ? 'th' : 'en_US').format(dueDate);
                                           final isIncome = rule.transactionType == 'income';
                                           final isTransfer = rule.transactionType == 'transfer';
@@ -728,11 +730,19 @@ class VaultHomeScreen extends ConsumerWidget {
                                                           mainAxisSize: MainAxisSize.min,
                                                           children: [
                                                             Text(
-                                                              isThai ? 'แตะเพื่อลงล่วงหน้า' : 'Tap to post',
-                                                              style: TextStyle(fontSize: 10, color: VaultTheme.accent(context), fontWeight: FontWeight.w600),
-                                                            ),
-                                                            const SizedBox(width: 2),
-                                                            Icon(Icons.chevron_right_rounded, size: 14, color: VaultTheme.accent(context)),
+                                                              (daysDiff <= 0 ? (isThai ? 'กดยืนยัน' : 'Confirm') : (isThai ? 'แตะเพื่อลงล่วงหน้า' : 'Tap to post')),
+                                                              style: TextStyle(
+                                                                fontSize: 10,
+                                                                color: daysDiff <= 0 ? Colors.orange.shade800 : VaultTheme.accent(context),
+                                                                fontWeight: daysDiff <= 0 ? FontWeight.bold : FontWeight.w600,
+                                                              ),
+                                                             ),
+                                                             const SizedBox(width: 2),
+                                                             Icon(
+                                                               daysDiff <= 0 ? Icons.arrow_forward_rounded : Icons.chevron_right_rounded,
+                                                               size: 14,
+                                                               color: daysDiff <= 0 ? Colors.orange.shade800 : VaultTheme.accent(context),
+                                                             ),
                                                           ],
                                                         ),
                                                       ],
@@ -798,6 +808,24 @@ class VaultHomeScreen extends ConsumerWidget {
     VoidCallback onDone,
   ) {
     final isThai = Localizations.localeOf(context).languageCode == 'th';
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dueDay = DateTime(scheduledDueDate.year, scheduledDueDate.month, scheduledDueDate.day);
+    final isDueOrPast = dueDay.isBefore(today) || dueDay.isAtSameMomentAs(today);
+    final ruleNote = rule.note ?? '';
+    final isAccruedRule = ruleNote.contains('[accrued]');
+    final hasPrevMonth = ruleNote.contains('[work_period:prev_month]');
+
+    String? displayWorkPeriod;
+    if (rule.transactionType == 'income') {
+      if (hasPrevMonth || isAccruedRule) {
+        final prev = DateTime(scheduledDueDate.year, scheduledDueDate.month - 1, 1);
+        displayWorkPeriod = '${prev.year}-${prev.month.toString().padLeft(2, '0')}';
+      } else if (ruleNote.contains('[work_period:same_month]')) {
+        displayWorkPeriod = '${scheduledDueDate.year}-${scheduledDueDate.month.toString().padLeft(2, '0')}';
+      }
+    }
+
     DateTime selectedDate = DateTime.now();
     final amountCtrl = TextEditingController(text: (rule.amountSatang / 100).toStringAsFixed(2));
     final noteCtrl = TextEditingController(text: rule.title);
@@ -815,11 +843,17 @@ class VaultHomeScreen extends ConsumerWidget {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: Row(
               children: [
-                Icon(Icons.schedule_send_rounded, color: VaultTheme.accent(context), size: 24),
+                Icon(
+                  isDueOrPast ? Icons.check_circle_outline_rounded : Icons.schedule_send_rounded,
+                  color: isDueOrPast ? Colors.orangeAccent : VaultTheme.accent(context),
+                  size: 24,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    isThai ? 'ลงบัญชีก่อนกำหนด' : 'Post Early & Edit',
+                    isDueOrPast
+                        ? (isThai ? 'ยืนยันบันทึกรายการประจำ' : 'Confirm Recurring Transaction')
+                        : (isThai ? 'ลงบัญชีก่อนกำหนด' : 'Post Early & Edit'),
                     style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -831,11 +865,44 @@ class VaultHomeScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    isThai
-                        ? 'รอบกำหนดการเดิม: ${DateFormat('d MMMM yyyy', 'th').format(scheduledDueDate)}\nระบบจะบันทึกรายการในวันที่คุณระบุ และข้ามรอบของกำหนดการนี้ไปรอบถัดไปทันที'
-                        : 'Scheduled: ${DateFormat('d MMM yyyy').format(scheduledDueDate)}\nThis will record the transaction now and skip this cycle in schedule.',
+                    isDueOrPast
+                        ? (isThai
+                            ? 'รอบกำหนดการ: ${DateFormat('d MMMM yyyy', 'th').format(scheduledDueDate)}\nรายการนี้ถึงกำหนดบันทึกแล้ว คุณสามารถตรวจสอบจำนวนเงินและกดยืนยันบันทึกได้ทันที'
+                            : 'Scheduled: ${DateFormat('d MMM yyyy').format(scheduledDueDate)}\nThis item is due. Please review details and confirm.')
+                        : (isThai
+                            ? 'รอบกำหนดการเดิม: ${DateFormat('d MMMM yyyy', 'th').format(scheduledDueDate)}\nระบบจะบันทึกรายการในวันที่คุณระบุ และข้ามรอบของกำหนดการนี้ไปรอบถัดไปทันที'
+                            : 'Scheduled: ${DateFormat('d MMM yyyy').format(scheduledDueDate)}\nThis will record the transaction now and skip this cycle in schedule.'),
                     style: TextStyle(fontSize: 12, color: VaultTheme.secondaryText(context)),
                   ),
+                  if (isAccruedRule) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.amber.shade300),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.hourglass_top_rounded, color: Colors.amber, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              isThai
+                                  ? '⏳ ระบบจะบันทึกเป็น "รายรับค้างรับ" (สถานะรอรับจริง)\nรอบเดือนงาน: ${displayWorkPeriod ?? "เดือนก่อนหน้า (N-1)"}'
+                                  : '⏳ Recorded as "Accrued Income"\nWork Period: ${displayWorkPeriod ?? "Previous Month (N-1)"}',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: VaultTheme.isDark(context) ? Colors.amber.shade200 : Colors.brown.shade800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 14),
 
                   // Date Picker

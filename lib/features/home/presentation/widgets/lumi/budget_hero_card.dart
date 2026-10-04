@@ -1,9 +1,12 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../../core/money/money.dart';
 import '../../../../../core/theme/vault_theme.dart';
 import '../../../../../l10n/app_localizations.dart';
+import 'lumi_mascot_avatar.dart';
 
-class BudgetHeroCard extends StatelessWidget {
+class BudgetHeroCard extends ConsumerWidget {
   final int remainingSatang;
   final int totalBudgetSatang;
   final int totalExpenseSatang;
@@ -18,7 +21,7 @@ class BudgetHeroCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final hasBudget = totalBudgetSatang > 0;
 
@@ -202,13 +205,40 @@ class BudgetHeroCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // Lumi mascot character alongside without overlapping
-                  Image.asset(
-                    'assets/images/lumi_budget_character.png',
-                    width: 95,
-                    height: 105,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                  // Lumi mascot character (displays custom mascot if uploaded via Settings)
+                  Builder(
+                    builder: (context) {
+                      final customData = ref.watch(customMascotProvider);
+                      if (customData != null && customData.isNotEmpty) {
+                        try {
+                          final commaIdx = customData.indexOf(',');
+                          final b64 = commaIdx != -1 ? customData.substring(commaIdx + 1) : customData;
+                          final bytes = base64Decode(b64);
+                          return ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: Image.memory(
+                              bytes,
+                              width: 95,
+                              height: 105,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => Image.asset(
+                                'assets/images/lumi_budget_character.png',
+                                width: 95,
+                                height: 105,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          );
+                        } catch (_) {}
+                      }
+                      return Image.asset(
+                        'assets/images/lumi_budget_character.png',
+                        width: 95,
+                        height: 105,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                      );
+                    },
                   ),
                 ],
               ),

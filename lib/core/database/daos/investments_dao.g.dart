@@ -15,6 +15,8 @@ mixin _$InvestmentsDaoMixin on DatabaseAccessor<AppDatabase> {
   $CurrenciesTable get currencies => attachedDatabase.currencies;
   $AccountsTable get accounts => attachedDatabase.accounts;
   $AuditLogsTable get auditLogs => attachedDatabase.auditLogs;
+  $InvestmentPortfoliosTable get investmentPortfolios =>
+      attachedDatabase.investmentPortfolios;
   InvestmentsDaoManager get managers => InvestmentsDaoManager(this);
 }
 
@@ -50,4 +52,9 @@ class InvestmentsDaoManager {
       $$AccountsTableTableManager(_db.attachedDatabase, _db.accounts);
   $$AuditLogsTableTableManager get auditLogs =>
       $$AuditLogsTableTableManager(_db.attachedDatabase, _db.auditLogs);
+  $$InvestmentPortfoliosTableTableManager get investmentPortfolios =>
+      $$InvestmentPortfoliosTableTableManager(
+        _db.attachedDatabase,
+        _db.investmentPortfolios,
+      );
 }

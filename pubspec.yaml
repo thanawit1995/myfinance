@@ -77,7 +77,6 @@ dependencies:
   # Cloud Sync & Auth
   supabase_flutter: ^2.9.0
   connectivity_plus: ^6.1.4
-
 dev_dependencies:
   flutter_test:
     sdk: flutter

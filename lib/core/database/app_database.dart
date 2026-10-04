@@ -47,6 +47,7 @@ part 'app_database.g.dart';
     TaxResidencyRecords,
     ImportBatches,
     ConflictLogs,
+    InvestmentPortfolios,
   ],
   daos: [
     AccountsDao,
@@ -72,7 +73,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.connection);
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration {
@@ -167,6 +168,10 @@ class AppDatabase extends _$AppDatabase {
           await m.addColumn(accounts, accounts.icon);
           await m.addColumn(assets, assets.icon);
         }
+        if (from < 12) {
+          await m.createTable(investmentPortfolios);
+          await m.addColumn(assets, assets.portfolioId);
+        }
       },
       beforeOpen: (details) async {
         await customStatement('PRAGMA foreign_keys = ON;');
@@ -229,6 +234,7 @@ class AppDatabase extends _$AppDatabase {
     await _safeAddColumn(m, categories, categories.sortOrder);
     await _safeAddColumn(m, accounts, accounts.icon);
     await _safeAddColumn(m, assets, assets.icon);
+    await _safeAddColumn(m, assets, assets.portfolioId);
   }
 
   Future<void> _ensureAllIndexesExist() async {

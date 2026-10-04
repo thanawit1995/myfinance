@@ -1466,7 +1466,7 @@ class VaultHomeScreen extends ConsumerWidget {
           if (isLumi)
             const Padding(
               padding: EdgeInsets.only(right: 12),
-              child: LumiMascotAvatar(size: 32, enableUploadOnTap: false),
+              child: LumiMascotAvatar(size: 32),
             )
           else ...[
             Text(

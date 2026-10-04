@@ -23,3 +23,4 @@ export 'tax_rules_table.dart';
 export 'tax_residency_table.dart';
 export 'import_batches_table.dart';
 export 'conflict_logs_table.dart';
+export 'investment_portfolios_table.dart';

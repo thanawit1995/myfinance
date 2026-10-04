@@ -186,13 +186,17 @@ class _EditCreditCardDialogState extends ConsumerState<EditCreditCardDialog> {
                           border: Border.all(color: accent),
                         ),
                         child: Center(
-                          child: Icon(
-                            _selectedIcon != null
-                                ? CategoryIconHelper.getIcon(_selectedIcon)
-                                : Icons.credit_card_rounded,
-                            size: 24,
-                            color: accent,
-                          ),
+                          child: _selectedIcon != null
+                              ? CategoryIconHelper.buildIconWidget(
+                                  _selectedIcon,
+                                  size: 24,
+                                  color: accent,
+                                )
+                              : Icon(
+                                  Icons.credit_card_rounded,
+                                  size: 24,
+                                  color: accent,
+                                ),
                         ),
                       ),
                     ),

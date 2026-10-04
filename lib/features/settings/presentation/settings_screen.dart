@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../home/presentation/widgets/lumi/lumi_mascot_avatar.dart';
 import '../../../../core/security/auth_provider.dart';
 import '../../../../core/sync/auth_service.dart' show currentUserProvider;
 import '../../../../core/sync/sync_service.dart' show syncServiceProvider, SyncStatus, SyncState;
@@ -169,6 +171,121 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 if (context.mounted) {
                   await PartnerWelcomeTutorialDialog.show(context, partnerName: partnerName);
                 }
+              },
+            ),
+          ]),
+
+          const SizedBox(height: 18),
+
+          // 1.5 Custom Mascot Settings (รูปมาสคอต Lumi)
+          _buildSectionHeader(isThai ? 'มาสคอต Lumi ประจำหน้าหลัก' : 'Lumi Mascot Customization'),
+          _buildSectionCard([
+            Consumer(
+              builder: (ctx, ref, _) {
+                final customData = ref.watch(customMascotProvider);
+                final hasCustom = customData != null && customData.isNotEmpty;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 60,
+                        height: 66,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFFFD1E3), width: 1.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFF5C9D).withValues(alpha: 0.15),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: hasCustom
+                              ? Image.memory(
+                                  base64Decode(customData.contains(',') ? customData.split(',').last : customData),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, _, _) => Image.asset('assets/images/lumi_budget_character.png', fit: BoxFit.contain),
+                                )
+                              : Image.asset('assets/images/lumi_budget_character.png', fit: BoxFit.contain),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isThai ? 'รูปมาสคอตใหญ่ (งบประมาณ)' : 'Budget Hero Mascot',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              hasCustom
+                                  ? (isThai ? 'ใช้รูปที่ผู้ใช้อัปโหลดเอง' : 'Using custom image')
+                                  : (isThai ? 'รูปน้องแมว Lumi ดั้งเดิม' : 'Default Lumi character'),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: VaultTheme.secondaryText(context),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 4,
+                              children: [
+                                OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    visualDensity: VisualDensity.compact,
+                                    side: const BorderSide(color: Color(0xFFFF5C9D)),
+                                  ),
+                                  icon: const Icon(Icons.upload_rounded, size: 16, color: Color(0xFFFF5C9D)),
+                                  label: Text(
+                                    isThai ? 'อัปโหลดรูป' : 'Upload',
+                                    style: const TextStyle(fontSize: 12, color: Color(0xFFFF5C9D)),
+                                  ),
+                                  onPressed: () async {
+                                    final ok = await ref.read(customMascotProvider.notifier).pickAndSaveMascot(context);
+                                    if (ok && context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text(isThai ? 'เปลี่ยนรูปมาสคอต Lumi สำเร็จ ✨' : 'Lumi mascot updated ✨')),
+                                      );
+                                    }
+                                  },
+                                ),
+                                if (hasCustom)
+                                  TextButton.icon(
+                                    style: TextButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                    icon: const Icon(Icons.restore_rounded, size: 16, color: Colors.orange),
+                                    label: Text(
+                                      isThai ? 'รีเซ็ต' : 'Reset',
+                                      style: const TextStyle(fontSize: 12, color: Colors.orange),
+                                    ),
+                                    onPressed: () async {
+                                      await ref.read(customMascotProvider.notifier).resetToDefault();
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text(isThai ? 'รีเซ็ตเป็นรูปมาสคอตดั้งเดิมแล้ว' : 'Reset to default mascot')),
+                                        );
+                                      }
+                                    },
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
               },
             ),
           ]),

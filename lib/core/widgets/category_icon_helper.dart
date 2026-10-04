@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 
 class CategoryIconHelper {
@@ -148,8 +149,35 @@ class CategoryIconHelper {
 
   static List<String> get allIcons => iconMap.keys.toList();
 
+  static Widget buildIconWidget(
+    String? iconName, {
+    double size = 24,
+    Color? color,
+    BoxFit fit = BoxFit.cover,
+  }) {
+    if (iconName != null && iconName.startsWith('data:image')) {
+      try {
+        final commaIdx = iconName.indexOf(',');
+        final b64 = commaIdx != -1 ? iconName.substring(commaIdx + 1) : iconName;
+        final bytes = base64Decode(b64);
+        return ClipOval(
+          child: Image.memory(
+            bytes,
+            width: size,
+            height: size,
+            fit: fit,
+            errorBuilder: (_, _, _) => Icon(Icons.category, size: size, color: color),
+          ),
+        );
+      } catch (_) {
+        return Icon(Icons.category, size: size, color: color);
+      }
+    }
+    return Icon(getIcon(iconName), size: size, color: color);
+  }
+
   static IconData getIcon(String? iconName) {
-    if (iconName == null || iconName.isEmpty) {
+    if (iconName == null || iconName.isEmpty || iconName.startsWith('data:image')) {
       return Icons.category;
     }
     return iconMap[iconName] ?? Icons.category;

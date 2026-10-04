@@ -35,11 +35,24 @@ class AuthService {
   bool get isLoggedIn => currentUser != null;
 
   /// Sign in with Google via Supabase OAuth.
-  /// On web: opens a popup / redirect flow.
+  /// On web: opens a popup / redirect flow back to current app base path.
   Future<void> signInWithGoogle() async {
+    String? redirectUrl;
+    if (kIsWeb) {
+      final base = Uri.base;
+      // Strip search query/hash and ensure trailing slash
+      var path = base.path;
+      if (!path.endsWith('/')) {
+        path = '$path/';
+      }
+      redirectUrl = '${base.origin}$path';
+    } else {
+      redirectUrl = 'io.supabase.myfinance://login-callback';
+    }
+
     await _client.auth.signInWithOAuth(
       OAuthProvider.google,
-      redirectTo: kIsWeb ? null : 'io.supabase.myfinance://login-callback',
+      redirectTo: redirectUrl,
       authScreenLaunchMode: LaunchMode.platformDefault,
     );
   }

@@ -153,9 +153,83 @@ class InvestmentTradeRecord {
   Currencies,
   Accounts,
   AuditLogs,
+  InvestmentPortfolios,
 ])
 class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDaoMixin {
   InvestmentsDao(super.db);
+
+  // ─── Custom Portfolios (พอร์ตการลงทุนที่ผู้ใช้สร้างเอง) ───
+  Future<List<InvestmentPortfolio>> getAllPortfolios() async {
+    return (select(investmentPortfolios)
+          ..where((p) => p.deletedAt.isNull())
+          ..orderBy([(p) => OrderingTerm.asc(p.createdAt)]))
+        .get();
+  }
+
+  Future<InvestmentPortfolio?> getPortfolioById(String id) async {
+    return (select(investmentPortfolios)
+          ..where((p) => p.id.equals(id) & p.deletedAt.isNull()))
+        .getSingleOrNull();
+  }
+
+  Future<void> createPortfolio({
+    required String name,
+    String? description,
+    String? color,
+    bool isDefault = false,
+  }) async {
+    final now = DateTime.now();
+    await into(investmentPortfolios).insert(
+      InvestmentPortfoliosCompanion.insert(
+        id: const Uuid().v4(),
+        name: name,
+        description: Value(description),
+        color: Value(color),
+        isDefault: Value(isDefault),
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+  }
+
+  Future<void> updatePortfolio({
+    required String id,
+    required String name,
+    String? description,
+    String? color,
+  }) async {
+    await (update(investmentPortfolios)..where((p) => p.id.equals(id))).write(
+      InvestmentPortfoliosCompanion(
+        name: Value(name),
+        description: Value(description),
+        color: Value(color),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
+  Future<void> deletePortfolio(String id) async {
+    // Unassign assets first
+    await (update(assets)..where((a) => a.portfolioId.equals(id))).write(
+      const AssetsCompanion(portfolioId: Value(null)),
+    );
+    // Soft delete portfolio
+    await (update(investmentPortfolios)..where((p) => p.id.equals(id))).write(
+      InvestmentPortfoliosCompanion(
+        deletedAt: Value(DateTime.now()),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
+  Future<void> setAssetPortfolio(String assetId, String? portfolioId) async {
+    await (update(assets)..where((a) => a.id.equals(assetId))).write(
+      AssetsCompanion(
+        portfolioId: Value(portfolioId),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
 
   static const _uuid = Uuid();
 

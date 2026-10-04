@@ -2795,6 +2795,17 @@ class $AssetsTable extends Assets with TableInfo<$AssetsTable, Asset> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _portfolioIdMeta = const VerificationMeta(
+    'portfolioId',
+  );
+  @override
+  late final GeneratedColumn<String> portfolioId = GeneratedColumn<String>(
+    'portfolio_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _noteMeta = const VerificationMeta('note');
   @override
   late final GeneratedColumn<String> note = GeneratedColumn<String>(
@@ -2858,6 +2869,7 @@ class $AssetsTable extends Assets with TableInfo<$AssetsTable, Asset> {
     defaultAccountId,
     market,
     icon,
+    portfolioId,
     note,
     extraDetailsJson,
     createdAt,
@@ -2939,6 +2951,15 @@ class $AssetsTable extends Assets with TableInfo<$AssetsTable, Asset> {
         icon.isAcceptableOrUnknown(data['icon']!, _iconMeta),
       );
     }
+    if (data.containsKey('portfolio_id')) {
+      context.handle(
+        _portfolioIdMeta,
+        portfolioId.isAcceptableOrUnknown(
+          data['portfolio_id']!,
+          _portfolioIdMeta,
+        ),
+      );
+    }
     if (data.containsKey('note')) {
       context.handle(
         _noteMeta,
@@ -3017,6 +3038,10 @@ class $AssetsTable extends Assets with TableInfo<$AssetsTable, Asset> {
         DriftSqlType.string,
         data['${effectivePrefix}icon'],
       ),
+      portfolioId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}portfolio_id'],
+      ),
       note: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}note'],
@@ -3055,6 +3080,7 @@ class Asset extends DataClass implements Insertable<Asset> {
   final String defaultAccountId;
   final String? market;
   final String? icon;
+  final String? portfolioId;
   final String? note;
   final String? extraDetailsJson;
   final DateTime createdAt;
@@ -3069,6 +3095,7 @@ class Asset extends DataClass implements Insertable<Asset> {
     required this.defaultAccountId,
     this.market,
     this.icon,
+    this.portfolioId,
     this.note,
     this.extraDetailsJson,
     required this.createdAt,
@@ -3089,6 +3116,9 @@ class Asset extends DataClass implements Insertable<Asset> {
     }
     if (!nullToAbsent || icon != null) {
       map['icon'] = Variable<String>(icon);
+    }
+    if (!nullToAbsent || portfolioId != null) {
+      map['portfolio_id'] = Variable<String>(portfolioId);
     }
     if (!nullToAbsent || note != null) {
       map['note'] = Variable<String>(note);
@@ -3116,6 +3146,9 @@ class Asset extends DataClass implements Insertable<Asset> {
           ? const Value.absent()
           : Value(market),
       icon: icon == null && nullToAbsent ? const Value.absent() : Value(icon),
+      portfolioId: portfolioId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(portfolioId),
       note: note == null && nullToAbsent ? const Value.absent() : Value(note),
       extraDetailsJson: extraDetailsJson == null && nullToAbsent
           ? const Value.absent()
@@ -3142,6 +3175,7 @@ class Asset extends DataClass implements Insertable<Asset> {
       defaultAccountId: serializer.fromJson<String>(json['defaultAccountId']),
       market: serializer.fromJson<String?>(json['market']),
       icon: serializer.fromJson<String?>(json['icon']),
+      portfolioId: serializer.fromJson<String?>(json['portfolioId']),
       note: serializer.fromJson<String?>(json['note']),
       extraDetailsJson: serializer.fromJson<String?>(json['extraDetailsJson']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -3161,6 +3195,7 @@ class Asset extends DataClass implements Insertable<Asset> {
       'defaultAccountId': serializer.toJson<String>(defaultAccountId),
       'market': serializer.toJson<String?>(market),
       'icon': serializer.toJson<String?>(icon),
+      'portfolioId': serializer.toJson<String?>(portfolioId),
       'note': serializer.toJson<String?>(note),
       'extraDetailsJson': serializer.toJson<String?>(extraDetailsJson),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -3178,6 +3213,7 @@ class Asset extends DataClass implements Insertable<Asset> {
     String? defaultAccountId,
     Value<String?> market = const Value.absent(),
     Value<String?> icon = const Value.absent(),
+    Value<String?> portfolioId = const Value.absent(),
     Value<String?> note = const Value.absent(),
     Value<String?> extraDetailsJson = const Value.absent(),
     DateTime? createdAt,
@@ -3192,6 +3228,7 @@ class Asset extends DataClass implements Insertable<Asset> {
     defaultAccountId: defaultAccountId ?? this.defaultAccountId,
     market: market.present ? market.value : this.market,
     icon: icon.present ? icon.value : this.icon,
+    portfolioId: portfolioId.present ? portfolioId.value : this.portfolioId,
     note: note.present ? note.value : this.note,
     extraDetailsJson: extraDetailsJson.present
         ? extraDetailsJson.value
@@ -3214,6 +3251,9 @@ class Asset extends DataClass implements Insertable<Asset> {
           : this.defaultAccountId,
       market: data.market.present ? data.market.value : this.market,
       icon: data.icon.present ? data.icon.value : this.icon,
+      portfolioId: data.portfolioId.present
+          ? data.portfolioId.value
+          : this.portfolioId,
       note: data.note.present ? data.note.value : this.note,
       extraDetailsJson: data.extraDetailsJson.present
           ? data.extraDetailsJson.value
@@ -3235,6 +3275,7 @@ class Asset extends DataClass implements Insertable<Asset> {
           ..write('defaultAccountId: $defaultAccountId, ')
           ..write('market: $market, ')
           ..write('icon: $icon, ')
+          ..write('portfolioId: $portfolioId, ')
           ..write('note: $note, ')
           ..write('extraDetailsJson: $extraDetailsJson, ')
           ..write('createdAt: $createdAt, ')
@@ -3254,6 +3295,7 @@ class Asset extends DataClass implements Insertable<Asset> {
     defaultAccountId,
     market,
     icon,
+    portfolioId,
     note,
     extraDetailsJson,
     createdAt,
@@ -3272,6 +3314,7 @@ class Asset extends DataClass implements Insertable<Asset> {
           other.defaultAccountId == this.defaultAccountId &&
           other.market == this.market &&
           other.icon == this.icon &&
+          other.portfolioId == this.portfolioId &&
           other.note == this.note &&
           other.extraDetailsJson == this.extraDetailsJson &&
           other.createdAt == this.createdAt &&
@@ -3288,6 +3331,7 @@ class AssetsCompanion extends UpdateCompanion<Asset> {
   final Value<String> defaultAccountId;
   final Value<String?> market;
   final Value<String?> icon;
+  final Value<String?> portfolioId;
   final Value<String?> note;
   final Value<String?> extraDetailsJson;
   final Value<DateTime> createdAt;
@@ -3303,6 +3347,7 @@ class AssetsCompanion extends UpdateCompanion<Asset> {
     this.defaultAccountId = const Value.absent(),
     this.market = const Value.absent(),
     this.icon = const Value.absent(),
+    this.portfolioId = const Value.absent(),
     this.note = const Value.absent(),
     this.extraDetailsJson = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -3319,6 +3364,7 @@ class AssetsCompanion extends UpdateCompanion<Asset> {
     required String defaultAccountId,
     this.market = const Value.absent(),
     this.icon = const Value.absent(),
+    this.portfolioId = const Value.absent(),
     this.note = const Value.absent(),
     this.extraDetailsJson = const Value.absent(),
     required DateTime createdAt,
@@ -3342,6 +3388,7 @@ class AssetsCompanion extends UpdateCompanion<Asset> {
     Expression<String>? defaultAccountId,
     Expression<String>? market,
     Expression<String>? icon,
+    Expression<String>? portfolioId,
     Expression<String>? note,
     Expression<String>? extraDetailsJson,
     Expression<DateTime>? createdAt,
@@ -3358,6 +3405,7 @@ class AssetsCompanion extends UpdateCompanion<Asset> {
       if (defaultAccountId != null) 'default_account_id': defaultAccountId,
       if (market != null) 'market': market,
       if (icon != null) 'icon': icon,
+      if (portfolioId != null) 'portfolio_id': portfolioId,
       if (note != null) 'note': note,
       if (extraDetailsJson != null) 'extra_details_json': extraDetailsJson,
       if (createdAt != null) 'created_at': createdAt,
@@ -3376,6 +3424,7 @@ class AssetsCompanion extends UpdateCompanion<Asset> {
     Value<String>? defaultAccountId,
     Value<String?>? market,
     Value<String?>? icon,
+    Value<String?>? portfolioId,
     Value<String?>? note,
     Value<String?>? extraDetailsJson,
     Value<DateTime>? createdAt,
@@ -3392,6 +3441,7 @@ class AssetsCompanion extends UpdateCompanion<Asset> {
       defaultAccountId: defaultAccountId ?? this.defaultAccountId,
       market: market ?? this.market,
       icon: icon ?? this.icon,
+      portfolioId: portfolioId ?? this.portfolioId,
       note: note ?? this.note,
       extraDetailsJson: extraDetailsJson ?? this.extraDetailsJson,
       createdAt: createdAt ?? this.createdAt,
@@ -3428,6 +3478,9 @@ class AssetsCompanion extends UpdateCompanion<Asset> {
     if (icon.present) {
       map['icon'] = Variable<String>(icon.value);
     }
+    if (portfolioId.present) {
+      map['portfolio_id'] = Variable<String>(portfolioId.value);
+    }
     if (note.present) {
       map['note'] = Variable<String>(note.value);
     }
@@ -3460,6 +3513,7 @@ class AssetsCompanion extends UpdateCompanion<Asset> {
           ..write('defaultAccountId: $defaultAccountId, ')
           ..write('market: $market, ')
           ..write('icon: $icon, ')
+          ..write('portfolioId: $portfolioId, ')
           ..write('note: $note, ')
           ..write('extraDetailsJson: $extraDetailsJson, ')
           ..write('createdAt: $createdAt, ')
@@ -19775,6 +19829,576 @@ class ConflictLogsCompanion extends UpdateCompanion<ConflictLog> {
   }
 }
 
+class $InvestmentPortfoliosTable extends InvestmentPortfolios
+    with TableInfo<$InvestmentPortfoliosTable, InvestmentPortfolio> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $InvestmentPortfoliosTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _descriptionMeta = const VerificationMeta(
+    'description',
+  );
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+    'description',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _colorMeta = const VerificationMeta('color');
+  @override
+  late final GeneratedColumn<String> color = GeneratedColumn<String>(
+    'color',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _isDefaultMeta = const VerificationMeta(
+    'isDefault',
+  );
+  @override
+  late final GeneratedColumn<bool> isDefault = GeneratedColumn<bool>(
+    'is_default',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_default" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _syncVersionMeta = const VerificationMeta(
+    'syncVersion',
+  );
+  @override
+  late final GeneratedColumn<int> syncVersion = GeneratedColumn<int>(
+    'sync_version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    description,
+    color,
+    isDefault,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    syncVersion,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'investment_portfolios';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<InvestmentPortfolio> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+        _descriptionMeta,
+        description.isAcceptableOrUnknown(
+          data['description']!,
+          _descriptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('color')) {
+      context.handle(
+        _colorMeta,
+        color.isAcceptableOrUnknown(data['color']!, _colorMeta),
+      );
+    }
+    if (data.containsKey('is_default')) {
+      context.handle(
+        _isDefaultMeta,
+        isDefault.isAcceptableOrUnknown(data['is_default']!, _isDefaultMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('sync_version')) {
+      context.handle(
+        _syncVersionMeta,
+        syncVersion.isAcceptableOrUnknown(
+          data['sync_version']!,
+          _syncVersionMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  InvestmentPortfolio map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return InvestmentPortfolio(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      ),
+      color: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}color'],
+      ),
+      isDefault: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_default'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      syncVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sync_version'],
+      )!,
+    );
+  }
+
+  @override
+  $InvestmentPortfoliosTable createAlias(String alias) {
+    return $InvestmentPortfoliosTable(attachedDatabase, alias);
+  }
+}
+
+class InvestmentPortfolio extends DataClass
+    implements Insertable<InvestmentPortfolio> {
+  final String id;
+  final String name;
+  final String? description;
+  final String? color;
+  final bool isDefault;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  final int syncVersion;
+  const InvestmentPortfolio({
+    required this.id,
+    required this.name,
+    this.description,
+    this.color,
+    required this.isDefault,
+    required this.createdAt,
+    required this.updatedAt,
+    this.deletedAt,
+    required this.syncVersion,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
+    if (!nullToAbsent || color != null) {
+      map['color'] = Variable<String>(color);
+    }
+    map['is_default'] = Variable<bool>(isDefault);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['sync_version'] = Variable<int>(syncVersion);
+    return map;
+  }
+
+  InvestmentPortfoliosCompanion toCompanion(bool nullToAbsent) {
+    return InvestmentPortfoliosCompanion(
+      id: Value(id),
+      name: Value(name),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
+      color: color == null && nullToAbsent
+          ? const Value.absent()
+          : Value(color),
+      isDefault: Value(isDefault),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      syncVersion: Value(syncVersion),
+    );
+  }
+
+  factory InvestmentPortfolio.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return InvestmentPortfolio(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      description: serializer.fromJson<String?>(json['description']),
+      color: serializer.fromJson<String?>(json['color']),
+      isDefault: serializer.fromJson<bool>(json['isDefault']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      syncVersion: serializer.fromJson<int>(json['syncVersion']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'description': serializer.toJson<String?>(description),
+      'color': serializer.toJson<String?>(color),
+      'isDefault': serializer.toJson<bool>(isDefault),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'syncVersion': serializer.toJson<int>(syncVersion),
+    };
+  }
+
+  InvestmentPortfolio copyWith({
+    String? id,
+    String? name,
+    Value<String?> description = const Value.absent(),
+    Value<String?> color = const Value.absent(),
+    bool? isDefault,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+    int? syncVersion,
+  }) => InvestmentPortfolio(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    description: description.present ? description.value : this.description,
+    color: color.present ? color.value : this.color,
+    isDefault: isDefault ?? this.isDefault,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    syncVersion: syncVersion ?? this.syncVersion,
+  );
+  InvestmentPortfolio copyWithCompanion(InvestmentPortfoliosCompanion data) {
+    return InvestmentPortfolio(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
+      color: data.color.present ? data.color.value : this.color,
+      isDefault: data.isDefault.present ? data.isDefault.value : this.isDefault,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      syncVersion: data.syncVersion.present
+          ? data.syncVersion.value
+          : this.syncVersion,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('InvestmentPortfolio(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('description: $description, ')
+          ..write('color: $color, ')
+          ..write('isDefault: $isDefault, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('syncVersion: $syncVersion')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    name,
+    description,
+    color,
+    isDefault,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    syncVersion,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is InvestmentPortfolio &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.description == this.description &&
+          other.color == this.color &&
+          other.isDefault == this.isDefault &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.syncVersion == this.syncVersion);
+}
+
+class InvestmentPortfoliosCompanion
+    extends UpdateCompanion<InvestmentPortfolio> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<String?> description;
+  final Value<String?> color;
+  final Value<bool> isDefault;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> syncVersion;
+  final Value<int> rowid;
+  const InvestmentPortfoliosCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.description = const Value.absent(),
+    this.color = const Value.absent(),
+    this.isDefault = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.syncVersion = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  InvestmentPortfoliosCompanion.insert({
+    required String id,
+    required String name,
+    this.description = const Value.absent(),
+    this.color = const Value.absent(),
+    this.isDefault = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.syncVersion = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<InvestmentPortfolio> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? description,
+    Expression<String>? color,
+    Expression<bool>? isDefault,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? syncVersion,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (description != null) 'description': description,
+      if (color != null) 'color': color,
+      if (isDefault != null) 'is_default': isDefault,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (syncVersion != null) 'sync_version': syncVersion,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  InvestmentPortfoliosCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<String?>? description,
+    Value<String?>? color,
+    Value<bool>? isDefault,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? syncVersion,
+    Value<int>? rowid,
+  }) {
+    return InvestmentPortfoliosCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      color: color ?? this.color,
+      isDefault: isDefault ?? this.isDefault,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      syncVersion: syncVersion ?? this.syncVersion,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (color.present) {
+      map['color'] = Variable<String>(color.value);
+    }
+    if (isDefault.present) {
+      map['is_default'] = Variable<bool>(isDefault.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (syncVersion.present) {
+      map['sync_version'] = Variable<int>(syncVersion.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('InvestmentPortfoliosCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('description: $description, ')
+          ..write('color: $color, ')
+          ..write('isDefault: $isDefault, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('syncVersion: $syncVersion, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -19813,6 +20437,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $TaxResidencyRecordsTable(this);
   late final $ImportBatchesTable importBatches = $ImportBatchesTable(this);
   late final $ConflictLogsTable conflictLogs = $ConflictLogsTable(this);
+  late final $InvestmentPortfoliosTable investmentPortfolios =
+      $InvestmentPortfoliosTable(this);
   late final Index idxTransDate = Index(
     'idx_trans_date',
     'CREATE INDEX idx_trans_date ON transactions (transaction_date)',
@@ -19911,6 +20537,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     taxResidencyRecords,
     importBatches,
     conflictLogs,
+    investmentPortfolios,
     idxTransDate,
     idxTransSourceAcc,
     idxTransCategory,
@@ -21209,6 +21836,7 @@ typedef $$AssetsTableCreateCompanionBuilder =
       required String defaultAccountId,
       Value<String?> market,
       Value<String?> icon,
+      Value<String?> portfolioId,
       Value<String?> note,
       Value<String?> extraDetailsJson,
       required DateTime createdAt,
@@ -21226,6 +21854,7 @@ typedef $$AssetsTableUpdateCompanionBuilder =
       Value<String> defaultAccountId,
       Value<String?> market,
       Value<String?> icon,
+      Value<String?> portfolioId,
       Value<String?> note,
       Value<String?> extraDetailsJson,
       Value<DateTime> createdAt,
@@ -21280,6 +21909,11 @@ class $$AssetsTableFilterComposer
 
   ColumnFilters<String> get icon => $composableBuilder(
     column: $table.icon,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get portfolioId => $composableBuilder(
+    column: $table.portfolioId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -21358,6 +21992,11 @@ class $$AssetsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get portfolioId => $composableBuilder(
+    column: $table.portfolioId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get note => $composableBuilder(
     column: $table.note,
     builder: (column) => ColumnOrderings(column),
@@ -21421,6 +22060,11 @@ class $$AssetsTableAnnotationComposer
   GeneratedColumn<String> get icon =>
       $composableBuilder(column: $table.icon, builder: (column) => column);
 
+  GeneratedColumn<String> get portfolioId => $composableBuilder(
+    column: $table.portfolioId,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get note =>
       $composableBuilder(column: $table.note, builder: (column) => column);
 
@@ -21475,6 +22119,7 @@ class $$AssetsTableTableManager
                 Value<String> defaultAccountId = const Value.absent(),
                 Value<String?> market = const Value.absent(),
                 Value<String?> icon = const Value.absent(),
+                Value<String?> portfolioId = const Value.absent(),
                 Value<String?> note = const Value.absent(),
                 Value<String?> extraDetailsJson = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -21490,6 +22135,7 @@ class $$AssetsTableTableManager
                 defaultAccountId: defaultAccountId,
                 market: market,
                 icon: icon,
+                portfolioId: portfolioId,
                 note: note,
                 extraDetailsJson: extraDetailsJson,
                 createdAt: createdAt,
@@ -21507,6 +22153,7 @@ class $$AssetsTableTableManager
                 required String defaultAccountId,
                 Value<String?> market = const Value.absent(),
                 Value<String?> icon = const Value.absent(),
+                Value<String?> portfolioId = const Value.absent(),
                 Value<String?> note = const Value.absent(),
                 Value<String?> extraDetailsJson = const Value.absent(),
                 required DateTime createdAt,
@@ -21522,6 +22169,7 @@ class $$AssetsTableTableManager
                 defaultAccountId: defaultAccountId,
                 market: market,
                 icon: icon,
+                portfolioId: portfolioId,
                 note: note,
                 extraDetailsJson: extraDetailsJson,
                 createdAt: createdAt,
@@ -29097,6 +29745,302 @@ typedef $$ConflictLogsTableProcessedTableManager =
       ConflictLog,
       PrefetchHooks Function()
     >;
+typedef $$InvestmentPortfoliosTableCreateCompanionBuilder =
+    InvestmentPortfoliosCompanion Function({
+      required String id,
+      required String name,
+      Value<String?> description,
+      Value<String?> color,
+      Value<bool> isDefault,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> syncVersion,
+      Value<int> rowid,
+    });
+typedef $$InvestmentPortfoliosTableUpdateCompanionBuilder =
+    InvestmentPortfoliosCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<String?> description,
+      Value<String?> color,
+      Value<bool> isDefault,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> syncVersion,
+      Value<int> rowid,
+    });
+
+class $$InvestmentPortfoliosTableFilterComposer
+    extends Composer<_$AppDatabase, $InvestmentPortfoliosTable> {
+  $$InvestmentPortfoliosTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get color => $composableBuilder(
+    column: $table.color,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isDefault => $composableBuilder(
+    column: $table.isDefault,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get syncVersion => $composableBuilder(
+    column: $table.syncVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$InvestmentPortfoliosTableOrderingComposer
+    extends Composer<_$AppDatabase, $InvestmentPortfoliosTable> {
+  $$InvestmentPortfoliosTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get color => $composableBuilder(
+    column: $table.color,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isDefault => $composableBuilder(
+    column: $table.isDefault,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get syncVersion => $composableBuilder(
+    column: $table.syncVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$InvestmentPortfoliosTableAnnotationComposer
+    extends Composer<_$AppDatabase, $InvestmentPortfoliosTable> {
+  $$InvestmentPortfoliosTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get color =>
+      $composableBuilder(column: $table.color, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDefault =>
+      $composableBuilder(column: $table.isDefault, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get syncVersion => $composableBuilder(
+    column: $table.syncVersion,
+    builder: (column) => column,
+  );
+}
+
+class $$InvestmentPortfoliosTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $InvestmentPortfoliosTable,
+          InvestmentPortfolio,
+          $$InvestmentPortfoliosTableFilterComposer,
+          $$InvestmentPortfoliosTableOrderingComposer,
+          $$InvestmentPortfoliosTableAnnotationComposer,
+          $$InvestmentPortfoliosTableCreateCompanionBuilder,
+          $$InvestmentPortfoliosTableUpdateCompanionBuilder,
+          (
+            InvestmentPortfolio,
+            BaseReferences<
+              _$AppDatabase,
+              $InvestmentPortfoliosTable,
+              InvestmentPortfolio
+            >,
+          ),
+          InvestmentPortfolio,
+          PrefetchHooks Function()
+        > {
+  $$InvestmentPortfoliosTableTableManager(
+    _$AppDatabase db,
+    $InvestmentPortfoliosTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$InvestmentPortfoliosTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$InvestmentPortfoliosTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$InvestmentPortfoliosTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String?> description = const Value.absent(),
+                Value<String?> color = const Value.absent(),
+                Value<bool> isDefault = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> syncVersion = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => InvestmentPortfoliosCompanion(
+                id: id,
+                name: name,
+                description: description,
+                color: color,
+                isDefault: isDefault,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                syncVersion: syncVersion,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                Value<String?> description = const Value.absent(),
+                Value<String?> color = const Value.absent(),
+                Value<bool> isDefault = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> syncVersion = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => InvestmentPortfoliosCompanion.insert(
+                id: id,
+                name: name,
+                description: description,
+                color: color,
+                isDefault: isDefault,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                syncVersion: syncVersion,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$InvestmentPortfoliosTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $InvestmentPortfoliosTable,
+      InvestmentPortfolio,
+      $$InvestmentPortfoliosTableFilterComposer,
+      $$InvestmentPortfoliosTableOrderingComposer,
+      $$InvestmentPortfoliosTableAnnotationComposer,
+      $$InvestmentPortfoliosTableCreateCompanionBuilder,
+      $$InvestmentPortfoliosTableUpdateCompanionBuilder,
+      (
+        InvestmentPortfolio,
+        BaseReferences<
+          _$AppDatabase,
+          $InvestmentPortfoliosTable,
+          InvestmentPortfolio
+        >,
+      ),
+      InvestmentPortfolio,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -29157,4 +30101,6 @@ class $AppDatabaseManager {
       $$ImportBatchesTableTableManager(_db, _db.importBatches);
   $$ConflictLogsTableTableManager get conflictLogs =>
       $$ConflictLogsTableTableManager(_db, _db.conflictLogs);
+  $$InvestmentPortfoliosTableTableManager get investmentPortfolios =>
+      $$InvestmentPortfoliosTableTableManager(_db, _db.investmentPortfolios);
 }

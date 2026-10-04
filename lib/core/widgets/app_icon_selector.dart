@@ -1,6 +1,10 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../theme/vault_theme.dart';
 import 'category_icon_helper.dart';
+import 'image_cropper_dialog.dart';
 
 /// Reusable icon picker dialog/sheet for Accounts, Assets, and Categories.
 class AppIconSelector extends StatelessWidget {
@@ -62,6 +66,59 @@ class AppIconSelector extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 8),
+
+              // Upload custom photo button
+              InkWell(
+                onTap: () async {
+                  final result = await FilePicker.platform.pickFiles(
+                    type: FileType.image,
+                    withData: true,
+                  );
+                  if (result == null || result.files.isEmpty) return;
+                  final file = result.files.first;
+                  final bytes = file.bytes ?? (file.path != null ? await File(file.path!).readAsBytes() : null);
+                  if (bytes == null) return;
+
+                  if (ctx.mounted) {
+                    final croppedBytes = await ImageCropperDialog.show(
+                      ctx,
+                      imageBytes: bytes,
+                      aspectRatio: 1.0,
+                      title: isThai ? 'ครอบตัดไอคอน (1:1)' : 'Crop Icon (1:1)',
+                    );
+                    if (croppedBytes != null && ctx.mounted) {
+                      final b64 = base64Encode(croppedBytes);
+                      Navigator.pop(ctx, 'data:image/png;base64,$b64');
+                    }
+                  }
+                },
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: VaultTheme.accent(context).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: VaultTheme.accent(context).withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.add_photo_alternate_rounded, color: VaultTheme.accent(context), size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        isThai ? 'อัปโหลดรูปภาพจากเครื่อง (กำหนดเอง)' : 'Upload Custom Image',
+                        style: TextStyle(
+                          fontFamily: VaultTheme.fontFamily,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.bold,
+                          color: VaultTheme.accent(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
               Expanded(
                 child: ListView(
                   controller: scrollController,

@@ -177,13 +177,17 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                         border: Border.all(color: Theme.of(context).colorScheme.primary),
                       ),
                       child: Center(
-                        child: Icon(
-                          _selectedIcon != null
-                              ? CategoryIconHelper.getIcon(_selectedIcon)
-                              : (_accountType == 'credit_card' ? Icons.credit_card : Icons.account_balance_wallet),
-                          size: 26,
-                          color: Theme.of(context).colorScheme.onPrimaryContainer,
-                        ),
+                        child: _selectedIcon != null
+                            ? CategoryIconHelper.buildIconWidget(
+                                _selectedIcon,
+                                size: 26,
+                                color: Theme.of(context).colorScheme.onPrimaryContainer,
+                              )
+                            : Icon(
+                                _accountType == 'credit_card' ? Icons.credit_card : Icons.account_balance_wallet,
+                                size: 26,
+                                color: Theme.of(context).colorScheme.onPrimaryContainer,
+                              ),
                       ),
                     ),
                   ),

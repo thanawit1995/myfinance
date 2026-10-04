@@ -27,7 +27,9 @@ class PortfolioScreen extends ConsumerStatefulWidget {
 class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   String _selectedCategoryFilter = 'all';
+  String? _selectedPortfolioFilter; // null means 'all', or portfolio UUID
   String _selectedSortOption = 'value_desc'; // 'value_desc', 'value_asc', 'pnl_pct_desc', 'pnl_pct_asc', 'name_asc'
+  bool _chartGroupByPortfolio = false; // toggle between asset category and portfolio allocation
 
   @override
   void initState() {
@@ -95,7 +97,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                 leading: CircleAvatar(
                   backgroundColor: Theme.of(sheetContext).colorScheme.primaryContainer,
                   child: holding.asset.icon != null
-                      ? Icon(CategoryIconHelper.getIcon(holding.asset.icon), color: Theme.of(sheetContext).colorScheme.primary)
+                      ? CategoryIconHelper.buildIconWidget(holding.asset.icon, size: 22, color: Theme.of(sheetContext).colorScheme.primary)
                       : Text(holding.asset.symbol.isNotEmpty ? holding.asset.symbol.substring(0, 1) : '?'),
                 ),
                 title: Text('${holding.asset.symbol} - ${holding.asset.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -235,6 +237,221 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
     }
   }
 
+  Future<void> _showManagePortfoliosDialog(BuildContext context, InvestmentsDao invDao, bool isThai) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  top: 20,
+                  bottom: MediaQuery.of(modalCtx).viewInsets.bottom + 16,
+                ),
+                child: FutureBuilder<List<InvestmentPortfolio>>(
+                  future: invDao.getAllPortfolios(),
+                  builder: (ctx, snapshot) {
+                    final portfolios = snapshot.data ?? [];
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              isThai ? 'จัดการพอร์ตการลงทุน (Portfolios)' : 'Manage Portfolios',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close),
+                              onPressed: () => Navigator.pop(modalCtx),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          isThai
+                              ? 'แบ่งพอร์ตตามเป้าหมาย เช่น พอร์ตเกษียณ (DCA), พอร์ตปันผล, พอร์ตเก็งกำไร'
+                              : 'Group assets by objective (e.g. Retirement DCA, Dividend, Speculation)',
+                          style: TextStyle(fontSize: 12.5, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        ),
+                        const SizedBox(height: 14),
+                        const Divider(height: 1),
+                        const SizedBox(height: 8),
+
+                        if (portfolios.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            child: Center(
+                              child: Text(
+                                isThai ? 'ยังไม่มีพอร์ตที่สร้างเอง' : 'No custom portfolios yet',
+                                style: const TextStyle(color: Colors.grey),
+                              ),
+                            ),
+                          )
+                        else
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxHeight: 280),
+                            child: ListView.separated(
+                              shrinkWrap: true,
+                              itemCount: portfolios.length,
+                              separatorBuilder: (_, _) => const Divider(height: 1),
+                              itemBuilder: (ctx, i) {
+                                final p = portfolios[i];
+                                return ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: CircleAvatar(
+                                    backgroundColor: Colors.indigo.shade50,
+                                    child: const Icon(Icons.folder_special_rounded, color: Colors.indigo),
+                                  ),
+                                  title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                  subtitle: p.description != null && p.description!.isNotEmpty
+                                      ? Text(p.description!, maxLines: 1, overflow: TextOverflow.ellipsis)
+                                      : null,
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.edit_outlined, size: 20),
+                                        onPressed: () async {
+                                          await _showCreateOrEditPortfolioDialog(context, invDao, isThai, portfolioToEdit: p);
+                                          setModalState(() {});
+                                        },
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                                        onPressed: () async {
+                                          final confirm = await showDialog<bool>(
+                                            context: context,
+                                            builder: (c) => AlertDialog(
+                                              title: Text(isThai ? 'ลบพอร์ต ${p.name}' : 'Delete Portfolio ${p.name}'),
+                                              content: Text(
+                                                isThai
+                                                    ? 'สินทรัพย์ที่อยู่ในพอร์ตนี้จะไม่ถูกลบ แต่จะเปลี่ยนเป็นสถานะ "ทั่วไป (ไม่มีพอร์ต)"'
+                                                    : 'Assets in this portfolio will not be deleted; they will be set to unassigned.',
+                                              ),
+                                              actions: [
+                                                TextButton(onPressed: () => Navigator.pop(c, false), child: Text(isThai ? 'ยกเลิก' : 'Cancel')),
+                                                FilledButton(
+                                                  style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                                                  onPressed: () => Navigator.pop(c, true),
+                                                  child: Text(isThai ? 'ลบพอร์ต' : 'Delete'),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                          if (confirm == true) {
+                                            await invDao.deletePortfolio(p.id);
+                                            if (_selectedPortfolioFilter == p.id) {
+                                              _selectedPortfolioFilter = null;
+                                            }
+                                            setModalState(() {});
+                                            if (mounted) setState(() {});
+                                          }
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            icon: const Icon(Icons.add),
+                            label: Text(isThai ? 'สร้างพอร์ตลงทุนใหม่' : 'Create New Portfolio'),
+                            onPressed: () async {
+                              await _showCreateOrEditPortfolioDialog(context, invDao, isThai);
+                              setModalState(() {});
+                            },
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _showCreateOrEditPortfolioDialog(
+    BuildContext context,
+    InvestmentsDao invDao,
+    bool isThai, {
+    InvestmentPortfolio? portfolioToEdit,
+  }) async {
+    final nameCtrl = TextEditingController(text: portfolioToEdit?.name ?? '');
+    final descCtrl = TextEditingController(text: portfolioToEdit?.description ?? '');
+    final isEdit = portfolioToEdit != null;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dlgCtx) => AlertDialog(
+        title: Text(isEdit ? (isThai ? 'แก้ไขพอร์ต' : 'Edit Portfolio') : (isThai ? 'สร้างพอร์ตลงทุนใหม่' : 'Create New Portfolio')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: isThai ? 'ชื่อพอร์ต (เช่น DCA เกษียณ, หุ้นปันผล)' : 'Portfolio Name',
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: descCtrl,
+              decoration: InputDecoration(
+                labelText: isThai ? 'คำอธิบาย (ไม่บังคับ)' : 'Description (Optional)',
+                border: const OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dlgCtx, false), child: Text(isThai ? 'ยกเลิก' : 'Cancel')),
+          FilledButton(
+            onPressed: () {
+              if (nameCtrl.text.trim().isNotEmpty) {
+                Navigator.pop(dlgCtx, true);
+              }
+            },
+            child: Text(isThai ? 'บันทึก' : 'Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      if (isEdit) {
+        await invDao.updatePortfolio(
+          id: portfolioToEdit.id,
+          name: nameCtrl.text.trim(),
+          description: descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim(),
+        );
+      } else {
+        await invDao.createPortfolio(
+          name: nameCtrl.text.trim(),
+          description: descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim(),
+        );
+      }
+      if (mounted) setState(() {});
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final invDao = ref.watch(investmentsDaoProvider);
@@ -248,7 +465,10 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
           PopupMenuButton<String>(
             tooltip: isThai ? 'เมนูเพิ่มเติม' : 'More Options',
             onSelected: (val) async {
-              if (val == 'new_asset') {
+              if (val == 'manage_portfolios') {
+                await _showManagePortfoliosDialog(context, invDao, isThai);
+                if (mounted) setState(() {});
+              } else if (val == 'new_asset') {
                 final ok = await AssetFormDialog.show(context);
                 if (ok == true && mounted) setState(() {});
               } else if (val == 'income') {
@@ -268,6 +488,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
               }
             },
             itemBuilder: (context) => [
+              PopupMenuItem(value: 'manage_portfolios', child: Row(children: [const Icon(Icons.folder_special_rounded, color: Colors.indigo), const SizedBox(width: 8), Text(isThai ? 'จัดการพอร์ตการลงทุน (Portfolios)' : 'Manage Portfolios')])),
               PopupMenuItem(value: 'new_asset', child: Row(children: [const Icon(Icons.add), const SizedBox(width: 8), Text(isThai ? 'เพิ่มสินทรัพย์ใหม่' : 'Add New Asset')])),
               PopupMenuItem(value: 'income', child: Row(children: [const Icon(Icons.attach_money), const SizedBox(width: 8), Text(isThai ? 'บันทึกเงินปันผล/ดอกเบี้ย' : 'Record Dividend / Interest')])),
               PopupMenuItem(value: 'valuation', child: Row(children: [const Icon(Icons.price_change_outlined), const SizedBox(width: 8), Text(isThai ? 'อัปเดตราคาตลาดสิ้นเดือน' : 'Update Monthly Valuation')])),
@@ -286,21 +507,25 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
           ],
         ),
       ),
-      body: FutureBuilder<PortfolioSummary>(
-        future: invDao.getPortfolioSummary(),
+      body: FutureBuilder<List<dynamic>>(
+        future: Future.wait([
+          invDao.getPortfolioSummary(),
+          invDao.getAllPortfolios(),
+        ]),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final summary = snapshot.data;
+          final summary = snapshot.data?[0] as PortfolioSummary?;
+          final portfolios = (snapshot.data?[1] as List<InvestmentPortfolio>?) ?? [];
           final holdings = summary?.holdings ?? [];
 
           return TabBarView(
             controller: _tabController,
             children: [
               // Tab 1: Holdings & Portfolio Overview
-              _buildHoldingsTab(context, summary, holdings, isThai),
+              _buildHoldingsTab(context, summary, holdings, portfolios, isThai),
 
               // Tab 2: Realized Gain/Loss Summary
               _buildRealizedGainLossTab(context, invDao, isThai),
@@ -314,7 +539,13 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
     );
   }
 
-  Widget _buildHoldingsTab(BuildContext context, PortfolioSummary? summary, List<PortfolioAssetHolding> holdings, bool isThai) {
+  Widget _buildHoldingsTab(
+    BuildContext context,
+    PortfolioSummary? summary,
+    List<PortfolioAssetHolding> holdings,
+    List<InvestmentPortfolio> portfolios,
+    bool isThai,
+  ) {
     final theme = Theme.of(context);
 
     if (summary == null || (holdings.isEmpty && summary.uninvestedAssets.isEmpty)) {
@@ -345,10 +576,19 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
       availableCategories.add(h.asset.assetType);
     }
 
-    // 2. Filter holdings
+    // 2. Filter holdings by Category and Portfolio
     final filteredHoldings = holdings.where((h) {
-      if (_selectedCategoryFilter == 'all') return true;
-      return h.asset.assetType == _selectedCategoryFilter;
+      if (_selectedCategoryFilter != 'all' && h.asset.assetType != _selectedCategoryFilter) {
+        return false;
+      }
+      if (_selectedPortfolioFilter != null) {
+        if (_selectedPortfolioFilter == '__unassigned__') {
+          return h.asset.portfolioId == null;
+        } else {
+          return h.asset.portfolioId == _selectedPortfolioFilter;
+        }
+      }
+      return true;
     }).toList();
 
     // 3. Sort holdings (Default: value descending)
@@ -388,11 +628,69 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
     final pricePnlMoney = Money(displayPricePnlSatang);
     final fxPnlMoney = Money(displayFxPnlSatang);
 
+    // Selected portfolio name label
+    String? currentPortfolioName;
+    if (_selectedPortfolioFilter != null) {
+      if (_selectedPortfolioFilter == '__unassigned__') {
+        currentPortfolioName = isThai ? 'ทั่วไป (ไม่มีพอร์ต)' : 'Unassigned';
+      } else {
+        currentPortfolioName = portfolios.firstWhere(
+          (p) => p.id == _selectedPortfolioFilter,
+          orElse: () => InvestmentPortfolio(id: '', name: isThai ? 'ไม่พบพอร์ต' : 'Unknown', isDefault: false, createdAt: DateTime.now(), updatedAt: DateTime.now(), syncVersion: 1),
+        ).name;
+      }
+    }
+
     return RefreshIndicator(
       onRefresh: () async => setState(() {}),
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // 0. Portfolio Horizontal Filter Chips (ถ้ามีพอร์ตที่สร้างไว้)
+          if (portfolios.isNotEmpty) ...[
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  FilterChip(
+                    label: Text(isThai ? 'ทุกพอร์ต' : 'All Portfolios'),
+                    selected: _selectedPortfolioFilter == null,
+                    onSelected: (val) {
+                      setState(() => _selectedPortfolioFilter = null);
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  ...portfolios.map((p) {
+                    final isSel = _selectedPortfolioFilter == p.id;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: FilterChip(
+                        avatar: const Icon(Icons.folder_special_rounded, size: 16),
+                        label: Text(p.name),
+                        selected: isSel,
+                        onSelected: (val) {
+                          setState(() {
+                            _selectedPortfolioFilter = val ? p.id : null;
+                          });
+                        },
+                      ),
+                    );
+                  }),
+                  FilterChip(
+                    label: Text(isThai ? 'ทั่วไป (ไม่มีพอร์ต)' : 'Unassigned'),
+                    selected: _selectedPortfolioFilter == '__unassigned__',
+                    onSelected: (val) {
+                      setState(() {
+                        _selectedPortfolioFilter = val ? '__unassigned__' : null;
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+
           // 1. Overall Portfolio Summary Card (Dynamic based on selected filter)
           Card(
             elevation: 0,
@@ -411,13 +709,25 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    _selectedCategoryFilter == 'all'
-                        ? (isThai ? 'มูลค่าพอร์ตปัจจุบันรวม' : 'Total Portfolio Value')
-                        : (isThai
-                            ? 'มูลค่าพอร์ต (${_getCategoryName(_selectedCategoryFilter, isThai)})'
-                            : 'Portfolio Value (${_getCategoryName(_selectedCategoryFilter, isThai)})'),
-                    style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        currentPortfolioName != null
+                            ? (isThai ? 'พอร์ต: $currentPortfolioName' : 'Portfolio: $currentPortfolioName')
+                            : (_selectedCategoryFilter == 'all'
+                                ? (isThai ? 'มูลค่าพอร์ตปัจจุบันรวม' : 'Total Portfolio Value')
+                                : (isThai
+                                    ? 'มูลค่าพอร์ต (${_getCategoryName(_selectedCategoryFilter, isThai)})'
+                                    : 'Portfolio Value (${_getCategoryName(_selectedCategoryFilter, isThai)})')),
+                        style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold),
+                      ),
+                      if (currentPortfolioName != null && _selectedCategoryFilter != 'all')
+                        Text(
+                          '(${_getCategoryName(_selectedCategoryFilter, isThai)})',
+                          style: TextStyle(fontSize: 12, color: theme.colorScheme.primary),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -522,7 +832,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
           const SizedBox(height: 16),
 
           // 3. Asset Allocation Donut Chart
-          _buildAllocationChart(context, filteredHoldings, displayValSatang, isThai),
+          _buildAllocationChart(context, filteredHoldings, portfolios, displayValSatang, isThai),
           // 4. Quick Actions: Update Valuation & Record Dividend
           Row(
             children: [
@@ -681,8 +991,8 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                   ),
                   child: Center(
                     child: h.asset.icon != null
-                        ? Icon(
-                            CategoryIconHelper.getIcon(h.asset.icon),
+                        ? CategoryIconHelper.buildIconWidget(
+                            h.asset.icon,
                             size: 22,
                             color: theme.colorScheme.primary,
                           )
@@ -772,7 +1082,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                       CircleAvatar(
                         backgroundColor: theme.colorScheme.surfaceContainerHighest,
                         child: asset.icon != null
-                            ? Icon(CategoryIconHelper.getIcon(asset.icon), color: theme.colorScheme.primary)
+                            ? CategoryIconHelper.buildIconWidget(asset.icon, size: 22, color: theme.colorScheme.primary)
                             : Text(
                                 asset.symbol.isNotEmpty ? asset.symbol.substring(0, 1) : '?',
                                 style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
@@ -1016,13 +1326,33 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
     );
   }
 
-  Widget _buildAllocationChart(BuildContext context, List<PortfolioAssetHolding> holdings, int totalValue, bool isThai) {
+  Widget _buildAllocationChart(
+    BuildContext context,
+    List<PortfolioAssetHolding> holdings,
+    List<InvestmentPortfolio> portfolios,
+    int totalValue,
+    bool isThai,
+  ) {
     if (totalValue <= 0) return const SizedBox.shrink();
 
-    // Group by asset type
-    final typeMap = <String, int>{};
-    for (final h in holdings) {
-      typeMap[h.asset.assetType] = (typeMap[h.asset.assetType] ?? 0) + h.currentValueThbSatang;
+    // Grouping map and labels
+    final groupMap = <String, int>{};
+    final labelMap = <String, String>{};
+
+    if (_chartGroupByPortfolio && portfolios.isNotEmpty) {
+      final portfolioNameLookup = {for (final p in portfolios) p.id: p.name};
+      for (final h in holdings) {
+        final pId = h.asset.portfolioId ?? '__unassigned__';
+        final name = pId == '__unassigned__' ? (isThai ? 'ทั่วไป (ไม่มีพอร์ต)' : 'Unassigned') : (portfolioNameLookup[pId] ?? (isThai ? 'ไม่ระบุ' : 'Unknown'));
+        groupMap[pId] = (groupMap[pId] ?? 0) + h.currentValueThbSatang;
+        labelMap[pId] = name;
+      }
+    } else {
+      for (final h in holdings) {
+        final type = h.asset.assetType;
+        groupMap[type] = (groupMap[type] ?? 0) + h.currentValueThbSatang;
+        labelMap[type] = _assetTypeLabel(type, isThai);
+      }
     }
 
     final colors = [
@@ -1033,12 +1363,14 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
       Colors.teal.shade600,
       Colors.orange.shade700,
       Colors.indigo.shade600,
+      Colors.pink.shade600,
+      Colors.cyan.shade700,
     ];
 
     final sections = <PieChartSectionData>[];
     int colorIdx = 0;
 
-    typeMap.forEach((type, satang) {
+    groupMap.forEach((key, satang) {
       final pct = (satang / totalValue) * 100.0;
       final c = colors[colorIdx % colors.length];
       colorIdx++;
@@ -1059,7 +1391,49 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(isThai ? 'สัดส่วนตามประเภทสินทรัพย์' : 'Asset Allocation', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _chartGroupByPortfolio && portfolios.isNotEmpty
+                      ? (isThai ? 'สัดส่วนตามพอร์ตการลงทุน' : 'Portfolio Allocation')
+                      : (isThai ? 'สัดส่วนตามประเภทสินทรัพย์' : 'Asset Allocation'),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                if (portfolios.isNotEmpty)
+                  InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () {
+                      setState(() {
+                        _chartGroupByPortfolio = !_chartGroupByPortfolio;
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _chartGroupByPortfolio ? Icons.category_outlined : Icons.folder_special_outlined,
+                            size: 16,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _chartGroupByPortfolio
+                                ? (isThai ? 'ดูกลุ่มสินทรัพย์' : 'View by Asset Type')
+                                : (isThai ? 'ดูตามพอร์ต' : 'View by Portfolio'),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(height: 12),
             SizedBox(
               height: 140,
@@ -1078,21 +1452,30 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                   const SizedBox(width: 16),
                   Expanded(
                     flex: 1,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: typeMap.entries.map((e) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2),
-                          child: Row(
-                            children: [
-                              Container(width: 10, height: 10, color: colors[typeMap.keys.toList().indexOf(e.key) % colors.length]),
-                              const SizedBox(width: 6),
-                              Expanded(child: Text(_assetTypeLabel(e.key, isThai), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
-                            ],
-                          ),
-                        );
-                      }).toList(),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: groupMap.entries.map((e) {
+                          final idx = groupMap.keys.toList().indexOf(e.key);
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            child: Row(
+                              children: [
+                                Container(width: 10, height: 10, color: colors[idx % colors.length]),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    labelMap[e.key] ?? e.key,
+                                    style: const TextStyle(fontSize: 12),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
                     ),
                   ),
                 ],

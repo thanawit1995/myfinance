@@ -39,6 +39,7 @@ class _AssetFormDialogState extends ConsumerState<AssetFormDialog> {
   String _selectedAssetType = 'thai_stock';
   String _selectedCurrency = 'THB';
   String? _selectedAccountId;
+  String? _selectedPortfolioId;
   DateTime? _maturityDate;
   String _couponFrequency = 'semi_annually';
   String? _selectedIcon;
@@ -67,6 +68,7 @@ class _AssetFormDialogState extends ConsumerState<AssetFormDialog> {
       _selectedAssetType = a.assetType;
       _selectedCurrency = a.currencyCode;
       _selectedAccountId = a.defaultAccountId;
+      _selectedPortfolioId = a.portfolioId;
       _selectedIcon = a.icon;
       if (a.extraDetailsJson != null && a.extraDetailsJson!.isNotEmpty) {
         try {
@@ -123,6 +125,7 @@ class _AssetFormDialogState extends ConsumerState<AssetFormDialog> {
           currencyCode: _selectedCurrency,
           defaultAccountId: _selectedAccountId!,
           icon: Value(_selectedIcon),
+          portfolioId: Value(_selectedPortfolioId),
           market: Value(_marketController.text.trim().isEmpty ? null : _marketController.text.trim()),
           note: Value(_noteController.text.trim().isEmpty ? null : _noteController.text.trim()),
           extraDetailsJson: Value(extraJson),
@@ -141,6 +144,7 @@ class _AssetFormDialogState extends ConsumerState<AssetFormDialog> {
           currencyCode: Value(_selectedCurrency),
           defaultAccountId: Value(_selectedAccountId!),
           icon: Value(_selectedIcon),
+          portfolioId: Value(_selectedPortfolioId),
           market: Value(_marketController.text.trim().isEmpty ? null : _marketController.text.trim()),
           note: Value(_noteController.text.trim().isEmpty ? null : _noteController.text.trim()),
           extraDetailsJson: Value(extraJson),
@@ -189,13 +193,17 @@ class _AssetFormDialogState extends ConsumerState<AssetFormDialog> {
                           border: Border.all(color: Theme.of(context).colorScheme.primary),
                         ),
                         child: Center(
-                          child: Icon(
-                            _selectedIcon != null
-                                ? CategoryIconHelper.getIcon(_selectedIcon)
-                                : Icons.pie_chart,
-                            size: 26,
-                            color: Theme.of(context).colorScheme.onPrimaryContainer,
-                          ),
+                          child: _selectedIcon != null
+                              ? CategoryIconHelper.buildIconWidget(
+                                  _selectedIcon,
+                                  size: 26,
+                                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                )
+                              : Icon(
+                                  Icons.pie_chart,
+                                  size: 26,
+                                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                ),
                         ),
                       ),
                     ),
@@ -313,6 +321,43 @@ class _AssetFormDialogState extends ConsumerState<AssetFormDialog> {
                         );
                       }).toList(),
                       onChanged: (val) => setState(() => _selectedAccountId = val),
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+
+                // 4.5 Custom Portfolio Grouping
+                FutureBuilder<List<InvestmentPortfolio>>(
+                  future: ref.read(investmentsDaoProvider).getAllPortfolios(),
+                  builder: (context, snapshot) {
+                    final portfolios = snapshot.data ?? [];
+                    return DropdownButtonFormField<String?>(
+                      decoration: const InputDecoration(
+                        labelText: 'จัดเข้าพอร์ตลงทุน (Portfolio)',
+                        hintText: 'ไม่ระบุพอร์ต (ค่าเริ่มต้น)',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.pie_chart_outline_rounded),
+                      ),
+                      initialValue: _selectedPortfolioId,
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('ไม่จัดเข้าพอร์ต (ทั่วไป)'),
+                        ),
+                        ...portfolios.map((p) {
+                          return DropdownMenuItem<String?>(
+                            value: p.id,
+                            child: Row(
+                              children: [
+                                Icon(Icons.folder_rounded, size: 18, color: Theme.of(context).colorScheme.primary),
+                                const SizedBox(width: 8),
+                                Text(p.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                          );
+                        }),
+                      ],
+                      onChanged: (val) => setState(() => _selectedPortfolioId = val),
                     );
                   },
                 ),

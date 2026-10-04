@@ -257,27 +257,6 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
     return period;
   }
 
-  String _formatWorkPeriodDisplay(String period, bool isThai) {
-    final parts = period.split('-');
-    if (parts.length == 2) {
-      final year = int.tryParse(parts[0]);
-      final month = int.tryParse(parts[1]);
-      if (year != null && month != null && month >= 1 && month <= 12) {
-        const thaiMonths = [
-          'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-          'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
-        ];
-        const enMonths = [
-          'January', 'February', 'March', 'April', 'May', 'June',
-          'July', 'August', 'September', 'October', 'November', 'December'
-        ];
-        return isThai
-            ? '${thaiMonths[month - 1]} $year (${year + 543})'
-            : '${enMonths[month - 1]} $year';
-      }
-    }
-    return period;
-  }
 
   Future<void> _duplicateLastTransaction() async {
     final last = await ref.read(transactionsDaoProvider).getLastTransaction();
@@ -558,41 +537,8 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
     ref.read(transactionsVersionProvider.notifier).state++;
 
     if (mounted) {
-      final isThai = Localizations.localeOf(context).languageCode == 'th';
-      final srcAcc = _currentSourceAccount;
-      final srcCurrency = srcAcc?.currencyCode ?? 'THB';
-      final srcSymbol = srcCurrency == 'USD' ? '\$' : (srcCurrency == 'THB' ? '฿' : '$srcCurrency ');
-      final recurringMsg = _isRecurring ? (isThai ? ' และตั้งรายการประจำแล้ว' : ' and recurring schedule set') : '';
-      final accruedMsg = isAccrued ? (isThai ? ' (บันทึกเป็นรายได้ค้างรับรอบ ${_formatWorkPeriodDisplay(_accruedWorkPeriod, isThai)})' : ' (Accrued income for $_accruedWorkPeriod)') : '';
-      final typeText = _formatType(_transactionType, isThai);
-      final successMsg = isThai
-          ? 'บันทึกรายการ $typeText $srcSymbol$_amountString สำเร็จ$recurringMsg$accruedMsg'
-          : 'Successfully saved $typeText $srcSymbol$_amountString$recurringMsg$accruedMsg';
-
       // Show success animation overlay
       TransactionSuccessOverlay.show(context);
-
-      final messenger = ScaffoldMessenger.of(context);
-      messenger.clearSnackBars();
-      messenger.showSnackBar(
-        SnackBar(
-          duration: const Duration(seconds: 4),
-          content: Text(successMsg),
-          backgroundColor: VaultTheme.positive(context),
-          action: SnackBarAction(
-            label: isThai ? 'บันทึกรายการเดิมอีกครั้ง' : 'Duplicate Last',
-            textColor: Colors.white,
-            onPressed: _duplicateLastTransaction,
-          ),
-        ),
-      );
-
-      // Explicitly guarantee dismiss after 5 seconds
-      Future.delayed(const Duration(seconds: 5), () {
-        try {
-          messenger.hideCurrentSnackBar();
-        } catch (_) {}
-      });
 
       widget.onTransactionSaved?.call();
       if (Navigator.of(context).canPop()) {

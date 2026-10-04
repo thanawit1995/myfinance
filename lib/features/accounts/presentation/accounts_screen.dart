@@ -213,10 +213,9 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
           child: ListTile(
             leading: CircleAvatar(
               backgroundColor: isUsd ? Colors.green.shade50 : Colors.blue.shade50,
-              child: Icon(
-                account.icon != null
-                    ? CategoryIconHelper.getIcon(account.icon)
-                    : Icons.account_balance,
+              child: CategoryIconHelper.buildIconWidget(
+                account.icon ?? 'account_balance',
+                size: 22,
                 color: isUsd ? Colors.green.shade700 : Colors.blue.shade700,
               ),
             ),
@@ -291,10 +290,9 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
           child: ListTile(
             leading: CircleAvatar(
               backgroundColor: Colors.deepOrange.shade50,
-              child: Icon(
-                account.icon != null
-                    ? CategoryIconHelper.getIcon(account.icon)
-                    : Icons.credit_card,
+              child: CategoryIconHelper.buildIconWidget(
+                account.icon ?? 'credit_card',
+                size: 22,
                 color: Colors.deepOrange.shade700,
               ),
             ),

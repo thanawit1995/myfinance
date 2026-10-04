@@ -686,13 +686,20 @@ class SyncService extends StateNotifier<SyncState> {
     final cloudRows = await query as List<dynamic>;
 
     if (cloudRows.isNotEmpty) {
+      final localAccounts = await _db.select(_db.accounts).get();
+      final localIconMap = {for (final a in localAccounts) a.id: a.icon};
+
       await _db.batch((batch) {
         for (final r in cloudRows) {
           final row = r as Map<String, dynamic>;
+          final accountId = row['id'] as String;
+          final cloudIcon = row['icon'] as String?;
+          final iconToSave = cloudIcon ?? localIconMap[accountId];
+
           batch.insert(
             _db.accounts,
             AccountsCompanion(
-              id: Value(row['id'] as String),
+              id: Value(accountId),
               name: Value(row['name'] as String),
               accountType: Value(row['account_type'] as String),
               currencyCode: Value(row['currency_code'] as String? ?? 'THB'),
@@ -700,7 +707,7 @@ class SyncService extends StateNotifier<SyncState> {
               closingDay: Value(row['closing_day'] as int?),
               dueDay: Value(row['due_day'] as int?),
               creditLimitSatang: Value(row['credit_limit_satang'] as int?),
-              icon: Value(row['icon'] as String?),
+              icon: Value(iconToSave),
               isActive: Value(row['is_active'] as bool? ?? true),
               syncVersion: Value((row['sync_version'] as num?)?.toInt() ?? 1),
               createdAt: Value(DateTime.parse(row['created_at'] as String).toLocal()),
@@ -752,19 +759,26 @@ class SyncService extends StateNotifier<SyncState> {
     final cloudRows = await query as List<dynamic>;
 
     if (cloudRows.isNotEmpty) {
+      final localCategories = await _db.select(_db.categories).get();
+      final localIconMap = {for (final c in localCategories) c.id: c.icon};
+
       await _db.batch((batch) {
         for (final r in cloudRows) {
           final row = r as Map<String, dynamic>;
+          final categoryId = row['id'] as String;
+          final cloudIcon = row['icon'] as String?;
+          final iconToSave = cloudIcon ?? localIconMap[categoryId];
+
           batch.insert(
             _db.categories,
             CategoriesCompanion(
-              id: Value(row['id'] as String),
+              id: Value(categoryId),
               nameTh: Value(row['name_th'] as String? ?? ''),
               nameEn: Value(row['name_en'] as String? ?? ''),
               categoryType: Value(row['category_type'] as String),
               parentId: Value(row['parent_id'] as String?),
               taxIncomeType: Value(row['tax_income_type'] as String?),
-              icon: Value(row['icon'] as String?),
+              icon: Value(iconToSave),
               color: Value(row['color'] as String?),
               isSystem: Value(row['is_system'] as bool? ?? false),
               isActive: Value(row['is_active'] as bool? ?? true),
@@ -829,19 +843,26 @@ class SyncService extends StateNotifier<SyncState> {
       final cloudRows = await query as List<dynamic>;
 
       if (cloudRows.isNotEmpty) {
+        final localAssets = await _db.select(_db.assets).get();
+        final localIconMap = {for (final a in localAssets) a.id: a.icon};
+
         await _db.batch((batch) {
           for (final r in cloudRows) {
             final row = r as Map<String, dynamic>;
+            final assetId = row['id'] as String;
+            final cloudIcon = row['icon'] as String?;
+            final iconToSave = cloudIcon ?? localIconMap[assetId];
+
             batch.insert(
               _db.assets,
               AssetsCompanion(
-                id: Value(row['id'] as String),
+                id: Value(assetId),
                 symbol: Value(row['symbol'] as String),
                 name: Value(row['name'] as String),
                 assetType: Value(row['asset_type'] as String),
                 currencyCode: Value(row['currency_code'] as String? ?? 'THB'),
                 defaultAccountId: Value(row['default_account_id'] as String? ?? '00000000-0000-4000-8000-000000000001'),
-                icon: Value(row['icon'] as String?),
+                icon: Value(iconToSave),
                 market: Value(row['market'] as String?),
                 note: Value(row['note'] as String?),
                 extraDetailsJson: Value(row['extra_details_json'] as String?),

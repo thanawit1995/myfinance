@@ -2133,6 +2133,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       if (ok) {
         ref.invalidate(customMascotProvider);
         ref.invalidate(customCardBgProvider);
+        ref.read(transactionsVersionProvider.notifier).state++;
         await _loadStats();
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(

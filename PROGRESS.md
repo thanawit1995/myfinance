@@ -2,6 +2,16 @@
 
 อัปเดตล่าสุด: 4 ตุลาคม 2026 (ปรับปรุง UI, Cloud Sync, Animation & ปรับแต่งรูป/ไอคอน)
 
+- [x] **Master Cloud Sync Account & Asset Icon Preservation (4 ต.ค. 2026)**:
+  - **1. ป้องกัน Delta Sync เขียนทับไอคอนในเครื่องด้วย null (`sync_service.dart`)**:
+    - ปรับปรุง `_syncAccounts`, `_syncAssets`, และ `_syncCategories` ในระหว่างการดึงข้อมูลจาก Cloud (Pull)
+    - หากแถวข้อมูลจาก Cloud Supabase ส่งค่า `icon` มาเป็น null (เช่น กรณีตารางบน Supabase ยังไม่มีคอลัมน์ หรือถูกตัดออก) ระบบจะรักษาไอคอนในเครื่อง (`localIconMap`) ไว้ ไม่ถูกเขียนทับด้วย null เด็ดขาด
+  - **2. แก้ไขการรีเฟรชหน้าจอเมื่อดึง Master Snapshot สำเร็จ (`backup_restore_screen.dart`)**:
+    - เพิ่ม `transactionsVersionProvider.notifier.state++` ทันทีหลัง `pullMasterSnapshotFromCloud` ทำงานสำเร็จ เพื่อส่งสัญญาณให้หน้าจอบัญชี (`AccountsScreen`), บัตรเครดิต และหน้าหลัก รีโหลดข้อมูลใหม่จากฐานข้อมูล SQLite ทันทีโดยไม่ต้องสลับหน้าจอหรือรีสตาร์ตแอป
+  - **3. ผลการทดสอบและการรับรองคุณภาพ**:
+    - `flutter analyze`: **0 errors, 0 warnings**
+    - `flutter test`: ผ่านทั้งหมด **191/191 tests passed** (100%)
+
 - [x] **Image Cropper Overhaul, Cloud Route Fix, Auto Refresh & Portfolio Pie Chart Sync (4 ต.ค. 2026)**:
   - **1. ปรับปรุงระบบ Image Cropper ใหม่ทั้งหมด (`image_cropper_dialog.dart`)**:
     - เพิ่ม **ปุ่มหมุนรูปภาพทีละ 90° ตามเข็มนาฬิกา (Rotate 90°)** แก้ปัญหารูปถ่ายแนวนอน/แนวตั้งกลับด้าน

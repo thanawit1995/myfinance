@@ -31,11 +31,21 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
   String _selectedSortOption = 'value_desc'; // 'value_desc', 'value_asc', 'pnl_pct_desc', 'pnl_pct_asc', 'name_asc'
   bool _chartGroupByPortfolio = false; // toggle between asset category and portfolio allocation
   bool _isPortfolioFilterMode = false; // toggle between Category chips and Portfolio chips
+  late Future<List<dynamic>> _dataFuture;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _reloadFuture();
+  }
+
+  void _reloadFuture() {
+    final invDao = ref.read(investmentsDaoProvider);
+    _dataFuture = Future.wait([
+      invDao.getPortfolioSummary(),
+      invDao.getAllPortfolios(),
+    ]);
   }
 
   @override
@@ -509,12 +519,9 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
         ),
       ),
       body: FutureBuilder<List<dynamic>>(
-        future: Future.wait([
-          invDao.getPortfolioSummary(),
-          invDao.getAllPortfolios(),
-        ]),
+        future: _dataFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
 
@@ -643,7 +650,11 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
     }
 
     return RefreshIndicator(
-      onRefresh: () async => setState(() {}),
+      onRefresh: () async {
+        setState(() {
+          _reloadFuture();
+        });
+      },
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -836,136 +847,106 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
           // 5. Compact 2-Button Control Bar: Portfolio / Category Mode & Sorting
           Row(
             children: [
-              // Segmented Switch: Toggle Categories vs Portfolios
-              Expanded(
-                flex: 6,
-                child: Container(
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6)),
-                  ),
-                  padding: const EdgeInsets.all(3),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(9),
-                          onTap: () {
-                            if (_isPortfolioFilterMode) {
-                              setState(() => _isPortfolioFilterMode = false);
-                            }
-                          },
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 220),
-                            curve: Curves.easeOutCubic,
-                            decoration: BoxDecoration(
-                              color: !_isPortfolioFilterMode
-                                  ? theme.colorScheme.surface
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(9),
-                              boxShadow: !_isPortfolioFilterMode
-                                  ? [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.08),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 1),
-                                      ),
-                                    ]
-                                  : null,
-                            ),
-                            alignment: Alignment.center,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.category_outlined,
-                                  size: 15,
-                                  color: !_isPortfolioFilterMode
-                                      ? theme.colorScheme.primary
-                                      : theme.colorScheme.onSurfaceVariant,
-                                ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  isThai ? 'หมวดหมู่' : 'Category',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: !_isPortfolioFilterMode ? FontWeight.bold : FontWeight.normal,
-                                    color: !_isPortfolioFilterMode
-                                        ? theme.colorScheme.primary
-                                        : theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
+              // Segmented Icon Switch: Toggle Categories vs Portfolios (Icon Only)
+              Container(
+                height: 40,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6)),
+                ),
+                padding: const EdgeInsets.all(3),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Tooltip(
+                      message: isThai ? 'โหมดหมวดหมู่สินทรัพย์' : 'Categories Mode',
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(9),
+                        onTap: () {
+                          if (_isPortfolioFilterMode) {
+                            setState(() => _isPortfolioFilterMode = false);
+                          }
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeOutCubic,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: !_isPortfolioFilterMode
+                                ? theme.colorScheme.surface
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(9),
+                            boxShadow: !_isPortfolioFilterMode
+                                ? [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.08),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 1),
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          alignment: Alignment.center,
+                          child: Icon(
+                            Icons.category_outlined,
+                            size: 19,
+                            color: !_isPortfolioFilterMode
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ),
-                      Expanded(
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(9),
-                          onTap: () {
-                            if (!_isPortfolioFilterMode) {
-                              setState(() => _isPortfolioFilterMode = true);
-                            }
-                          },
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 220),
-                            curve: Curves.easeOutCubic,
-                            decoration: BoxDecoration(
-                              color: _isPortfolioFilterMode
-                                  ? theme.colorScheme.surface
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(9),
-                              boxShadow: _isPortfolioFilterMode
-                                  ? [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.08),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 1),
-                                      ),
-                                    ]
-                                  : null,
-                            ),
-                            alignment: Alignment.center,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.folder_special_rounded,
-                                  size: 15,
-                                  color: _isPortfolioFilterMode
-                                      ? theme.colorScheme.primary
-                                      : theme.colorScheme.onSurfaceVariant,
-                                ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  isThai ? 'พอร์ตลงทุน' : 'Portfolio',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: _isPortfolioFilterMode ? FontWeight.bold : FontWeight.normal,
-                                    color: _isPortfolioFilterMode
-                                        ? theme.colorScheme.primary
-                                        : theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
+                    ),
+                    const SizedBox(width: 2),
+                    Tooltip(
+                      message: isThai ? 'โหมดพอร์ตการลงทุน' : 'Portfolios Mode',
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(9),
+                        onTap: () {
+                          if (!_isPortfolioFilterMode) {
+                            setState(() => _isPortfolioFilterMode = true);
+                          }
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeOutCubic,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: _isPortfolioFilterMode
+                                ? theme.colorScheme.surface
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(9),
+                            boxShadow: _isPortfolioFilterMode
+                                ? [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.08),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 1),
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          alignment: Alignment.center,
+                          child: Icon(
+                            Icons.folder_special_rounded,
+                            size: 19,
+                            color: _isPortfolioFilterMode
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(width: 10),
               // Button 2: Sort
               Expanded(
-                flex: 5,
                 child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     side: BorderSide(color: theme.colorScheme.outlineVariant),
                   ),
@@ -973,7 +954,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                   label: Text(
                     '${isThai ? "เรียง" : "Sort"}: ${_getSortName(_selectedSortOption, isThai)}',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 12.5,
                       fontWeight: FontWeight.w600,
                       color: theme.colorScheme.onSurface,
                     ),

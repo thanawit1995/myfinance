@@ -55,8 +55,27 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
     final codec = await ui.instantiateImageCodec(widget.imageBytes);
     final frame = await codec.getNextFrame();
     if (mounted) {
+      final img = frame.image;
+      const cropBoxWidth = 280.0;
+      final cropBoxHeight = cropBoxWidth / widget.aspectRatio;
+
+      final imgW = img.width.toDouble();
+      final imgH = img.height.toDouble();
+      final scaleToFitWidth = cropBoxWidth / imgW;
+      final scaleToFitHeight = cropBoxHeight / imgH;
+      final baseScale = math.max(scaleToFitWidth, scaleToFitHeight);
+
+      final displayW = imgW * baseScale;
+      final displayH = imgH * baseScale;
+
+      // Center the child (displayW, displayH) in the viewport (cropBoxWidth, cropBoxHeight)
+      final initialTx = (cropBoxWidth - displayW) / 2.0;
+      final initialTy = (cropBoxHeight - displayH) / 2.0;
+
+      _controller.value = Matrix4.translationValues(initialTx, initialTy, 0.0);
+
       setState(() {
-        _decodedImage = frame.image;
+        _decodedImage = img;
       });
     }
   }
@@ -97,8 +116,7 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
       final matrix = _controller.value;
       canvas.transform(matrix.storage);
 
-      // In the viewport, InteractiveViewer displays the image at its true aspect ratio
-      // fitted within viewport with BoxFit.cover initially
+      // In the InteractiveViewer, the child is exactly displayW x displayH (BoxFit.cover base size)
       final scaleToFitWidth = viewportWidth / imgW;
       final scaleToFitHeight = viewportHeight / imgH;
       final baseScale = math.max(scaleToFitWidth, scaleToFitHeight);
@@ -106,13 +124,12 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
       final displayW = imgW * baseScale;
       final displayH = imgH * baseScale;
 
-      final initialOffsetX = (viewportWidth - displayW) / 2.0;
-      final initialOffsetY = (viewportHeight - displayH) / 2.0;
-
+      // Draw image across the full display quad (0, 0, displayW, displayH)
+      // which is the exact child of InteractiveViewer!
       canvas.drawImageRect(
         _decodedImage!,
         Rect.fromLTWH(0, 0, imgW, imgH),
-        Rect.fromLTWH(initialOffsetX, initialOffsetY, displayW, displayH),
+        Rect.fromLTWH(0, 0, displayW, displayH),
         Paint()
           ..isAntiAlias = true
           ..filterQuality = FilterQuality.high,
@@ -207,23 +224,16 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
                             transformationController: _controller,
                             minScale: 0.5,
                             maxScale: 5.0,
-                            boundaryMargin: const EdgeInsets.all(180),
+                            boundaryMargin: const EdgeInsets.all(220),
                             child: SizedBox(
-                              width: cropBoxWidth,
-                              height: cropBoxHeight,
-                              child: Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  SizedBox(
-                                    width: displayW,
-                                    height: displayH,
-                                    child: RawImage(
-                                      image: _decodedImage,
-                                      fit: BoxFit.contain,
-                                      filterQuality: FilterQuality.high,
-                                    ),
-                                  ),
-                                ],
+                              width: displayW,
+                              height: displayH,
+                              child: RawImage(
+                                image: _decodedImage,
+                                width: displayW,
+                                height: displayH,
+                                fit: BoxFit.fill,
+                                filterQuality: FilterQuality.high,
                               ),
                             ),
                           );

@@ -660,7 +660,22 @@ class SyncService extends StateNotifier<SyncState> {
           'updated_at': a.updatedAt.toUtc().toIso8601String(),
           'deleted_at': a.deletedAt?.toUtc().toIso8601String(),
         }).toList();
-        await _supabase.from('accounts').upsert(payload, onConflict: 'id');
+
+        try {
+          await _supabase.from('accounts').upsert(payload, onConflict: 'id');
+        } catch (e) {
+          // หากตาราง accounts บน Supabase ยังไม่ได้เพิ่มคอลัมน์ icon ให้ตัด icon ออกชั่วคราวแล้ว upsert อีกรอบ
+          if (e.toString().contains("'icon'") || e.toString().contains('PGRST204')) {
+            final fallbackPayload = payload.map((m) {
+              final copy = Map<String, dynamic>.from(m);
+              copy.remove('icon');
+              return copy;
+            }).toList();
+            await _supabase.from('accounts').upsert(fallbackPayload, onConflict: 'id');
+          } else {
+            rethrow;
+          }
+        }
       }
     }
 
@@ -789,7 +804,21 @@ class SyncService extends StateNotifier<SyncState> {
             'updated_at': a.updatedAt.toUtc().toIso8601String(),
             'deleted_at': a.deletedAt?.toUtc().toIso8601String(),
           }).toList();
-          await _supabase.from('assets').upsert(payload, onConflict: 'id');
+
+          try {
+            await _supabase.from('assets').upsert(payload, onConflict: 'id');
+          } catch (e) {
+            if (e.toString().contains("'icon'") || e.toString().contains('PGRST204')) {
+              final fallbackPayload = payload.map((m) {
+                final copy = Map<String, dynamic>.from(m);
+                copy.remove('icon');
+                return copy;
+              }).toList();
+              await _supabase.from('assets').upsert(fallbackPayload, onConflict: 'id');
+            } else {
+              rethrow;
+            }
+          }
         }
       }
 

@@ -119,8 +119,7 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
     final initialTy = (_viewportHeight - displayH) / 2.0;
 
     _controller.value = Matrix4.identity()
-      ..translateByVector3(v64.Vector3(initialTx, initialTy, 0.0))
-      ..scaleByVector3(v64.Vector3(1.0, 1.0, 1.0));
+      ..translateByVector3(v64.Vector3(initialTx, initialTy, 0.0));
     _currentScale = 1.0;
   }
 
@@ -195,25 +194,25 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
       // 3. Apply the user's interactive viewer transformation matrix
       canvas.transform(_controller.value.storage);
 
-      // 4. Draw the rotated image into (0, 0, displayW, displayH)
+      // 4. Draw rotated image exactly as rendered in InteractiveViewer's displayW x displayH box
       canvas.save();
-      // Center of unrotated/rotated quad
       canvas.translate(displayW / 2.0, displayH / 2.0);
       canvas.rotate(_rotationQuarterTurns * math.pi / 2.0);
 
-      final originalW = img.width.toDouble();
-      final originalH = img.height.toDouble();
-      final originalScaledW = originalW * baseScale;
-      final originalScaledH = originalH * baseScale;
+      // Raw unrotated image source dimensions
+      final imgW = img.width.toDouble();
+      final imgH = img.height.toDouble();
+      final origScaledW = imgW * baseScale;
+      final origScaledH = imgH * baseScale;
 
       canvas.drawImageRect(
         img,
-        Rect.fromLTWH(0, 0, originalW, originalH),
+        Rect.fromLTWH(0, 0, imgW, imgH),
         Rect.fromLTWH(
-          -originalScaledW / 2.0,
-          -originalScaledH / 2.0,
-          originalScaledW,
-          originalScaledH,
+          -origScaledW / 2.0,
+          -origScaledH / 2.0,
+          origScaledW,
+          origScaledH,
         ),
         Paint()
           ..isAntiAlias = true
@@ -309,6 +308,8 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
 
                                 final displayW = rSize.width * baseScale;
                                 final displayH = rSize.height * baseScale;
+                                final unrotatedW = img.width * baseScale;
+                                final unrotatedH = img.height * baseScale;
 
                                 return InteractiveViewer(
                                   transformationController: _controller,
@@ -318,14 +319,16 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
                                   child: SizedBox(
                                     width: displayW,
                                     height: displayH,
-                                    child: Transform.rotate(
-                                      angle: _rotationQuarterTurns * math.pi / 2.0,
-                                      child: RawImage(
-                                        image: img,
-                                        width: (_rotationQuarterTurns % 2 == 1 ? displayH : displayW),
-                                        height: (_rotationQuarterTurns % 2 == 1 ? displayW : displayH),
-                                        fit: BoxFit.fill,
-                                        filterQuality: FilterQuality.high,
+                                    child: Center(
+                                      child: Transform.rotate(
+                                        angle: _rotationQuarterTurns * math.pi / 2.0,
+                                        child: RawImage(
+                                          image: img,
+                                          width: unrotatedW,
+                                          height: unrotatedH,
+                                          fit: BoxFit.fill,
+                                          filterQuality: FilterQuality.high,
+                                        ),
                                       ),
                                     ),
                                   ),

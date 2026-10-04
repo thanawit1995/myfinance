@@ -379,13 +379,17 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                         border: Border.all(color: Theme.of(context).colorScheme.primary),
                       ),
                       child: Center(
-                        child: Icon(
-                          editedIcon != null
-                              ? CategoryIconHelper.getIcon(editedIcon)
-                              : Icons.account_balance,
-                          size: 26,
-                          color: Theme.of(context).colorScheme.onPrimaryContainer,
-                        ),
+                        child: editedIcon != null
+                            ? CategoryIconHelper.buildIconWidget(
+                                editedIcon,
+                                size: 26,
+                                color: Theme.of(context).colorScheme.onPrimaryContainer,
+                              )
+                            : Icon(
+                                Icons.account_balance,
+                                size: 26,
+                                color: Theme.of(context).colorScheme.onPrimaryContainer,
+                              ),
                       ),
                     ),
                   ),

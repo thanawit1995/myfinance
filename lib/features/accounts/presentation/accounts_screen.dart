@@ -11,6 +11,7 @@ import 'account_detail_screen.dart';
 import 'credit_card_summary_screen.dart';
 import 'add_account_dialog.dart';
 import 'edit_credit_card_dialog.dart';
+import '../../../../core/theme/vault_theme.dart';
 import '../../investments/presentation/portfolio_screen.dart';
 
 class AccountsScreen extends ConsumerStatefulWidget {
@@ -21,7 +22,6 @@ class AccountsScreen extends ConsumerStatefulWidget {
 }
 
 class _AccountsScreenState extends ConsumerState<AccountsScreen> {
-  @override
   @override
   Widget build(BuildContext context) {
     ref.watch(transactionsVersionProvider);
@@ -131,34 +131,8 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                 Card(
                   margin: const EdgeInsets.symmetric(vertical: 4),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: Colors.purple.shade50,
-                      child: Icon(Icons.show_chart, color: Colors.purple.shade700),
-                    ),
-                    title: Text(
-                      isThai ? 'สินทรัพย์การลงทุนรวม' : 'Total Investment Assets',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Text(
-                      isThai ? 'แตะเพื่อดูพอร์ตหุ้น, กองทุน, คริปโต, ทองคำ' : 'Tap to view stocks, funds, crypto, gold',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          Money(portValue).format(symbol: '฿'),
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: theme.colorScheme.primary,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
-                      ],
-                    ),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
                     onTap: () async {
                       await Navigator.of(context).push(
                         MaterialPageRoute(
@@ -167,6 +141,54 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                       );
                       if (mounted) setState(() {});
                     },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 20,
+                            backgroundColor: Colors.purple.shade50,
+                            child: Icon(Icons.show_chart, color: Colors.purple.shade700, size: 22),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  isThai ? 'สินทรัพย์การลงทุนรวม' : 'Total Investment Assets',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  isThai ? 'แตะเพื่อดูพอร์ตหุ้น, กองทุน, คริปโต, ทองคำ' : 'Tap to view stocks, funds, crypto, gold',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: VaultTheme.secondaryText(context),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            Money(portValue).format(symbol: '฿'),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          const Icon(Icons.chevron_right, size: 18, color: Colors.grey),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -210,88 +232,8 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
         return Card(
           margin: const EdgeInsets.symmetric(vertical: 4),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: ListTile(
-            leading: Builder(
-              builder: (context) {
-                final iconStr = account.icon ?? 'account_balance';
-                final isCustomImage = iconStr.startsWith('data:image');
-                if (isCustomImage) {
-                  return SizedBox(
-                    width: 40,
-                    height: 40,
-                    child: CategoryIconHelper.buildIconWidget(iconStr, size: 40),
-                  );
-                }
-                return CircleAvatar(
-                  backgroundColor: isUsd ? Colors.green.shade50 : Colors.blue.shade50,
-                  child: CategoryIconHelper.buildIconWidget(
-                    iconStr,
-                    size: 22,
-                    color: isUsd ? Colors.green.shade700 : Colors.blue.shade700,
-                  ),
-                );
-              },
-            ),
-            title: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    account.name,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
-                ),
-                if (isUsd) ...[
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                    decoration: BoxDecoration(
-                       color: Colors.green.shade100,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text('USD', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green.shade900)),
-                  ),
-                ],
-              ],
-            ),
-            subtitle: Text(
-              account.isActive
-                  ? (isThai ? 'เปิดใช้งาน' : 'Active')
-                  : (isThai ? 'ปิดใช้งาน (ไม่นับรวมสินทรัพย์)' : 'Inactive (Excluded from assets)'),
-              style: TextStyle(fontSize: 12, color: account.isActive ? Colors.green : Colors.grey),
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      nativeMoney.format(symbol: isUsd ? r'$' : '฿'),
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                    if (isUsd)
-                      Text(
-                        '≈ ${thbMoney.format(symbol: '฿')} (${isThai ? "เรต" : "Rate"} ${fxRate.toStringAsFixed(2)})',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(width: 4),
-                IconButton(
-                  icon: const Icon(Icons.edit_outlined, size: 20, color: Colors.grey),
-                  tooltip: isThai ? 'แก้ไขบัญชีและไอคอน' : 'Edit account & icon',
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () => _showEditAccountDialog(account, isThai),
-                ),
-              ],
-            ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
             onTap: () async {
               await Navigator.of(context).push(
                 MaterialPageRoute(
@@ -301,6 +243,117 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
               if (mounted) setState(() {});
             },
             onLongPress: () => _showEditAccountDialog(account, isThai),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  Builder(
+                    builder: (context) {
+                      final iconStr = account.icon ?? 'account_balance';
+                      final isCustomImage = iconStr.startsWith('data:image');
+                      if (isCustomImage) {
+                        return SizedBox(
+                          width: 40,
+                          height: 40,
+                          child: CategoryIconHelper.buildIconWidget(iconStr, size: 40),
+                        );
+                      }
+                      return CircleAvatar(
+                        radius: 20,
+                        backgroundColor: isUsd ? Colors.green.shade50 : Colors.blue.shade50,
+                        child: CategoryIconHelper.buildIconWidget(
+                          iconStr,
+                          size: 22,
+                          color: isUsd ? Colors.green.shade700 : Colors.blue.shade700,
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                account.name,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ),
+                            if (isUsd) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.shade100,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'USD',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green.shade900,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        if (!account.isActive) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            isThai ? 'ปิดใช้งาน (ไม่นับรวมสินทรัพย์)' : 'Inactive (Excluded)',
+                            style: const TextStyle(fontSize: 11, color: Colors.grey),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        nativeMoney.format(symbol: isUsd ? r'$' : '฿'),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      if (isUsd)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 1),
+                          child: Text(
+                            '≈ ${thbMoney.format(symbol: '฿')} (${isThai ? "เรต" : "Rate"} ${fxRate.toStringAsFixed(2)})',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(width: 2),
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, size: 19, color: Colors.grey),
+                    tooltip: isThai ? 'แก้ไขบัญชีและไอคอน' : 'Edit account & icon',
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    onPressed: () => _showEditAccountDialog(account, isThai),
+                  ),
+                ],
+              ),
+            ),
           ),
         );
       },
@@ -319,63 +372,8 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
         return Card(
           margin: const EdgeInsets.symmetric(vertical: 4),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: ListTile(
-            leading: Builder(
-              builder: (context) {
-                final iconStr = account.icon ?? 'credit_card';
-                final isCustomImage = iconStr.startsWith('data:image');
-                if (isCustomImage) {
-                  return SizedBox(
-                    width: 40,
-                    height: 40,
-                    child: CategoryIconHelper.buildIconWidget(iconStr, size: 40),
-                  );
-                }
-                return CircleAvatar(
-                  backgroundColor: Colors.deepOrange.shade50,
-                  child: CategoryIconHelper.buildIconWidget(
-                    iconStr,
-                    size: 22,
-                    color: Colors.deepOrange.shade700,
-                  ),
-                );
-              },
-            ),
-            title: Text(account.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text(
-              isThai
-                  ? 'ตัดรอบวันที่ ${account.closingDay ?? 23} • ครบชำระวันที่ ${account.dueDay ?? 10}'
-                  : 'Closes day ${account.closingDay ?? 23} • Due day ${account.dueDay ?? 10}',
-              style: const TextStyle(fontSize: 12),
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      isDebt ? '-${debtMoney.format(symbol: '฿')}' : '฿0.00',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isDebt ? Colors.red.shade700 : Colors.black87),
-                    ),
-                    Text(
-                      isDebt
-                          ? (isThai ? 'ยอดหนี้คงค้าง' : 'Outstanding balance')
-                          : (isThai ? 'ไม่มีหนี้' : 'Zero balance'),
-                      style: TextStyle(fontSize: 11, color: isDebt ? Colors.red.shade700 : Colors.green),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 4),
-                IconButton(
-                  icon: const Icon(Icons.edit_outlined, size: 20, color: Colors.grey),
-                  tooltip: isThai ? 'แก้ไขข้อมูลบัตรและไอคอน' : 'Edit card & icon',
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () => _showEditAccountDialog(account, isThai),
-                ),
-              ],
-            ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -384,6 +382,100 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
               );
             },
             onLongPress: () => _showEditAccountDialog(account, isThai),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  Builder(
+                    builder: (context) {
+                      final iconStr = account.icon ?? 'credit_card';
+                      final isCustomImage = iconStr.startsWith('data:image');
+                      if (isCustomImage) {
+                        return SizedBox(
+                          width: 40,
+                          height: 40,
+                          child: CategoryIconHelper.buildIconWidget(iconStr, size: 40),
+                        );
+                      }
+                      return CircleAvatar(
+                        radius: 20,
+                        backgroundColor: Colors.deepOrange.shade50,
+                        child: CategoryIconHelper.buildIconWidget(
+                          iconStr,
+                          size: 22,
+                          color: Colors.deepOrange.shade700,
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          account.name,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          isThai
+                              ? 'ตัดรอบวันที่ ${account.closingDay ?? 23} • ครบชำระวันที่ ${account.dueDay ?? 10}'
+                              : 'Closes day ${account.closingDay ?? 23} • Due day ${account.dueDay ?? 10}',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: VaultTheme.secondaryText(context),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        isDebt ? '-${debtMoney.format(symbol: '฿')}' : '฿0.00',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: isDebt ? Colors.red.shade700 : VaultTheme.primaryText(context),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 1),
+                        child: Text(
+                          isDebt
+                              ? (isThai ? 'ยอดหนี้คงค้าง' : 'Outstanding')
+                              : (isThai ? 'ไม่มีหนี้' : 'Zero balance'),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: isDebt ? Colors.red.shade700 : Colors.green,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 2),
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, size: 19, color: Colors.grey),
+                    tooltip: isThai ? 'แก้ไขข้อมูลบัตรและไอคอน' : 'Edit card & icon',
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    onPressed: () => _showEditAccountDialog(account, isThai),
+                  ),
+                ],
+              ),
+            ),
           ),
         );
       },

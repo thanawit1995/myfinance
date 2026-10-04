@@ -164,7 +164,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  isThai ? 'หุ้น • กองทุน • คริปโต • ทองคำ' : 'Stocks • Funds • Crypto • Gold',
+                                  isThai ? 'พอร์ตหุ้น, กองทุน, คริปโต, ทองคำ' : 'Stocks, funds, crypto, gold',
                                   style: TextStyle(
                                     fontSize: 11.5,
                                     color: VaultTheme.secondaryText(context),
@@ -223,7 +223,6 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
         final data = snapshot.data;
         final nativeSatang = data?.nativeBalanceSatang ?? 0;
         final thbSatang = data?.thbEquivalentSatang ?? 0;
-        final fxRate = data?.fxRate ?? Decimal.one;
 
         final isUsd = account.currencyCode == 'USD';
         final nativeMoney = Money(nativeSatang);
@@ -245,101 +244,92 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
             onLongPress: () => _showEditAccountDialog(account, isThai),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      Builder(
-                        builder: (context) {
-                          final iconStr = account.icon ?? 'account_balance';
-                          final isCustomImage = iconStr.startsWith('data:image');
-                          if (isCustomImage) {
-                            return SizedBox(
-                              width: 36,
-                              height: 36,
-                              child: CategoryIconHelper.buildIconWidget(iconStr, size: 36),
-                            );
-                          }
-                          return CircleAvatar(
-                            radius: 18,
-                            backgroundColor: isUsd ? Colors.green.shade50 : Colors.blue.shade50,
-                            child: CategoryIconHelper.buildIconWidget(
-                              iconStr,
-                              size: 20,
-                              color: isUsd ? Colors.green.shade700 : Colors.blue.shade700,
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                account.name,
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            if (isUsd) ...[
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                decoration: BoxDecoration(
-                                  color: Colors.green.shade100,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  'USD',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.green.shade900,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
+                  Builder(
+                    builder: (context) {
+                      final iconStr = account.icon ?? 'account_balance';
+                      final isCustomImage = iconStr.startsWith('data:image');
+                      if (isCustomImage) {
+                        return SizedBox(
+                          width: 40,
+                          height: 40,
+                          child: CategoryIconHelper.buildIconWidget(iconStr, size: 40),
+                        );
+                      }
+                      return CircleAvatar(
+                        radius: 20,
+                        backgroundColor: isUsd ? Colors.green.shade50 : Colors.blue.shade50,
+                        child: CategoryIconHelper.buildIconWidget(
+                          iconStr,
+                          size: 22,
+                          color: isUsd ? Colors.green.shade700 : Colors.blue.shade700,
                         ),
-                      ),
-                      const SizedBox(width: 8),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            account.name,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (isUsd) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade100,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'USD',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green.shade900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
                       Text(
                         nativeMoney.format(symbol: isUsd ? r'$' : '฿'),
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                       ),
+                      if (isUsd)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 1),
+                          child: Text(
+                            '≈ ${thbMoney.format(symbol: '฿')}',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                      if (!account.isActive)
+                        Text(
+                          isThai ? 'ปิดใช้งาน' : 'Inactive',
+                          style: const TextStyle(fontSize: 11, color: Colors.grey),
+                        ),
                     ],
                   ),
-                  if (isUsd || !account.isActive) ...[
-                    const SizedBox(height: 4),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 46),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          if (!account.isActive)
-                            Text(
-                              isThai ? 'ปิดใช้งาน' : 'Inactive',
-                              style: const TextStyle(fontSize: 11, color: Colors.grey),
-                            )
-                          else
-                            const SizedBox.shrink(),
-                          if (isUsd)
-                            Text(
-                              '≈ ${thbMoney.format(symbol: '฿')} (${isThai ? "เรต" : "Rate"} ${fxRate.toStringAsFixed(2)})',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w600,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),

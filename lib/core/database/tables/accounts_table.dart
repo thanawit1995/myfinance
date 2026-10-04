@@ -10,6 +10,7 @@ class Accounts extends Table {
   IntColumn get closingDay => integer().nullable()(); // 23 for credit card
   IntColumn get dueDay => integer().nullable()();
   IntColumn get creditLimitSatang => integer().nullable()();
+  TextColumn get icon => text().nullable()(); // custom icon name, e.g. 'account_balance'
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();

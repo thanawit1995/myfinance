@@ -202,7 +202,7 @@ class _DividendIncomeDialogState extends ConsumerState<DividendIncomeDialog> {
                       // 1. Asset
                       DropdownButtonFormField<String>(
                         decoration: const InputDecoration(labelText: 'สินทรัพย์ *', border: OutlineInputBorder()),
-                        value: _selectedAssetId,
+                        initialValue: _selectedAssetId,
                         items: _assets.map((a) {
                           return DropdownMenuItem(value: a.id, child: Text('${a.symbol} - ${a.name} (${a.currencyCode})'));
                         }).toList(),
@@ -220,7 +220,7 @@ class _DividendIncomeDialogState extends ConsumerState<DividendIncomeDialog> {
                       // 2. Account
                       DropdownButtonFormField<String>(
                         decoration: const InputDecoration(labelText: 'รับเงินสุทธิเข้าบัญชี *', border: OutlineInputBorder()),
-                        value: _selectedAccountId,
+                        initialValue: _selectedAccountId,
                         items: _accounts.map((a) {
                           return DropdownMenuItem(value: a.id, child: Text('${a.name} (${a.currencyCode})'));
                         }).toList(),
@@ -231,7 +231,7 @@ class _DividendIncomeDialogState extends ConsumerState<DividendIncomeDialog> {
                       // 3. Income Type
                       DropdownButtonFormField<String>(
                         decoration: const InputDecoration(labelText: 'ประเภทรายได้', border: OutlineInputBorder()),
-                        value: _incomeType,
+                        initialValue: _incomeType,
                         items: const [
                           DropdownMenuItem(value: 'dividend', child: Text('เงินปันผล (Dividend)')),
                           DropdownMenuItem(value: 'interest', child: Text('ดอกเบี้ย (Interest)')),

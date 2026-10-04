@@ -15,6 +15,7 @@ import 'monthly_valuation_screen.dart';
 import 'lot_inspection_screen.dart';
 import '../../settings/presentation/trash_bin_screen.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../../core/widgets/category_icon_helper.dart';
 
 class PortfolioScreen extends ConsumerStatefulWidget {
   const PortfolioScreen({super.key});
@@ -93,7 +94,9 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
               ListTile(
                 leading: CircleAvatar(
                   backgroundColor: Theme.of(sheetContext).colorScheme.primaryContainer,
-                  child: Text(holding.asset.symbol.substring(0, 1)),
+                  child: holding.asset.icon != null
+                      ? Icon(CategoryIconHelper.getIcon(holding.asset.icon), color: Theme.of(sheetContext).colorScheme.primary)
+                      : Text(holding.asset.symbol.isNotEmpty ? holding.asset.symbol.substring(0, 1) : '?'),
                 ),
                 title: Text('${holding.asset.symbol} - ${holding.asset.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: Text(isThai ? 'ถืออยู่ ${holding.totalQuantity} หน่วย' : 'Holding ${holding.totalQuantity} units'),
@@ -677,10 +680,16 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Center(
-                    child: Text(
-                      h.asset.symbol.isNotEmpty ? h.asset.symbol.substring(0, 1) : '?',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: theme.colorScheme.primary),
-                    ),
+                    child: h.asset.icon != null
+                        ? Icon(
+                            CategoryIconHelper.getIcon(h.asset.icon),
+                            size: 22,
+                            color: theme.colorScheme.primary,
+                          )
+                        : Text(
+                            h.asset.symbol.isNotEmpty ? h.asset.symbol.substring(0, 1) : '?',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: theme.colorScheme.primary),
+                          ),
                   ),
                 ),
                 title: Row(
@@ -762,10 +771,12 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                     children: [
                       CircleAvatar(
                         backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                        child: Text(
-                          asset.symbol.isNotEmpty ? asset.symbol.substring(0, 1) : '?',
-                          style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
-                        ),
+                        child: asset.icon != null
+                            ? Icon(CategoryIconHelper.getIcon(asset.icon), color: theme.colorScheme.primary)
+                            : Text(
+                                asset.symbol.isNotEmpty ? asset.symbol.substring(0, 1) : '?',
+                                style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
+                              ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(

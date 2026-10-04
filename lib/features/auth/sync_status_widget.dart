@@ -210,56 +210,59 @@ class SyncStatusWidget extends ConsumerWidget {
             ],
             const SizedBox(height: 20),
             if (user != null) ...[
-              // 1. Master push (upload)
+              // 1. Quick Sync (ด่วน)
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
                   style: FilledButton.styleFrom(
-                    backgroundColor: Colors.deepOrange.shade700,
+                    backgroundColor: Colors.teal.shade700,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   onPressed: state.status == SyncStatus.syncing
                       ? null
-                      : () => _confirmForcePush(context, ref, isThai),
-                  icon: const Icon(Icons.upload_rounded, size: 20),
+                      : () async {
+                          Navigator.of(ctx).pop();
+                          await ref.read(syncServiceProvider.notifier).quickStartupSync();
+                        },
+                  icon: const Icon(Icons.sync_rounded, size: 20),
                   label: Text(
-                    isThai ? '1. อัปโหลด Master ขึ้นคลาวด์ (Master Push)' : '1. Master Push (Upload)',
+                    isThai ? 'ซิงค์ข้อมูลด่วน' : 'Quick Sync',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // 2. Open Settings for Force Push / Download Master
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: VaultTheme.primaryText(context),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    Navigator.of(context).pushNamed('/backup_restore');
+                  },
+                  icon: const Icon(Icons.settings_backup_restore_rounded, size: 18),
+                  label: Text(
+                    isThai ? 'การสำรองและจัดการ Master' : 'Manage Master & Backup',
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                   ),
                 ),
               ),
               const SizedBox(height: 10),
 
-              // 2. Download master data
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.blue.shade700,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  onPressed: state.status == SyncStatus.syncing
-                      ? null
-                      : () => _confirmPullMaster(context, ref, isThai),
-                  icon: const Icon(Icons.cloud_download_rounded, size: 20),
-                  label: Text(
-                    isThai ? '2. ดาวน์โหลด Master จากคลาวด์ (Download Master)' : '2. Download Master Data',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-
               // 3. Log out
               SizedBox(
                 width: double.infinity,
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(
                     foregroundColor: Colors.redAccent,
-                    side: const BorderSide(color: Colors.redAccent, width: 1.2),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   onPressed: () async {
@@ -268,7 +271,7 @@ class SyncStatusWidget extends ConsumerWidget {
                   },
                   icon: const Icon(Icons.logout_rounded, size: 18),
                   label: Text(
-                    isThai ? '3. ออกจากระบบคลาวด์ (Log Out)' : '3. Log Out',
+                    isThai ? 'ออกจากระบบ' : 'Sign Out',
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                   ),
                 ),
@@ -280,133 +283,7 @@ class SyncStatusWidget extends ConsumerWidget {
     );
   }
 
-  Future<void> _confirmForcePush(BuildContext context, WidgetRef ref, bool isThai) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.warning_amber_rounded, color: Colors.deepOrange),
-            const SizedBox(width: 8),
-            Text(isThai ? 'ยืนยันเขียนทับคลาวด์ (Force Push)' : 'Confirm Force Push'),
-          ],
-        ),
-        content: Text(
-          isThai
-              ? 'ระบบจะนำข้อมูลทั้งหมดในเครื่องนี้ขึ้นไปแทนที่บน Google Cloud 100% และลบข้อมูลธุรกรรมเก่าที่มีอยู่บนคลาวด์ทิ้ง\n\n'
-                'เหมาะสำหรับ:\n'
-                '• คุณเพิ่งกู้คืนไฟล์สำรอง (Backup) มาใหม่\n'
-                '• ข้อมูลบนคลาวด์มีรายการเก่าที่ผิดพลาดหรือซ้ำซ้อน\n\n'
-                'คุณแน่ใจหรือไม่ว่าต้องการดำเนินการ?'
-              : 'This will replace all transactions on the cloud with your current local database.\n\nAre you sure you want to proceed?',
-          style: const TextStyle(fontSize: 13),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.deepOrange),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(isThai ? 'ยืนยันเขียนทับคลาวด์' : 'Confirm Overwrite'),
-          ),
-        ],
-      ),
-    );
 
-    if (confirmed == true && context.mounted) {
-      Navigator.of(context).pop(); // close bottom sheet
-      final scaffoldMessenger = ScaffoldMessenger.of(context);
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text(isThai ? 'กำลังส่งข้อมูลขึ้นไปเขียนทับบนคลาวด์...' : 'Force pushing data to cloud...'),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-
-      final ok = await ref.read(syncServiceProvider.notifier).forcePushLocalToCloud();
-      if (ok) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text(isThai ? 'เขียนทับข้อมูลบนคลาวด์สำเร็จเรียบร้อย! คลาวด์เป็นข้อมูลล่าสุดแล้ว' : 'Cloud successfully overwritten with local data!'),
-            backgroundColor: Colors.teal,
-          ),
-        );
-      } else {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text(isThai ? 'เกิดข้อผิดพลาดในการเขียนทับคลาวด์' : 'Failed to overwrite cloud data'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _confirmPullMaster(BuildContext context, WidgetRef ref, bool isThai) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.cloud_download_rounded, color: Colors.blueAccent),
-            const SizedBox(width: 8),
-            Text(isThai ? 'ยืนยันดึงข้อมูล Master จากคลาวด์' : 'Confirm Pull Master Snapshot'),
-          ],
-        ),
-        content: Text(
-          isThai
-              ? 'ระบบจะดึงฐานข้อมูล Master 25 ตารางจาก Google Cloud มาเขียนทับฐานข้อมูลในเครื่องนี้ 100%\n\n'
-                'ข้อมูลทั้งหมดจะตรงกับเครื่องที่ส่ง Master ขึ้นไปอย่างสมบูรณ์แบบ (เหมือนการนำเข้าไฟล์ .db)\n\n'
-                '• มีระบบ Safety Backup สำรองข้อมูลเดิมในเครื่องนี้ให้อัตโนมัติก่อนเริ่มกู้คืน\n\n'
-                'คุณแน่ใจหรือไม่ว่าต้องการดำเนินการ?'
-              : 'This will replace all tables in this device with the Cloud Master Snapshot 100%.\n\nA safety backup will be created automatically before restoring.\n\nDo you want to proceed?',
-          style: const TextStyle(fontSize: 13),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.blue.shade700),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(isThai ? 'ยืนยันดึงข้อมูล Master' : 'Confirm Pull Master'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true && context.mounted) {
-      Navigator.of(context).pop(); // close bottom sheet
-      final scaffoldMessenger = ScaffoldMessenger.of(context);
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text(isThai ? 'กำลังดึงฐานข้อมูล Master จากคลาวด์...' : 'Pulling Master Snapshot from cloud...'),
-          duration: const Duration(seconds: 3),
-        ),
-      );
-
-      final ok = await ref.read(syncServiceProvider.notifier).pullMasterSnapshotFromCloud(isThai: isThai);
-      if (ok) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text(isThai ? 'ดึงข้อมูล Master สำเร็จเรียบร้อย! ข้อมูลทุกตารางตรงกับ Master 100%' : 'Successfully pulled Master Snapshot!'),
-            backgroundColor: Colors.teal,
-          ),
-        );
-      } else {
-        final err = ref.read(syncServiceProvider).errorMessage;
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text(err ?? (isThai ? 'เกิดข้อผิดพลาดในการดึงข้อมูล Master' : 'Failed to pull master snapshot')),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
-    }
-  }
 
   Widget _infoRow(String label, String value) {
     return Row(

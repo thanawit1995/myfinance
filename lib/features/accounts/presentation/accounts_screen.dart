@@ -5,6 +5,8 @@ import '../../../../core/database/app_database.dart';
 import '../../../../core/database/database_provider.dart';
 import '../../../../core/database/daos/credit_card_dao.dart';
 import '../../../../core/money/money.dart';
+import '../../../../core/widgets/app_icon_selector.dart';
+import '../../../../core/widgets/category_icon_helper.dart';
 import 'account_detail_screen.dart';
 import 'credit_card_summary_screen.dart';
 import 'add_account_dialog.dart';
@@ -211,7 +213,12 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
           child: ListTile(
             leading: CircleAvatar(
               backgroundColor: isUsd ? Colors.green.shade50 : Colors.blue.shade50,
-              child: Icon(Icons.account_balance, color: isUsd ? Colors.green.shade700 : Colors.blue.shade700),
+              child: Icon(
+                account.icon != null
+                    ? CategoryIconHelper.getIcon(account.icon)
+                    : Icons.account_balance,
+                color: isUsd ? Colors.green.shade700 : Colors.blue.shade700,
+              ),
             ),
             title: Row(
               children: [
@@ -284,7 +291,12 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
           child: ListTile(
             leading: CircleAvatar(
               backgroundColor: Colors.deepOrange.shade50,
-              child: Icon(Icons.credit_card, color: Colors.deepOrange.shade700),
+              child: Icon(
+                account.icon != null
+                    ? CategoryIconHelper.getIcon(account.icon)
+                    : Icons.credit_card,
+                color: Colors.deepOrange.shade700,
+              ),
             ),
             title: Text(account.name, style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text(
@@ -341,46 +353,103 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
     }
 
     final controller = TextEditingController(text: account.name);
-    final newName = await showDialog<String>(
+    String? editedIcon = account.icon;
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(isThai ? 'แก้ไขชื่อบัญชี' : 'Edit Account Name'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: InputDecoration(
-            labelText: isThai ? 'ชื่อบัญชี' : 'Account Name',
-            border: const OutlineInputBorder(),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          title: Text(isThai ? 'แก้ไขบัญชี' : 'Edit Account'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  InkWell(
+                    onTap: () async {
+                      final chosen = await AppIconSelector.show(context, currentIcon: editedIcon);
+                      if (chosen != null) {
+                        setDlgState(() => editedIcon = chosen);
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Theme.of(context).colorScheme.primary),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          editedIcon != null
+                              ? CategoryIconHelper.getIcon(editedIcon)
+                              : Icons.account_balance,
+                          size: 26,
+                          color: Theme.of(context).colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isThai ? 'ไอคอนประจำบัญชี' : 'Account Icon',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          isThai ? 'แตะที่กล่องเพื่อเปลี่ยนไอคอน' : 'Tap to change icon',
+                          style: const TextStyle(fontSize: 11.5, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: isThai ? 'ชื่อบัญชี' : 'Account Name',
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+            ],
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final trimmed = controller.text.trim();
+                if (trimmed.isNotEmpty) {
+                  Navigator.of(ctx).pop(true);
+                }
+              },
+              child: Text(isThai ? 'บันทึก' : 'Save'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final trimmed = controller.text.trim();
-              if (trimmed.isNotEmpty) {
-                Navigator.of(ctx).pop(trimmed);
-              }
-            },
-            child: Text(isThai ? 'บันทึก' : 'Save'),
-          ),
-        ],
       ),
     );
 
-    if (newName != null && newName.isNotEmpty && newName != account.name) {
-      await ref.read(accountsDaoProvider).updateAccountName(account.id, newName);
+    if (confirmed == true) {
+      final trimmed = controller.text.trim();
+      await ref.read(accountsDaoProvider).updateAccountName(account.id, trimmed, icon: editedIcon);
       if (mounted) {
         setState(() {});
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            duration: const Duration(seconds: 5),
+            duration: const Duration(seconds: 4),
             content: Text(isThai
-                ? 'แก้ไขชื่อบัญชีเป็น "$newName" สำเร็จ'
-                : 'Account name updated to "$newName"'),
+                ? 'อัปเดตข้อมูลบัญชี "$trimmed" สำเร็จ'
+                : 'Account "$trimmed" updated successfully'),
           ),
         );
       }

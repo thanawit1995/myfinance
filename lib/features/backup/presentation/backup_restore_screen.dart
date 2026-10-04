@@ -27,6 +27,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
   List<SafetyBackupItem> _safetyBackups = [];
   String? _designatedFolder;
   List<RollingBackupItem> _rollingBackups = [];
+  bool _quickStartupSyncEnabled = true;
 
   @override
   void initState() {
@@ -38,6 +39,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     try {
       final db = ref.read(databaseProvider);
       final service = ref.read(backupRestoreServiceProvider);
+      final quickSyncOn = await SyncService.isQuickStartupSyncEnabled();
 
       final accounts = await db.accountsDao.getActiveAccounts();
       final txRow = await db.customSelect('SELECT count(*) as cnt FROM transactions WHERE deleted_at IS NULL').getSingleOrNull();
@@ -61,6 +63,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
           _safetyBackups = safetyBackups;
           _designatedFolder = designatedFolder;
           _rollingBackups = rollingBackups;
+          _quickStartupSyncEnabled = quickSyncOn;
         });
       }
     } catch (_) {}
@@ -1824,6 +1827,49 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
               ),
             ),
 
+            if (isLoggedIn) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: VaultTheme.background(context),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: VaultTheme.border(context).withValues(alpha: 0.5)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.flash_on_rounded, size: 20, color: Colors.teal),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isThai ? 'ซิงค์อัตโนมัติเมื่อเปิดแอป (Quick Startup Sync)' : 'Quick Startup Sync',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            isThai
+                                ? 'ซิงค์ข้อมูลล่าสุดทันทีที่เปิดแอปหรือต่อเน็ต'
+                                : 'Sync latest changes on app launch or reconnect',
+                            style: const TextStyle(fontSize: 11, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch(
+                      value: _quickStartupSyncEnabled,
+                      activeThumbColor: Colors.teal,
+                      onChanged: (val) async {
+                        setState(() => _quickStartupSyncEnabled = val);
+                        await SyncService.setQuickStartupSyncEnabled(val);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             const SizedBox(height: 16),
 
             // Action Buttons
@@ -1874,7 +1920,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                         label: FittedBox(
                           fit: BoxFit.scaleDown,
                           child: Text(
-                            isThai ? 'เขียนทับข้อมูลบนคลาวด์ด้วยเครื่องนี้ 100% (Master Push)' : 'Force Push Local to Cloud',
+                            isThai ? 'เขียนทับข้อมูลคลาวด์ (Master Push)' : 'Force Push to Cloud',
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                           ),
                         ),
@@ -1896,7 +1942,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                         label: FittedBox(
                           fit: BoxFit.scaleDown,
                           child: Text(
-                            isThai ? 'ดึงข้อมูล Master จากคลาวด์แทนที่เครื่องนี้ 100%' : 'Pull Master Snapshot from Cloud',
+                            isThai ? 'ดาวน์โหลดข้อมูล Master' : 'Download Master',
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                           ),
                         ),

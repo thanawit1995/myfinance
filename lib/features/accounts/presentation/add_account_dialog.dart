@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/database/database_provider.dart';
+import '../../../../core/widgets/app_icon_selector.dart';
+import '../../../../core/widgets/category_icon_helper.dart';
 
 class AddAccountDialog extends ConsumerStatefulWidget {
   const AddAccountDialog({super.key});
@@ -33,6 +35,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
   String _accountType = 'bank'; // bank, fcd, offshore, credit_card, cash
   String _currencyCode = 'THB'; // THB, USD
   bool _isDomestic = true;
+  String? _selectedIcon;
 
   @override
   void dispose() {
@@ -93,6 +96,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
       closingDay: Value(closingDay),
       dueDay: Value(dueDay),
       creditLimitSatang: Value(creditLimitSatang),
+      icon: Value(_selectedIcon),
       isActive: const Value(true),
       createdAt: now,
       updatedAt: now,
@@ -153,7 +157,57 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Account Name
+                // Icon selector
+                Row(
+                children: [
+                  InkWell(
+                    onTap: () async {
+                      final chosen = await AppIconSelector.show(context, currentIcon: _selectedIcon);
+                      if (chosen != null) {
+                        setState(() => _selectedIcon = chosen);
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Theme.of(context).colorScheme.primary),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          _selectedIcon != null
+                              ? CategoryIconHelper.getIcon(_selectedIcon)
+                              : (_accountType == 'credit_card' ? Icons.credit_card : Icons.account_balance_wallet),
+                          size: 26,
+                          color: Theme.of(context).colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isThai ? 'ไอคอนประจำบัญชี' : 'Account Icon',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          isThai ? 'แตะที่กล่องเพื่อเลือกไอคอนที่ต้องการ' : 'Tap to change icon',
+                          style: const TextStyle(fontSize: 11.5, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+
+              // Account Name
                 TextFormField(
                   controller: _nameController,
                   decoration: InputDecoration(

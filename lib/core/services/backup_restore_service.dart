@@ -400,10 +400,19 @@ class BackupRestoreService {
       await db.customStatement('PRAGMA foreign_keys = OFF;');
       Future<void> insertTableRows(String table, List<Map<String, dynamic>> rows) async {
         if (rows.isEmpty) return;
+
+        // ดึงรายชื่อคอลัมน์ที่มีอยู่จริงในโครงสร้างตารางปัจจุบัน
+        final tableInfo = await db.customSelect('PRAGMA table_info("$table");').get();
+        final validCols = tableInfo.map((r) => r.data['name'] as String).toSet();
+
         for (final row in rows) {
-          final cols = row.keys.map((c) => '"$c"').join(', ');
-          final placeholders = row.keys.map((_) => '?').join(', ');
-          final values = row.values.toList();
+          final filteredMap = Map<String, dynamic>.from(row)
+            ..removeWhere((k, _) => !validCols.contains(k));
+          if (filteredMap.isEmpty) continue;
+
+          final cols = filteredMap.keys.map((c) => '"$c"').join(', ');
+          final placeholders = filteredMap.keys.map((_) => '?').join(', ');
+          final values = filteredMap.values.toList();
           await db.customStatement(
             'INSERT OR REPLACE INTO "$table" ($cols) VALUES ($placeholders);',
             values,

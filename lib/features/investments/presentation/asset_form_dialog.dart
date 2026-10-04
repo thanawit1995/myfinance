@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/database/database_provider.dart';
+import '../../../../core/widgets/app_icon_selector.dart';
+import '../../../../core/widgets/category_icon_helper.dart';
 
 class AssetFormDialog extends ConsumerStatefulWidget {
   final Asset? assetToEdit;
@@ -39,6 +41,7 @@ class _AssetFormDialogState extends ConsumerState<AssetFormDialog> {
   String? _selectedAccountId;
   DateTime? _maturityDate;
   String _couponFrequency = 'semi_annually';
+  String? _selectedIcon;
 
   final _assetTypes = [
     {'key': 'thai_stock', 'label': 'หุ้นไทย'},
@@ -64,6 +67,7 @@ class _AssetFormDialogState extends ConsumerState<AssetFormDialog> {
       _selectedAssetType = a.assetType;
       _selectedCurrency = a.currencyCode;
       _selectedAccountId = a.defaultAccountId;
+      _selectedIcon = a.icon;
       if (a.extraDetailsJson != null && a.extraDetailsJson!.isNotEmpty) {
         try {
           final extra = jsonDecode(a.extraDetailsJson!) as Map<String, dynamic>;
@@ -118,6 +122,7 @@ class _AssetFormDialogState extends ConsumerState<AssetFormDialog> {
           assetType: _selectedAssetType,
           currencyCode: _selectedCurrency,
           defaultAccountId: _selectedAccountId!,
+          icon: Value(_selectedIcon),
           market: Value(_marketController.text.trim().isEmpty ? null : _marketController.text.trim()),
           note: Value(_noteController.text.trim().isEmpty ? null : _noteController.text.trim()),
           extraDetailsJson: Value(extraJson),
@@ -135,6 +140,7 @@ class _AssetFormDialogState extends ConsumerState<AssetFormDialog> {
           assetType: Value(_selectedAssetType),
           currencyCode: Value(_selectedCurrency),
           defaultAccountId: Value(_selectedAccountId!),
+          icon: Value(_selectedIcon),
           market: Value(_marketController.text.trim().isEmpty ? null : _marketController.text.trim()),
           note: Value(_noteController.text.trim().isEmpty ? null : _noteController.text.trim()),
           extraDetailsJson: Value(extraJson),
@@ -163,6 +169,56 @@ class _AssetFormDialogState extends ConsumerState<AssetFormDialog> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Icon Selector & Info
+                Row(
+                  children: [
+                    InkWell(
+                      onTap: () async {
+                        final chosen = await AppIconSelector.show(context, currentIcon: _selectedIcon);
+                        if (chosen != null) {
+                          setState(() => _selectedIcon = chosen);
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Theme.of(context).colorScheme.primary),
+                        ),
+                        child: Center(
+                          child: Icon(
+                            _selectedIcon != null
+                                ? CategoryIconHelper.getIcon(_selectedIcon)
+                                : Icons.pie_chart,
+                            size: 26,
+                            color: Theme.of(context).colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'ไอคอนสินทรัพย์',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            'แตะที่กล่องเพื่อเลือกไอคอนที่ต้องการ',
+                            style: TextStyle(fontSize: 11.5, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
                 // 1. Symbol & Name
                 TextFormField(
                   controller: _symbolController,

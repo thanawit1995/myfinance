@@ -505,6 +505,102 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
     );
   }
 
+  Future<void> _showAccountPickerSheet(BuildContext context, {bool isDestination = false}) async {
+    final accounts = isDestination
+        ? _accounts.where((a) => a.id != _selectedAccountId).toList()
+        : _accounts;
+
+    final selectedId = isDestination ? _selectedDestinationAccountId : _selectedAccountId;
+
+    final chosen = await showModalBottomSheet<Account>(
+      context: context,
+      backgroundColor: VaultTheme.surface(context),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Row(
+                  children: [
+                    Text(
+                      isDestination ? 'เลือกบัญชีปลายทาง' : 'เลือกบัญชีที่ทำรายการ',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: accounts.length,
+                  separatorBuilder: (_, _) => const Divider(height: 1),
+                  itemBuilder: (_, index) {
+                    final acc = accounts[index];
+                    final isSelected = acc.id == selectedId;
+                    final isCreditCard = acc.accountType == 'credit_card';
+
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: (isCreditCard ? Colors.deepOrange : Colors.blue).withValues(alpha: 0.12),
+                        child: Icon(
+                          acc.icon != null
+                              ? CategoryIconHelper.getIcon(acc.icon)
+                              : (isCreditCard ? Icons.credit_card : Icons.account_balance_wallet),
+                          color: isCreditCard ? Colors.deepOrange : Colors.blue,
+                          size: 20,
+                        ),
+                      ),
+                      title: Text(
+                        acc.name,
+                        style: TextStyle(
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                      subtitle: Text(
+                        '${acc.currencyCode} • ${isCreditCard ? "บัตรเครดิต" : "บัญชีเงินฝาก"}',
+                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                      trailing: isSelected
+                          ? Icon(Icons.check_circle, color: VaultTheme.accent(context), size: 22)
+                          : null,
+                      onTap: () => Navigator.of(ctx).pop(acc),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (chosen != null) {
+      setState(() {
+        if (isDestination) {
+          _selectedDestinationAccountId = chosen.id;
+        } else {
+          _selectedAccountId = chosen.id;
+          if (_selectedDestinationAccountId == chosen.id) {
+            final remaining = _accounts.where((a) => a.id != chosen.id).toList();
+            _selectedDestinationAccountId = remaining.isNotEmpty ? remaining.first.id : null;
+          }
+        }
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -569,36 +665,53 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
 
                 // 2. Transfer Accounts Dropdowns (Placed above Amount for transfers so dual-currency reacts)
                 if (_transactionType == 'transfer') ...[
-                  DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(
-                      isDense: true,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      labelText: 'จากบัญชีต้นทาง',
-                      border: OutlineInputBorder(),
-                    ),
-                    initialValue: _accounts.any((a) => a.id == _selectedAccountId) ? _selectedAccountId : null,
-                    items: _accounts.map((a) => DropdownMenuItem(value: a.id, child: Text('${a.name} (${a.currencyCode})'))).toList(),
-                    onChanged: (val) {
-                      setState(() {
-                        _selectedAccountId = val;
-                        if (_selectedDestinationAccountId == val) {
-                          final remaining = _accounts.where((a) => a.id != val).toList();
-                          _selectedDestinationAccountId = remaining.isNotEmpty ? remaining.first.id : null;
-                        }
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(
-                      isDense: true,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      labelText: 'ไปยังบัญชีปลายทาง',
-                      border: OutlineInputBorder(),
-                    ),
-                    initialValue: _accounts.any((a) => a.id == _selectedDestinationAccountId) ? _selectedDestinationAccountId : null,
-                    items: _accounts.where((a) => a.id != _selectedAccountId).map((a) => DropdownMenuItem(value: a.id, child: Text('${a.name} (${a.currencyCode})'))).toList(),
-                    onChanged: (val) => setState(() => _selectedDestinationAccountId = val),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => _showAccountPickerSheet(context, isDestination: false),
+                          borderRadius: BorderRadius.circular(4),
+                          child: InputDecorator(
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                              labelText: 'จากบัญชีต้นทาง',
+                              suffixIcon: Icon(Icons.expand_more_rounded, size: 20),
+                              border: OutlineInputBorder(),
+                            ),
+                            child: Text(
+                              srcAcc != null ? '${srcAcc.name} (${srcAcc.currencyCode})' : 'เลือกบัญชี',
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 4),
+                        child: Icon(Icons.arrow_forward, size: 16),
+                      ),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => _showAccountPickerSheet(context, isDestination: true),
+                          borderRadius: BorderRadius.circular(4),
+                          child: InputDecorator(
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                              labelText: 'ไปยังบัญชีปลายทาง',
+                              suffixIcon: Icon(Icons.expand_more_rounded, size: 20),
+                              border: OutlineInputBorder(),
+                            ),
+                            child: Text(
+                              dstAcc != null ? '${dstAcc.name} (${dstAcc.currencyCode})' : 'เลือกบัญชี',
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                 ],
@@ -760,16 +873,30 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                   const SizedBox(height: 8),
 
                   // Account Selector for Non-transfer
-                  DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(
-                      isDense: true,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      labelText: 'บัญชี',
-                      border: OutlineInputBorder(),
+                  InkWell(
+                    onTap: () => _showAccountPickerSheet(context, isDestination: false),
+                    borderRadius: BorderRadius.circular(4),
+                    child: InputDecorator(
+                      decoration: InputDecoration(
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        labelText: 'บัญชี',
+                        prefixIcon: Icon(
+                          srcAcc?.icon != null
+                              ? CategoryIconHelper.getIcon(srcAcc!.icon)
+                              : (srcAcc?.accountType == 'credit_card' ? Icons.credit_card : Icons.account_balance_wallet_outlined),
+                          size: 18,
+                        ),
+                        prefixIconConstraints: const BoxConstraints(minWidth: 36),
+                        suffixIcon: const Icon(Icons.expand_more_rounded, size: 20),
+                        border: const OutlineInputBorder(),
+                      ),
+                      child: Text(
+                        srcAcc != null ? '${srcAcc.name} (${srcAcc.currencyCode})' : 'เลือกบัญชี',
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    initialValue: _accounts.any((a) => a.id == _selectedAccountId) ? _selectedAccountId : null,
-                    items: _accounts.map((a) => DropdownMenuItem(value: a.id, child: Text('${a.name} (${a.currencyCode})'))).toList(),
-                    onChanged: (val) => setState(() => _selectedAccountId = val),
                   ),
                   const SizedBox(height: 8),
                 ],

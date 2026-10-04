@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../../core/theme/vault_theme.dart';
+import 'lumi_mascot_avatar.dart';
 
 class LumiTipCard extends StatelessWidget {
   final String message;
@@ -54,33 +55,7 @@ class LumiTipCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // Momo cat mascot avatar
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF231B2B) : Colors.white,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isDark
-                        ? (isWarning ? const Color(0xFF5A2B35) : const Color(0xFF553F24))
-                        : (isWarning ? const Color(0xFFFFCCD4) : const Color(0xFFFFDDB0)),
-                    width: 1.5,
-                  ),
-                ),
-                child: ClipOval(
-                  child: Image.asset(
-                    'assets/images/lumi_cat_crisp.png',
-                    width: 44,
-                    height: 44,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => const Icon(
-                      Icons.pets_rounded,
-                      color: Color(0xFFFF9800),
-                      size: 22,
-                    ),
-                  ),
-                ),
-              ),
+              const LumiMascotAvatar(size: 44),
               const SizedBox(width: 14),
 
               // Advice content

@@ -57,8 +57,21 @@ class SyncService extends StateNotifier<SyncState> {
   static const _prefLastSync = 'last_sync_timestamp';
   static const _prefDeviceId = 'myfinance_device_id';
   static const _prefForcePushNext = 'pref_force_push_next_sync';
+  static const _prefQuickStartupSyncEnabled = 'pref_quick_startup_sync_enabled';
   StreamSubscription? _connectivitySub;
   StreamSubscription? _authSub;
+
+  /// ตั้งค่าสถานะเปิด-ปิด Quick Startup Sync
+  static Future<void> setQuickStartupSyncEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_prefQuickStartupSyncEnabled, enabled);
+  }
+
+  /// ตรวจสอบว่า Quick Startup Sync เปิดอยู่หรือไม่ (ค่าเริ่มต้น: true)
+  static Future<bool> isQuickStartupSyncEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_prefQuickStartupSyncEnabled) ?? true;
+  }
 
   /// ตั้งค่าสถานะให้การเชื่อมต่อครั้งถัดไปทำ Force Push (เขียนทับคลาวด์) แทนการดึงข้อมูลเก่า
   static Future<void> markForcePushNext() async {
@@ -106,7 +119,7 @@ class SyncService extends StateNotifier<SyncState> {
         final p = await SharedPreferences.getInstance();
         if (p.getBool(_prefForcePushNext) ?? false) {
           await forcePushLocalToCloud();
-        } else {
+        } else if (p.getBool(_prefQuickStartupSyncEnabled) ?? true) {
           await quickStartupSync();
         }
       } else if (!online) {
@@ -119,7 +132,7 @@ class SyncService extends StateNotifier<SyncState> {
         final p = await SharedPreferences.getInstance();
         if (p.getBool(_prefForcePushNext) ?? false) {
           await forcePushLocalToCloud();
-        } else {
+        } else if (p.getBool(_prefQuickStartupSyncEnabled) ?? true) {
           await quickStartupSync();
         }
       } else {
@@ -131,7 +144,7 @@ class SyncService extends StateNotifier<SyncState> {
       final p = await SharedPreferences.getInstance();
       if (p.getBool(_prefForcePushNext) ?? false) {
         await forcePushLocalToCloud();
-      } else {
+      } else if (p.getBool(_prefQuickStartupSyncEnabled) ?? true) {
         await quickStartupSync();
       }
     }

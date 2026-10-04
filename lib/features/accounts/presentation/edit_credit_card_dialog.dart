@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/database/database_provider.dart';
 import '../../../../core/theme/vault_theme.dart';
+import '../../../../core/widgets/app_icon_selector.dart';
+import '../../../../core/widgets/category_icon_helper.dart';
 
 class EditCreditCardDialog extends ConsumerStatefulWidget {
   final Account account;
@@ -30,11 +32,13 @@ class _EditCreditCardDialogState extends ConsumerState<EditCreditCardDialog> {
   late final TextEditingController _creditLimitController;
 
   bool _isSaving = false;
+  String? _selectedIcon;
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.account.name);
+    _selectedIcon = widget.account.icon;
     _closingDayController = TextEditingController(text: (widget.account.closingDay ?? 23).toString());
     _dueDayController = TextEditingController(text: (widget.account.dueDay ?? 10).toString());
 
@@ -72,6 +76,7 @@ class _EditCreditCardDialogState extends ConsumerState<EditCreditCardDialog> {
       await ref.read(accountsDaoProvider).updateCreditCardDetails(
         id: widget.account.id,
         name: name,
+        icon: _selectedIcon,
         closingDay: closingDay,
         dueDay: dueDay,
         creditLimitSatang: creditLimitSatang,
@@ -161,7 +166,55 @@ class _EditCreditCardDialogState extends ConsumerState<EditCreditCardDialog> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
+                // Icon selector
+                Row(
+                  children: [
+                    InkWell(
+                      onTap: () async {
+                        final chosen = await AppIconSelector.show(context, currentIcon: _selectedIcon);
+                        if (chosen != null) {
+                          setState(() => _selectedIcon = chosen);
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: accent),
+                        ),
+                        child: Center(
+                          child: Icon(
+                            _selectedIcon != null
+                                ? CategoryIconHelper.getIcon(_selectedIcon)
+                                : Icons.credit_card_rounded,
+                            size: 24,
+                            color: accent,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isThai ? 'ไอคอนบัตร' : 'Card Icon',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: primaryText),
+                          ),
+                          Text(
+                            isThai ? 'แตะเพื่อเปลี่ยนไอคอนบัตรเครดิต' : 'Tap to change icon',
+                            style: TextStyle(fontSize: 11.5, color: secondaryText),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
 
                 // ── ชื่อบัตร ──
                 TextFormField(

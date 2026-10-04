@@ -1120,6 +1120,15 @@ class $AccountsTable extends Accounts with TableInfo<$AccountsTable, Account> {
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _iconMeta = const VerificationMeta('icon');
+  @override
+  late final GeneratedColumn<String> icon = GeneratedColumn<String>(
+    'icon',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _isActiveMeta = const VerificationMeta(
     'isActive',
   );
@@ -1190,6 +1199,7 @@ class $AccountsTable extends Accounts with TableInfo<$AccountsTable, Account> {
     closingDay,
     dueDay,
     creditLimitSatang,
+    icon,
     isActive,
     createdAt,
     updatedAt,
@@ -1272,6 +1282,12 @@ class $AccountsTable extends Accounts with TableInfo<$AccountsTable, Account> {
         ),
       );
     }
+    if (data.containsKey('icon')) {
+      context.handle(
+        _iconMeta,
+        icon.isAcceptableOrUnknown(data['icon']!, _iconMeta),
+      );
+    }
     if (data.containsKey('is_active')) {
       context.handle(
         _isActiveMeta,
@@ -1350,6 +1366,10 @@ class $AccountsTable extends Accounts with TableInfo<$AccountsTable, Account> {
         DriftSqlType.int,
         data['${effectivePrefix}credit_limit_satang'],
       ),
+      icon: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}icon'],
+      ),
       isActive: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_active'],
@@ -1388,6 +1408,7 @@ class Account extends DataClass implements Insertable<Account> {
   final int? closingDay;
   final int? dueDay;
   final int? creditLimitSatang;
+  final String? icon;
   final bool isActive;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -1402,6 +1423,7 @@ class Account extends DataClass implements Insertable<Account> {
     this.closingDay,
     this.dueDay,
     this.creditLimitSatang,
+    this.icon,
     required this.isActive,
     required this.createdAt,
     required this.updatedAt,
@@ -1424,6 +1446,9 @@ class Account extends DataClass implements Insertable<Account> {
     }
     if (!nullToAbsent || creditLimitSatang != null) {
       map['credit_limit_satang'] = Variable<int>(creditLimitSatang);
+    }
+    if (!nullToAbsent || icon != null) {
+      map['icon'] = Variable<String>(icon);
     }
     map['is_active'] = Variable<bool>(isActive);
     map['created_at'] = Variable<DateTime>(createdAt);
@@ -1451,6 +1476,7 @@ class Account extends DataClass implements Insertable<Account> {
       creditLimitSatang: creditLimitSatang == null && nullToAbsent
           ? const Value.absent()
           : Value(creditLimitSatang),
+      icon: icon == null && nullToAbsent ? const Value.absent() : Value(icon),
       isActive: Value(isActive),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
@@ -1475,6 +1501,7 @@ class Account extends DataClass implements Insertable<Account> {
       closingDay: serializer.fromJson<int?>(json['closingDay']),
       dueDay: serializer.fromJson<int?>(json['dueDay']),
       creditLimitSatang: serializer.fromJson<int?>(json['creditLimitSatang']),
+      icon: serializer.fromJson<String?>(json['icon']),
       isActive: serializer.fromJson<bool>(json['isActive']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -1494,6 +1521,7 @@ class Account extends DataClass implements Insertable<Account> {
       'closingDay': serializer.toJson<int?>(closingDay),
       'dueDay': serializer.toJson<int?>(dueDay),
       'creditLimitSatang': serializer.toJson<int?>(creditLimitSatang),
+      'icon': serializer.toJson<String?>(icon),
       'isActive': serializer.toJson<bool>(isActive),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -1511,6 +1539,7 @@ class Account extends DataClass implements Insertable<Account> {
     Value<int?> closingDay = const Value.absent(),
     Value<int?> dueDay = const Value.absent(),
     Value<int?> creditLimitSatang = const Value.absent(),
+    Value<String?> icon = const Value.absent(),
     bool? isActive,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -1527,6 +1556,7 @@ class Account extends DataClass implements Insertable<Account> {
     creditLimitSatang: creditLimitSatang.present
         ? creditLimitSatang.value
         : this.creditLimitSatang,
+    icon: icon.present ? icon.value : this.icon,
     isActive: isActive ?? this.isActive,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -1553,6 +1583,7 @@ class Account extends DataClass implements Insertable<Account> {
       creditLimitSatang: data.creditLimitSatang.present
           ? data.creditLimitSatang.value
           : this.creditLimitSatang,
+      icon: data.icon.present ? data.icon.value : this.icon,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -1574,6 +1605,7 @@ class Account extends DataClass implements Insertable<Account> {
           ..write('closingDay: $closingDay, ')
           ..write('dueDay: $dueDay, ')
           ..write('creditLimitSatang: $creditLimitSatang, ')
+          ..write('icon: $icon, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -1593,6 +1625,7 @@ class Account extends DataClass implements Insertable<Account> {
     closingDay,
     dueDay,
     creditLimitSatang,
+    icon,
     isActive,
     createdAt,
     updatedAt,
@@ -1611,6 +1644,7 @@ class Account extends DataClass implements Insertable<Account> {
           other.closingDay == this.closingDay &&
           other.dueDay == this.dueDay &&
           other.creditLimitSatang == this.creditLimitSatang &&
+          other.icon == this.icon &&
           other.isActive == this.isActive &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
@@ -1627,6 +1661,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
   final Value<int?> closingDay;
   final Value<int?> dueDay;
   final Value<int?> creditLimitSatang;
+  final Value<String?> icon;
   final Value<bool> isActive;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -1642,6 +1677,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
     this.closingDay = const Value.absent(),
     this.dueDay = const Value.absent(),
     this.creditLimitSatang = const Value.absent(),
+    this.icon = const Value.absent(),
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -1658,6 +1694,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
     this.closingDay = const Value.absent(),
     this.dueDay = const Value.absent(),
     this.creditLimitSatang = const Value.absent(),
+    this.icon = const Value.absent(),
     this.isActive = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
@@ -1680,6 +1717,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
     Expression<int>? closingDay,
     Expression<int>? dueDay,
     Expression<int>? creditLimitSatang,
+    Expression<String>? icon,
     Expression<bool>? isActive,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -1696,6 +1734,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
       if (closingDay != null) 'closing_day': closingDay,
       if (dueDay != null) 'due_day': dueDay,
       if (creditLimitSatang != null) 'credit_limit_satang': creditLimitSatang,
+      if (icon != null) 'icon': icon,
       if (isActive != null) 'is_active': isActive,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -1714,6 +1753,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
     Value<int?>? closingDay,
     Value<int?>? dueDay,
     Value<int?>? creditLimitSatang,
+    Value<String?>? icon,
     Value<bool>? isActive,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -1730,6 +1770,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
       closingDay: closingDay ?? this.closingDay,
       dueDay: dueDay ?? this.dueDay,
       creditLimitSatang: creditLimitSatang ?? this.creditLimitSatang,
+      icon: icon ?? this.icon,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -1766,6 +1807,9 @@ class AccountsCompanion extends UpdateCompanion<Account> {
     if (creditLimitSatang.present) {
       map['credit_limit_satang'] = Variable<int>(creditLimitSatang.value);
     }
+    if (icon.present) {
+      map['icon'] = Variable<String>(icon.value);
+    }
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
     }
@@ -1798,6 +1842,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
           ..write('closingDay: $closingDay, ')
           ..write('dueDay: $dueDay, ')
           ..write('creditLimitSatang: $creditLimitSatang, ')
+          ..write('icon: $icon, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -2741,6 +2786,15 @@ class $AssetsTable extends Assets with TableInfo<$AssetsTable, Asset> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _iconMeta = const VerificationMeta('icon');
+  @override
+  late final GeneratedColumn<String> icon = GeneratedColumn<String>(
+    'icon',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _noteMeta = const VerificationMeta('note');
   @override
   late final GeneratedColumn<String> note = GeneratedColumn<String>(
@@ -2803,6 +2857,7 @@ class $AssetsTable extends Assets with TableInfo<$AssetsTable, Asset> {
     currencyCode,
     defaultAccountId,
     market,
+    icon,
     note,
     extraDetailsJson,
     createdAt,
@@ -2876,6 +2931,12 @@ class $AssetsTable extends Assets with TableInfo<$AssetsTable, Asset> {
       context.handle(
         _marketMeta,
         market.isAcceptableOrUnknown(data['market']!, _marketMeta),
+      );
+    }
+    if (data.containsKey('icon')) {
+      context.handle(
+        _iconMeta,
+        icon.isAcceptableOrUnknown(data['icon']!, _iconMeta),
       );
     }
     if (data.containsKey('note')) {
@@ -2952,6 +3013,10 @@ class $AssetsTable extends Assets with TableInfo<$AssetsTable, Asset> {
         DriftSqlType.string,
         data['${effectivePrefix}market'],
       ),
+      icon: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}icon'],
+      ),
       note: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}note'],
@@ -2989,6 +3054,7 @@ class Asset extends DataClass implements Insertable<Asset> {
   final String currencyCode;
   final String defaultAccountId;
   final String? market;
+  final String? icon;
   final String? note;
   final String? extraDetailsJson;
   final DateTime createdAt;
@@ -3002,6 +3068,7 @@ class Asset extends DataClass implements Insertable<Asset> {
     required this.currencyCode,
     required this.defaultAccountId,
     this.market,
+    this.icon,
     this.note,
     this.extraDetailsJson,
     required this.createdAt,
@@ -3019,6 +3086,9 @@ class Asset extends DataClass implements Insertable<Asset> {
     map['default_account_id'] = Variable<String>(defaultAccountId);
     if (!nullToAbsent || market != null) {
       map['market'] = Variable<String>(market);
+    }
+    if (!nullToAbsent || icon != null) {
+      map['icon'] = Variable<String>(icon);
     }
     if (!nullToAbsent || note != null) {
       map['note'] = Variable<String>(note);
@@ -3045,6 +3115,7 @@ class Asset extends DataClass implements Insertable<Asset> {
       market: market == null && nullToAbsent
           ? const Value.absent()
           : Value(market),
+      icon: icon == null && nullToAbsent ? const Value.absent() : Value(icon),
       note: note == null && nullToAbsent ? const Value.absent() : Value(note),
       extraDetailsJson: extraDetailsJson == null && nullToAbsent
           ? const Value.absent()
@@ -3070,6 +3141,7 @@ class Asset extends DataClass implements Insertable<Asset> {
       currencyCode: serializer.fromJson<String>(json['currencyCode']),
       defaultAccountId: serializer.fromJson<String>(json['defaultAccountId']),
       market: serializer.fromJson<String?>(json['market']),
+      icon: serializer.fromJson<String?>(json['icon']),
       note: serializer.fromJson<String?>(json['note']),
       extraDetailsJson: serializer.fromJson<String?>(json['extraDetailsJson']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -3088,6 +3160,7 @@ class Asset extends DataClass implements Insertable<Asset> {
       'currencyCode': serializer.toJson<String>(currencyCode),
       'defaultAccountId': serializer.toJson<String>(defaultAccountId),
       'market': serializer.toJson<String?>(market),
+      'icon': serializer.toJson<String?>(icon),
       'note': serializer.toJson<String?>(note),
       'extraDetailsJson': serializer.toJson<String?>(extraDetailsJson),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -3104,6 +3177,7 @@ class Asset extends DataClass implements Insertable<Asset> {
     String? currencyCode,
     String? defaultAccountId,
     Value<String?> market = const Value.absent(),
+    Value<String?> icon = const Value.absent(),
     Value<String?> note = const Value.absent(),
     Value<String?> extraDetailsJson = const Value.absent(),
     DateTime? createdAt,
@@ -3117,6 +3191,7 @@ class Asset extends DataClass implements Insertable<Asset> {
     currencyCode: currencyCode ?? this.currencyCode,
     defaultAccountId: defaultAccountId ?? this.defaultAccountId,
     market: market.present ? market.value : this.market,
+    icon: icon.present ? icon.value : this.icon,
     note: note.present ? note.value : this.note,
     extraDetailsJson: extraDetailsJson.present
         ? extraDetailsJson.value
@@ -3138,6 +3213,7 @@ class Asset extends DataClass implements Insertable<Asset> {
           ? data.defaultAccountId.value
           : this.defaultAccountId,
       market: data.market.present ? data.market.value : this.market,
+      icon: data.icon.present ? data.icon.value : this.icon,
       note: data.note.present ? data.note.value : this.note,
       extraDetailsJson: data.extraDetailsJson.present
           ? data.extraDetailsJson.value
@@ -3158,6 +3234,7 @@ class Asset extends DataClass implements Insertable<Asset> {
           ..write('currencyCode: $currencyCode, ')
           ..write('defaultAccountId: $defaultAccountId, ')
           ..write('market: $market, ')
+          ..write('icon: $icon, ')
           ..write('note: $note, ')
           ..write('extraDetailsJson: $extraDetailsJson, ')
           ..write('createdAt: $createdAt, ')
@@ -3176,6 +3253,7 @@ class Asset extends DataClass implements Insertable<Asset> {
     currencyCode,
     defaultAccountId,
     market,
+    icon,
     note,
     extraDetailsJson,
     createdAt,
@@ -3193,6 +3271,7 @@ class Asset extends DataClass implements Insertable<Asset> {
           other.currencyCode == this.currencyCode &&
           other.defaultAccountId == this.defaultAccountId &&
           other.market == this.market &&
+          other.icon == this.icon &&
           other.note == this.note &&
           other.extraDetailsJson == this.extraDetailsJson &&
           other.createdAt == this.createdAt &&
@@ -3208,6 +3287,7 @@ class AssetsCompanion extends UpdateCompanion<Asset> {
   final Value<String> currencyCode;
   final Value<String> defaultAccountId;
   final Value<String?> market;
+  final Value<String?> icon;
   final Value<String?> note;
   final Value<String?> extraDetailsJson;
   final Value<DateTime> createdAt;
@@ -3222,6 +3302,7 @@ class AssetsCompanion extends UpdateCompanion<Asset> {
     this.currencyCode = const Value.absent(),
     this.defaultAccountId = const Value.absent(),
     this.market = const Value.absent(),
+    this.icon = const Value.absent(),
     this.note = const Value.absent(),
     this.extraDetailsJson = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -3237,6 +3318,7 @@ class AssetsCompanion extends UpdateCompanion<Asset> {
     required String currencyCode,
     required String defaultAccountId,
     this.market = const Value.absent(),
+    this.icon = const Value.absent(),
     this.note = const Value.absent(),
     this.extraDetailsJson = const Value.absent(),
     required DateTime createdAt,
@@ -3259,6 +3341,7 @@ class AssetsCompanion extends UpdateCompanion<Asset> {
     Expression<String>? currencyCode,
     Expression<String>? defaultAccountId,
     Expression<String>? market,
+    Expression<String>? icon,
     Expression<String>? note,
     Expression<String>? extraDetailsJson,
     Expression<DateTime>? createdAt,
@@ -3274,6 +3357,7 @@ class AssetsCompanion extends UpdateCompanion<Asset> {
       if (currencyCode != null) 'currency_code': currencyCode,
       if (defaultAccountId != null) 'default_account_id': defaultAccountId,
       if (market != null) 'market': market,
+      if (icon != null) 'icon': icon,
       if (note != null) 'note': note,
       if (extraDetailsJson != null) 'extra_details_json': extraDetailsJson,
       if (createdAt != null) 'created_at': createdAt,
@@ -3291,6 +3375,7 @@ class AssetsCompanion extends UpdateCompanion<Asset> {
     Value<String>? currencyCode,
     Value<String>? defaultAccountId,
     Value<String?>? market,
+    Value<String?>? icon,
     Value<String?>? note,
     Value<String?>? extraDetailsJson,
     Value<DateTime>? createdAt,
@@ -3306,6 +3391,7 @@ class AssetsCompanion extends UpdateCompanion<Asset> {
       currencyCode: currencyCode ?? this.currencyCode,
       defaultAccountId: defaultAccountId ?? this.defaultAccountId,
       market: market ?? this.market,
+      icon: icon ?? this.icon,
       note: note ?? this.note,
       extraDetailsJson: extraDetailsJson ?? this.extraDetailsJson,
       createdAt: createdAt ?? this.createdAt,
@@ -3339,6 +3425,9 @@ class AssetsCompanion extends UpdateCompanion<Asset> {
     if (market.present) {
       map['market'] = Variable<String>(market.value);
     }
+    if (icon.present) {
+      map['icon'] = Variable<String>(icon.value);
+    }
     if (note.present) {
       map['note'] = Variable<String>(note.value);
     }
@@ -3370,6 +3459,7 @@ class AssetsCompanion extends UpdateCompanion<Asset> {
           ..write('currencyCode: $currencyCode, ')
           ..write('defaultAccountId: $defaultAccountId, ')
           ..write('market: $market, ')
+          ..write('icon: $icon, ')
           ..write('note: $note, ')
           ..write('extraDetailsJson: $extraDetailsJson, ')
           ..write('createdAt: $createdAt, ')
@@ -20352,6 +20442,7 @@ typedef $$AccountsTableCreateCompanionBuilder =
       Value<int?> closingDay,
       Value<int?> dueDay,
       Value<int?> creditLimitSatang,
+      Value<String?> icon,
       Value<bool> isActive,
       required DateTime createdAt,
       required DateTime updatedAt,
@@ -20369,6 +20460,7 @@ typedef $$AccountsTableUpdateCompanionBuilder =
       Value<int?> closingDay,
       Value<int?> dueDay,
       Value<int?> creditLimitSatang,
+      Value<String?> icon,
       Value<bool> isActive,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -20423,6 +20515,11 @@ class $$AccountsTableFilterComposer
 
   ColumnFilters<int> get creditLimitSatang => $composableBuilder(
     column: $table.creditLimitSatang,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get icon => $composableBuilder(
+    column: $table.icon,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -20501,6 +20598,11 @@ class $$AccountsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get icon => $composableBuilder(
+    column: $table.icon,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isActive => $composableBuilder(
     column: $table.isActive,
     builder: (column) => ColumnOrderings(column),
@@ -20570,6 +20672,9 @@ class $$AccountsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get icon =>
+      $composableBuilder(column: $table.icon, builder: (column) => column);
+
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
 
@@ -20624,6 +20729,7 @@ class $$AccountsTableTableManager
                 Value<int?> closingDay = const Value.absent(),
                 Value<int?> dueDay = const Value.absent(),
                 Value<int?> creditLimitSatang = const Value.absent(),
+                Value<String?> icon = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -20639,6 +20745,7 @@ class $$AccountsTableTableManager
                 closingDay: closingDay,
                 dueDay: dueDay,
                 creditLimitSatang: creditLimitSatang,
+                icon: icon,
                 isActive: isActive,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -20656,6 +20763,7 @@ class $$AccountsTableTableManager
                 Value<int?> closingDay = const Value.absent(),
                 Value<int?> dueDay = const Value.absent(),
                 Value<int?> creditLimitSatang = const Value.absent(),
+                Value<String?> icon = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
@@ -20671,6 +20779,7 @@ class $$AccountsTableTableManager
                 closingDay: closingDay,
                 dueDay: dueDay,
                 creditLimitSatang: creditLimitSatang,
+                icon: icon,
                 isActive: isActive,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -21099,6 +21208,7 @@ typedef $$AssetsTableCreateCompanionBuilder =
       required String currencyCode,
       required String defaultAccountId,
       Value<String?> market,
+      Value<String?> icon,
       Value<String?> note,
       Value<String?> extraDetailsJson,
       required DateTime createdAt,
@@ -21115,6 +21225,7 @@ typedef $$AssetsTableUpdateCompanionBuilder =
       Value<String> currencyCode,
       Value<String> defaultAccountId,
       Value<String?> market,
+      Value<String?> icon,
       Value<String?> note,
       Value<String?> extraDetailsJson,
       Value<DateTime> createdAt,
@@ -21164,6 +21275,11 @@ class $$AssetsTableFilterComposer
 
   ColumnFilters<String> get market => $composableBuilder(
     column: $table.market,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get icon => $composableBuilder(
+    column: $table.icon,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -21237,6 +21353,11 @@ class $$AssetsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get icon => $composableBuilder(
+    column: $table.icon,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get note => $composableBuilder(
     column: $table.note,
     builder: (column) => ColumnOrderings(column),
@@ -21297,6 +21418,9 @@ class $$AssetsTableAnnotationComposer
   GeneratedColumn<String> get market =>
       $composableBuilder(column: $table.market, builder: (column) => column);
 
+  GeneratedColumn<String> get icon =>
+      $composableBuilder(column: $table.icon, builder: (column) => column);
+
   GeneratedColumn<String> get note =>
       $composableBuilder(column: $table.note, builder: (column) => column);
 
@@ -21350,6 +21474,7 @@ class $$AssetsTableTableManager
                 Value<String> currencyCode = const Value.absent(),
                 Value<String> defaultAccountId = const Value.absent(),
                 Value<String?> market = const Value.absent(),
+                Value<String?> icon = const Value.absent(),
                 Value<String?> note = const Value.absent(),
                 Value<String?> extraDetailsJson = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -21364,6 +21489,7 @@ class $$AssetsTableTableManager
                 currencyCode: currencyCode,
                 defaultAccountId: defaultAccountId,
                 market: market,
+                icon: icon,
                 note: note,
                 extraDetailsJson: extraDetailsJson,
                 createdAt: createdAt,
@@ -21380,6 +21506,7 @@ class $$AssetsTableTableManager
                 required String currencyCode,
                 required String defaultAccountId,
                 Value<String?> market = const Value.absent(),
+                Value<String?> icon = const Value.absent(),
                 Value<String?> note = const Value.absent(),
                 Value<String?> extraDetailsJson = const Value.absent(),
                 required DateTime createdAt,
@@ -21394,6 +21521,7 @@ class $$AssetsTableTableManager
                 currencyCode: currencyCode,
                 defaultAccountId: defaultAccountId,
                 market: market,
+                icon: icon,
                 note: note,
                 extraDetailsJson: extraDetailsJson,
                 createdAt: createdAt,

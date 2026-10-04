@@ -10,6 +10,7 @@ class Assets extends Table {
   TextColumn get currencyCode => text().references(Currencies, #code)();
   TextColumn get defaultAccountId => text().references(Accounts, #id)();
   TextColumn get market => text().nullable()(); // SET, TFEX, NYSE, NASDAQ, etc.
+  TextColumn get icon => text().nullable()(); // custom icon name
   TextColumn get note => text().nullable()();
   TextColumn get extraDetailsJson => text().nullable()(); // For bonds: couponRate, maturityDate, frequency
   DateTimeColumn get createdAt => dateTime()();

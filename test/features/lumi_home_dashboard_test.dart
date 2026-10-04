@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:myfinance/core/theme/lumi_theme.dart';
 import 'package:myfinance/features/home/presentation/widgets/lumi/budget_hero_card.dart';
@@ -40,24 +41,25 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
-        theme: LumiTheme.lightTheme,
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        supportedLocales: const [
-          Locale('th'),
-          Locale('en'),
-        ],
-        locale: const Locale('th'),
-        home: Scaffold(
-          body: LumiDesktopLayout(
-            data: dummyBundle,
-            headerWidget: const Text('Lumi Header Test'),
-            onNavigateToBudget: () => budgetTapped = true,
+      ProviderScope(
+        child: MaterialApp(
+          theme: LumiTheme.lightTheme,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('th'),
+            Locale('en'),
+          ],
+          locale: const Locale('th'),
+          home: Scaffold(
+            body: LumiDesktopLayout(
+              data: dummyBundle,
+              headerWidget: const Text('Lumi Header Test'),
+              onNavigateToBudget: () => budgetTapped = true,
             onNavigateToMoney: () {},
             onNavigateToInvest: () {},
             onNavigateToCreditCards: () {},
@@ -67,7 +69,7 @@ void main() {
           ),
         ),
       ),
-    );
+    ));
 
     await tester.pumpAndSettle();
 

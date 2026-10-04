@@ -16,6 +16,7 @@ import '../../categories/presentation/category_picker_sheet.dart';
 import '../../insurance/presentation/insurance_policy_form_dialog.dart';
 import '../../recurring/domain/recurring_engine.dart';
 import '../../import/domain/csv_import_parser.dart';
+import '../../../../core/widgets/transaction_success_overlay.dart';
 import 'package:intl/intl.dart';
 
 class QuickAddScreen extends ConsumerStatefulWidget {
@@ -568,11 +569,14 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
           ? 'บันทึกรายการ $typeText $srcSymbol$_amountString สำเร็จ$recurringMsg$accruedMsg'
           : 'Successfully saved $typeText $srcSymbol$_amountString$recurringMsg$accruedMsg';
 
+      // Show success animation overlay
+      TransactionSuccessOverlay.show(context);
+
       final messenger = ScaffoldMessenger.of(context);
       messenger.clearSnackBars();
       messenger.showSnackBar(
         SnackBar(
-          duration: const Duration(seconds: 5),
+          duration: const Duration(seconds: 4),
           content: Text(successMsg),
           backgroundColor: VaultTheme.positive(context),
           action: SnackBarAction(
@@ -852,38 +856,29 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
                 _buildSelectedPolicyBanner(theme, isThai),
               ],
               const SizedBox(height: 12),
-              // Row: Note (flex 3) + Account (flex 2)
-              Row(
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: TextField(
-                      controller: _noteController,
-                      decoration: InputDecoration(
-                        labelText: isThai ? 'ชื่อรายการ / บันทึก' : 'Title / Note',
-                        hintText: isThai ? 'เช่น เงินเดือน, กาแฟ' : 'e.g. Salary, Coffee',
-                        prefixIcon: const Icon(Icons.edit_note_outlined, size: 20),
-                        prefixIconConstraints: const BoxConstraints(minWidth: 36),
-                        border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-                      ),
-                      onChanged: (val) {
-                        if (_transactionType == 'income') {
-                          setState(() {
-                            _inferTaxCategory(val, _selectedCategoryId);
-                          });
-                        }
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    flex: 2,
-                    child: _buildAccountDropdownCompact(theme, isThai),
-                  ),
-                ],
+              // Row 1: Note (Full width for clear typing)
+              TextField(
+                controller: _noteController,
+                decoration: InputDecoration(
+                  labelText: isThai ? 'ชื่อรายการ / บันทึก' : 'Title / Note',
+                  hintText: isThai ? 'เช่น เงินเดือน, กาแฟ, ข้าวกลางวัน' : 'e.g. Salary, Coffee, Lunch',
+                  prefixIcon: const Icon(Icons.edit_note_outlined, size: 20),
+                  prefixIconConstraints: const BoxConstraints(minWidth: 36),
+                  border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                ),
+                onChanged: (val) {
+                  if (_transactionType == 'income') {
+                    setState(() {
+                      _inferTaxCategory(val, _selectedCategoryId);
+                    });
+                  }
+                },
               ),
+              const SizedBox(height: 12),
+              // Row 2: Account selector (Full width with icon and balance preview)
+              _buildAccountDropdownCompact(theme, isThai),
               if (_transactionType == 'income') ...[
                 const SizedBox(height: 12),
                 // Income: Row: Tax Dropdown (flex 3) + Compact Accrued Button (flex 2)
@@ -1342,69 +1337,169 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
     });
   }
 
-  Widget _buildAccountDropdownCompact(ThemeData theme, bool isThai) {
-    final validAccountId = _accounts.any((a) => a.id == _selectedAccountId)
-        ? _selectedAccountId
-        : (_accounts.isNotEmpty ? _accounts.first.id : null);
+  Future<void> _showAccountPickerSheet(BuildContext context, bool isThai, {bool isDestination = false}) async {
+    final accounts = isDestination
+        ? _accounts.where((a) => a.id != _selectedAccountId).toList()
+        : _accounts;
 
-    return DropdownButtonFormField<String>(
-      key: ValueKey('account_compact_$validAccountId'),
-      initialValue: validAccountId,
-      isExpanded: true,
-      menuMaxHeight: 250,
-      decoration: InputDecoration(
-        labelText: isThai ? 'บัญชี' : 'Account',
-        prefixIcon: const Icon(Icons.account_balance_wallet_outlined, size: 18),
-        prefixIconConstraints: const BoxConstraints(minWidth: 32),
-        border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
+    final selectedId = isDestination ? _selectedDestinationAccountId : _selectedAccountId;
+
+    final chosen = await showModalBottomSheet<Account>(
+      context: context,
+      backgroundColor: VaultTheme.surface(context),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      items: _accounts.map((a) => DropdownMenuItem(
-        value: a.id,
-        child: Text(
-          '${a.name} (${a.currencyCode})',
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 12),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Row(
+                  children: [
+                    Text(
+                      isDestination
+                          ? (isThai ? 'เลือกบัญชีปลายทาง' : 'Select Destination Account')
+                          : (isThai ? 'เลือกบัญชีที่ทำรายการ' : 'Select Account'),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: accounts.length,
+                  separatorBuilder: (_, _) => const Divider(height: 1),
+                  itemBuilder: (_, index) {
+                    final acc = accounts[index];
+                    final isSelected = acc.id == selectedId;
+                    final isCreditCard = acc.accountType == 'credit_card';
+
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: (isCreditCard ? Colors.deepOrange : Colors.blue).withValues(alpha: 0.12),
+                        child: Icon(
+                          acc.icon != null
+                              ? CategoryIconHelper.getIcon(acc.icon)
+                              : (isCreditCard ? Icons.credit_card : Icons.account_balance_wallet),
+                          color: isCreditCard ? Colors.deepOrange : Colors.blue,
+                          size: 20,
+                        ),
+                      ),
+                      title: Text(
+                        acc.name,
+                        style: TextStyle(
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                      subtitle: Text(
+                        '${acc.currencyCode} • ${isCreditCard ? (isThai ? "บัตรเครดิต" : "Credit Card") : (isThai ? "บัญชีเงินฝาก" : "Bank Account")}',
+                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                      trailing: isSelected
+                          ? Icon(Icons.check_circle, color: VaultTheme.accent(context), size: 22)
+                          : null,
+                      onTap: () => Navigator.of(ctx).pop(acc),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (chosen != null) {
+      setState(() {
+        if (isDestination) {
+          _selectedDestinationAccountId = chosen.id;
+        } else {
+          _selectedAccountId = chosen.id;
+          if (_selectedDestinationAccountId == chosen.id) {
+            final remaining = _accounts.where((a) => a.id != chosen.id).toList();
+            _selectedDestinationAccountId = remaining.isNotEmpty ? remaining.first.id : null;
+          }
+        }
+      });
+    }
+  }
+
+  Widget _buildAccountDropdownCompact(ThemeData theme, bool isThai) {
+    final validAccount = _accounts.where((a) => a.id == _selectedAccountId).firstOrNull ??
+        (_accounts.isNotEmpty ? _accounts.first : null);
+
+    return InkWell(
+      onTap: () => _showAccountPickerSheet(context, isThai, isDestination: false),
+      borderRadius: const BorderRadius.all(Radius.circular(10)),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: isThai ? 'บัญชีที่ใช้ทำรายการ' : 'Account',
+          prefixIcon: Icon(
+            validAccount?.icon != null
+                ? CategoryIconHelper.getIcon(validAccount!.icon)
+                : (validAccount?.accountType == 'credit_card' ? Icons.credit_card : Icons.account_balance_wallet_outlined),
+            size: 20,
+            color: VaultTheme.accent(context),
+          ),
+          prefixIconConstraints: const BoxConstraints(minWidth: 36),
+          suffixIcon: const Icon(Icons.expand_more_rounded, size: 22),
+          border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
         ),
-      )).toList(),
-      onChanged: (val) => setState(() => _selectedAccountId = val),
+        child: Text(
+          validAccount != null
+              ? '${validAccount.name} (${validAccount.currencyCode})'
+              : (isThai ? 'เลือกบัญชี' : 'Select Account'),
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: validAccount != null ? FontWeight.w600 : FontWeight.normal,
+            color: validAccount != null ? VaultTheme.primaryText(context) : VaultTheme.secondaryText(context),
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
     );
   }
 
   Widget _buildTransferAccountsRow(ThemeData theme, bool isThai) {
+    final srcAcc = _accounts.where((a) => a.id == _selectedAccountId).firstOrNull ??
+        (_accounts.isNotEmpty ? _accounts.first : null);
     final destAccounts = _accounts.where((a) => a.id != _selectedAccountId).toList();
-    final effectiveDestId = destAccounts.any((a) => a.id == _selectedDestinationAccountId)
-        ? _selectedDestinationAccountId
-        : (destAccounts.isNotEmpty ? destAccounts.first.id : null);
+    final destAcc = destAccounts.where((a) => a.id == _selectedDestinationAccountId).firstOrNull ??
+        (destAccounts.isNotEmpty ? destAccounts.first : null);
 
     return Row(
       children: [
         Expanded(
-          child: DropdownButtonFormField<String>(
-            key: ValueKey('transfer_src_$_selectedAccountId'),
-            initialValue: _selectedAccountId,
-            isExpanded: true,
-            menuMaxHeight: 250,
-            decoration: InputDecoration(
-              labelText: isThai ? 'จากบัญชี' : 'From',
-              border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
-              isDense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
+          child: InkWell(
+            onTap: () => _showAccountPickerSheet(context, isThai, isDestination: false),
+            borderRadius: BorderRadius.circular(10),
+            child: InputDecorator(
+              decoration: InputDecoration(
+                labelText: isThai ? 'จากบัญชี' : 'From',
+                suffixIcon: const Icon(Icons.expand_more_rounded, size: 18),
+                border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              ),
+              child: Text(
+                srcAcc != null ? '${srcAcc.name} (${srcAcc.currencyCode})' : '-',
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
             ),
-            items: _accounts.map((a) => DropdownMenuItem(
-              value: a.id,
-              child: Text('${a.name} (${a.currencyCode})', overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
-            )).toList(),
-            onChanged: (val) {
-              setState(() {
-                _selectedAccountId = val;
-                if (_selectedDestinationAccountId == val) {
-                  final remaining = _accounts.where((a) => a.id != val).toList();
-                  _selectedDestinationAccountId = remaining.isNotEmpty ? remaining.first.id : null;
-                }
-              });
-            },
           ),
         ),
         const Padding(
@@ -1412,22 +1507,23 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
           child: Icon(Icons.arrow_forward, size: 18),
         ),
         Expanded(
-          child: DropdownButtonFormField<String>(
-            key: ValueKey('transfer_dest_$effectiveDestId'),
-            initialValue: effectiveDestId,
-            isExpanded: true,
-            menuMaxHeight: 250,
-            decoration: InputDecoration(
-              labelText: isThai ? 'ไปยังบัญชี' : 'To',
-              border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
-              isDense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
+          child: InkWell(
+            onTap: () => _showAccountPickerSheet(context, isThai, isDestination: true),
+            borderRadius: BorderRadius.circular(10),
+            child: InputDecorator(
+              decoration: InputDecoration(
+                labelText: isThai ? 'ไปยังบัญชี' : 'To',
+                suffixIcon: const Icon(Icons.expand_more_rounded, size: 18),
+                border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              ),
+              child: Text(
+                destAcc != null ? '${destAcc.name} (${destAcc.currencyCode})' : '-',
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
             ),
-            items: destAccounts.map((a) => DropdownMenuItem(
-              value: a.id,
-              child: Text('${a.name} (${a.currencyCode})', overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
-            )).toList(),
-            onChanged: (val) => setState(() => _selectedDestinationAccountId = val),
           ),
         ),
       ],

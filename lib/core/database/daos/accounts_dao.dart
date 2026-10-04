@@ -61,10 +61,11 @@ class AccountsDao extends DatabaseAccessor<AppDatabase> with _$AccountsDaoMixin 
     );
   }
 
-  Future<int> updateAccountName(String id, String newName) {
+  Future<int> updateAccountName(String id, String newName, {String? icon}) {
     return (update(accounts)..where((a) => a.id.equals(id))).write(
       AccountsCompanion(
         name: Value(newName),
+        icon: icon != null ? Value(icon) : const Value.absent(),
         updatedAt: Value(DateTime.now()),
       ),
     );
@@ -73,6 +74,7 @@ class AccountsDao extends DatabaseAccessor<AppDatabase> with _$AccountsDaoMixin 
   Future<int> updateCreditCardDetails({
     required String id,
     String? name,
+    String? icon,
     int? closingDay,
     int? dueDay,
     int? creditLimitSatang,
@@ -80,6 +82,7 @@ class AccountsDao extends DatabaseAccessor<AppDatabase> with _$AccountsDaoMixin 
     return (update(accounts)..where((a) => a.id.equals(id))).write(
       AccountsCompanion(
         name: name != null ? Value(name) : const Value.absent(),
+        icon: icon != null ? Value(icon) : const Value.absent(),
         closingDay: Value(closingDay),
         dueDay: Value(dueDay),
         creditLimitSatang: Value(creditLimitSatang),

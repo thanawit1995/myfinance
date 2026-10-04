@@ -18,6 +18,7 @@ import '../../auth/sync_status_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:drift/drift.dart' hide Column;
 import 'widgets/lumi/lumi_desktop_layout.dart';
+import 'widgets/lumi/lumi_mascot_avatar.dart';
 import '../../budget/presentation/widgets/expense_trend_projection_chart.dart';
 
 class VaultHomeScreen extends ConsumerWidget {
@@ -205,34 +206,8 @@ class VaultHomeScreen extends ConsumerWidget {
           Expanded(
             child: Row(
               children: [
-                // Avatar badge
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFFF5C9D).withValues(alpha: 0.18),
-                        blurRadius: 10,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                    border: Border.all(color: const Color(0xFFFFD1E3), width: 1.5),
-                  ),
-                  child: ClipOval(
-                    child: Image.asset(
-                      'assets/images/lumi_cat_crisp.png',
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => const Icon(
-                        Icons.pets_rounded,
-                        color: Color(0xFFFF5C9D),
-                        size: 24,
-                      ),
-                    ),
-                  ),
-                ),
+                // Avatar badge with custom photo upload support
+                const LumiMascotAvatar(size: 44),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -514,6 +489,27 @@ class VaultHomeScreen extends ConsumerWidget {
                                               ),
                                             ),
                                             const Spacer(),
+                                            if (recent.isNotEmpty)
+                                              TextButton(
+                                                style: TextButton.styleFrom(
+                                                  visualDensity: VisualDensity.compact,
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                                ),
+                                                onPressed: () async {
+                                                  final prefs = await SharedPreferences.getInstance();
+                                                  final dismissed = prefs.getStringList('dismissed_recurring_notification_ids')?.toSet() ?? <String>{};
+                                                  for (final r in recent) {
+                                                    dismissed.add(r.id);
+                                                  }
+                                                  await prefs.setStringList('dismissed_recurring_notification_ids', dismissed.toList());
+                                                  setSheetState(() {});
+                                                  ref.read(transactionsVersionProvider.notifier).state++;
+                                                },
+                                                child: Text(
+                                                  isThai ? 'รับทราบทั้งหมด' : 'Clear all',
+                                                  style: const TextStyle(fontSize: 11.5, color: Colors.green),
+                                                ),
+                                              ),
                                             Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                                               decoration: BoxDecoration(
@@ -579,14 +575,35 @@ class VaultHomeScreen extends ConsumerWidget {
                                                 '$dateStr • ${isEarly ? (isThai ? "บันทึกล่วงหน้า" : "Early posted") : (isThai ? "สร้างอัตโนมัติ" : "Auto-posted")}',
                                                 style: TextStyle(fontSize: 11, color: VaultTheme.secondaryText(context)),
                                               ),
-                                              trailing: Text(
-                                                '${isIncome ? '+' : '-'}$amountStr',
-                                                style: TextStyle(
-                                                  fontFamily: VaultTheme.fontFamily,
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 13,
-                                                  color: isIncome ? Colors.green : Colors.redAccent,
-                                                ),
+                                              trailing: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Text(
+                                                    '${isIncome ? '+' : '-'}$amountStr',
+                                                    style: TextStyle(
+                                                      fontFamily: VaultTheme.fontFamily,
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 13,
+                                                      color: isIncome ? Colors.green : Colors.redAccent,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  IconButton(
+                                                    icon: const Icon(Icons.check_circle_outline, size: 20, color: Colors.grey),
+                                                    tooltip: isThai ? 'รับทราบและนำออกจากแจ้งเตือน' : 'Acknowledge',
+                                                    visualDensity: VisualDensity.compact,
+                                                    padding: EdgeInsets.zero,
+                                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                                    onPressed: () async {
+                                                      final prefs = await SharedPreferences.getInstance();
+                                                      final dismissed = prefs.getStringList('dismissed_recurring_notification_ids')?.toSet() ?? <String>{};
+                                                      dismissed.add(tx.id);
+                                                      await prefs.setStringList('dismissed_recurring_notification_ids', dismissed.toList());
+                                                      setSheetState(() {});
+                                                      ref.read(transactionsVersionProvider.notifier).state++;
+                                                    },
+                                                  ),
+                                                ],
                                               ),
                                             ),
                                           );
@@ -1447,29 +1464,9 @@ class VaultHomeScreen extends ConsumerWidget {
       child: Row(
         children: [
           if (isLumi)
-            Container(
-              width: 32,
-              height: 32,
-              margin: const EdgeInsets.only(right: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFFF9E44).withValues(alpha: 0.2),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Image.asset(
-                  'assets/images/lumi_cat_crisp.png',
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => const Icon(Icons.pets, color: Color(0xFFFF9E44)),
-                ),
-              ),
+            const Padding(
+              padding: EdgeInsets.only(right: 12),
+              child: LumiMascotAvatar(size: 32, enableUploadOnTap: false),
             )
           else ...[
             Text(

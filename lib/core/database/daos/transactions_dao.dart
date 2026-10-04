@@ -742,5 +742,49 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
 
     return duplicateIds;
   }
+
+  /// Optimized summary calculation for month cash flow & daily expense breakdown
+  Future<({
+    int totalIncomeSatang,
+    int totalExpenseSatang,
+    Map<int, int> dailyExpenses,
+  })> getMonthlyCashFlowSummary(int year, int month, int upToDay) async {
+    final startOfMonth = DateTime(year, month, 1);
+    final endOfMonth = DateTime(month == 12 ? year + 1 : year, month == 12 ? 1 : month + 1, 1);
+
+    final monthTxs = await (select(transactions)
+          ..where((t) =>
+              t.deletedAt.isNull() &
+              t.transactionDate.isBiggerOrEqualValue(startOfMonth) &
+              t.transactionDate.isSmallerThanValue(endOfMonth)))
+        .get();
+
+    int totalIncome = 0;
+    int totalExpense = 0;
+    final Map<int, int> daily = {};
+    for (int d = 1; d <= upToDay; d++) {
+      daily[d] = 0;
+    }
+
+    for (final t in monthTxs) {
+      if (t.transactionType == 'income') {
+        if (!t.isCleared) continue;
+        totalIncome += t.amountThbSatang;
+      } else if (t.transactionType == 'expense') {
+        final expAmount = t.amountThbSatang + t.feeThbSatang;
+        totalExpense += expAmount;
+        final d = t.transactionDate.day;
+        if (d <= upToDay) {
+          daily[d] = (daily[d] ?? 0) + expAmount;
+        }
+      }
+    }
+
+    return (
+      totalIncomeSatang: totalIncome,
+      totalExpenseSatang: totalExpense,
+      dailyExpenses: daily,
+    );
+  }
 }
 

@@ -49,6 +49,7 @@ void main() async {
   // Initialize Supabase (safe to call even when offline — will retry on connect)
   await Supabase.initialize(
     url: SupabaseConfig.projectUrl,
+    // ignore: deprecated_member_use
     anonKey: SupabaseConfig.anonKey,
   );
 

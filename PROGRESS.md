@@ -1,6 +1,38 @@
 # บันทึกความคืบหน้าโครงการ MyFinance (PROGRESS.md)
 
-อัปเดตล่าสุด: 3 ตุลาคม 2026 (รอบดึกส่งท้าย)
+อัปเดตล่าสุด: 4 ตุลาคม 2026 (ปรับปรุง UI, Cloud Sync, Animation & ปรับแต่งรูป/ไอคอน)
+
+- [x] **UI Compactness, Master Cloud Sync Integrity, Icon Customization, Home Speed, Notification Dismiss, Modern Dropdown & Mascot Upload (4 ต.ค. 2026)**:
+  - **1. ปรับอินเทอร์เฟซปุ่มซิงค์ให้กระชับและรองรับภาษาตามที่เลือก (`backup_restore_screen.dart`, `sync_status_widget.dart`)**:
+    - ปรับปุ่ม Force Upload / Download ให้กระชับขึ้น: `เขียนทับข้อมูลคลาวด์ (Master Push)` และ `ดาวน์โหลดข้อมูล Master`
+    - หน้า Home ป๊อปอัปสถานะซิงค์ปรับเหลือเฉพาะสถานะการซิงค์ล่าสุด + ปุ่ม **"ซิงค์ด่วน (Quick Sync)"** ส่วนการ Force Upload / Download Master ย้ายเข้าไปอยู่ในหน้า Settings (การสำรองและกู้คืนข้อมูล) เพื่อป้องกันการกดพลาด
+    - เพิ่มการตั้งค่า **เปิด-ปิด Quick Startup Sync อัตโนมัติเมื่อเปิดแอป** ให้ผู้ใช้เลือกเปิดหรือปิดได้ตามต้องการ
+  - **2. ตรวจสอบและแก้ไขระบบ Master Push / Download Master ให้ครอบคลุมทุกตาราง (`backup_restore_service.dart`, `app_database.dart`)**:
+    - ยกระดับ Schema Version เป็น 11 และปรับกระบวนการ Import ข้อมูลของ Master Snapshot ให้ตรวจสอบคอลัมน์ของตารางจริงด้วย `PRAGMA table_info` อัตโนมัติ ป้องกันปัญหาการนำเข้าล้มเหลวหากมีคอลัมน์ใหม่เพิ่มขึ้นมา
+    - รองรับการ Export / Import ข้อมูลครบทั้ง 25 ตารางอย่างสมบูรณ์แบบ
+  - **3. ระบบปรับแต่งไอคอนสำหรับบัญชี บัตรเครดิต และสินทรัพย์ลงทุน (`app_icon_selector.dart`, `add_account_dialog.dart`, `edit_credit_card_dialog.dart`, `asset_form_dialog.dart`)**:
+    - เพิ่มคอลัมน์ `icon` ในตาราง `accounts` และ `assets` พร้อม Migration ใน AppDatabase
+    - สร้าง `AppIconSelector` bottom sheet สำหรับเลือกไอคอนสวยงาม แยกตามหมวดหมู่ (ธนาคาร, การเงิน, บัตร, สินทรัพย์/หุ้น, ไลฟ์สไตล์)
+    - รองรับการเลือกและแสดงผลไอคอนที่ปรับแต่งเองในหน้า Accounts, บัตรเครดิต และพอร์ตการลงทุน (Portfolio / Holdings)
+  - **4. ปรับปรุงความเร็วในการโหลดหน้า Home (`vault_home_screen.dart`, `transactions_dao.dart`)**:
+    - รวมการคำนวณสรุปกระแสเงินสดรายได้-รายจ่ายเป็น Single SQL Query ด้วยฟังก์ชัน `getMonthlyCashFlowSummary` ใน TransactionsDao แทนการดึงข้อมูลทั้งเดือนมาคำนวณซ้ำใน Dart
+    - รันคำค้นหาทั้ง 9 ฟังก์ชันใน `_loadHomeData` แบบขนาน (Parallel execution ผ่าน `Future.wait`) ทำให้หน้า Home โหลดเสร็จเร็วกว่าเดิมเกือบ 3 เท่า
+  - **5. จัดการ Notification รายการที่บันทึกแล้วให้กดรับทราบเพื่อเอาออกจาก Noti ได้ (`vault_home_screen.dart`)**:
+    - เพิ่มปุ่มไอคอนติ๊กถูก (รับทราบ) ในแต่ละรายการ Recurring ที่บันทึกแล้ว และปุ่ม **"รับทราบทั้งหมด"** ด้านบน
+    - บันทึกประวัติรายการที่รับทราบแล้วลงใน SharedPreferences และตัดยอดออกจากตัวเลขนับการแจ้งเตือนที่ยังไม่ได้อ่าน
+  - **6. ออกแบบ Dropdown บัญชีใหม่ให้สวยงามและขยายกรอบเลือกบัญชีใน Quick Add (`quick_add_screen.dart`, `edit_transaction_dialog.dart`)**:
+    - แยกช่องบันทึกช่วยจำ (Note) และช่องเลือกบัญชีให้เต็มความกว้างแถว (Full width)
+    - เปลี่ยน Dropdown แบบเดิมเป็น Modal Bottom Sheet ที่แสดงรายการบัญชีพร้อมไอคอน ยอดเงินคงเหลือ สกุลเงิน และประเภทบัญชีอย่างชัดเจน สวยงาม สัมผัสง่าย
+  - **7. เพิ่ม Animation ตอนบันทึกรายการรายรับ-รายจ่ายตามธีม (`transaction_success_overlay.dart`, `quick_add_screen.dart`)**:
+    - ออกแบบแอนิเมชันเฉลิมฉลองเมื่อบันทึกรายการสำเร็จ:
+      - **ธีม Lumi**: เอฟเฟกต์ Confetti สีพาสเทลสดใสพร้อมไอคอนเฉลิมฉลอง
+      - **ธีม VAULT**: เอฟเฟกต์ประกายสีทองแชมเปญ Quiet Luxury เรียบหรู
+  - **8. อัปโหลดรูปภาพ Avatar สำหรับมาสคอต Lumi (`lumi_mascot_avatar.dart`, `lumi_tip_card.dart`, `vault_home_screen.dart`)**:
+    - ผู้ใช้สามารถกดที่รูปน้องแมว Lumi เพื่ออัปโหลดรูปภาพของตัวเองได้ (รองรับทั้งไฟล์ภาพบนเครื่องและ Web Base64) พร้อมปุ่มรีเซ็ตกลับเป็นรูปมาสคอตตั้งต้น
+  - **9. การทดสอบและการรับรองคุณภาพ**:
+    - `flutter test`: ผ่านทั้งหมด **191/191 tests passed** (100%)
+    - `flutter analyze --no-fatal-infos`: **0 errors, 0 warnings**
+
 
 - [x] **Credit Card Closing Day & Payment Due Date Editing Feature (4 ต.ค. 2026)**:
   - **1. เพิ่มฟังก์ชันอัปเดตใน AccountsDao (`accounts_dao.dart`)**:

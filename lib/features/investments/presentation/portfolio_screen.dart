@@ -29,7 +29,6 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
   String _selectedCategoryFilter = 'all';
   String? _selectedPortfolioFilter; // null means 'all', or portfolio UUID
   String _selectedSortOption = 'value_desc'; // 'value_desc', 'value_asc', 'pnl_pct_desc', 'pnl_pct_asc', 'name_asc'
-  bool _chartGroupByPortfolio = false; // toggle between asset category and portfolio allocation
   bool _isPortfolioFilterMode = false; // toggle between Category chips and Portfolio chips
   late Future<List<dynamic>> _dataFuture;
 
@@ -465,6 +464,14 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(transactionsVersionProvider, (prev, next) {
+      if (prev != next && mounted) {
+        setState(() {
+          _reloadFuture();
+        });
+      }
+    });
+
     final invDao = ref.watch(investmentsDaoProvider);
     final l10n = AppLocalizations.of(context);
     final isThai = Localizations.localeOf(context).languageCode == 'th';
@@ -1027,7 +1034,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                         const SizedBox(width: 8),
                         ActionChip(
                           avatar: const Icon(Icons.add, size: 16),
-                          label: Text(isThai ? '+ จัดการพอร์ต' : '+ Manage'),
+                          label: Text(isThai ? 'จัดการพอร์ต' : 'Manage'),
                           onPressed: () async {
                             await _showManagePortfoliosDialog(context, ref.read(investmentsDaoProvider), isThai);
                             if (mounted) setState(() {});
@@ -1455,7 +1462,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
     final groupMap = <String, int>{};
     final labelMap = <String, String>{};
 
-    if (_chartGroupByPortfolio && portfolios.isNotEmpty) {
+    if (_isPortfolioFilterMode && portfolios.isNotEmpty) {
       final portfolioNameLookup = {for (final p in portfolios) p.id: p.name};
       for (final h in holdings) {
         final pId = h.asset.portfolioId ?? '__unassigned__';
@@ -1511,43 +1518,11 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  _chartGroupByPortfolio && portfolios.isNotEmpty
+                  _isPortfolioFilterMode && portfolios.isNotEmpty
                       ? (isThai ? 'สัดส่วนตามพอร์ตการลงทุน' : 'Portfolio Allocation')
                       : (isThai ? 'สัดส่วนตามประเภทสินทรัพย์' : 'Asset Allocation'),
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                 ),
-                if (portfolios.isNotEmpty)
-                  InkWell(
-                    borderRadius: BorderRadius.circular(8),
-                    onTap: () {
-                      setState(() {
-                        _chartGroupByPortfolio = !_chartGroupByPortfolio;
-                      });
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      child: Row(
-                        children: [
-                          Icon(
-                            _chartGroupByPortfolio ? Icons.category_outlined : Icons.folder_special_outlined,
-                            size: 16,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            _chartGroupByPortfolio
-                                ? (isThai ? 'ดูกลุ่มสินทรัพย์' : 'View by Asset Type')
-                                : (isThai ? 'ดูตามพอร์ต' : 'View by Portfolio'),
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
               ],
             ),
             const SizedBox(height: 12),

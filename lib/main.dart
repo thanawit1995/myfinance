@@ -15,6 +15,7 @@ import 'core/theme/vault_theme.dart';
 import 'core/services/web_theme_helper/web_theme_helper.dart';
 import 'core/widgets/main_shell.dart';
 import 'features/auth/login_screen.dart';
+import 'features/backup/presentation/backup_restore_screen.dart';
 import 'l10n/app_localizations.dart';
 
 void main() async {
@@ -180,6 +181,7 @@ class _MyFinanceAppState extends State<MyFinanceApp> {
       ],
       routes: {
         '/login': (context) => const LoginScreen(),
+        '/backup_restore': (context) => const BackupRestoreScreen(),
       },
       home: MainShell(
         currentLocale: _locale,

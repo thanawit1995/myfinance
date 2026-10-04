@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/sync/auth_service.dart';
 import '../../core/theme/vault_theme.dart';
+import '../backup/presentation/backup_restore_screen.dart';
 
 /// Top-Right Floating or AppBar Sync Status Indicator.
 /// Easy to tap, shows current sync status and account info.
@@ -245,7 +246,9 @@ class SyncStatusWidget extends ConsumerWidget {
                   ),
                   onPressed: () {
                     Navigator.of(ctx).pop();
-                    Navigator.of(context).pushNamed('/backup_restore');
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const BackupRestoreScreen()),
+                    );
                   },
                   icon: const Icon(Icons.settings_backup_restore_rounded, size: 18),
                   label: Text(

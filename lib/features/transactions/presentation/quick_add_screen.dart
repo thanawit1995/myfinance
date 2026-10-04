@@ -1331,15 +1331,25 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
                     final isCreditCard = acc.accountType == 'credit_card';
 
                     return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: (isCreditCard ? Colors.deepOrange : Colors.blue).withValues(alpha: 0.12),
-                        child: Icon(
-                          acc.icon != null
-                              ? CategoryIconHelper.getIcon(acc.icon)
-                              : (isCreditCard ? Icons.credit_card : Icons.account_balance_wallet),
-                          color: isCreditCard ? Colors.deepOrange : Colors.blue,
-                          size: 20,
-                        ),
+                      leading: Builder(
+                        builder: (context) {
+                          if (acc.icon != null && acc.icon!.startsWith('data:image')) {
+                            return SizedBox(
+                              width: 36,
+                              height: 36,
+                              child: CategoryIconHelper.buildIconWidget(acc.icon, size: 36),
+                            );
+                          }
+                          return CircleAvatar(
+                            radius: 18,
+                            backgroundColor: (isCreditCard ? Colors.deepOrange : Colors.blue).withValues(alpha: 0.12),
+                            child: CategoryIconHelper.buildIconWidget(
+                              acc.icon ?? (isCreditCard ? 'credit_card' : 'account_balance_wallet'),
+                              size: 20,
+                              color: isCreditCard ? Colors.deepOrange : Colors.blue,
+                            ),
+                          );
+                        },
                       ),
                       title: Text(
                         acc.name,
@@ -1391,14 +1401,26 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
       child: InputDecorator(
         decoration: InputDecoration(
           labelText: isThai ? 'บัญชีที่ใช้ทำรายการ' : 'Account',
-          prefixIcon: Icon(
-            validAccount?.icon != null
-                ? CategoryIconHelper.getIcon(validAccount!.icon)
-                : (validAccount?.accountType == 'credit_card' ? Icons.credit_card : Icons.account_balance_wallet_outlined),
-            size: 20,
-            color: VaultTheme.accent(context),
+          prefixIcon: Padding(
+            padding: const EdgeInsets.only(left: 8, right: 6),
+            child: Builder(
+              builder: (context) {
+                final iconStr = validAccount?.icon ?? (validAccount?.accountType == 'credit_card' ? 'credit_card' : 'account_balance_wallet');
+                return SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: Center(
+                    child: CategoryIconHelper.buildIconWidget(
+                      iconStr,
+                      size: 20,
+                      color: VaultTheme.accent(context),
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
-          prefixIconConstraints: const BoxConstraints(minWidth: 36),
+          prefixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 24),
           suffixIcon: const Icon(Icons.expand_more_rounded, size: 22),
           border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
           isDense: true,

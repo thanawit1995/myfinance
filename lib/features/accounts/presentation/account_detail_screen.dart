@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/database/database_provider.dart';
 import '../../../../core/money/money.dart';
+import '../../../../core/widgets/app_icon_selector.dart';
+import '../../../../core/widgets/category_icon_helper.dart';
 import '../../transactions/presentation/edit_transaction_dialog.dart';
 
 class AccountDetailScreen extends ConsumerStatefulWidget {
@@ -18,6 +20,7 @@ class AccountDetailScreen extends ConsumerStatefulWidget {
 
 class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
   late String _accountName;
+  late String? _accountIcon;
   DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
   DateTimeRange? _customDateRange;
   bool _isCustomRange = false;
@@ -26,6 +29,7 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
   void initState() {
     super.initState();
     _accountName = widget.account.name;
+    _accountIcon = widget.account.icon;
   }
 
   DateTime get _startDate {
@@ -56,14 +60,53 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
     final txDao = ref.watch(transactionsDaoProvider);
     final isThai = Localizations.localeOf(context).languageCode == 'th';
 
+    final isUsd = widget.account.currencyCode == 'USD';
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(_accountName),
+        title: Row(
+          children: [
+            Builder(
+              builder: (context) {
+                final iconStr = _accountIcon ?? 'account_balance';
+                final isCustomImage = iconStr.startsWith('data:image');
+                if (isCustomImage) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: CategoryIconHelper.buildIconWidget(iconStr, size: 32),
+                    ),
+                  );
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: CircleAvatar(
+                    radius: 16,
+                    backgroundColor: isUsd ? Colors.green.shade50 : Colors.blue.shade50,
+                    child: CategoryIconHelper.buildIconWidget(
+                      iconStr,
+                      size: 18,
+                      color: isUsd ? Colors.green.shade700 : Colors.blue.shade700,
+                    ),
+                  ),
+                );
+              },
+            ),
+            Expanded(
+              child: Text(
+                _accountName,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit_outlined),
-            tooltip: isThai ? 'แก้ไขชื่อบัญชี' : 'Edit account name',
-            onPressed: () => _editAccountName(isThai),
+            tooltip: isThai ? 'แก้ไขบัญชี (ชื่อและไอคอน)' : 'Edit account (Name & Icon)',
+            onPressed: () => _editAccount(isThai),
           ),
           IconButton(
             icon: Icon(widget.account.isActive ? Icons.archive_outlined : Icons.unarchive_outlined),
@@ -89,7 +132,6 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
               final balance = data?.nativeBalanceSatang ?? 0;
               final thbEquivalent = data?.thbEquivalentSatang ?? 0;
               final fxRate = data?.fxRate;
-              final isUsd = widget.account.currencyCode == 'USD';
               final symbol = isUsd ? r'$' : '฿';
               final money = Money(balance);
 
@@ -101,32 +143,62 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
                   color: theme.colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Column(
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(isThai ? 'ยอดคงเหลือปัจจุบัน' : 'Current Balance', style: theme.textTheme.titleSmall),
-                    const SizedBox(height: 6),
-                    Text(
-                      money.format(symbol: symbol),
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onPrimaryContainer,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(isThai ? 'ยอดคงเหลือปัจจุบัน' : 'Current Balance', style: theme.textTheme.titleSmall),
+                          const SizedBox(height: 6),
+                          Text(
+                            money.format(symbol: symbol),
+                            style: theme.textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                          if (isUsd && fxRate != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              '≈ ${Money(thbEquivalent).format(symbol: '฿')} (${isThai ? "อัตราแลกเปลี่ยน" : "FX Rate"} ${fxRate.toStringAsFixed(2)} ฿/\$)',
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 4),
+                          Text(
+                            '${isThai ? "สกุลเงิน" : "Currency"}: ${widget.account.currencyCode} · ${widget.account.isDomestic ? (isThai ? 'ในประเทศ' : 'Domestic') : (isThai ? 'ต่างประเทศ' : 'Offshore')}',
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ],
                       ),
                     ),
-                    if (isUsd && fxRate != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        '≈ ${Money(thbEquivalent).format(symbol: '฿')} (${isThai ? "อัตราแลกเปลี่ยน" : "FX Rate"} ${fxRate.toStringAsFixed(2)} ฿/\$)',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 4),
-                    Text(
-                      '${isThai ? "สกุลเงิน" : "Currency"}: ${widget.account.currencyCode} · ${widget.account.isDomestic ? (isThai ? 'ในประเทศ' : 'Domestic') : (isThai ? 'ต่างประเทศ' : 'Offshore')}',
-                      style: theme.textTheme.bodySmall,
+                    const SizedBox(width: 12),
+                    Builder(
+                      builder: (context) {
+                        final iconStr = _accountIcon ?? 'account_balance';
+                        final isCustomImage = iconStr.startsWith('data:image');
+                        if (isCustomImage) {
+                          return SizedBox(
+                            width: 52,
+                            height: 52,
+                            child: CategoryIconHelper.buildIconWidget(iconStr, size: 52),
+                          );
+                        }
+                        return CircleAvatar(
+                          radius: 26,
+                          backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.6),
+                          child: CategoryIconHelper.buildIconWidget(
+                            iconStr,
+                            size: 28,
+                            color: theme.colorScheme.primary,
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -418,50 +490,113 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
     }
   }
 
-  Future<void> _editAccountName(bool isThai) async {
+  Future<void> _editAccount(bool isThai) async {
     final controller = TextEditingController(text: _accountName);
-    final newName = await showDialog<String>(
+    String? editedIcon = _accountIcon;
+
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(isThai ? 'แก้ไขชื่อบัญชี' : 'Edit Account Name'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: InputDecoration(
-            labelText: isThai ? 'ชื่อบัญชี' : 'Account Name',
-            border: const OutlineInputBorder(),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          title: Text(isThai ? 'แก้ไขบัญชี' : 'Edit Account'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  InkWell(
+                    onTap: () async {
+                      final chosen = await AppIconSelector.show(context, currentIcon: editedIcon);
+                      if (chosen != null) {
+                        setDlgState(() => editedIcon = chosen);
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Theme.of(context).colorScheme.primary),
+                      ),
+                      child: Center(
+                        child: editedIcon != null
+                            ? CategoryIconHelper.buildIconWidget(
+                                editedIcon,
+                                size: 26,
+                                color: Theme.of(context).colorScheme.onPrimaryContainer,
+                              )
+                            : Icon(
+                                Icons.account_balance,
+                                size: 26,
+                                color: Theme.of(context).colorScheme.onPrimaryContainer,
+                              ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isThai ? 'ไอคอนประจำบัญชี' : 'Account Icon',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          isThai ? 'แตะที่กล่องเพื่อเปลี่ยนไอคอน' : 'Tap to change icon',
+                          style: const TextStyle(fontSize: 11.5, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: isThai ? 'ชื่อบัญชี' : 'Account Name',
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+            ],
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final trimmed = controller.text.trim();
+                if (trimmed.isNotEmpty) {
+                  Navigator.of(ctx).pop(true);
+                }
+              },
+              child: Text(isThai ? 'บันทึก' : 'Save'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final trimmed = controller.text.trim();
-              if (trimmed.isNotEmpty) {
-                Navigator.of(ctx).pop(trimmed);
-              }
-            },
-            child: Text(isThai ? 'บันทึก' : 'Save'),
-          ),
-        ],
       ),
     );
 
-    if (newName != null && newName.isNotEmpty && newName != _accountName) {
-      await ref.read(accountsDaoProvider).updateAccountName(widget.account.id, newName);
+    if (confirmed == true) {
+      final trimmed = controller.text.trim();
+      await ref.read(accountsDaoProvider).updateAccountName(widget.account.id, trimmed, icon: editedIcon);
       if (mounted) {
         setState(() {
-          _accountName = newName;
+          _accountName = trimmed;
+          _accountIcon = editedIcon;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            duration: const Duration(seconds: 5),
+            duration: const Duration(seconds: 4),
             content: Text(isThai
-                ? 'แก้ไขชื่อบัญชีเป็น "$newName" สำเร็จ'
-                : 'Account name updated to "$newName"'),
+                ? 'แก้ไขข้อมูลบัญชี "$trimmed" สำเร็จ'
+                : 'Account "$trimmed" updated successfully'),
           ),
         );
       }

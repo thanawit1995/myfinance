@@ -234,7 +234,14 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
             ),
             title: Row(
               children: [
-                Text(account.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                Expanded(
+                  child: Text(
+                    account.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
                 if (isUsd) ...[
                   const SizedBox(width: 6),
                   Container(
@@ -254,23 +261,35 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                   : (isThai ? 'ปิดใช้งาน (ไม่นับรวมสินทรัพย์)' : 'Inactive (Excluded from assets)'),
               style: TextStyle(fontSize: 12, color: account.isActive ? Colors.green : Colors.grey),
             ),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  nativeMoney.format(symbol: isUsd ? r'$' : '฿'),
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                if (isUsd)
-                  Text(
-                    '≈ ${thbMoney.format(symbol: '฿')} (${isThai ? "เรต" : "Rate"} ${fxRate.toStringAsFixed(2)})',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.primary,
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      nativeMoney.format(symbol: isUsd ? r'$' : '฿'),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
-                  ),
+                    if (isUsd)
+                      Text(
+                        '≈ ${thbMoney.format(symbol: '฿')} (${isThai ? "เรต" : "Rate"} ${fxRate.toStringAsFixed(2)})',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 4),
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, size: 20, color: Colors.grey),
+                  tooltip: isThai ? 'แก้ไขบัญชีและไอคอน' : 'Edit account & icon',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => _showEditAccountDialog(account, isThai),
+                ),
               ],
             ),
             onTap: () async {
@@ -329,19 +348,31 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                   : 'Closes day ${account.closingDay ?? 23} • Due day ${account.dueDay ?? 10}',
               style: const TextStyle(fontSize: 12),
             ),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  isDebt ? '-${debtMoney.format(symbol: '฿')}' : '฿0.00',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isDebt ? Colors.red.shade700 : Colors.black87),
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      isDebt ? '-${debtMoney.format(symbol: '฿')}' : '฿0.00',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isDebt ? Colors.red.shade700 : Colors.black87),
+                    ),
+                    Text(
+                      isDebt
+                          ? (isThai ? 'ยอดหนี้คงค้าง' : 'Outstanding balance')
+                          : (isThai ? 'ไม่มีหนี้' : 'Zero balance'),
+                      style: TextStyle(fontSize: 11, color: isDebt ? Colors.red.shade700 : Colors.green),
+                    ),
+                  ],
                 ),
-                Text(
-                  isDebt
-                      ? (isThai ? 'ยอดหนี้คงค้าง' : 'Outstanding balance')
-                      : (isThai ? 'ไม่มีหนี้' : 'Zero balance'),
-                  style: TextStyle(fontSize: 11, color: isDebt ? Colors.red.shade700 : Colors.green),
+                const SizedBox(width: 4),
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, size: 20, color: Colors.grey),
+                  tooltip: isThai ? 'แก้ไขข้อมูลบัตรและไอคอน' : 'Edit card & icon',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => _showEditAccountDialog(account, isThai),
                 ),
               ],
             ),

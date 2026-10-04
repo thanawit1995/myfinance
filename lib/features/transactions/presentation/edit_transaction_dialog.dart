@@ -551,15 +551,25 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                     final isCreditCard = acc.accountType == 'credit_card';
 
                     return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: (isCreditCard ? Colors.deepOrange : Colors.blue).withValues(alpha: 0.12),
-                        child: Icon(
-                          acc.icon != null
-                              ? CategoryIconHelper.getIcon(acc.icon)
-                              : (isCreditCard ? Icons.credit_card : Icons.account_balance_wallet),
-                          color: isCreditCard ? Colors.deepOrange : Colors.blue,
-                          size: 20,
-                        ),
+                      leading: Builder(
+                        builder: (context) {
+                          if (acc.icon != null && acc.icon!.startsWith('data:image')) {
+                            return SizedBox(
+                              width: 36,
+                              height: 36,
+                              child: CategoryIconHelper.buildIconWidget(acc.icon, size: 36),
+                            );
+                          }
+                          return CircleAvatar(
+                            radius: 18,
+                            backgroundColor: (isCreditCard ? Colors.deepOrange : Colors.blue).withValues(alpha: 0.12),
+                            child: CategoryIconHelper.buildIconWidget(
+                              acc.icon ?? (isCreditCard ? 'credit_card' : 'account_balance_wallet'),
+                              size: 20,
+                              color: isCreditCard ? Colors.deepOrange : Colors.blue,
+                            ),
+                          );
+                        },
                       ),
                       title: Text(
                         acc.name,
@@ -881,13 +891,26 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                         isDense: true,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         labelText: 'บัญชี',
-                        prefixIcon: Icon(
-                          srcAcc?.icon != null
-                              ? CategoryIconHelper.getIcon(srcAcc!.icon)
-                              : (srcAcc?.accountType == 'credit_card' ? Icons.credit_card : Icons.account_balance_wallet_outlined),
-                          size: 18,
+                        prefixIcon: Padding(
+                          padding: const EdgeInsets.only(left: 8, right: 6),
+                          child: Builder(
+                            builder: (context) {
+                              final iconStr = srcAcc?.icon ?? (srcAcc?.accountType == 'credit_card' ? 'credit_card' : 'account_balance_wallet');
+                              return SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: Center(
+                                  child: CategoryIconHelper.buildIconWidget(
+                                    iconStr,
+                                    size: 18,
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
                         ),
-                        prefixIconConstraints: const BoxConstraints(minWidth: 36),
+                        prefixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 24),
                         suffixIcon: const Icon(Icons.expand_more_rounded, size: 20),
                         border: const OutlineInputBorder(),
                       ),

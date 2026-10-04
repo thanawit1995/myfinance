@@ -1,11 +1,13 @@
+import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/database/database_provider.dart';
 import '../../../../core/money/money.dart';
 
-class LotInspectionScreen extends ConsumerWidget {
+class LotInspectionScreen extends ConsumerStatefulWidget {
   final Asset asset;
 
   const LotInspectionScreen({super.key, required this.asset});
@@ -17,9 +19,197 @@ class LotInspectionScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LotInspectionScreen> createState() => _LotInspectionScreenState();
+}
+
+class _LotInspectionScreenState extends ConsumerState<LotInspectionScreen> {
+  Future<void> _showEditLotDialog(InvestmentLot lot) async {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+    final invDao = ref.read(investmentsDaoProvider);
+
+    DateTime editDate = lot.buyDate;
+    final qtyCtrl = TextEditingController(text: lot.quantity);
+    final priceStr = lot.pricePerUnitOriginal ?? (lot.costPerUnitOriginalSatang / 100.0).toStringAsFixed(4);
+    final priceCtrl = TextEditingController(text: priceStr);
+    final fxCtrl = TextEditingController(text: lot.fxRate);
+    final feeCtrl = TextEditingController(text: (lot.feeThbSatang / 100.0).toStringAsFixed(2));
+
+    // Fetch existing transaction note
+    final tx = await (ref.read(databaseProvider).select(ref.read(databaseProvider).transactions)
+          ..where((t) => t.id.equals(lot.buyTransactionId)))
+        .getSingleOrNull();
+    final noteCtrl = TextEditingController(text: tx?.note ?? '');
+
+    if (!mounted) return;
+
+    final updated = await showDialog<bool>(
+      context: context,
+      builder: (dlgCtx) => StatefulBuilder(
+        builder: (ctx, setDlgState) {
+          return AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.edit_note_rounded, color: Colors.blue),
+                const SizedBox(width: 8),
+                Text(isThai ? 'แก้ไขข้อมูล Lot ซื้อ' : 'Edit Buy Lot'),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isThai
+                      ? 'ระบบจะอัปเดตธุรกรรมในบัญชี และคำนวณการจัดสรรต้นทุน/กำไร FIFO ใหม่ทั้งหมดให้อัตโนมัติ'
+                      : 'Transaction in ledger will update and FIFO lot consumptions will be recalculated automatically.',
+                    style: TextStyle(fontSize: 11.5, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Date
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.calendar_today, size: 20),
+                    title: Text(DateFormat('d MMM yyyy').format(editDate), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    trailing: const Icon(Icons.edit_calendar, size: 20),
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: ctx,
+                        initialDate: editDate,
+                        firstDate: DateTime(2015),
+                        lastDate: DateTime(2035),
+                      );
+                      if (picked != null) {
+                        setDlgState(() => editDate = picked);
+                      }
+                    },
+                  ),
+                  const Divider(height: 12),
+
+                  // Quantity
+                  TextField(
+                    controller: qtyCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+                    decoration: InputDecoration(
+                      labelText: isThai ? 'จำนวนหน่วยที่ซื้อ (Quantity) *' : 'Quantity *',
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Price
+                  TextField(
+                    controller: priceCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+                    decoration: InputDecoration(
+                      labelText: isThai
+                          ? 'ราคาต่อหน่วย (${widget.asset.currencyCode}) *'
+                          : 'Price per Unit (${widget.asset.currencyCode}) *',
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // FX Rate (if foreign)
+                  if (widget.asset.currencyCode != 'THB') ...[
+                    TextField(
+                      controller: fxCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+                      decoration: InputDecoration(
+                        labelText: isThai
+                            ? 'อัตราแลกเปลี่ยน FX (฿ ต่อ 1 ${widget.asset.currencyCode}) *'
+                            : 'FX Rate *',
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // Fee
+                  TextField(
+                    controller: feeCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+                    decoration: InputDecoration(
+                      labelText: isThai ? 'ค่าธรรมเนียม (บาท THB)' : 'Fee (THB)',
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Note
+                  TextField(
+                    controller: noteCtrl,
+                    decoration: InputDecoration(
+                      labelText: isThai ? 'บันทึกช่วยจำ (Note)' : 'Note',
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dlgCtx, false), child: Text(isThai ? 'ยกเลิก' : 'Cancel')),
+              FilledButton(
+                onPressed: () {
+                  final q = Decimal.tryParse(qtyCtrl.text.trim());
+                  final p = Decimal.tryParse(priceCtrl.text.trim());
+                  final fx = Decimal.tryParse(fxCtrl.text.trim());
+                  if (q == null || q <= Decimal.zero || p == null || p <= Decimal.zero || fx == null || fx <= Decimal.zero) {
+                    return;
+                  }
+                  Navigator.pop(dlgCtx, true);
+                },
+                child: Text(isThai ? 'บันทึก' : 'Save'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (updated == true && mounted) {
+      final q = Decimal.parse(qtyCtrl.text.trim());
+      final p = Decimal.parse(priceCtrl.text.trim());
+      final pSatang = (p * Decimal.fromInt(100)).round().toBigInt().toInt();
+      final fx = Decimal.parse(fxCtrl.text.trim());
+      final feeDouble = double.tryParse(feeCtrl.text.trim()) ?? 0.0;
+      final feeSatang = (feeDouble * 100).round();
+
+      await invDao.updateBuyLotAndTransaction(
+        lotId: lot.id,
+        buyDate: editDate,
+        quantity: q,
+        priceOriginalSatang: pSatang,
+        pricePerUnitOriginal: p,
+        fxRate: fx,
+        feeThbSatang: feeSatang,
+        note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
+      );
+
+      ref.read(transactionsVersionProvider.notifier).state++;
+      setState(() {});
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isThai ? 'อัปเดตข้อมูล Lot และคำนวณ FIFO ใหม่สำเร็จ' : 'Updated Lot and recalculated FIFO successfully'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final invDao = ref.watch(investmentsDaoProvider);
+    final asset = widget.asset;
 
     return Scaffold(
       appBar: AppBar(
@@ -68,7 +258,7 @@ class LotInspectionScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Header: Lot ID + Status
+                      // Header: Lot ID + Status + Edit Action
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -76,7 +266,7 @@ class LotInspectionScreen extends ConsumerWidget {
                             children: [
                               Text('Lot #${index + 1}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                               const SizedBox(width: 8),
-                                Container(
+                              Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
                                   color: statusColor.withValues(alpha: 0.15),
@@ -87,7 +277,20 @@ class LotInspectionScreen extends ConsumerWidget {
                               ),
                             ],
                           ),
-                          Text(DateFormat('d MMM yyyy').format(lot.buyDate), style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(DateFormat('d MMM yyyy').format(lot.buyDate), style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                              const SizedBox(width: 6),
+                              IconButton(
+                                icon: const Icon(Icons.edit_outlined, size: 20, color: Colors.blue),
+                                tooltip: 'แก้ไขรายการซื้อ Lot นี้',
+                                constraints: const BoxConstraints(),
+                                padding: const EdgeInsets.all(4),
+                                onPressed: () => _showEditLotDialog(lot),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                       const Divider(height: 20),

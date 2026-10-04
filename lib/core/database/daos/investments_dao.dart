@@ -786,6 +786,99 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
     }
   }
 
+  /// Updates an existing buy lot and its associated financial transaction, then re-runs FIFO calculation.
+  Future<void> updateBuyLotAndTransaction({
+    required String lotId,
+    required DateTime buyDate,
+    required Decimal quantity,
+    required int priceOriginalSatang,
+    Decimal? pricePerUnitOriginal,
+    required Decimal fxRate,
+    required int feeThbSatang,
+    String? note,
+  }) async {
+    final now = DateTime.now();
+    final lot = await (select(investmentLots)..where((l) => l.id.equals(lotId))).getSingleOrNull();
+    if (lot == null) throw Exception('Lot not found: $lotId');
+
+    final asset = await getAssetById(lot.assetId);
+    final symbol = asset?.symbol ?? 'ASSET';
+    final currencyCode = asset?.currencyCode ?? 'THB';
+
+    final totalCostThbSatang = FifoEngine.calculateBuyTotalCostThbSatang(
+      quantity: quantity,
+      costPerUnitOriginalSatang: priceOriginalSatang,
+      pricePerUnitOriginal: pricePerUnitOriginal,
+      fxRate: fxRate,
+      feeThbSatang: feeThbSatang,
+    );
+
+    final Decimal unitPriceOriginal = pricePerUnitOriginal ??
+        (Decimal.fromInt(priceOriginalSatang) * Decimal.parse('0.01'));
+    final Decimal unitPriceThb = unitPriceOriginal * fxRate;
+
+    final costPerUnitThbSatang = (unitPriceThb * Decimal.fromInt(100)).round().toBigInt().toInt();
+    final effectivePriceOriginalSatang = (unitPriceOriginal * Decimal.fromInt(100)).round().toBigInt().toInt();
+
+    final amountOriginalSatang = (quantity * unitPriceOriginal * Decimal.fromInt(100)).round().toBigInt().toInt();
+    final amountThbSatang = (Decimal.fromInt(amountOriginalSatang) * fxRate).round().toBigInt().toInt();
+
+    // 1. Update Transactions table
+    await (update(transactions)..where((t) => t.id.equals(lot.buyTransactionId))).write(
+      TransactionsCompanion(
+        amountOriginalSatang: Value(amountOriginalSatang),
+        fxRate: Value(fxRate.toString()),
+        amountThbSatang: Value(amountThbSatang),
+        feeThbSatang: Value(feeThbSatang),
+        transactionDate: Value(buyDate),
+        note: Value(note ?? 'ซื้อ $symbol $quantity หน่วย @ $unitPriceOriginal $currencyCode'),
+        updatedAt: Value(now),
+      ),
+    );
+
+    // 2. Update InvestmentLots table
+    await (update(investmentLots)..where((l) => l.id.equals(lotId))).write(
+      InvestmentLotsCompanion(
+        buyDate: Value(buyDate),
+        quantity: Value(quantity.toString()),
+        costPerUnitOriginalSatang: Value(effectivePriceOriginalSatang),
+        fxRate: Value(fxRate.toString()),
+        costPerUnitThbSatang: Value(costPerUnitThbSatang),
+        pricePerUnitOriginal: Value(unitPriceOriginal.toString()),
+        pricePerUnitThb: Value(unitPriceThb.toString()),
+        feeThbSatang: Value(feeThbSatang),
+        totalCostThbSatang: Value(totalCostThbSatang),
+        updatedAt: Value(now),
+      ),
+    );
+
+    // 3. Re-calculate entire FIFO history for this asset
+    await recalculateFifoForAsset(lot.assetId);
+
+    // 4. Audit Log
+    await into(auditLogs).insert(
+      AuditLogsCompanion.insert(
+        id: const Uuid().v4(),
+        entityTable: 'investment_lots',
+        entityId: lotId,
+        action: 'UPDATE_BUY_LOT',
+        afterDataJson: Value(jsonEncode({
+          'lotId': lotId,
+          'assetId': lot.assetId,
+          'buyDate': buyDate.toIso8601String(),
+          'quantity': quantity.toString(),
+          'priceOriginal': priceOriginalSatang,
+          'fxRate': fxRate.toString(),
+          'feeThbSatang': feeThbSatang,
+          'totalCostThb': totalCostThbSatang,
+        })),
+        changeTimestamp: now,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+  }
+
   Future<void> handleInvestmentTransactionDeleted(String transactionId, String? tag) async {
     if (tag == null) return;
     if (tag.startsWith('investment_buy:')) {

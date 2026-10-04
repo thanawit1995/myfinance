@@ -30,6 +30,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
   String? _selectedPortfolioFilter; // null means 'all', or portfolio UUID
   String _selectedSortOption = 'value_desc'; // 'value_desc', 'value_asc', 'pnl_pct_desc', 'pnl_pct_asc', 'name_asc'
   bool _chartGroupByPortfolio = false; // toggle between asset category and portfolio allocation
+  bool _isPortfolioFilterMode = false; // toggle between Category chips and Portfolio chips
 
   @override
   void initState() {
@@ -646,51 +647,6 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // 0. Portfolio Horizontal Filter Chips (ถ้ามีพอร์ตที่สร้างไว้)
-          if (portfolios.isNotEmpty) ...[
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  FilterChip(
-                    label: Text(isThai ? 'ทุกพอร์ต' : 'All Portfolios'),
-                    selected: _selectedPortfolioFilter == null,
-                    onSelected: (val) {
-                      setState(() => _selectedPortfolioFilter = null);
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  ...portfolios.map((p) {
-                    final isSel = _selectedPortfolioFilter == p.id;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: FilterChip(
-                        avatar: const Icon(Icons.folder_special_rounded, size: 16),
-                        label: Text(p.name),
-                        selected: isSel,
-                        onSelected: (val) {
-                          setState(() {
-                            _selectedPortfolioFilter = val ? p.id : null;
-                          });
-                        },
-                      ),
-                    );
-                  }),
-                  FilterChip(
-                    label: Text(isThai ? 'ทั่วไป (ไม่มีพอร์ต)' : 'Unassigned'),
-                    selected: _selectedPortfolioFilter == '__unassigned__',
-                    onSelected: (val) {
-                      setState(() {
-                        _selectedPortfolioFilter = val ? '__unassigned__' : null;
-                      });
-                    },
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-          ],
-
           // 1. Overall Portfolio Summary Card (Dynamic based on selected filter)
           Card(
             elevation: 0,
@@ -877,43 +833,49 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
           ),
           const SizedBox(height: 12),
 
-          // 5. Compact 2-Button Control Bar: Filter & Sorting
+          // 5. Compact 2-Button Control Bar: Portfolio / Category Mode & Sorting
           Row(
             children: [
-              // Button 1: Filter
+              // Button 1: Toggle Portfolio vs Category Mode
               Expanded(
                 child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     side: BorderSide(
-                      color: _selectedCategoryFilter != 'all'
+                      color: _isPortfolioFilterMode
                           ? theme.colorScheme.primary
                           : theme.colorScheme.outlineVariant,
                     ),
-                    backgroundColor: _selectedCategoryFilter != 'all'
+                    backgroundColor: _isPortfolioFilterMode
                         ? theme.colorScheme.primary.withValues(alpha: 0.08)
                         : null,
                   ),
                   icon: Icon(
-                    Icons.filter_list_rounded,
+                    _isPortfolioFilterMode ? Icons.folder_special_rounded : Icons.category_outlined,
                     size: 18,
-                    color: _selectedCategoryFilter != 'all'
+                    color: _isPortfolioFilterMode
                         ? theme.colorScheme.primary
                         : theme.colorScheme.onSurface,
                   ),
                   label: Text(
-                    '${isThai ? "หมวด" : "Category"}: ${_getCategoryName(_selectedCategoryFilter, isThai)}',
+                    _isPortfolioFilterMode
+                        ? (isThai ? 'พอร์ตลงทุน (Portfolio)' : 'Portfolios')
+                        : (isThai ? 'หมวดหมู่ (Categories)' : 'Categories'),
                     style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w600,
-                      color: _selectedCategoryFilter != 'all'
+                      color: _isPortfolioFilterMode
                           ? theme.colorScheme.primary
                           : theme.colorScheme.onSurface,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
-                  onPressed: () => _showFilterDialog(context, availableCategories, isThai),
+                  onPressed: () {
+                    setState(() {
+                      _isPortfolioFilterMode = !_isPortfolioFilterMode;
+                    });
+                  },
                 ),
               ),
               const SizedBox(width: 10),
@@ -940,7 +902,79 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
+
+          // Horizontal Filter Chips Row (สลับระหว่าง Categories กับ Portfolios)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _isPortfolioFilterMode
+                  ? [
+                      // Mode A: Portfolios Filter Chips
+                      FilterChip(
+                        label: Text(isThai ? 'ทุกพอร์ต' : 'All Portfolios'),
+                        selected: _selectedPortfolioFilter == null,
+                        onSelected: (val) {
+                          setState(() => _selectedPortfolioFilter = null);
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      ...portfolios.map((p) {
+                        final isSel = _selectedPortfolioFilter == p.id;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: FilterChip(
+                            avatar: const Icon(Icons.folder_special_rounded, size: 15),
+                            label: Text(p.name),
+                            selected: isSel,
+                            onSelected: (val) {
+                              setState(() {
+                                _selectedPortfolioFilter = val ? p.id : null;
+                              });
+                            },
+                          ),
+                        );
+                      }),
+                      FilterChip(
+                        label: Text(isThai ? 'ทั่วไป (ไม่มีพอร์ต)' : 'Unassigned'),
+                        selected: _selectedPortfolioFilter == '__unassigned__',
+                        onSelected: (val) {
+                          setState(() {
+                            _selectedPortfolioFilter = val ? '__unassigned__' : null;
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      ActionChip(
+                        avatar: const Icon(Icons.add, size: 16),
+                        label: Text(isThai ? '+ จัดการพอร์ต' : '+ Manage'),
+                        onPressed: () async {
+                          await _showManagePortfoliosDialog(context, ref.read(investmentsDaoProvider), isThai);
+                          if (mounted) setState(() {});
+                        },
+                      ),
+                    ]
+                  : [
+                      // Mode B: Category Filter Chips (ทั้งหมด, หุ้นต่างประเทศ, หุ้นไทย, กองทุน, ทอง, ...)
+                      ...availableCategories.map((cat) {
+                        final isSel = _selectedCategoryFilter == cat;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: FilterChip(
+                            label: Text(_getCategoryName(cat, isThai)),
+                            selected: isSel,
+                            onSelected: (val) {
+                              setState(() {
+                                _selectedCategoryFilter = cat;
+                              });
+                            },
+                          ),
+                        );
+                      }),
+                    ],
+            ),
+          ),
+          const SizedBox(height: 14),
 
           // 5. Holdings List
           if (filteredHoldings.isNotEmpty) ...[
@@ -959,7 +993,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                       Icon(Icons.inventory_2_outlined, size: 36, color: theme.colorScheme.primary),
                       const SizedBox(height: 8),
                       Text(
-                        isThai ? 'ไม่พบสินทรัพย์ในหมวดหมู่นี้' : 'No assets found in this category',
+                        isThai ? 'ไม่พบสินทรัพย์ตามตัวกรองนี้' : 'No assets found for this filter',
                         style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
                       ),
                     ],
@@ -979,78 +1013,126 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                 ? (h.totalUnrealizedGainLossThbSatang / h.totalCostThbSatang) * 100.0
                 : 0.0;
 
+            // Check if asset is assigned to a portfolio
+            String? assetPortfolioName;
+            if (h.asset.portfolioId != null) {
+              assetPortfolioName = portfolios.where((p) => p.id == h.asset.portfolioId).firstOrNull?.name;
+            }
+
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                leading: Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(
-                    child: h.asset.icon != null
-                        ? CategoryIconHelper.buildIconWidget(
-                            h.asset.icon,
-                            size: 22,
-                            color: theme.colorScheme.primary,
-                          )
-                        : Text(
-                            h.asset.symbol.isNotEmpty ? h.asset.symbol.substring(0, 1) : '?',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: theme.colorScheme.primary),
-                          ),
-                  ),
-                ),
-                title: Row(
-                  children: [
-                    Text(h.asset.symbol, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              clipBehavior: Clip.antiAlias,
+              child: Stack(
+                children: [
+                  ListTile(
+                    contentPadding: EdgeInsets.fromLTRB(16, assetPortfolioName != null ? 12 : 8, 16, 8),
+                    leading: Container(
+                      width: 42,
+                      height: 42,
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(4),
+                        color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Text(
-                        h.asset.currencyCode,
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant),
+                      child: Center(
+                        child: h.asset.icon != null
+                            ? CategoryIconHelper.buildIconWidget(
+                                h.asset.icon,
+                                size: 22,
+                                color: theme.colorScheme.primary,
+                              )
+                            : Text(
+                                h.asset.symbol.isNotEmpty ? h.asset.symbol.substring(0, 1) : '?',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: theme.colorScheme.primary),
+                              ),
                       ),
                     ),
-                  ],
-                ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(h.asset.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
-                    const SizedBox(height: 2),
-                    Text(isThai ? 'ถือ: ${h.totalQuantity} หน่วย • ทุน: ${costMoney.format(symbol: '฿')}' : 'Hold: ${h.totalQuantity} units • Cost: ${costMoney.format(symbol: '฿')}', style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
-                  ],
-                ),
-                trailing: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(valMoney.format(symbol: '฿'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                    const SizedBox(height: 2),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: (isProfit ? AppTheme.incomeColor(context) : AppTheme.expenseColor(context)).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        '${isProfit ? '+' : ''}${pnlMoney.format(symbol: '฿')} (${isProfit ? '+' : ''}${itemPct.toStringAsFixed(1)}%)',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 11,
-                          color: isProfit ? AppTheme.incomeColor(context) : AppTheme.expenseColor(context),
+                    title: Row(
+                      children: [
+                        Text(h.asset.symbol, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            h.asset.currencyCode,
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant),
+                          ),
+                        ),
+                      ],
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(h.asset.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
+                        const SizedBox(height: 2),
+                        Text(isThai ? 'ถือ: ${h.totalQuantity} หน่วย • ทุน: ${costMoney.format(symbol: '฿')}' : 'Hold: ${h.totalQuantity} units • Cost: ${costMoney.format(symbol: '฿')}', style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
+                      ],
+                    ),
+                    trailing: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(valMoney.format(symbol: '฿'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        const SizedBox(height: 2),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: (isProfit ? AppTheme.incomeColor(context) : AppTheme.expenseColor(context)).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '${isProfit ? '+' : ''}${pnlMoney.format(symbol: '฿')} (${isProfit ? '+' : ''}${itemPct.toStringAsFixed(1)}%)',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                              color: isProfit ? AppTheme.incomeColor(context) : AppTheme.expenseColor(context),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    onTap: () => _showHoldingOptions(context, h),
+                  ),
+
+                  // Tag Badge on upper right corner
+                  if (assetPortfolioName != null)
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                          borderRadius: const BorderRadius.only(
+                            bottomLeft: Radius.circular(8),
+                            topRight: Radius.circular(12),
+                          ),
+                          border: Border.all(
+                            color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                            width: 0.5,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.folder_special_rounded, size: 10, color: theme.colorScheme.primary),
+                            const SizedBox(width: 3),
+                            Text(
+                              assetPortfolioName,
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                  ],
-                ),
-                onTap: () => _showHoldingOptions(context, h),
+                ],
               ),
             );
           }),
@@ -1229,53 +1311,6 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
     );
   }
 
-  void _showFilterDialog(BuildContext context, Set<String> categories, bool isThai) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                  child: Text(
-                    isThai ? 'กรองตามประเภทสินทรัพย์' : 'Filter by Asset Category',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                ),
-                const Divider(),
-                ...categories.map((cat) {
-                  final isSelected = _selectedCategoryFilter == cat;
-                  return ListTile(
-                    leading: Icon(
-                      isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                      color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey,
-                    ),
-                    title: Text(
-                      _getCategoryName(cat, isThai),
-                      style: TextStyle(
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        color: isSelected ? Theme.of(context).colorScheme.primary : null,
-                      ),
-                    ),
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      setState(() => _selectedCategoryFilter = cat);
-                    },
-                  );
-                }),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 
   void _showSortDialog(BuildContext context, bool isThai) {
     final sortOptions = ['value_desc', 'value_asc', 'pnl_pct_desc', 'pnl_pct_asc', 'name_asc'];

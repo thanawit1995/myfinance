@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -72,56 +73,51 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
     setState(() => _isProcessing = true);
 
     try {
-      // Crop to square or aspect ratio at max 512x512 resolution for smooth performance & storage
-      const targetSize = 512.0;
-      final targetWidth = targetSize;
-      final targetHeight = targetSize / widget.aspectRatio;
+      const viewportWidth = 280.0;
+      final viewportHeight = viewportWidth / widget.aspectRatio;
+
+      final imgW = _decodedImage!.width.toDouble();
+      final imgH = _decodedImage!.height.toDouble();
+
+      // Determine initial fitted display size (BoxFit.cover to fill viewport)
+      final scaleToFitWidth = viewportWidth / imgW;
+      final scaleToFitHeight = viewportHeight / imgH;
+      final baseScale = math.max(scaleToFitWidth, scaleToFitHeight);
+
+      final displayW = imgW * baseScale;
+      final displayH = imgH * baseScale;
+
+      // Output resolution (capped at 512 for performance and storage)
+      const maxTargetDimension = 512.0;
+      final targetWidth = widget.aspectRatio >= 1.0
+          ? maxTargetDimension
+          : maxTargetDimension * widget.aspectRatio;
+      final targetHeight = targetWidth / widget.aspectRatio;
 
       final recorder = ui.PictureRecorder();
       final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, targetWidth, targetHeight));
 
-      // Calculate transformation from InteractiveViewer matrix
+      // Scaling factor from on-screen crop box to output bitmap
+      final outputScale = targetWidth / viewportWidth;
+      canvas.scale(outputScale, outputScale);
+
+      // Apply the user's interactive viewer transformation matrix
       final matrix = _controller.value;
-      final scale = matrix.getMaxScaleOnAxis();
-      final translationX = matrix.getTranslation().x;
-      final translationY = matrix.getTranslation().y;
+      canvas.transform(matrix.storage);
 
-      // The crop window on screen
-      const viewportSize = 280.0;
-      final viewportHeight = viewportSize / widget.aspectRatio;
-
-      // Draw with offset and scale to match the user's interactive positioning
-      final scaleRatio = targetWidth / viewportSize;
-
-      canvas.save();
-      canvas.scale(scaleRatio, scaleRatio);
-      canvas.translate(translationX, translationY);
-      canvas.scale(scale, scale);
-
-      // Fit image into initial viewport box
-      final imgW = _decodedImage!.width.toDouble();
-      final imgH = _decodedImage!.height.toDouble();
-
-      final fittedScale = (viewportSize / imgW).clamp(0.001, 10.0);
-      final renderW = imgW * fittedScale;
-      final renderH = imgH * fittedScale;
+      // Draw the exact displayed image quad centered in viewport
+      final initialOffsetX = (viewportWidth - displayW) / 2.0;
+      final initialOffsetY = (viewportHeight - displayH) / 2.0;
 
       canvas.drawImageRect(
         _decodedImage!,
         Rect.fromLTWH(0, 0, imgW, imgH),
-        Rect.fromLTWH(
-          (viewportSize - renderW) / 2,
-          (viewportHeight - renderH) / 2,
-          renderW,
-          renderH,
-        ),
-        Paint()..isAntiAlias = true,
+        Rect.fromLTWH(initialOffsetX, initialOffsetY, displayW, displayH),
+        Paint()..isAntiAlias = true..filterQuality = FilterQuality.high,
       );
 
-      canvas.restore();
-
       final picture = recorder.endRecording();
-      final img = await picture.toImage(targetWidth.toInt(), targetHeight.toInt());
+      final img = await picture.toImage(targetWidth.round(), targetHeight.round());
       final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
 
       if (byteData != null && mounted) {
@@ -195,17 +191,38 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
                 borderRadius: BorderRadius.circular(widget.aspectRatio == 1.0 ? 140 : 14),
                 child: _decodedImage == null
                     ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF5C9D)))
-                    : InteractiveViewer(
-                        transformationController: _controller,
-                        minScale: 0.5,
-                        maxScale: 4.0,
-                        boundaryMargin: const EdgeInsets.all(120),
-                        child: Center(
-                          child: RawImage(
-                            image: _decodedImage,
-                            fit: BoxFit.contain,
-                          ),
-                        ),
+                    : Builder(
+                        builder: (context) {
+                          final imgW = _decodedImage!.width.toDouble();
+                          final imgH = _decodedImage!.height.toDouble();
+                          final scaleToFitWidth = cropBoxWidth / imgW;
+                          final scaleToFitHeight = cropBoxHeight / imgH;
+                          final baseScale = math.max(scaleToFitWidth, scaleToFitHeight);
+                          final displayW = imgW * baseScale;
+                          final displayH = imgH * baseScale;
+
+                          return InteractiveViewer(
+                            transformationController: _controller,
+                            minScale: 0.5,
+                            maxScale: 5.0,
+                            boundaryMargin: const EdgeInsets.all(180),
+                            child: SizedBox(
+                              width: cropBoxWidth,
+                              height: cropBoxHeight,
+                              child: Center(
+                                child: SizedBox(
+                                  width: displayW,
+                                  height: displayH,
+                                  child: RawImage(
+                                    image: _decodedImage,
+                                    fit: BoxFit.fill,
+                                    filterQuality: FilterQuality.high,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
               ),
             ),

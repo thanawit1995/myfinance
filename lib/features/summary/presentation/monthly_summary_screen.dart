@@ -81,101 +81,94 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
   late DateTime _cursorDate;
   DateTimeRange? _customRange;
   bool _showIncomeCategories = false;
-  int _slideDirection = 1; // 1 = Next (สไลด์จากขวา), -1 = Previous (สไลด์จากซ้าย)
-  _PeriodReportData? _cachedData;
+  static const int _basePageIndex = 1000;
+  late final PageController _pageController;
+  late final DateTime _initialAnchorDate;
 
   @override
   void initState() {
     super.initState();
     final now = DateTime.now();
     _cursorDate = widget.initialMonth ?? DateTime(now.year, now.month, now.day);
+    _initialAnchorDate = _cursorDate;
+    _pageController = PageController(initialPage: _basePageIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  DateTime _calculateDateForPageIndex(int index) {
+    final offset = index - _basePageIndex;
+    switch (_granularity) {
+      case ReportGranularity.daily:
+        return _initialAnchorDate.add(Duration(days: offset));
+      case ReportGranularity.weekly:
+        return _initialAnchorDate.add(Duration(days: offset * 7));
+      case ReportGranularity.monthly:
+        return DateTime(_initialAnchorDate.year, _initialAnchorDate.month + offset, 1);
+      case ReportGranularity.quarterly:
+        return DateTime(_initialAnchorDate.year, _initialAnchorDate.month + (offset * 3), 1);
+      case ReportGranularity.yearly:
+        return DateTime(_initialAnchorDate.year + offset, 1, 1);
+      case ReportGranularity.all:
+      case ReportGranularity.custom:
+        return _initialAnchorDate;
+    }
   }
 
   void _previousPeriod() {
-    setState(() {
-      _slideDirection = -1;
-      switch (_granularity) {
-        case ReportGranularity.daily:
-          _cursorDate = _cursorDate.subtract(const Duration(days: 1));
-          break;
-        case ReportGranularity.weekly:
-          _cursorDate = _cursorDate.subtract(const Duration(days: 7));
-          break;
-        case ReportGranularity.monthly:
-          _cursorDate = DateTime(_cursorDate.year, _cursorDate.month - 1, 1);
-          break;
-        case ReportGranularity.quarterly:
-          _cursorDate = DateTime(_cursorDate.year, _cursorDate.month - 3, 1);
-          break;
-        case ReportGranularity.yearly:
-          _cursorDate = DateTime(_cursorDate.year - 1, 1, 1);
-          break;
-        case ReportGranularity.all:
-        case ReportGranularity.custom:
-          break;
-      }
-    });
+    if (_granularity == ReportGranularity.all || _granularity == ReportGranularity.custom) return;
+    _pageController.previousPage(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   void _nextPeriod() {
-    setState(() {
-      _slideDirection = 1;
-      switch (_granularity) {
-        case ReportGranularity.daily:
-          _cursorDate = _cursorDate.add(const Duration(days: 1));
-          break;
-        case ReportGranularity.weekly:
-          _cursorDate = _cursorDate.add(const Duration(days: 7));
-          break;
-        case ReportGranularity.monthly:
-          _cursorDate = DateTime(_cursorDate.year, _cursorDate.month + 1, 1);
-          break;
-        case ReportGranularity.quarterly:
-          _cursorDate = DateTime(_cursorDate.year, _cursorDate.month + 3, 1);
-          break;
-        case ReportGranularity.yearly:
-          _cursorDate = DateTime(_cursorDate.year + 1, 1, 1);
-          break;
-        case ReportGranularity.all:
-        case ReportGranularity.custom:
-          break;
-      }
-    });
+    if (_granularity == ReportGranularity.all || _granularity == ReportGranularity.custom) return;
+    _pageController.nextPage(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+    );
   }
 
-  ({DateTime start, DateTime end}) _computeDateRange() {
+  ({DateTime start, DateTime end}) _computeDateRange({DateTime? targetDate}) {
+    final d = targetDate ?? _cursorDate;
     switch (_granularity) {
       case ReportGranularity.daily:
-        final s = DateTime(_cursorDate.year, _cursorDate.month, _cursorDate.day, 0, 0, 0);
-        final e = DateTime(_cursorDate.year, _cursorDate.month, _cursorDate.day, 23, 59, 59, 999);
+        final s = DateTime(d.year, d.month, d.day, 0, 0, 0);
+        final e = DateTime(d.year, d.month, d.day, 23, 59, 59, 999);
         return (start: s, end: e);
 
       case ReportGranularity.weekly:
-        final weekday = _cursorDate.weekday; // 1 = Monday, 7 = Sunday
-        final monday = _cursorDate.subtract(Duration(days: weekday - 1));
+        final weekday = d.weekday; // 1 = Monday, 7 = Sunday
+        final monday = d.subtract(Duration(days: weekday - 1));
         final s = DateTime(monday.year, monday.month, monday.day, 0, 0, 0);
         final sunday = monday.add(const Duration(days: 6));
         final e = DateTime(sunday.year, sunday.month, sunday.day, 23, 59, 59, 999);
         return (start: s, end: e);
 
       case ReportGranularity.monthly:
-        final s = DateTime(_cursorDate.year, _cursorDate.month, 1, 0, 0, 0);
-        final days = DateTime(_cursorDate.year, _cursorDate.month + 1, 0).day;
-        final e = DateTime(_cursorDate.year, _cursorDate.month, days, 23, 59, 59, 999);
+        final s = DateTime(d.year, d.month, 1, 0, 0, 0);
+        final days = DateTime(d.year, d.month + 1, 0).day;
+        final e = DateTime(d.year, d.month, days, 23, 59, 59, 999);
         return (start: s, end: e);
 
       case ReportGranularity.quarterly:
-        final q = ((_cursorDate.month - 1) ~/ 3) + 1; // 1..4
+        final q = ((d.month - 1) ~/ 3) + 1; // 1..4
         final startMonth = (q - 1) * 3 + 1;
         final endMonth = startMonth + 2;
-        final s = DateTime(_cursorDate.year, startMonth, 1, 0, 0, 0);
-        final days = DateTime(_cursorDate.year, endMonth + 1, 0).day;
-        final e = DateTime(_cursorDate.year, endMonth, days, 23, 59, 59, 999);
+        final s = DateTime(d.year, startMonth, 1, 0, 0, 0);
+        final days = DateTime(d.year, endMonth + 1, 0).day;
+        final e = DateTime(d.year, endMonth, days, 23, 59, 59, 999);
         return (start: s, end: e);
 
       case ReportGranularity.yearly:
-        final s = DateTime(_cursorDate.year, 1, 1, 0, 0, 0);
-        final e = DateTime(_cursorDate.year, 12, 31, 23, 59, 59, 999);
+        final s = DateTime(d.year, 1, 1, 0, 0, 0);
+        final e = DateTime(d.year, 12, 31, 23, 59, 59, 999);
         return (start: s, end: e);
 
       case ReportGranularity.all:
@@ -184,14 +177,15 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
         return (start: s, end: e);
 
       case ReportGranularity.custom:
-        final s = _customRange?.start ?? DateTime(_cursorDate.year, _cursorDate.month, 1);
-        final rawEnd = _customRange?.end ?? _cursorDate;
+        final s = _customRange?.start ?? DateTime(d.year, d.month, 1);
+        final rawEnd = _customRange?.end ?? d;
         final e = DateTime(rawEnd.year, rawEnd.month, rawEnd.day, 23, 59, 59, 999);
         return (start: s, end: e);
     }
   }
 
-  String _formatPeriodTitle(bool isThai) {
+  String _formatPeriodTitle(bool isThai, {DateTime? targetDate}) {
+    final d = targetDate ?? _cursorDate;
     const thaiMonths = [
       'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน',
       'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม',
@@ -205,12 +199,11 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
 
     switch (_granularity) {
       case ReportGranularity.daily:
-        final d = _cursorDate;
         final m = isThai ? thaiShortMonths[d.month - 1] : DateFormat('MMM').format(d);
         return '${d.day} $m ${d.year}';
 
       case ReportGranularity.weekly:
-        final range = _computeDateRange();
+        final range = _computeDateRange(targetDate: d);
         final s = range.start;
         final e = range.end;
         final sm = isThai ? thaiShortMonths[s.month - 1] : DateFormat('MMM').format(s);
@@ -218,21 +211,21 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
         return '${s.day} $sm - ${e.day} $em ${e.year}';
 
       case ReportGranularity.monthly:
-        final m = isThai ? thaiMonths[_cursorDate.month - 1] : DateFormat('MMMM').format(_cursorDate);
-        return '$m ${_cursorDate.year}';
+        final m = isThai ? thaiMonths[d.month - 1] : DateFormat('MMMM').format(d);
+        return '$m ${d.year}';
 
       case ReportGranularity.quarterly:
-        final q = ((_cursorDate.month - 1) ~/ 3) + 1;
-        return 'Q$q ${_cursorDate.year}';
+        final q = ((d.month - 1) ~/ 3) + 1;
+        return 'Q$q ${d.year}';
 
       case ReportGranularity.yearly:
-        return isThai ? 'ปี ${_cursorDate.year}' : 'Year ${_cursorDate.year}';
+        return isThai ? 'ปี ${d.year}' : 'Year ${d.year}';
 
       case ReportGranularity.all:
         return isThai ? 'ข้อมูลทั้งหมด (All Time)' : 'All Time History';
 
       case ReportGranularity.custom:
-        final range = _computeDateRange();
+        final range = _computeDateRange(targetDate: d);
         final s = range.start;
         final e = range.end;
         final sm = isThai ? thaiShortMonths[s.month - 1] : DateFormat('MMM').format(s);
@@ -241,8 +234,8 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
     }
   }
 
-  Future<_PeriodReportData> _loadData() async {
-    final range = _computeDateRange();
+  Future<_PeriodReportData> _loadData({DateTime? targetDate}) async {
+    final range = _computeDateRange(targetDate: targetDate);
     final start = range.start;
     final end = range.end;
 
@@ -437,88 +430,79 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
             }
           }
         },
-        child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Column(
           children: [
-            // 1. Granularity Selector (Day, Week, Month, Quarter, Year, All, Custom)
-            _buildGranularitySelector(context, isThai),
-            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Column(
+                children: [
+                  // 1. Granularity Selector (Day, Week, Month, Quarter, Year, All, Custom)
+                  _buildGranularitySelector(context, isThai),
+                  const SizedBox(height: 10),
 
-            // 2. Navigation Header with Date Title (clean, no swipe instruction)
-            _buildNavigationHeader(context, isLumi, isThai),
-            const SizedBox(height: 14),
+                  // 2. Navigation Header with Date Title
+                  _buildNavigationHeader(context, isLumi, isThai),
+                ],
+              ),
+            ),
 
-            // 3. Smooth Slide Animated Content for current period
-            FutureBuilder<_PeriodReportData>(
-              future: _loadData(),
-              builder: (context, snapshot) {
-                if (snapshot.hasData) {
-                  _cachedData = snapshot.data;
-                }
+            // 3. Finger-Following Interactive PageView (เลื่อนติดนิ้ว)
+            Expanded(
+              child: PageView.builder(
+                controller: _pageController,
+                physics: _granularity == ReportGranularity.all || _granularity == ReportGranularity.custom
+                    ? const NeverScrollableScrollPhysics()
+                    : const PageScrollPhysics(),
+                onPageChanged: (index) {
+                  final newDate = _calculateDateForPageIndex(index);
+                  setState(() {
+                    _cursorDate = newDate;
+                  });
+                },
+                itemBuilder: (context, index) {
+                  final pageDate = _calculateDateForPageIndex(index);
+                  return FutureBuilder<_PeriodReportData>(
+                    future: _loadData(targetDate: pageDate),
+                    builder: (context, snapshot) {
+                      final data = snapshot.data ??
+                          _PeriodReportData(
+                            startDate: pageDate,
+                            endDate: pageDate,
+                            incomeSatang: 0,
+                            accruedIncomeSatang: 0,
+                            expenseSatang: 0,
+                            investmentSatang: 0,
+                            savingsSatang: 0,
+                            savingsRatePercent: 0.0,
+                            savingsMoMPercent: null,
+                            cumulativeExpensesByDay: {1: 0, 8: 0, 15: 0, 22: 0, 30: 0},
+                            daysInMonth: 30,
+                            expenseCategories: [],
+                            incomeCategories: [],
+                          );
 
-                final data = _cachedData ??
-                    snapshot.data ??
-                    _PeriodReportData(
-                      startDate: DateTime.now(),
-                      endDate: DateTime.now(),
-                      incomeSatang: 0,
-                      accruedIncomeSatang: 0,
-                      expenseSatang: 0,
-                      investmentSatang: 0,
-                      savingsSatang: 0,
-                      savingsRatePercent: 0.0,
-                      savingsMoMPercent: null,
-                      cumulativeExpensesByDay: {1: 0, 8: 0, 15: 0, 22: 0, 30: 0},
-                      daysInMonth: 30,
-                      expenseCategories: [],
-                      incomeCategories: [],
-                    );
-
-                final contentKey = ValueKey('${_cursorDate.millisecondsSinceEpoch}_$_granularity');
-
-                return AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 280),
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeInCubic,
-                  transitionBuilder: (Widget child, Animation<double> animation) {
-                    final inOffset = _slideDirection >= 0 ? const Offset(0.35, 0.0) : const Offset(-0.35, 0.0);
-                    final outOffset = _slideDirection >= 0 ? const Offset(-0.35, 0.0) : const Offset(0.35, 0.0);
-                    final isIncoming = child.key == contentKey;
-
-                    return SlideTransition(
-                      position: Tween<Offset>(
-                        begin: isIncoming ? inOffset : Offset.zero,
-                        end: isIncoming ? Offset.zero : outOffset,
-                      ).animate(animation),
-                      child: FadeTransition(
-                        opacity: animation,
-                        child: child,
-                      ),
-                    );
-                  },
-                  child: KeyedSubtree(
-                    key: contentKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Unified Financial Summary Card
-                        _buildUnifiedSummaryCard(context, data, isLumi, isThai),
-                        const SizedBox(height: 16),
-
-                        // Cumulative Expense Trend Chart (if Monthly)
-                        if (_granularity == ReportGranularity.monthly) ...[
-                          _buildExpenseTrendCard(context, data, isLumi, isThai),
+                      return ListView(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        children: [
+                          // Unified Financial Summary Card
+                          _buildUnifiedSummaryCard(context, data, isLumi, isThai),
                           const SizedBox(height: 16),
-                        ],
 
-                        // Category Breakdown Section
-                        _buildCategoryBreakdownCard(context, data, isThai),
-                        const SizedBox(height: 36),
-                      ],
-                    ),
-                  ),
-                );
-              },
+                          // Cumulative Expense Trend Chart (if Monthly)
+                          if (_granularity == ReportGranularity.monthly) ...[
+                            _buildExpenseTrendCard(context, data, isLumi, isThai),
+                            const SizedBox(height: 16),
+                          ],
+
+                          // Category Breakdown Section
+                          _buildCategoryBreakdownCard(context, data, isThai),
+                          const SizedBox(height: 36),
+                        ],
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ],
         ),

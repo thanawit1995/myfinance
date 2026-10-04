@@ -836,62 +836,144 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
           // 5. Compact 2-Button Control Bar: Portfolio / Category Mode & Sorting
           Row(
             children: [
-              // Button 1: Toggle Portfolio vs Category Mode
+              // Segmented Switch: Toggle Categories vs Portfolios
               Expanded(
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    side: BorderSide(
-                      color: _isPortfolioFilterMode
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.outlineVariant,
-                    ),
-                    backgroundColor: _isPortfolioFilterMode
-                        ? theme.colorScheme.primary.withValues(alpha: 0.08)
-                        : null,
+                flex: 6,
+                child: Container(
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6)),
                   ),
-                  icon: Icon(
-                    _isPortfolioFilterMode ? Icons.folder_special_rounded : Icons.category_outlined,
-                    size: 18,
-                    color: _isPortfolioFilterMode
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.onSurface,
+                  padding: const EdgeInsets.all(3),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(9),
+                          onTap: () {
+                            if (_isPortfolioFilterMode) {
+                              setState(() => _isPortfolioFilterMode = false);
+                            }
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 220),
+                            curve: Curves.easeOutCubic,
+                            decoration: BoxDecoration(
+                              color: !_isPortfolioFilterMode
+                                  ? theme.colorScheme.surface
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(9),
+                              boxShadow: !_isPortfolioFilterMode
+                                  ? [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.08),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 1),
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            alignment: Alignment.center,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.category_outlined,
+                                  size: 15,
+                                  color: !_isPortfolioFilterMode
+                                      ? theme.colorScheme.primary
+                                      : theme.colorScheme.onSurfaceVariant,
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  isThai ? 'หมวดหมู่' : 'Category',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: !_isPortfolioFilterMode ? FontWeight.bold : FontWeight.normal,
+                                    color: !_isPortfolioFilterMode
+                                        ? theme.colorScheme.primary
+                                        : theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(9),
+                          onTap: () {
+                            if (!_isPortfolioFilterMode) {
+                              setState(() => _isPortfolioFilterMode = true);
+                            }
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 220),
+                            curve: Curves.easeOutCubic,
+                            decoration: BoxDecoration(
+                              color: _isPortfolioFilterMode
+                                  ? theme.colorScheme.surface
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(9),
+                              boxShadow: _isPortfolioFilterMode
+                                  ? [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.08),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 1),
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            alignment: Alignment.center,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.folder_special_rounded,
+                                  size: 15,
+                                  color: _isPortfolioFilterMode
+                                      ? theme.colorScheme.primary
+                                      : theme.colorScheme.onSurfaceVariant,
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  isThai ? 'พอร์ตลงทุน' : 'Portfolio',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: _isPortfolioFilterMode ? FontWeight.bold : FontWeight.normal,
+                                    color: _isPortfolioFilterMode
+                                        ? theme.colorScheme.primary
+                                        : theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  label: Text(
-                    _isPortfolioFilterMode
-                        ? (isThai ? 'พอร์ตลงทุน (Portfolio)' : 'Portfolios')
-                        : (isThai ? 'หมวดหมู่ (Categories)' : 'Categories'),
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                      color: _isPortfolioFilterMode
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.onSurface,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _isPortfolioFilterMode = !_isPortfolioFilterMode;
-                    });
-                  },
                 ),
               ),
               const SizedBox(width: 10),
               // Button 2: Sort
               Expanded(
+                flex: 5,
                 child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     side: BorderSide(color: theme.colorScheme.outlineVariant),
                   ),
-                  icon: Icon(Icons.sort_rounded, size: 18, color: theme.colorScheme.onSurface),
+                  icon: Icon(Icons.sort_rounded, size: 17, color: theme.colorScheme.onSurface),
                   label: Text(
                     '${isThai ? "เรียง" : "Sort"}: ${_getSortName(_selectedSortOption, isThai)}',
                     style: TextStyle(
-                      fontSize: 12.5,
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: theme.colorScheme.onSurface,
                     ),
@@ -904,74 +986,92 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
           ),
           const SizedBox(height: 10),
 
-          // Horizontal Filter Chips Row (สลับระหว่าง Categories กับ Portfolios)
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: _isPortfolioFilterMode
-                  ? [
-                      // Mode A: Portfolios Filter Chips
-                      FilterChip(
-                        label: Text(isThai ? 'ทุกพอร์ต' : 'All Portfolios'),
-                        selected: _selectedPortfolioFilter == null,
-                        onSelected: (val) {
-                          setState(() => _selectedPortfolioFilter = null);
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      ...portfolios.map((p) {
-                        final isSel = _selectedPortfolioFilter == p.id;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: FilterChip(
-                            avatar: const Icon(Icons.folder_special_rounded, size: 15),
-                            label: Text(p.name),
-                            selected: isSel,
-                            onSelected: (val) {
-                              setState(() {
-                                _selectedPortfolioFilter = val ? p.id : null;
-                              });
-                            },
-                          ),
-                        );
-                      }),
-                      FilterChip(
-                        label: Text(isThai ? 'ทั่วไป (ไม่มีพอร์ต)' : 'Unassigned'),
-                        selected: _selectedPortfolioFilter == '__unassigned__',
-                        onSelected: (val) {
-                          setState(() {
-                            _selectedPortfolioFilter = val ? '__unassigned__' : null;
-                          });
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      ActionChip(
-                        avatar: const Icon(Icons.add, size: 16),
-                        label: Text(isThai ? '+ จัดการพอร์ต' : '+ Manage'),
-                        onPressed: () async {
-                          await _showManagePortfoliosDialog(context, ref.read(investmentsDaoProvider), isThai);
-                          if (mounted) setState(() {});
-                        },
-                      ),
-                    ]
-                  : [
-                      // Mode B: Category Filter Chips (ทั้งหมด, หุ้นต่างประเทศ, หุ้นไทย, กองทุน, ทอง, ...)
-                      ...availableCategories.map((cat) {
-                        final isSel = _selectedCategoryFilter == cat;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: FilterChip(
-                            label: Text(_getCategoryName(cat, isThai)),
-                            selected: isSel,
-                            onSelected: (val) {
-                              setState(() {
-                                _selectedCategoryFilter = cat;
-                              });
-                            },
-                          ),
-                        );
-                      }),
-                    ],
+          // Horizontal Filter Chips Row with smooth AnimatedSwitcher
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (child, animation) {
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0.05, 0),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
+              );
+            },
+            child: SingleChildScrollView(
+              key: ValueKey<bool>(_isPortfolioFilterMode),
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: _isPortfolioFilterMode
+                    ? [
+                        // Mode A: Portfolios Filter Chips
+                        FilterChip(
+                          label: Text(isThai ? 'ทุกพอร์ต' : 'All Portfolios'),
+                          selected: _selectedPortfolioFilter == null,
+                          onSelected: (val) {
+                            setState(() => _selectedPortfolioFilter = null);
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        ...portfolios.map((p) {
+                          final isSel = _selectedPortfolioFilter == p.id;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: FilterChip(
+                              avatar: const Icon(Icons.folder_special_rounded, size: 15),
+                              label: Text(p.name),
+                              selected: isSel,
+                              onSelected: (val) {
+                                setState(() {
+                                  _selectedPortfolioFilter = val ? p.id : null;
+                                });
+                              },
+                            ),
+                          );
+                        }),
+                        FilterChip(
+                          label: Text(isThai ? 'ทั่วไป (ไม่มีพอร์ต)' : 'Unassigned'),
+                          selected: _selectedPortfolioFilter == '__unassigned__',
+                          onSelected: (val) {
+                            setState(() {
+                              _selectedPortfolioFilter = val ? '__unassigned__' : null;
+                            });
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        ActionChip(
+                          avatar: const Icon(Icons.add, size: 16),
+                          label: Text(isThai ? '+ จัดการพอร์ต' : '+ Manage'),
+                          onPressed: () async {
+                            await _showManagePortfoliosDialog(context, ref.read(investmentsDaoProvider), isThai);
+                            if (mounted) setState(() {});
+                          },
+                        ),
+                      ]
+                    : [
+                        // Mode B: Category Filter Chips (ทั้งหมด, หุ้นต่างประเทศ, หุ้นไทย, กองทุน, ทอง, ...)
+                        ...availableCategories.map((cat) {
+                          final isSel = _selectedCategoryFilter == cat;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: FilterChip(
+                              label: Text(_getCategoryName(cat, isThai)),
+                              selected: isSel,
+                              onSelected: (val) {
+                                setState(() {
+                                  _selectedCategoryFilter = cat;
+                                });
+                              },
+                            ),
+                          );
+                        }),
+                      ],
+              ),
             ),
           ),
           const SizedBox(height: 14),

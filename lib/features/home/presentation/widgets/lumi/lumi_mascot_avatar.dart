@@ -76,6 +76,63 @@ class CustomMascotNotifier extends StateNotifier<String?> {
   }
 }
 
+const String customCardBgBase64PrefKey = 'custom_lumi_card_bg_base64';
+
+final customCardBgProvider = StateNotifierProvider<CustomCardBgNotifier, String?>((ref) {
+  return CustomCardBgNotifier();
+});
+
+class CustomCardBgNotifier extends StateNotifier<String?> {
+  CustomCardBgNotifier() : super(null) {
+    _loadBg();
+  }
+
+  Future<void> _loadBg() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = prefs.getString(customCardBgBase64PrefKey);
+  }
+
+  Future<bool> pickAndSaveBackground(BuildContext context) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        withData: true,
+      );
+
+      if (result == null || result.files.isEmpty) return false;
+
+      final file = result.files.first;
+      final rawBytes = file.bytes ?? (file.path != null ? await File(file.path!).readAsBytes() : null);
+      if (rawBytes == null) return false;
+
+      if (!context.mounted) return false;
+      final isThai = Localizations.localeOf(context).languageCode == 'th';
+      // Crop with Budget Hero Card aspect ratio (~16:9 or ~2.1:1)
+      final croppedBytes = await ImageCropperDialog.show(
+        context,
+        imageBytes: rawBytes,
+        aspectRatio: 2.1,
+        title: isThai ? 'ครอบตัดรูปพื้นหลังการ์ด Lumi' : 'Crop Lumi Card Background',
+      );
+
+      if (croppedBytes == null) return false;
+
+      final prefs = await SharedPreferences.getInstance();
+      final b64 = base64Encode(croppedBytes);
+      await prefs.setString(customCardBgBase64PrefKey, b64);
+      state = b64;
+      return true;
+    } catch (_) {}
+    return false;
+  }
+
+  Future<void> resetToDefault() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(customCardBgBase64PrefKey);
+    state = null;
+  }
+}
+
 /// Widget that displays the fixed Lumi mascot avatar (small icon)
 class LumiMascotAvatar extends StatelessWidget {
   final double size;

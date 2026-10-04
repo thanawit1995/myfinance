@@ -79,14 +79,6 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
       final imgW = _decodedImage!.width.toDouble();
       final imgH = _decodedImage!.height.toDouble();
 
-      // Determine initial fitted display size (BoxFit.cover to fill viewport)
-      final scaleToFitWidth = viewportWidth / imgW;
-      final scaleToFitHeight = viewportHeight / imgH;
-      final baseScale = math.max(scaleToFitWidth, scaleToFitHeight);
-
-      final displayW = imgW * baseScale;
-      final displayH = imgH * baseScale;
-
       // Output resolution (capped at 512 for performance and storage)
       const maxTargetDimension = 512.0;
       final targetWidth = widget.aspectRatio >= 1.0
@@ -105,7 +97,15 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
       final matrix = _controller.value;
       canvas.transform(matrix.storage);
 
-      // Draw the exact displayed image quad centered in viewport
+      // In the viewport, InteractiveViewer displays the image at its true aspect ratio
+      // fitted within viewport with BoxFit.cover initially
+      final scaleToFitWidth = viewportWidth / imgW;
+      final scaleToFitHeight = viewportHeight / imgH;
+      final baseScale = math.max(scaleToFitWidth, scaleToFitHeight);
+
+      final displayW = imgW * baseScale;
+      final displayH = imgH * baseScale;
+
       final initialOffsetX = (viewportWidth - displayW) / 2.0;
       final initialOffsetY = (viewportHeight - displayH) / 2.0;
 
@@ -113,7 +113,9 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
         _decodedImage!,
         Rect.fromLTWH(0, 0, imgW, imgH),
         Rect.fromLTWH(initialOffsetX, initialOffsetY, displayW, displayH),
-        Paint()..isAntiAlias = true..filterQuality = FilterQuality.high,
+        Paint()
+          ..isAntiAlias = true
+          ..filterQuality = FilterQuality.high,
       );
 
       final picture = recorder.endRecording();
@@ -209,16 +211,19 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
                             child: SizedBox(
                               width: cropBoxWidth,
                               height: cropBoxHeight,
-                              child: Center(
-                                child: SizedBox(
-                                  width: displayW,
-                                  height: displayH,
-                                  child: RawImage(
-                                    image: _decodedImage,
-                                    fit: BoxFit.fill,
-                                    filterQuality: FilterQuality.high,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: displayW,
+                                    height: displayH,
+                                    child: RawImage(
+                                      image: _decodedImage,
+                                      fit: BoxFit.contain,
+                                      filterQuality: FilterQuality.high,
+                                    ),
                                   ),
-                                ),
+                                ],
                               ),
                             ),
                           );

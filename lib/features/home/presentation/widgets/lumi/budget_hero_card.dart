@@ -42,6 +42,9 @@ class BudgetHeroCard extends ConsumerWidget {
     final isThai = Localizations.localeOf(context).languageCode == 'th';
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    final customBgData = ref.watch(customCardBgProvider);
+    final hasCustomBg = customBgData != null && customBgData.isNotEmpty;
+
     return Semantics(
       button: true,
       label: isThai ? 'งบประมาณคงเหลือ' : 'Remaining Budget',
@@ -50,13 +53,6 @@ class BudgetHeroCard extends ConsumerWidget {
         borderRadius: BorderRadius.circular(28),
         child: Container(
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: isDark
-                  ? const [Color(0xFF261925), Color(0xFF1E1424)]
-                  : const [Color(0xFFFFF7F2), Color(0xFFFFECEF)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
             borderRadius: BorderRadius.circular(28),
             border: Border.all(
               color: isWarning
@@ -71,6 +67,29 @@ class BudgetHeroCard extends ConsumerWidget {
                 offset: const Offset(0, 4),
               ),
             ],
+            gradient: !hasCustomBg
+                ? LinearGradient(
+                    colors: isDark
+                        ? const [Color(0xFF261925), Color(0xFF1E1424)]
+                        : const [Color(0xFFFFF7F2), Color(0xFFFFECEF)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : null,
+            image: hasCustomBg
+                ? DecorationImage(
+                    image: MemoryImage(
+                      base64Decode(customBgData.contains(',') ? customBgData.split(',').last : customBgData),
+                    ),
+                    fit: BoxFit.cover,
+                    colorFilter: ColorFilter.mode(
+                      isDark
+                          ? const Color(0xFF1A121E).withValues(alpha: 0.85)
+                          : const Color(0xFFFFF7F2).withValues(alpha: 0.82),
+                      BlendMode.srcOver,
+                    ),
+                  )
+                : null,
           ),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
           child: Column(

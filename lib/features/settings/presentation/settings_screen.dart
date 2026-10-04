@@ -123,24 +123,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               },
             ),
             _buildDivider(),
-            _buildDropdownRow<AppThemeStyle>(
-              icon: Icons.style_rounded,
-              iconColor: const Color(0xFFFF5C9D),
-              title: l10n?.themeStyle ?? 'สไตล์ดีไซน์',
-              value: widget.currentThemeStyle,
-              items: const [
-                DropdownMenuItem(
-                  value: AppThemeStyle.vault,
-                  child: Text('VAULT'),
+            SwitchListTile.adaptive(
+              secondary: Icon(
+                Icons.style_rounded,
+                color: widget.currentThemeStyle == AppThemeStyle.lumi
+                    ? const Color(0xFFFF5C9D)
+                    : Colors.amber,
+              ),
+              title: Text(
+                l10n?.themeStyle ?? (isThai ? 'สไตล์ธีมแอป' : 'Theme Style'),
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(
+                widget.currentThemeStyle == AppThemeStyle.lumi
+                    ? (isThai ? 'Lumi (Sunny Bloom & Mascot สดใส)' : 'Lumi (Sunny Bloom & Mascot)')
+                    : (isThai ? 'VAULT (Quiet Luxury เรียบหรู สุขุม)' : 'VAULT (Quiet Luxury)'),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: VaultTheme.secondaryText(context),
                 ),
-                DropdownMenuItem(
-                  value: AppThemeStyle.lumi,
-                  child: Text('Lumi'),
-                ),
-              ],
-              onChanged: (style) {
-                if (style != null && widget.onThemeStyleChanged != null) {
-                  widget.onThemeStyleChanged!(style);
+              ),
+              value: widget.currentThemeStyle == AppThemeStyle.lumi,
+              activeTrackColor: const Color(0xFFFF5C9D).withValues(alpha: 0.6),
+              activeThumbColor: const Color(0xFFFF5C9D),
+              onChanged: (bool isLumi) {
+                if (widget.onThemeStyleChanged != null) {
+                  widget.onThemeStyleChanged!(
+                    isLumi ? AppThemeStyle.lumi : AppThemeStyle.vault,
+                  );
                 }
               },
             ),
@@ -175,120 +185,241 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ]),
 
-          const SizedBox(height: 18),
-
-          // 1.5 Custom Mascot Settings (รูปมาสคอต Lumi)
-          _buildSectionHeader(isThai ? 'มาสคอต Lumi ประจำหน้าหลัก' : 'Lumi Mascot Customization'),
-          _buildSectionCard([
-            Consumer(
-              builder: (ctx, ref, _) {
-                final customData = ref.watch(customMascotProvider);
-                final hasCustom = customData != null && customData.isNotEmpty;
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 60,
-                        height: 66,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFFFFD1E3), width: 1.5),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFFFF5C9D).withValues(alpha: 0.15),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: hasCustom
-                              ? Image.memory(
-                                  base64Decode(customData.contains(',') ? customData.split(',').last : customData),
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, _, _) => Image.asset('assets/images/lumi_budget_character.png', fit: BoxFit.contain),
-                                )
-                              : Image.asset('assets/images/lumi_budget_character.png', fit: BoxFit.contain),
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              isThai ? 'รูปมาสคอตใหญ่ (งบประมาณ)' : 'Budget Hero Mascot',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              hasCustom
-                                  ? (isThai ? 'ใช้รูปที่ผู้ใช้อัปโหลดเอง' : 'Using custom image')
-                                  : (isThai ? 'รูปน้องแมว Lumi ดั้งเดิม' : 'Default Lumi character'),
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: VaultTheme.secondaryText(context),
+          // 1.5 Custom Mascot & Background Settings (แสดงเมื่อเปิดธีม Lumi เท่านั้น)
+          if (widget.currentThemeStyle == AppThemeStyle.lumi) ...[
+            const SizedBox(height: 18),
+            _buildSectionHeader(isThai ? 'ปรับแต่งธีม LUMI (รูปภาพ)' : 'Lumi Theme Customization'),
+            _buildSectionCard([
+              // 1.5.1 รูปมาสคอตใหญ่
+              Consumer(
+                builder: (ctx, ref, _) {
+                  final customData = ref.watch(customMascotProvider);
+                  final hasCustom = customData != null && customData.isNotEmpty;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 60,
+                          height: 66,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFFFFD1E3), width: 1.5),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFFF5C9D).withValues(alpha: 0.15),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 4,
-                              children: [
-                                OutlinedButton.icon(
-                                  style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                    visualDensity: VisualDensity.compact,
-                                    side: const BorderSide(color: Color(0xFFFF5C9D)),
-                                  ),
-                                  icon: const Icon(Icons.upload_rounded, size: 16, color: Color(0xFFFF5C9D)),
-                                  label: Text(
-                                    isThai ? 'อัปโหลดรูป' : 'Upload',
-                                    style: const TextStyle(fontSize: 12, color: Color(0xFFFF5C9D)),
-                                  ),
-                                  onPressed: () async {
-                                    final ok = await ref.read(customMascotProvider.notifier).pickAndSaveMascot(context);
-                                    if (ok && context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text(isThai ? 'เปลี่ยนรูปมาสคอต Lumi สำเร็จ ✨' : 'Lumi mascot updated ✨')),
-                                      );
-                                    }
-                                  },
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: hasCustom
+                                ? Image.memory(
+                                    base64Decode(customData.contains(',') ? customData.split(',').last : customData),
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, _, _) => Image.asset('assets/images/lumi_budget_character.png', fit: BoxFit.contain),
+                                  )
+                                : Image.asset('assets/images/lumi_budget_character.png', fit: BoxFit.contain),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isThai ? 'รูปมาสคอตใหญ่ (งบประมาณ)' : 'Budget Hero Mascot',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                hasCustom
+                                    ? (isThai ? 'ใช้รูปที่ผู้ใช้อัปโหลดเอง' : 'Using custom image')
+                                    : (isThai ? 'รูปน้องแมว Lumi ดั้งเดิม' : 'Default Lumi character'),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: VaultTheme.secondaryText(context),
                                 ),
-                                if (hasCustom)
-                                  TextButton.icon(
-                                    style: TextButton.styleFrom(
+                              ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 4,
+                                children: [
+                                  OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                       visualDensity: VisualDensity.compact,
+                                      side: const BorderSide(color: Color(0xFFFF5C9D)),
                                     ),
-                                    icon: const Icon(Icons.restore_rounded, size: 16, color: Colors.orange),
+                                    icon: const Icon(Icons.upload_rounded, size: 16, color: Color(0xFFFF5C9D)),
                                     label: Text(
-                                      isThai ? 'รีเซ็ต' : 'Reset',
-                                      style: const TextStyle(fontSize: 12, color: Colors.orange),
+                                      isThai ? 'อัปโหลดรูป' : 'Upload',
+                                      style: const TextStyle(fontSize: 12, color: Color(0xFFFF5C9D)),
                                     ),
                                     onPressed: () async {
-                                      await ref.read(customMascotProvider.notifier).resetToDefault();
-                                      if (context.mounted) {
+                                      final ok = await ref.read(customMascotProvider.notifier).pickAndSaveMascot(context);
+                                      if (ok && context.mounted) {
                                         ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text(isThai ? 'รีเซ็ตเป็นรูปมาสคอตดั้งเดิมแล้ว' : 'Reset to default mascot')),
+                                          SnackBar(content: Text(isThai ? 'เปลี่ยนรูปมาสคอต Lumi สำเร็จ ✨' : 'Lumi mascot updated ✨')),
                                         );
                                       }
                                     },
                                   ),
-                              ],
-                            ),
-                          ],
+                                  if (hasCustom)
+                                    TextButton.icon(
+                                      style: TextButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                      icon: const Icon(Icons.restore_rounded, size: 16, color: Colors.orange),
+                                      label: Text(
+                                        isThai ? 'รีเซ็ต' : 'Reset',
+                                        style: const TextStyle(fontSize: 12, color: Colors.orange),
+                                      ),
+                                      onPressed: () async {
+                                        await ref.read(customMascotProvider.notifier).resetToDefault();
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text(isThai ? 'รีเซ็ตเป็นรูปมาสคอตดั้งเดิมแล้ว' : 'Reset to default mascot')),
+                                          );
+                                        }
+                                      },
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ]),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              _buildDivider(),
+              // 1.5.2 รูปพื้นหลังการ์ดงบประมาณ (Budget Hero Card Background)
+              Consumer(
+                builder: (ctx, ref, _) {
+                  final bgData = ref.watch(customCardBgProvider);
+                  final hasCustomBg = bgData != null && bgData.isNotEmpty;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 60,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFFFD1E3), width: 1.5),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFFF5C9D).withValues(alpha: 0.15),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: hasCustomBg
+                                ? Image.memory(
+                                    base64Decode(bgData.contains(',') ? bgData.split(',').last : bgData),
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, _, _) => const Icon(Icons.image, color: Colors.grey),
+                                  )
+                                : Container(
+                                    decoration: const BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [Color(0xFFFFF7F2), Color(0xFFFFECEF)],
+                                      ),
+                                    ),
+                                    child: const Center(
+                                      child: Icon(Icons.wallpaper_rounded, size: 20, color: Color(0xFFFF5C9D)),
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isThai ? 'พื้นหลังการ์ดงบประมาณ' : 'Budget Card Background',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                hasCustomBg
+                                    ? (isThai ? 'ใช้รูปพื้นหลังที่ตั้งค่าเอง' : 'Using custom background')
+                                    : (isThai ? 'สี Gradient ดั้งเดิม (ชมพู-ส้มพาสเทล)' : 'Default pastel gradient'),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: VaultTheme.secondaryText(context),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 4,
+                                children: [
+                                  OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      visualDensity: VisualDensity.compact,
+                                      side: const BorderSide(color: Color(0xFFFF5C9D)),
+                                    ),
+                                    icon: const Icon(Icons.upload_rounded, size: 16, color: Color(0xFFFF5C9D)),
+                                    label: Text(
+                                      isThai ? 'อัปโหลดรูป' : 'Upload',
+                                      style: const TextStyle(fontSize: 12, color: Color(0xFFFF5C9D)),
+                                    ),
+                                    onPressed: () async {
+                                      final ok = await ref.read(customCardBgProvider.notifier).pickAndSaveBackground(context);
+                                      if (ok && context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text(isThai ? 'เปลี่ยนพื้นหลังการ์ดสำเร็จ ✨' : 'Card background updated ✨')),
+                                        );
+                                      }
+                                    },
+                                  ),
+                                  if (hasCustomBg)
+                                    TextButton.icon(
+                                      style: TextButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                      icon: const Icon(Icons.restore_rounded, size: 16, color: Colors.orange),
+                                      label: Text(
+                                        isThai ? 'รีเซ็ต' : 'Reset',
+                                        style: const TextStyle(fontSize: 12, color: Colors.orange),
+                                      ),
+                                      onPressed: () async {
+                                        await ref.read(customCardBgProvider.notifier).resetToDefault();
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text(isThai ? 'รีเซ็ตเป็นพื้นหลังดั้งเดิมแล้ว' : 'Reset to default background')),
+                                          );
+                                        }
+                                      },
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ]),
+          ],
 
           const SizedBox(height: 18),
 
@@ -633,16 +764,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Widget _buildSectionCard(List<Widget> children) {
-    return Container(
-      decoration: BoxDecoration(
-        color: VaultTheme.surface(context),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: VaultTheme.border(context), width: 0.8),
-      ),
+    return Material(
+      color: VaultTheme.surface(context),
+      borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: children,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: VaultTheme.border(context), width: 0.8),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: children,
+        ),
       ),
     );
   }

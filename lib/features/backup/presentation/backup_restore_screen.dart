@@ -10,6 +10,7 @@ import '../../../core/services/web_db_helper/web_db_helper.dart';
 import '../../../core/sync/auth_service.dart';
 import '../../../core/sync/sync_service.dart';
 import '../../../core/theme/vault_theme.dart';
+import '../../home/presentation/widgets/lumi/lumi_mascot_avatar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class BackupRestoreScreen extends ConsumerStatefulWidget {
@@ -2130,13 +2131,15 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       setState(() => _isLoading = false);
 
       if (ok) {
+        ref.invalidate(customMascotProvider);
+        ref.invalidate(customCardBgProvider);
         await _loadStats();
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(isThai
-                ? 'ดึงข้อมูล Master จากคลาวด์สำเร็จเรียบร้อย! ข้อมูลทุกตารางตรงกับ Master 100%'
-                : 'Successfully restored Master Snapshot! All tables matched 100%'),
+                ? 'ดึงข้อมูล Master จากคลาวด์สำเร็จเรียบร้อย! ข้อมูลทุกตารางและรูปภาพตรงกับ Master 100%'
+                : 'Successfully restored Master Snapshot! All tables and images matched 100%'),
             backgroundColor: VaultTheme.positive(context),
           ),
         );

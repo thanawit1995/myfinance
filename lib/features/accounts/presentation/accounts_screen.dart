@@ -211,13 +211,26 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
           margin: const EdgeInsets.symmetric(vertical: 4),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: isUsd ? Colors.green.shade50 : Colors.blue.shade50,
-              child: CategoryIconHelper.buildIconWidget(
-                account.icon ?? 'account_balance',
-                size: 22,
-                color: isUsd ? Colors.green.shade700 : Colors.blue.shade700,
-              ),
+            leading: Builder(
+              builder: (context) {
+                final iconStr = account.icon ?? 'account_balance';
+                final isCustomImage = iconStr.startsWith('data:image');
+                if (isCustomImage) {
+                  return SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: CategoryIconHelper.buildIconWidget(iconStr, size: 40),
+                  );
+                }
+                return CircleAvatar(
+                  backgroundColor: isUsd ? Colors.green.shade50 : Colors.blue.shade50,
+                  child: CategoryIconHelper.buildIconWidget(
+                    iconStr,
+                    size: 22,
+                    color: isUsd ? Colors.green.shade700 : Colors.blue.shade700,
+                  ),
+                );
+              },
             ),
             title: Row(
               children: [
@@ -288,13 +301,26 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
           margin: const EdgeInsets.symmetric(vertical: 4),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: Colors.deepOrange.shade50,
-              child: CategoryIconHelper.buildIconWidget(
-                account.icon ?? 'credit_card',
-                size: 22,
-                color: Colors.deepOrange.shade700,
-              ),
+            leading: Builder(
+              builder: (context) {
+                final iconStr = account.icon ?? 'credit_card';
+                final isCustomImage = iconStr.startsWith('data:image');
+                if (isCustomImage) {
+                  return SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: CategoryIconHelper.buildIconWidget(iconStr, size: 40),
+                  );
+                }
+                return CircleAvatar(
+                  backgroundColor: Colors.deepOrange.shade50,
+                  child: CategoryIconHelper.buildIconWidget(
+                    iconStr,
+                    size: 22,
+                    color: Colors.deepOrange.shade700,
+                  ),
+                );
+              },
             ),
             title: Text(account.name, style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text(

@@ -47,6 +47,14 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
     ]);
   }
 
+  void _refreshData() {
+    if (mounted) {
+      setState(() {
+        _reloadFuture();
+      });
+    }
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
@@ -104,11 +112,23 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: Theme.of(sheetContext).colorScheme.primaryContainer,
-                  child: holding.asset.icon != null
-                      ? CategoryIconHelper.buildIconWidget(holding.asset.icon, size: 22, color: Theme.of(sheetContext).colorScheme.primary)
-                      : Text(holding.asset.symbol.isNotEmpty ? holding.asset.symbol.substring(0, 1) : '?'),
+                leading: Builder(
+                  builder: (context) {
+                    final icon = holding.asset.icon;
+                    if (icon != null && icon.startsWith('data:image')) {
+                      return SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: CategoryIconHelper.buildIconWidget(icon, size: 40),
+                      );
+                    }
+                    return CircleAvatar(
+                      backgroundColor: Theme.of(sheetContext).colorScheme.primaryContainer,
+                      child: icon != null
+                          ? CategoryIconHelper.buildIconWidget(icon, size: 22, color: Theme.of(sheetContext).colorScheme.primary)
+                          : Text(holding.asset.symbol.isNotEmpty ? holding.asset.symbol.substring(0, 1) : '?'),
+                    );
+                  },
                 ),
                 title: Text('${holding.asset.symbol} - ${holding.asset.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: Text(isThai ? 'ถืออยู่ ${holding.totalQuantity} หน่วย' : 'Holding ${holding.totalQuantity} units'),
@@ -120,7 +140,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                 onTap: () async {
                   Navigator.pop(sheetContext);
                   final ok = await BuySellTradeDialog.show(context, initialAsset: holding.asset, initialIsBuy: true);
-                  if (ok == true && mounted) setState(() {});
+                  if (ok == true && mounted) _refreshData();
                 },
               ),
               ListTile(
@@ -129,7 +149,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                 onTap: () async {
                   Navigator.pop(sheetContext);
                   final ok = await BuySellTradeDialog.show(context, initialAsset: holding.asset, initialIsBuy: false);
-                  if (ok == true && mounted) setState(() {});
+                  if (ok == true && mounted) _refreshData();
                 },
               ),
               ListTile(
@@ -146,7 +166,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                 onTap: () async {
                   Navigator.pop(sheetContext);
                   final ok = await AssetFormDialog.show(context, assetToEdit: holding.asset);
-                  if (ok == true && mounted) setState(() {});
+                  if (ok == true && mounted) _refreshData();
                 },
               ),
             ],
@@ -187,7 +207,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
               onPressed: () async {
                 await ref.read(investmentsDaoProvider).restoreAsset(asset.id);
                 if (mounted) {
-                  setState(() {});
+                  _refreshData();
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text(isThai ? 'กู้คืน ${asset.symbol} สำเร็จ' : 'Restored ${asset.symbol}')),
                   );
@@ -197,7 +217,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
             duration: const Duration(seconds: 4),
           ),
         );
-        setState(() {});
+        _refreshData();
       }
     }
   }
@@ -235,7 +255,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
     if (confirm == true) {
       await ref.read(transactionsDaoProvider).softDeleteTransaction(trade.id);
       if (mounted) {
-        setState(() {});
+        _refreshData();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(isThai
@@ -485,16 +505,16 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
             onSelected: (val) async {
               if (val == 'manage_portfolios') {
                 await _showManagePortfoliosDialog(context, invDao, isThai);
-                if (mounted) setState(() {});
+                if (mounted) _refreshData();
               } else if (val == 'new_asset') {
                 final ok = await AssetFormDialog.show(context);
-                if (ok == true && mounted) setState(() {});
+                if (ok == true && mounted) _refreshData();
               } else if (val == 'income') {
                 final ok = await DividendIncomeDialog.show(context);
-                if (ok == true && mounted) setState(() {});
+                if (ok == true && mounted) _refreshData();
               } else if (val == 'valuation') {
                 final ok = await MonthlyValuationScreen.show(context);
-                if (ok == true && mounted) setState(() {});
+                if (ok == true && mounted) _refreshData();
               } else if (val == 'trash') {
                 await Navigator.push(
                   context,
@@ -502,7 +522,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                     builder: (context) => const TrashBinScreen(initialTab: 1),
                   ),
                 );
-                if (mounted) setState(() {});
+                if (mounted) _refreshData();
               }
             },
             itemBuilder: (context) => [
@@ -1114,25 +1134,37 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                 children: [
                   ListTile(
                     contentPadding: EdgeInsets.fromLTRB(16, assetPortfolioName != null ? 12 : 8, 16, 8),
-                    leading: Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Center(
-                        child: h.asset.icon != null
-                            ? CategoryIconHelper.buildIconWidget(
-                                h.asset.icon,
-                                size: 22,
-                                color: theme.colorScheme.primary,
-                              )
-                            : Text(
-                                h.asset.symbol.isNotEmpty ? h.asset.symbol.substring(0, 1) : '?',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: theme.colorScheme.primary),
-                              ),
-                      ),
+                    leading: Builder(
+                      builder: (context) {
+                        final icon = h.asset.icon;
+                        if (icon != null && icon.startsWith('data:image')) {
+                          return SizedBox(
+                            width: 42,
+                            height: 42,
+                            child: CategoryIconHelper.buildIconWidget(icon, size: 42),
+                          );
+                        }
+                        return Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Center(
+                            child: icon != null
+                                ? CategoryIconHelper.buildIconWidget(
+                                    icon,
+                                    size: 22,
+                                    color: theme.colorScheme.primary,
+                                  )
+                                : Text(
+                                    h.asset.symbol.isNotEmpty ? h.asset.symbol.substring(0, 1) : '?',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: theme.colorScheme.primary),
+                                  ),
+                          ),
+                        );
+                      },
                     ),
                     title: Row(
                       children: [
@@ -1249,14 +1281,26 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   child: Row(
                     children: [
-                      CircleAvatar(
-                        backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                        child: asset.icon != null
-                            ? CategoryIconHelper.buildIconWidget(asset.icon, size: 22, color: theme.colorScheme.primary)
-                            : Text(
-                                asset.symbol.isNotEmpty ? asset.symbol.substring(0, 1) : '?',
-                                style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
-                              ),
+                      Builder(
+                        builder: (context) {
+                          final icon = asset.icon;
+                          if (icon != null && icon.startsWith('data:image')) {
+                            return SizedBox(
+                              width: 40,
+                              height: 40,
+                              child: CategoryIconHelper.buildIconWidget(icon, size: 40),
+                            );
+                          }
+                          return CircleAvatar(
+                            backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                            child: icon != null
+                                ? CategoryIconHelper.buildIconWidget(icon, size: 22, color: theme.colorScheme.primary)
+                                : Text(
+                                    asset.symbol.isNotEmpty ? asset.symbol.substring(0, 1) : '?',
+                                    style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
+                                  ),
+                          );
+                        },
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -1319,7 +1363,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                         ),
                         onPressed: () async {
                           final ok = await BuySellTradeDialog.show(context, initialAsset: asset, initialIsBuy: true);
-                          if (ok == true && mounted) setState(() {});
+                          if (ok == true && mounted) _refreshData();
                         },
                         child: Text(isThai ? 'ซื้อ' : 'Buy'),
                       ),
@@ -1329,7 +1373,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                         onSelected: (val) async {
                           if (val == 'edit') {
                             final ok = await AssetFormDialog.show(context, assetToEdit: asset);
-                            if (ok == true && mounted) setState(() {});
+                            if (ok == true && mounted) _refreshData();
                           } else if (val == 'delete') {
                             _confirmDeleteAsset(asset);
                           }
@@ -1388,7 +1432,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                 ),
                 onPressed: () async {
                   final ok = await AssetFormDialog.show(context);
-                  if (ok == true && mounted) setState(() {});
+                  if (ok == true && mounted) _refreshData();
                 },
               ),
             ),

@@ -443,25 +443,11 @@ class VaultHomeScreen extends ConsumerWidget {
                                   ),
                                 ],
                               ),
-                              FilledButton.tonalIcon(
-                                style: FilledButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  visualDensity: VisualDensity.compact,
-                                ),
-                                icon: const Icon(Icons.done_all_rounded, size: 16),
-                                label: Text(
-                                  isThai ? 'รับทราบแล้ว' : 'Mark read',
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                                ),
-                                onPressed: () async {
-                                  final prefs = await SharedPreferences.getInstance();
-                                  await prefs.setString(
-                                    'last_read_recurring_notification_time',
-                                    (recent.isNotEmpty && recent.first.createdAt.toUtc().isAfter(DateTime.now().toUtc()) ? recent.first.createdAt.toUtc() : DateTime.now().toUtc()).add(const Duration(days: 365)).toIso8601String(),
-                                  );
-                                  ref.read(transactionsVersionProvider.notifier).state++;
-                                  if (ctx.mounted) Navigator.pop(ctx);
-                                },
+                              IconButton(
+                                icon: const Icon(Icons.close_rounded, size: 20),
+                                tooltip: isThai ? 'ปิด' : 'Close',
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () => Navigator.pop(ctx),
                               ),
                             ],
                           ),
@@ -825,7 +811,7 @@ class VaultHomeScreen extends ConsumerWidget {
   })> _loadNotificationsData(WidgetRef ref) async {
     final db = ref.read(databaseProvider);
     final upcoming = await ref.read(recurringTransactionsDaoProvider).getUpcoming30Days(windowDays: 7);
-    final recent = await (db.select(db.transactions)
+    final rawRecent = await (db.select(db.transactions)
           ..where((t) =>
               (t.tag.equals('recurring_auto') |
                t.tag.equals('recurring_manual_confirmed') |
@@ -834,6 +820,11 @@ class VaultHomeScreen extends ConsumerWidget {
           ..orderBy([(t) => OrderingTerm.desc(t.transactionDate), (t) => OrderingTerm.desc(t.createdAt)])
           ..limit(30))
         .get();
+
+    final prefs = await SharedPreferences.getInstance();
+    final dismissedIds = prefs.getStringList('dismissed_recurring_notification_ids')?.toSet() ?? <String>{};
+    final recent = rawRecent.where((tx) => !dismissedIds.contains(tx.id)).toList();
+
     final accounts = await ref.read(accountsDaoProvider).getAllAccounts();
     final categories = await ref.read(categoriesDaoProvider).getAllCategories();
     return (
@@ -2203,12 +2194,22 @@ class VaultHomeScreen extends ConsumerWidget {
       totalAccruedSatang += a.amountThbSatang;
     }
 
-    // 10. Unread recurring transactions
+    // 10. Recurring transactions & rules due today / overdue
     int unreadRecurring = 0;
+    List<RecurringRule> dueRecurringRules = [];
     try {
+      final recurringDao = ref.read(recurringTransactionsDaoProvider);
+      final activeRules = await recurringDao.getActiveRules();
+      final todayDate = DateTime(now.year, now.month, now.day);
+
+      // Check rules that are due today or overdue and not auto-posted yet
+      dueRecurringRules = activeRules.where((r) {
+        final nextDateOnly = DateTime(r.nextRunDate.year, r.nextRunDate.month, r.nextRunDate.day);
+        return !nextDateOnly.isAfter(todayDate);
+      }).toList();
+
       final prefs = await SharedPreferences.getInstance();
-      final lastReadStr = prefs.getString('last_read_recurring_notification_time');
-      final lastReadTime = lastReadStr != null ? DateTime.tryParse(lastReadStr)?.toUtc() : null;
+      final dismissedIds = prefs.getStringList('dismissed_recurring_notification_ids')?.toSet() ?? <String>{};
 
       final recentRecurring = await (db.select(db.transactions)
             ..where((t) =>
@@ -2217,13 +2218,27 @@ class VaultHomeScreen extends ConsumerWidget {
                  t.tag.equals('recurring_early_posted')) &
                 t.deletedAt.isNull())
             ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
-            ..limit(20))
+            ..limit(30))
           .get();
 
-      unreadRecurring = lastReadTime == null
-          ? recentRecurring.length
-          : recentRecurring.where((t) => t.createdAt.toUtc().isAfter(lastReadTime)).length;
+      final unacknowledgedPosted = recentRecurring.where((t) => !dismissedIds.contains(t.id)).toList();
+      unreadRecurring = unacknowledgedPosted.length + dueRecurringRules.length;
     } catch (_) {}
+
+    // Priority Attention Insight for recurring rules due today
+    if (!attentionWarn && dueRecurringRules.isNotEmpty) {
+      final firstRule = dueRecurringRules.first;
+      if (dueRecurringRules.length == 1) {
+        attentionMsg = isThai
+            ? 'มีรายการประจำถึงกำหนดวันนี้: ${firstRule.title} (${Money(firstRule.amountSatang).format(symbol: '฿')})'
+            : 'Recurring transaction due today: ${firstRule.title} (${Money(firstRule.amountSatang).format(symbol: '฿')})';
+      } else {
+        attentionMsg = isThai
+            ? 'มีรายการประจำถึงกำหนดวันนี้ ${dueRecurringRules.length} รายการ (เช่น ${firstRule.title})'
+            : '${dueRecurringRules.length} recurring items due today (e.g. ${firstRule.title})';
+      }
+      attentionWarn = true;
+    }
 
     return _VaultHomeData(
       netWorthSatang: netWorth,

@@ -875,7 +875,7 @@ abstract class AppLocalizations {
   /// No description provided for @availableToSpendLumi.
   ///
   /// In th, this message translates to:
-  /// **'เงินที่ใช้ได้ในเดือนนี้ 🌸'**
+  /// **'เงินที่ใช้ได้ในเดือนนี้'**
   String get availableToSpendLumi;
 
   /// No description provided for @availableToSpendVault.

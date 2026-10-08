@@ -135,7 +135,7 @@
   "exportSuccess": "Backup exported successfully! You can save it to your private Google Drive.",
   "appVersionFooter": "OURS v1.0.0\nOur money, our journey.",
   "masterBudget": "MASTER BUDGET",
-  "availableToSpendLumi": "Available to spend 🌸",
+  "availableToSpendLumi": "Available to spend this month",
   "availableToSpendVault": "Available to spend",
   "daysRemainingInCycle": "{days} days left in cycle",
   "@daysRemainingInCycle": {

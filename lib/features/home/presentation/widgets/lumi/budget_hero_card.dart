@@ -101,19 +101,61 @@ class BudgetHeroCard extends ConsumerWidget {
                   )
                 : null,
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Card Header badge
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(28),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // Layer 1: Big Mascot sitting on the right, layered behind the budget progress bar
+                Positioned(
+                  right: -4,
+                  bottom: -6,
+                  child: IgnorePointer(
+                    child: Builder(
+                      builder: (context) {
+                        final customData = ref.watch(customMascotProvider);
+                        if (customData != null && customData.isNotEmpty) {
+                          try {
+                            final commaIdx = customData.indexOf(',');
+                            final b64 = commaIdx != -1 ? customData.substring(commaIdx + 1) : customData;
+                            final bytes = base64Decode(b64);
+                            return ClipRRect(
+                              borderRadius: BorderRadius.circular(20),
+                              child: Image.memory(
+                                bytes,
+                                width: 175,
+                                height: 185,
+                                fit: BoxFit.contain,
+                                errorBuilder: (_, _, _) => Image.asset(
+                                  defaultMascotAsset,
+                                  width: 175,
+                                  height: 185,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                            );
+                          } catch (_) {}
+                        }
+                        return Image.asset(
+                          defaultMascotAsset,
+                          width: 175,
+                          height: 185,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+
+                // Layer 2: Main Card Content in foreground
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Card Header badge
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
@@ -132,7 +174,7 @@ class BudgetHeroCard extends ConsumerWidget {
                               const SizedBox(width: 4),
                               Flexible(
                                 child: Text(
-                                  l10n?.availableToSpendLumi ?? 'เงินที่ใช้ได้ในเดือนนี้ 🌸',
+                                  l10n?.availableToSpendLumi ?? 'เงินที่ใช้ได้ในเดือนนี้',
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     fontFamily: VaultTheme.fontFamily,
@@ -210,22 +252,75 @@ class BudgetHeroCard extends ConsumerWidget {
 
                           const SizedBox(height: 8),
 
-                          // Metrics: Spent vs Budget
-                          Wrap(
-                            spacing: 12,
-                            runSpacing: 4,
+                          // Metric: Total Budget (simplified)
+                          _buildSubMetric(
+                            context: context,
+                            label: l10n?.fromTotalBudget ?? 'จากงบรวม',
+                            value: Money(totalBudgetSatang).format(symbol: '฿'),
+                            color: isDark ? const Color(0xFFA594A1) : const Color(0xFF87767F),
+                          ),
+                        ],
+
+                        if (hasBudget) ...[
+                          const SizedBox(height: 14),
+                          // Progress bar with inline percent used on the right
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _buildSubMetric(
-                                context: context,
-                                label: l10n?.usedSoFar ?? 'ใช้ไปแล้ว',
-                                value: Money(totalExpenseSatang).format(symbol: '฿'),
-                                color: const Color(0xFFFF5B9A),
+                              Text(
+                                l10n?.spendingProgress ?? 'ความคืบหน้าการใช้เงิน',
+                                style: const TextStyle(
+                                  fontFamily: VaultTheme.fontFamily,
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF87767F),
+                                ),
                               ),
-                              _buildSubMetric(
-                                context: context,
-                                label: l10n?.fromTotalBudget ?? 'จากงบรวม',
-                                value: Money(totalBudgetSatang).format(symbol: '฿'),
-                                color: isDark ? const Color(0xFFA594A1) : const Color(0xFF87767F),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: Stack(
+                                        children: [
+                                          Container(
+                                            height: 9,
+                                            width: double.infinity,
+                                            color: isDark ? Colors.white.withValues(alpha: 0.12) : Colors.white.withValues(alpha: 0.9),
+                                          ),
+                                          FractionallySizedBox(
+                                            widthFactor: progressRatio,
+                                            child: Container(
+                                              height: 9,
+                                              decoration: BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  colors: (isOverBudget || isWarning)
+                                                      ? [const Color(0xFFFF6E82), const Color(0xFFE64A63)]
+                                                      : [const Color(0xFFFFB86A), const Color(0xFFFF5B9A)],
+                                                  begin: Alignment.centerLeft,
+                                                  end: Alignment.centerRight,
+                                                ),
+                                                borderRadius: BorderRadius.circular(10),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '$percentUsed%',
+                                    style: VaultTheme.tabular(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: (isOverBudget || isWarning)
+                                          ? const Color(0xFFE64A63)
+                                          : const Color(0xFFFF5B9A),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -233,117 +328,12 @@ class BudgetHeroCard extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  // Lumi mascot character (displays custom mascot if uploaded via Settings)
-                  Builder(
-                    builder: (context) {
-                      final customData = ref.watch(customMascotProvider);
-                      if (customData != null && customData.isNotEmpty) {
-                        try {
-                          final commaIdx = customData.indexOf(',');
-                          final b64 = commaIdx != -1 ? customData.substring(commaIdx + 1) : customData;
-                          final bytes = base64Decode(b64);
-                          return ClipRRect(
-                            borderRadius: BorderRadius.circular(18),
-                            child: Image.memory(
-                              bytes,
-                              width: 125,
-                              height: 135,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => Image.asset(
-                                defaultMascotAsset,
-                                width: 125,
-                                height: 135,
-                                fit: BoxFit.contain,
-                              ),
-                            ),
-                          );
-                        } catch (_) {}
-                      }
-                      return Image.asset(
-                        defaultMascotAsset,
-                        width: 125,
-                        height: 135,
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                      );
-                    },
-                  ),
                 ],
               ),
-
-              if (hasBudget) ...[
-                const SizedBox(height: 14),
-                // Progress bar
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          l10n?.spendingProgress ?? 'ความคืบหน้าการใช้เงิน',
-                          style: const TextStyle(
-                            fontFamily: VaultTheme.fontFamily,
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF87767F),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFF5B9A).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            l10n?.percentUsed(percentUsed) ?? 'ใช้ไป $percentUsed%',
-                            style: VaultTheme.tabular(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFFFF5B9A),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Stack(
-                        children: [
-                          Container(
-                            height: 9,
-                            width: double.infinity,
-                            color: isDark ? Colors.white.withValues(alpha: 0.12) : Colors.white.withValues(alpha: 0.9),
-                          ),
-                          FractionallySizedBox(
-                            widthFactor: progressRatio,
-                            child: Container(
-                              height: 9,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: isWarning
-                                      ? [const Color(0xFFFF6E82), const Color(0xFFE64A63)]
-                                      : [const Color(0xFFFFB86A), const Color(0xFFFF5B9A)],
-                                  begin: Alignment.centerLeft,
-                                  end: Alignment.centerRight,
-                                ),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ],
+            ),
           ),
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildSubMetric({

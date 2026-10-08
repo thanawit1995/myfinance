@@ -75,7 +75,7 @@ void main() {
 
     // Verify all 6 distinct Lumi cards render
     expect(find.byType(BudgetHeroCard), findsOneWidget);
-    expect(find.text('เงินที่ใช้ได้ในเดือนนี้ 🌸'), findsOneWidget);
+    expect(find.text('เงินที่ใช้ได้ในเดือนนี้'), findsOneWidget);
 
     expect(find.byType(LumiTipCard), findsOneWidget);
     expect(find.text('คำแนะนำจาก Lumi 💡'), findsOneWidget);

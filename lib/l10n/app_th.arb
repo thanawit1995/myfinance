@@ -135,7 +135,7 @@
   "exportSuccess": "ดาวน์โหลด / ส่งออกไฟล์สำรองข้อมูลสำเร็จ สามารถบันทึกลง Google Drive ของคุณได้เลย",
   "appVersionFooter": "OURS v1.0.0\nOur money, our journey.",
   "masterBudget": "MASTER BUDGET",
-  "availableToSpendLumi": "เงินที่ใช้ได้ในเดือนนี้ 🌸",
+  "availableToSpendLumi": "เงินที่ใช้ได้ในเดือนนี้",
   "availableToSpendVault": "เหลือให้ใช้ได้",
   "daysRemainingInCycle": "{days} วันที่เหลือในรอบเดือน",
   "@daysRemainingInCycle": {

@@ -416,7 +416,7 @@ class AppLocalizationsTh extends AppLocalizations {
   String get masterBudget => 'MASTER BUDGET';
 
   @override
-  String get availableToSpendLumi => 'เงินที่ใช้ได้ในเดือนนี้ 🌸';
+  String get availableToSpendLumi => 'เงินที่ใช้ได้ในเดือนนี้';
 
   @override
   String get availableToSpendVault => 'เหลือให้ใช้ได้';

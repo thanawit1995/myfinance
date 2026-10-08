@@ -1,6 +1,22 @@
 # บันทึกความคืบหน้าโครงการ MyFinance (PROGRESS.md)
 
-อัปเดตล่าสุด: 8 ตุลาคม 2026 (ฟีเจอร์ราคาซื้อขาย 4 ตำแหน่ง, Master Budget ไม่รวมลงทุน, ระบบบัญชีหลัก)
+อัปเดตล่าสุด: 8 ตุลาคม 2026 (แยกกิจกรรมพอร์ตการลงทุนและผลผลิตจากสินทรัพย์ใน Financial Summary, ราคา 4 ตำแหน่ง, Master Budget ไม่รวมลงทุน, ระบบบัญชีหลัก)
+
+- [x] **Financial Summary & Dashboard Investment Separation (8 ต.ค. 2026)**:
+  - **1. แยกกิจกรรมและผลผลิตพอร์ตการลงทุนออกจากรายรับค่าครองชีพ (`monthly_summary_screen.dart`, `vault_home_screen.dart`)**:
+    - **รายรับค่าครองชีพ (Living Income)**: กรองยอดเงินสดจากการขายสินทรัพย์ (`investment_sell:`) และเงินปันผล/ดอกเบี้ยรับ (`cat-inc-...0003` หรือ tag `dividend:`) ออกจากการ์ดรายรับหลัก ทำให้รายรับแสดงเฉพาะรายได้จากการทำงาน/ธุรกิจอย่างแท้จริง
+    - **อัตราการออม (% Savings Rate)**: คำนวณจาก `(Living Income - Living Expense) / Living Income` สะท้อนวินัยการออมที่แท้จริง ไม่ถูกยอดขายสินทรัพย์หลักแสนหรือหลักล้านบิดเบือน
+    - **การ์ดใหม่ "กิจกรรมและผลผลิตจากการลงทุน" (Investment Activities & Asset Yields Card)**:
+      - **ผลผลิตจากสินทรัพย์**: แสดงยอดรวมเงินปันผลและดอกเบี้ยรับ (`assetYieldSatang`), แยกปันผลและดอกเบี้ยชัดเจน พร้อมแสดง **กำไร/ขาดทุนจากการขายที่รับรู้จริง (Realized Capital Gain/Loss)** ตามหลัก FIFO
+      - **การเคลื่อนย้ายเงินทุนในพอร์ต (Capital Flow)**: แสดงเงินลงทุนเพิ่ม (ซื้อสินทรัพย์), เงินสดที่ได้คืน (ขายสินทรัพย์), และกระแสเงินสดสุทธิ (Net Capital Flow)
+  - **2. เพิ่มฟังก์ชัน Query Realized Gain/Loss ตามช่วงเวลา (`investments_dao.dart`)**:
+    - เพิ่ม `getRealizedGainLossForPeriod(start, end)` ดึงยอด Realized Gain/Loss, ยอดขายรวม, และต้นทุนรวมจากตาราง `investmentSales` ในช่วงเวลาใดๆ ได้อย่างแม่นยำ
+  - **3. ปรับปรุงหน้า Home Dashboard (`vault_home_screen.dart`)**:
+    - คำนวณ `totalLivingIncomeMonthSatang` แยกจากการขายสินทรัพย์และปันผล ส่งต่อให้การ์ด Cash Flow และกราฟ Lumi Desktop Layout อย่างถูกต้อง
+  - **4. การทดสอบและการรับรองคุณภาพ**:
+    - เพิ่ม Unit Tests ใน `monthly_summary_investment_split_test.dart` ครอบคลุมการแยกรายรับ, การคำนวณ % การออม, และการ Query Realized Gain/Loss
+    - `flutter analyze`: **0 errors, 0 warnings** (No issues found)
+    - `flutter test`: ผ่านทั้งหมด **206/206 tests passed** (100%)
 
 - [x] **4-Decimal Investment Price, Non-Investment Master Budget & Default Account System (8 ต.ค. 2026)**:
   - **1. ซื้อขายสินทรัพย์สามารถตั้งราคาได้ถึงทศนิยม 4 หลัก (`buy_sell_trade_dialog.dart`, `investments_dao.dart`, `portfolio_screen.dart`)**:

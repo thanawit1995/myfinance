@@ -1433,6 +1433,31 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
     return result;
   }
 
+  /// คำนวณยอดรวมกำไร/ขาดทุนที่รับรู้จริง (Realized Capital Gain/Loss), ยอดขาย, และต้นทุน ในช่วงเวลาที่กำหนด
+  Future<({int totalRealizedGainLossThbSatang, int totalSellPriceThbSatang, int totalCostThbSatang})>
+      getRealizedGainLossForPeriod(DateTime start, DateTime end) async {
+    final sales = await (select(investmentSales)
+          ..where((s) =>
+              s.deletedAt.isNull() &
+              s.sellDate.isBiggerOrEqualValue(start) &
+              s.sellDate.isSmallerOrEqualValue(end)))
+        .get();
+
+    int totalRealized = 0;
+    int totalSellPrice = 0;
+    int totalCost = 0;
+    for (final s in sales) {
+      totalRealized += s.realizedGainLossThbSatang;
+      totalSellPrice += s.sellPriceThbSatang;
+      totalCost += s.costThbSatang;
+    }
+    return (
+      totalRealizedGainLossThbSatang: totalRealized,
+      totalSellPriceThbSatang: totalSellPrice,
+      totalCostThbSatang: totalCost,
+    );
+  }
+
   Future<List<InvestmentTradeRecord>> getInvestmentTrades({int? limit}) async {
     final query = select(transactions)
       ..where((t) =>

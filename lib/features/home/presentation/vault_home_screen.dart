@@ -82,7 +82,7 @@ class VaultHomeScreen extends ConsumerWidget {
                   netWorthSatang: data.netWorthSatang,
                   momChangePercent: data.momChangePercent,
                   cashFlowMonthSatang: data.cashFlowMonthSatang,
-                  totalIncomeSatang: data.totalIncomeMonthSatang,
+                  totalIncomeSatang: data.totalLivingIncomeMonthSatang,
                   totalExpenseSatang: data.totalLivingExpenseMonthSatang,
                   remainingBudgetSatang: data.remainingBudgetSatang,
                   totalBudgetSatang: data.totalBudgetMonthSatang,
@@ -2099,12 +2099,20 @@ class VaultHomeScreen extends ConsumerWidget {
     final monthTx = await txDao.searchTransactions(startDate: startOfMonth, endDate: endOfMonth);
 
     int totalIncome = 0;
+    int totalLivingIncome = 0;
     int totalExpense = 0;
     int totalLivingExpense = 0;
     for (final t in monthTx) {
       if (t.transactionType == 'income') {
         if (!t.isCleared) continue;
         totalIncome += t.amountThbSatang;
+        final isInvSell = (t.tag != null && t.tag!.startsWith('investment_sell:')) ||
+            (t.categoryId == 'cat-inc-0000-4000-8000-000000000099');
+        final isYield = (t.categoryId == 'cat-inc-0000-4000-8000-000000000003') ||
+            (t.tag != null && (t.tag!.startsWith('dividend:') || t.tag!.startsWith('interest:')));
+        if (!isInvSell && !isYield) {
+          totalLivingIncome += t.amountThbSatang;
+        }
       } else if (t.transactionType == 'expense') {
         final expAmount = t.amountThbSatang + t.feeThbSatang;
         totalExpense += expAmount;
@@ -2166,7 +2174,7 @@ class VaultHomeScreen extends ConsumerWidget {
     final recent = await txDao.getRecentTransactions(limit: 3);
 
     // 7. Dynamic Attention Insight
-    final savingsPct = totalIncome > 0 ? ((totalIncome - totalExpense) / totalIncome * 100).clamp(0, 100).toInt() : 0;
+    final savingsPct = totalLivingIncome > 0 ? ((totalLivingIncome - totalLivingExpense) / totalLivingIncome * 100).clamp(0, 100).toInt() : 0;
     String attentionMsg = l10n?.savingsRateStatus(savingsPct) ?? 'อัตราการออมเดือนนี้อยู่ที่ $savingsPct%';
     bool attentionWarn = false;
 
@@ -2258,6 +2266,7 @@ class VaultHomeScreen extends ConsumerWidget {
       momChangePercent: momPercent,
       cashFlowMonthSatang: cashFlow,
       totalIncomeMonthSatang: totalIncome,
+      totalLivingIncomeMonthSatang: totalLivingIncome,
       totalBudgetMonthSatang: totalBudget,
       totalExpenseMonthSatang: totalExpense,
       totalLivingExpenseMonthSatang: totalLivingExpense,
@@ -2293,6 +2302,7 @@ class _VaultHomeData {
   final double momChangePercent;
   final int cashFlowMonthSatang;
   final int totalIncomeMonthSatang;
+  final int totalLivingIncomeMonthSatang;
   final int totalBudgetMonthSatang;
   final int totalExpenseMonthSatang;
   final int totalLivingExpenseMonthSatang;
@@ -2317,6 +2327,7 @@ class _VaultHomeData {
     required this.momChangePercent,
     required this.cashFlowMonthSatang,
     required this.totalIncomeMonthSatang,
+    required this.totalLivingIncomeMonthSatang,
     required this.totalBudgetMonthSatang,
     required this.totalExpenseMonthSatang,
     required this.totalLivingExpenseMonthSatang,

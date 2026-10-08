@@ -38,10 +38,17 @@ class _CategoryBreakdownItem {
 class _PeriodReportData {
   final DateTime startDate;
   final DateTime endDate;
-  final int incomeSatang;
+  final int incomeSatang; // Living / Operating Income
+  final int livingIncomeSatang;
   final int accruedIncomeSatang;
   final int expenseSatang;
   final int investmentSatang;
+  final int assetSaleProceedsSatang;
+  final int assetYieldSatang;
+  final int dividendSatang;
+  final int interestSatang;
+  final int realizedGainLossSatang;
+  final int netInvestmentFlowSatang;
   final int savingsSatang;
   final double savingsRatePercent;
   final int? savingsMoMPercent;
@@ -54,9 +61,16 @@ class _PeriodReportData {
     required this.startDate,
     required this.endDate,
     required this.incomeSatang,
+    required this.livingIncomeSatang,
     required this.accruedIncomeSatang,
     required this.expenseSatang,
     this.investmentSatang = 0,
+    this.assetSaleProceedsSatang = 0,
+    this.assetYieldSatang = 0,
+    this.dividendSatang = 0,
+    this.interestSatang = 0,
+    this.realizedGainLossSatang = 0,
+    this.netInvestmentFlowSatang = 0,
     required this.savingsSatang,
     required this.savingsRatePercent,
     required this.savingsMoMPercent,
@@ -244,26 +258,51 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
     final allCats = await ref.read(categoriesDaoProvider).getAllCategories();
     final catMap = {for (final c in allCats) c.id: c};
 
-    int incomeSatang = 0;
+    int livingIncomeSatang = 0;
     int accruedIncomeSatang = 0;
     int expenseSatang = 0;
     int investmentSatang = 0;
+    int assetSaleProceedsSatang = 0;
+    int dividendSatang = 0;
+    int interestSatang = 0;
 
     final Map<String, int> expenseByCat = {};
     final Map<String, int> incomeByCat = {};
 
     for (final t in currentTxs) {
       if (t.transactionType == 'income') {
-        if (t.isCleared) {
-          incomeSatang += t.amountThbSatang;
-          final catId = t.categoryId ?? 'uncategorized';
-          incomeByCat[catId] = (incomeByCat[catId] ?? 0) + t.amountThbSatang;
+        final isAssetSale = (t.tag != null && t.tag!.startsWith('investment_sell:')) ||
+            (t.categoryId == 'cat-inc-0000-4000-8000-000000000099');
+        final isYield = (t.categoryId == 'cat-inc-0000-4000-8000-000000000003') ||
+            (t.tag != null && (t.tag!.startsWith('dividend:') || t.tag!.startsWith('interest:')));
+
+        if (isAssetSale) {
+          if (t.isCleared) {
+            assetSaleProceedsSatang += t.amountThbSatang;
+          }
+        } else if (isYield) {
+          if (t.isCleared) {
+            final noteLower = (t.note ?? '').toLowerCase();
+            final tagLower = (t.tag ?? '').toLowerCase();
+            if (tagLower.startsWith('dividend:') || noteLower.contains('dividend') || noteLower.contains('ปันผล')) {
+              dividendSatang += t.amountThbSatang;
+            } else {
+              interestSatang += t.amountThbSatang;
+            }
+          }
         } else {
-          accruedIncomeSatang += t.amountThbSatang;
+          if (t.isCleared) {
+            livingIncomeSatang += t.amountThbSatang;
+            final catId = t.categoryId ?? 'uncategorized';
+            incomeByCat[catId] = (incomeByCat[catId] ?? 0) + t.amountThbSatang;
+          } else {
+            accruedIncomeSatang += t.amountThbSatang;
+          }
         }
       } else if (t.transactionType == 'expense' || t.transactionType == 'invest_buy') {
         final isInvest = t.transactionType == 'invest_buy' ||
-            (t.tag != null && t.tag!.startsWith('investment_buy'));
+            (t.tag != null && t.tag!.startsWith('investment_buy:')) ||
+            (t.categoryId == 'cat-exp-0000-4000-8000-000000000099');
         final cost = t.amountThbSatang + t.feeThbSatang;
         if (isInvest) {
           investmentSatang += cost;
@@ -275,10 +314,18 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
       }
     }
 
-    final savingsSatang = incomeSatang - expenseSatang - investmentSatang;
-    final savingsRatePercent = incomeSatang > 0
-        ? ((savingsSatang / incomeSatang) * 100.0).clamp(-100.0, 100.0)
+    final assetYieldSatang = dividendSatang + interestSatang;
+    final incomeSatang = livingIncomeSatang;
+    final savingsSatang = livingIncomeSatang - expenseSatang;
+    final savingsRatePercent = livingIncomeSatang > 0
+        ? ((savingsSatang / livingIncomeSatang) * 100.0).clamp(-100.0, 100.0)
         : 0.0;
+    final netInvestmentFlowSatang = assetSaleProceedsSatang - investmentSatang;
+
+    // คำนวณกำไร/ขาดทุนจากการขายที่รับรู้จริง (Realized Gain/Loss) จาก InvestmentsDao
+    final invDao = ref.read(investmentsDaoProvider);
+    final realizedSummary = await invDao.getRealizedGainLossForPeriod(start, end);
+    final realizedGainLossSatang = realizedSummary.totalRealizedGainLossThbSatang;
 
     // Previous period comparison for monthly
     int? savingsMoMPercent;
@@ -374,9 +421,16 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
       startDate: start,
       endDate: end,
       incomeSatang: incomeSatang,
+      livingIncomeSatang: livingIncomeSatang,
       accruedIncomeSatang: accruedIncomeSatang,
       expenseSatang: expenseSatang,
       investmentSatang: investmentSatang,
+      assetSaleProceedsSatang: assetSaleProceedsSatang,
+      assetYieldSatang: assetYieldSatang,
+      dividendSatang: dividendSatang,
+      interestSatang: interestSatang,
+      realizedGainLossSatang: realizedGainLossSatang,
+      netInvestmentFlowSatang: netInvestmentFlowSatang,
       savingsSatang: savingsSatang,
       savingsRatePercent: savingsRatePercent,
       savingsMoMPercent: savingsMoMPercent,
@@ -469,9 +523,16 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
                             startDate: pageDate,
                             endDate: pageDate,
                             incomeSatang: 0,
+                            livingIncomeSatang: 0,
                             accruedIncomeSatang: 0,
                             expenseSatang: 0,
                             investmentSatang: 0,
+                            assetSaleProceedsSatang: 0,
+                            assetYieldSatang: 0,
+                            dividendSatang: 0,
+                            interestSatang: 0,
+                            realizedGainLossSatang: 0,
+                            netInvestmentFlowSatang: 0,
                             savingsSatang: 0,
                             savingsRatePercent: 0.0,
                             savingsMoMPercent: null,
@@ -486,6 +547,10 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
                         children: [
                           // Unified Financial Summary Card
                           _buildUnifiedSummaryCard(context, data, isLumi, isThai),
+                          const SizedBox(height: 16),
+
+                          // Investment Portfolio Activities & Asset Yields Card
+                          _buildInvestmentActivitiesCard(context, data, isLumi, isThai),
                           const SizedBox(height: 16),
 
                           // Cumulative Expense Trend Chart (if Monthly)
@@ -892,6 +957,287 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
             color: isSavingsPositive ? savingsColor : negative,
             ratio: savingsRatio,
             context: context,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInvestmentActivitiesCard(
+    BuildContext context,
+    _PeriodReportData data,
+    bool isLumi,
+    bool isThai,
+  ) {
+    final surface = VaultTheme.surface(context);
+    final border = VaultTheme.border(context);
+    final primaryText = VaultTheme.primaryText(context);
+    final secondaryText = VaultTheme.secondaryText(context);
+    const positive = Color(0xFF16A34A);
+    final negative = VaultTheme.negative(context);
+
+    // ผลตอบแทนรวมจากสินทรัพย์ (ปันผล/ดอกเบี้ย + Realized Gain)
+    final totalPortfolioGainSatang = data.assetYieldSatang + data.realizedGainLossSatang;
+    final isTotalGainPositive = totalPortfolioGainSatang >= 0;
+    final isRealizedPositive = data.realizedGainLossSatang >= 0;
+    final isNetFlowPositive = data.netInvestmentFlowSatang >= 0;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: border, width: 0.75),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Header with Title & Total Yield Badge
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.show_chart_rounded, size: 20, color: const Color(0xFF6366F1)),
+                  const SizedBox(width: 8),
+                  Text(
+                    isThai ? 'กิจกรรมและผลผลิตจากการลงทุน' : 'Investment Activities & Yields',
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: primaryText,
+                    ),
+                  ),
+                ],
+              ),
+              if (totalPortfolioGainSatang != 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: (isTotalGainPositive ? positive : negative).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: (isTotalGainPositive ? positive : negative).withValues(alpha: 0.3),
+                      width: 0.75,
+                    ),
+                  ),
+                  child: Text(
+                    '${isTotalGainPositive ? "+" : ""}${Money(totalPortfolioGainSatang).format(symbol: "฿")}',
+                    style: TextStyle(
+                      fontFamily: VaultTheme.fontFamily,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: isTotalGainPositive ? positive : negative,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // 2. Section 1: ผลผลิตจากสินทรัพย์ (Asset Yield & Realized Gain/Loss)
+          Text(
+            isThai ? 'ผลผลิตและผลตอบแทนจากสินทรัพย์' : 'Asset Yields & Capital Gains',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: secondaryText,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              // ปันผล & ดอกเบี้ยรับ
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: VaultTheme.surfaceSubtle(context),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: border.withValues(alpha: 0.5), width: 0.75),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.account_balance_wallet_outlined, size: 14, color: positive),
+                          const SizedBox(width: 5),
+                          Flexible(
+                            child: Text(
+                              isThai ? 'ปันผล & ดอกเบี้ย' : 'Dividends & Interest',
+                              style: TextStyle(fontSize: 11, color: secondaryText),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        Money(data.assetYieldSatang).format(symbol: '฿'),
+                        style: VaultTheme.tabular(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: data.assetYieldSatang > 0 ? positive : primaryText,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (data.dividendSatang > 0 || data.interestSatang > 0) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          isThai
+                              ? 'ปันผล ฿${Money(data.dividendSatang).format(symbol: "")} • ดอกเบี้ย ฿${Money(data.interestSatang).format(symbol: "")}'
+                              : 'Div ฿${Money(data.dividendSatang).format(symbol: "")} • Int ฿${Money(data.interestSatang).format(symbol: "")}',
+                          style: TextStyle(fontSize: 9.5, color: secondaryText.withValues(alpha: 0.8)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              // กำไร/ขาดทุนที่รับรู้จริง
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: VaultTheme.surfaceSubtle(context),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: border.withValues(alpha: 0.5), width: 0.75),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            isRealizedPositive ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+                            size: 14,
+                            color: data.realizedGainLossSatang != 0
+                                ? (isRealizedPositive ? positive : negative)
+                                : secondaryText,
+                          ),
+                          const SizedBox(width: 5),
+                          Flexible(
+                            child: Text(
+                              isThai ? 'กำไรขายที่รับรู้' : 'Realized Gain/Loss',
+                              style: TextStyle(fontSize: 11, color: secondaryText),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        data.realizedGainLossSatang != 0
+                            ? '${isRealizedPositive ? "+" : ""}${Money(data.realizedGainLossSatang).format(symbol: "฿")}'
+                            : '฿0.00',
+                        style: VaultTheme.tabular(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: data.realizedGainLossSatang != 0
+                              ? (isRealizedPositive ? positive : negative)
+                              : primaryText,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        isThai ? '(ไม่รวมในภาษีทั่วไป)' : '(Excluded from regular tax)',
+                        style: TextStyle(fontSize: 9.5, color: secondaryText.withValues(alpha: 0.8)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // 3. Section 2: การเคลื่อนย้ายเงินสดในพอร์ต (Capital Movements)
+          Divider(color: border.withValues(alpha: 0.5), height: 1, thickness: 0.75),
+          const SizedBox(height: 12),
+          Text(
+            isThai ? 'การเคลื่อนย้ายเงินสดในพอร์ต (Capital Flow)' : 'Portfolio Capital Movements',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: secondaryText,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildMovementItem(
+                label: isThai ? 'เงินลงทุนเพิ่ม (ซื้อ)' : 'Invested (Buy)',
+                amountSatang: data.investmentSatang,
+                prefix: '-',
+                color: const Color(0xFF6366F1),
+                context: context,
+              ),
+              _buildMovementItem(
+                label: isThai ? 'เงินสดที่ได้คืน (ขาย)' : 'Liquidated (Sell)',
+                amountSatang: data.assetSaleProceedsSatang,
+                prefix: '+',
+                color: const Color(0xFF0284C7),
+                context: context,
+              ),
+              _buildMovementItem(
+                label: isThai ? 'กระแสเงินสดสุทธิ' : 'Net Flow',
+                amountSatang: data.netInvestmentFlowSatang.abs(),
+                prefix: isNetFlowPositive ? '+' : '-',
+                color: data.netInvestmentFlowSatang != 0
+                    ? (isNetFlowPositive ? positive : secondaryText)
+                    : primaryText,
+                context: context,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMovementItem({
+    required String label,
+    required int amountSatang,
+    required String prefix,
+    required Color color,
+    required BuildContext context,
+  }) {
+    final secondaryText = VaultTheme.secondaryText(context);
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: VaultTheme.fontFamily,
+              fontSize: 11,
+              color: secondaryText,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            amountSatang > 0 ? '$prefix${Money(amountSatang).format(symbol: "฿")}' : '฿0.00',
+            style: VaultTheme.tabular(
+              fontSize: 12.5,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

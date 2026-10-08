@@ -33,7 +33,17 @@ class BudgetHeroCard extends ConsumerWidget {
         ? ((remainingSatang / totalBudgetSatang) * 100).clamp(0, 100).toInt()
         : 100;
 
-    final isWarning = hasBudget && percentRemaining < 20;
+    final isOverBudget = hasBudget && (remainingSatang < 0 || totalExpenseSatang > totalBudgetSatang);
+    final isWarning = hasBudget && !isOverBudget && percentRemaining <= 20;
+
+    final String defaultMascotAsset;
+    if (isOverBudget) {
+      defaultMascotAsset = 'assets/images/lumi_mascot_shock.png';
+    } else if (isWarning) {
+      defaultMascotAsset = 'assets/images/lumi_mascot_warning.png';
+    } else {
+      defaultMascotAsset = 'assets/images/lumi_mascot_smile.png';
+    }
 
     final progressRatio = hasBudget
         ? (totalExpenseSatang / totalBudgetSatang).clamp(0.0, 1.0)
@@ -55,7 +65,7 @@ class BudgetHeroCard extends ConsumerWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(28),
             border: Border.all(
-              color: isWarning
+              color: (isOverBudget || isWarning)
                   ? const Color(0xFFFF6E82).withValues(alpha: 0.5)
                   : (isDark ? const Color(0xFF4A3448) : const Color(0xFFFFDDE5)),
               width: 1.2,
@@ -234,16 +244,16 @@ class BudgetHeroCard extends ConsumerWidget {
                           final b64 = commaIdx != -1 ? customData.substring(commaIdx + 1) : customData;
                           final bytes = base64Decode(b64);
                           return ClipRRect(
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(18),
                             child: Image.memory(
                               bytes,
-                              width: 95,
-                              height: 105,
+                              width: 125,
+                              height: 135,
                               fit: BoxFit.cover,
                               errorBuilder: (_, _, _) => Image.asset(
-                                'assets/images/lumi_budget_character.png',
-                                width: 95,
-                                height: 105,
+                                defaultMascotAsset,
+                                width: 125,
+                                height: 135,
                                 fit: BoxFit.contain,
                               ),
                             ),
@@ -251,9 +261,9 @@ class BudgetHeroCard extends ConsumerWidget {
                         } catch (_) {}
                       }
                       return Image.asset(
-                        'assets/images/lumi_budget_character.png',
-                        width: 95,
-                        height: 105,
+                        defaultMascotAsset,
+                        width: 125,
+                        height: 135,
                         fit: BoxFit.contain,
                         errorBuilder: (_, _, _) => const SizedBox.shrink(),
                       );

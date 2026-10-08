@@ -1,6 +1,25 @@
 # บันทึกความคืบหน้าโครงการ MyFinance (PROGRESS.md)
 
-อัปเดตล่าสุด: 8 ตุลาคม 2026 (แยกกิจกรรมพอร์ตการลงทุนและผลผลิตจากสินทรัพย์ใน Financial Summary, ราคา 4 ตำแหน่ง, Master Budget ไม่รวมลงทุน, ระบบบัญชีหลัก)
+อัปเดตล่าสุด: 8 ตุลาคม 2026 (มาสคอต Lumi ตัวใหญ่หน้า Home เปลี่ยนอารมณ์ตามสถานะงบประมาณ Smile/Warning/Shock, แยกกิจกรรมพอร์ตการลงทุนและผลผลิตจากสินทรัพย์ใน Financial Summary)
+
+- [x] **Lumi Home Hero Mascot Dynamic Emotion & Upsize (8 ต.ค. 2026)**:
+  - **1. นำเข้าไฟล์ภาพมาสคอต Lumi & น้องแมวแบบโปร่งใส (Transparent PNG)**:
+    - คัดลอกจากโฟลเดอร์ `lumi_image/` เข้าสู่ `assets/images/`:
+      - `lumi_mascot_smile.png`: มาสคอตยิ้มสดใส กอดน้องแมว
+      - `lumi_mascot_warning.png`: มาสคอตกังวล สงสัย ถือโทรศัพท์พร้อมเครื่องหมายเตือน
+      - `lumi_mascot_shock.png`: มาสคอตตกใจสุดขีด ถือโทรศัพท์พร้อมเครื่องหมายตกใจ
+  - **2. แสดงผลอารมณ์มาสคอตตามสถานะงบประมาณคงเหลือเดือน (`BudgetHeroCard`, `vault_home_screen.dart`)**:
+    - **Smile (`lumi_mascot_smile.png`)**: งบประมาณเดือนนั้นคงเหลือ > 20% (หรือยังไม่ได้ตั้งงบประมาณ)
+    - **Warning (`lumi_mascot_warning.png`)**: งบประมาณเดือนนั้นคงเหลือ <= 20% และยังไม่เกินงบ
+    - **Shock (`lumi_mascot_shock.png`)**: รายจ่ายเกินงบประมาณเดือนนั้น (ยอดคงเหลือติดลบ หรือค่าใช้จ่าย > งบที่ตั้งไว้)
+    - รองรับ Custom Mascot จากเมนูตั้งค่า (Settings): หากผู้ใช้อัปโหลดรูปเอง จะแสดงรูปที่กำหนดเองก่อน
+  - **3. ขยายขนาดรูปมาสคอตให้โดดเด่นสวยงามตามดีไซน์**:
+    - ปรับขนาดจากเดิม 95x105 เป็น 125x135 พร้อมขอบมน 18px สอดคล้องกับภาพตัวอย่างดีไซน์ ไม่ล้นขอบและไม่เบียดบังข้อมูลยอดเงิน
+    - ปรับภาพพรีวิวในเมนูตั้งค่า (`settings_screen.dart`) ให้แสดงรูปใหม่เริ่มต้น
+  - **4. การทดสอบและการรับรองคุณภาพ**:
+    - เพิ่ม Widget Tests ใน `lumi_home_dashboard_test.dart` ครอบคลุมการแสดงผลรูปภาพทั้ง 3 สถานะ (Smile, Warning, Shock)
+    - `flutter analyze`: **0 errors, 0 warnings** (No issues found)
+    - `flutter test`: ผ่านทั้งหมด **209/209 tests passed** (100%)
 
 - [x] **Financial Summary & Dashboard Investment Separation (8 ต.ค. 2026)**:
   - **1. แยกกิจกรรมและผลผลิตพอร์ตการลงทุนออกจากรายรับค่าครองชีพ (`monthly_summary_screen.dart`, `vault_home_screen.dart`)**:

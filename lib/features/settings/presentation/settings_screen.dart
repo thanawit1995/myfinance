@@ -220,9 +220,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 ? Image.memory(
                                     base64Decode(customData.contains(',') ? customData.split(',').last : customData),
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, _, _) => Image.asset('assets/images/lumi_budget_character.png', fit: BoxFit.contain),
+                                    errorBuilder: (_, _, _) => Image.asset('assets/images/lumi_mascot_smile.png', fit: BoxFit.contain),
                                   )
-                                : Image.asset('assets/images/lumi_budget_character.png', fit: BoxFit.contain),
+                                : Image.asset('assets/images/lumi_mascot_smile.png', fit: BoxFit.contain),
                           ),
                         ),
                         const SizedBox(width: 14),
@@ -238,7 +238,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               Text(
                                 hasCustom
                                     ? (isThai ? 'ใช้รูปที่ผู้ใช้อัปโหลดเอง' : 'Using custom image')
-                                    : (isThai ? 'รูปน้องแมว Lumi ดั้งเดิม' : 'Default Lumi character'),
+                                    : (isThai ? 'รูปน้อง Lumi & น้องแมว (เปลี่ยนตามสถานะงบประมาณ)' : 'Lumi & Cat (Dynamic emotion by budget status)'),
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: VaultTheme.secondaryText(context),

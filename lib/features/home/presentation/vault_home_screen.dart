@@ -1072,10 +1072,20 @@ class VaultHomeScreen extends ConsumerWidget {
     final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
     final daysRemaining = (daysInMonth - now.day).clamp(0, daysInMonth);
 
-    final isWarning = hasBudget && percentRemaining < 20;
+    final isOverBudget = hasBudget && (remainingSatang < 0 || totalExpenseSatang > totalBudgetSatang);
+    final isWarning = hasBudget && !isOverBudget && percentRemaining <= 20;
     final progressRatio = hasBudget
         ? (totalExpenseSatang / totalBudgetSatang).clamp(0.0, 1.0)
         : 0.0;
+
+    final String lumiMascotAsset;
+    if (isOverBudget) {
+      lumiMascotAsset = 'assets/images/lumi_mascot_shock.png';
+    } else if (isWarning) {
+      lumiMascotAsset = 'assets/images/lumi_mascot_warning.png';
+    } else {
+      lumiMascotAsset = 'assets/images/lumi_mascot_smile.png';
+    }
 
     final isLumi = VaultTheme.isLumi(context);
     final ext = VaultTheme.extension(context);
@@ -1223,11 +1233,11 @@ class VaultHomeScreen extends ConsumerWidget {
                   ),
                   const SizedBox(width: 8),
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(18),
                     child: Image.asset(
-                      'assets/images/lumi_budget_character.png',
-                      width: 95,
-                      height: 100,
+                      lumiMascotAsset,
+                      width: 125,
+                      height: 135,
                       fit: BoxFit.contain,
                       errorBuilder: (_, _, _) => const SizedBox.shrink(),
                     ),

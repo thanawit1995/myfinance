@@ -104,4 +104,80 @@ void main() {
     await tester.tap(find.text('แนวโน้มรายจ่าย'));
     expect(summaryTapped, isTrue);
   });
+
+  group('BudgetHeroCard Mascot Dynamic Emotion Tests', () {
+    Widget buildCard({
+      required int remainingSatang,
+      required int totalBudgetSatang,
+      required int totalExpenseSatang,
+    }) {
+      return ProviderScope(
+        child: MaterialApp(
+          theme: LumiTheme.lightTheme,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [Locale('th')],
+          locale: const Locale('th'),
+          home: Scaffold(
+            body: BudgetHeroCard(
+              remainingSatang: remainingSatang,
+              totalBudgetSatang: totalBudgetSatang,
+              totalExpenseSatang: totalExpenseSatang,
+              onTap: () {},
+            ),
+          ),
+        ),
+      );
+    }
+
+    testWidgets('displays Smile mascot when remaining budget > 20%', (tester) async {
+      // 5,000 THB remaining out of 10,000 THB (50% remaining)
+      await tester.pumpWidget(buildCard(
+        remainingSatang: 500000,
+        totalBudgetSatang: 1000000,
+        totalExpenseSatang: 500000,
+      ));
+      await tester.pumpAndSettle();
+
+      final imageFinder = find.byWidgetPredicate(
+        (widget) => widget is Image && widget.image is AssetImage && (widget.image as AssetImage).assetName == 'assets/images/lumi_mascot_smile.png',
+      );
+      expect(imageFinder, findsOneWidget);
+    });
+
+    testWidgets('displays Warning mascot when remaining budget <= 20%', (tester) async {
+      // 1,500 THB remaining out of 10,000 THB (15% remaining)
+      await tester.pumpWidget(buildCard(
+        remainingSatang: 150000,
+        totalBudgetSatang: 1000000,
+        totalExpenseSatang: 850000,
+      ));
+      await tester.pumpAndSettle();
+
+      final imageFinder = find.byWidgetPredicate(
+        (widget) => widget is Image && widget.image is AssetImage && (widget.image as AssetImage).assetName == 'assets/images/lumi_mascot_warning.png',
+      );
+      expect(imageFinder, findsOneWidget);
+    });
+
+    testWidgets('displays Shock mascot when over budget (remaining < 0)', (tester) async {
+      // -500 THB remaining out of 10,000 THB (overspent)
+      await tester.pumpWidget(buildCard(
+        remainingSatang: -50000,
+        totalBudgetSatang: 1000000,
+        totalExpenseSatang: 1050000,
+      ));
+      await tester.pumpAndSettle();
+
+      final imageFinder = find.byWidgetPredicate(
+        (widget) => widget is Image && widget.image is AssetImage && (widget.image as AssetImage).assetName == 'assets/images/lumi_mascot_shock.png',
+      );
+      expect(imageFinder, findsOneWidget);
+    });
+  });
 }
+

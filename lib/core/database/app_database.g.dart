@@ -1129,6 +1129,21 @@ class $AccountsTable extends Accounts with TableInfo<$AccountsTable, Account> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _isDefaultMeta = const VerificationMeta(
+    'isDefault',
+  );
+  @override
+  late final GeneratedColumn<bool> isDefault = GeneratedColumn<bool>(
+    'is_default',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_default" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _isActiveMeta = const VerificationMeta(
     'isActive',
   );
@@ -1200,6 +1215,7 @@ class $AccountsTable extends Accounts with TableInfo<$AccountsTable, Account> {
     dueDay,
     creditLimitSatang,
     icon,
+    isDefault,
     isActive,
     createdAt,
     updatedAt,
@@ -1288,6 +1304,12 @@ class $AccountsTable extends Accounts with TableInfo<$AccountsTable, Account> {
         icon.isAcceptableOrUnknown(data['icon']!, _iconMeta),
       );
     }
+    if (data.containsKey('is_default')) {
+      context.handle(
+        _isDefaultMeta,
+        isDefault.isAcceptableOrUnknown(data['is_default']!, _isDefaultMeta),
+      );
+    }
     if (data.containsKey('is_active')) {
       context.handle(
         _isActiveMeta,
@@ -1370,6 +1392,10 @@ class $AccountsTable extends Accounts with TableInfo<$AccountsTable, Account> {
         DriftSqlType.string,
         data['${effectivePrefix}icon'],
       ),
+      isDefault: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_default'],
+      )!,
       isActive: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_active'],
@@ -1409,6 +1435,7 @@ class Account extends DataClass implements Insertable<Account> {
   final int? dueDay;
   final int? creditLimitSatang;
   final String? icon;
+  final bool isDefault;
   final bool isActive;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -1424,6 +1451,7 @@ class Account extends DataClass implements Insertable<Account> {
     this.dueDay,
     this.creditLimitSatang,
     this.icon,
+    required this.isDefault,
     required this.isActive,
     required this.createdAt,
     required this.updatedAt,
@@ -1450,6 +1478,7 @@ class Account extends DataClass implements Insertable<Account> {
     if (!nullToAbsent || icon != null) {
       map['icon'] = Variable<String>(icon);
     }
+    map['is_default'] = Variable<bool>(isDefault);
     map['is_active'] = Variable<bool>(isActive);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -1477,6 +1506,7 @@ class Account extends DataClass implements Insertable<Account> {
           ? const Value.absent()
           : Value(creditLimitSatang),
       icon: icon == null && nullToAbsent ? const Value.absent() : Value(icon),
+      isDefault: Value(isDefault),
       isActive: Value(isActive),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
@@ -1502,6 +1532,7 @@ class Account extends DataClass implements Insertable<Account> {
       dueDay: serializer.fromJson<int?>(json['dueDay']),
       creditLimitSatang: serializer.fromJson<int?>(json['creditLimitSatang']),
       icon: serializer.fromJson<String?>(json['icon']),
+      isDefault: serializer.fromJson<bool>(json['isDefault']),
       isActive: serializer.fromJson<bool>(json['isActive']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -1522,6 +1553,7 @@ class Account extends DataClass implements Insertable<Account> {
       'dueDay': serializer.toJson<int?>(dueDay),
       'creditLimitSatang': serializer.toJson<int?>(creditLimitSatang),
       'icon': serializer.toJson<String?>(icon),
+      'isDefault': serializer.toJson<bool>(isDefault),
       'isActive': serializer.toJson<bool>(isActive),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -1540,6 +1572,7 @@ class Account extends DataClass implements Insertable<Account> {
     Value<int?> dueDay = const Value.absent(),
     Value<int?> creditLimitSatang = const Value.absent(),
     Value<String?> icon = const Value.absent(),
+    bool? isDefault,
     bool? isActive,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -1557,6 +1590,7 @@ class Account extends DataClass implements Insertable<Account> {
         ? creditLimitSatang.value
         : this.creditLimitSatang,
     icon: icon.present ? icon.value : this.icon,
+    isDefault: isDefault ?? this.isDefault,
     isActive: isActive ?? this.isActive,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -1584,6 +1618,7 @@ class Account extends DataClass implements Insertable<Account> {
           ? data.creditLimitSatang.value
           : this.creditLimitSatang,
       icon: data.icon.present ? data.icon.value : this.icon,
+      isDefault: data.isDefault.present ? data.isDefault.value : this.isDefault,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -1606,6 +1641,7 @@ class Account extends DataClass implements Insertable<Account> {
           ..write('dueDay: $dueDay, ')
           ..write('creditLimitSatang: $creditLimitSatang, ')
           ..write('icon: $icon, ')
+          ..write('isDefault: $isDefault, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -1626,6 +1662,7 @@ class Account extends DataClass implements Insertable<Account> {
     dueDay,
     creditLimitSatang,
     icon,
+    isDefault,
     isActive,
     createdAt,
     updatedAt,
@@ -1645,6 +1682,7 @@ class Account extends DataClass implements Insertable<Account> {
           other.dueDay == this.dueDay &&
           other.creditLimitSatang == this.creditLimitSatang &&
           other.icon == this.icon &&
+          other.isDefault == this.isDefault &&
           other.isActive == this.isActive &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
@@ -1662,6 +1700,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
   final Value<int?> dueDay;
   final Value<int?> creditLimitSatang;
   final Value<String?> icon;
+  final Value<bool> isDefault;
   final Value<bool> isActive;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -1678,6 +1717,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
     this.dueDay = const Value.absent(),
     this.creditLimitSatang = const Value.absent(),
     this.icon = const Value.absent(),
+    this.isDefault = const Value.absent(),
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -1695,6 +1735,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
     this.dueDay = const Value.absent(),
     this.creditLimitSatang = const Value.absent(),
     this.icon = const Value.absent(),
+    this.isDefault = const Value.absent(),
     this.isActive = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
@@ -1718,6 +1759,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
     Expression<int>? dueDay,
     Expression<int>? creditLimitSatang,
     Expression<String>? icon,
+    Expression<bool>? isDefault,
     Expression<bool>? isActive,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -1735,6 +1777,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
       if (dueDay != null) 'due_day': dueDay,
       if (creditLimitSatang != null) 'credit_limit_satang': creditLimitSatang,
       if (icon != null) 'icon': icon,
+      if (isDefault != null) 'is_default': isDefault,
       if (isActive != null) 'is_active': isActive,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -1754,6 +1797,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
     Value<int?>? dueDay,
     Value<int?>? creditLimitSatang,
     Value<String?>? icon,
+    Value<bool>? isDefault,
     Value<bool>? isActive,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -1771,6 +1815,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
       dueDay: dueDay ?? this.dueDay,
       creditLimitSatang: creditLimitSatang ?? this.creditLimitSatang,
       icon: icon ?? this.icon,
+      isDefault: isDefault ?? this.isDefault,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -1810,6 +1855,9 @@ class AccountsCompanion extends UpdateCompanion<Account> {
     if (icon.present) {
       map['icon'] = Variable<String>(icon.value);
     }
+    if (isDefault.present) {
+      map['is_default'] = Variable<bool>(isDefault.value);
+    }
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
     }
@@ -1843,6 +1891,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
           ..write('dueDay: $dueDay, ')
           ..write('creditLimitSatang: $creditLimitSatang, ')
           ..write('icon: $icon, ')
+          ..write('isDefault: $isDefault, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -21070,6 +21119,7 @@ typedef $$AccountsTableCreateCompanionBuilder =
       Value<int?> dueDay,
       Value<int?> creditLimitSatang,
       Value<String?> icon,
+      Value<bool> isDefault,
       Value<bool> isActive,
       required DateTime createdAt,
       required DateTime updatedAt,
@@ -21088,6 +21138,7 @@ typedef $$AccountsTableUpdateCompanionBuilder =
       Value<int?> dueDay,
       Value<int?> creditLimitSatang,
       Value<String?> icon,
+      Value<bool> isDefault,
       Value<bool> isActive,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -21147,6 +21198,11 @@ class $$AccountsTableFilterComposer
 
   ColumnFilters<String> get icon => $composableBuilder(
     column: $table.icon,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isDefault => $composableBuilder(
+    column: $table.isDefault,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -21230,6 +21286,11 @@ class $$AccountsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isDefault => $composableBuilder(
+    column: $table.isDefault,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isActive => $composableBuilder(
     column: $table.isActive,
     builder: (column) => ColumnOrderings(column),
@@ -21302,6 +21363,9 @@ class $$AccountsTableAnnotationComposer
   GeneratedColumn<String> get icon =>
       $composableBuilder(column: $table.icon, builder: (column) => column);
 
+  GeneratedColumn<bool> get isDefault =>
+      $composableBuilder(column: $table.isDefault, builder: (column) => column);
+
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
 
@@ -21357,6 +21421,7 @@ class $$AccountsTableTableManager
                 Value<int?> dueDay = const Value.absent(),
                 Value<int?> creditLimitSatang = const Value.absent(),
                 Value<String?> icon = const Value.absent(),
+                Value<bool> isDefault = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -21373,6 +21438,7 @@ class $$AccountsTableTableManager
                 dueDay: dueDay,
                 creditLimitSatang: creditLimitSatang,
                 icon: icon,
+                isDefault: isDefault,
                 isActive: isActive,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -21391,6 +21457,7 @@ class $$AccountsTableTableManager
                 Value<int?> dueDay = const Value.absent(),
                 Value<int?> creditLimitSatang = const Value.absent(),
                 Value<String?> icon = const Value.absent(),
+                Value<bool> isDefault = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
@@ -21407,6 +21474,7 @@ class $$AccountsTableTableManager
                 dueDay: dueDay,
                 creditLimitSatang: creditLimitSatang,
                 icon: icon,
+                isDefault: isDefault,
                 isActive: isActive,
                 createdAt: createdAt,
                 updatedAt: updatedAt,

@@ -2072,9 +2072,20 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          '${trade.quantity} ${isThai ? "หน่วย" : "units"} @ ${Money(trade.priceOriginalSatang).format(symbol: trade.currencyCode == 'THB' ? '฿' : '\$')}',
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                        Builder(
+                          builder: (context) {
+                            final currSym = trade.currencyCode == 'THB' ? '฿' : '\$';
+                            String priceText;
+                            if (trade.pricePerUnitOriginal != null) {
+                              priceText = '$currSym${trade.pricePerUnitOriginal}';
+                            } else {
+                              priceText = Money(trade.priceOriginalSatang).format(symbol: currSym);
+                            }
+                            return Text(
+                              '${trade.quantity} ${isThai ? "หน่วย" : "units"} @ $priceText',
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                            );
+                          },
                         ),
                         if (hasRealizedPnl)
                           Container(

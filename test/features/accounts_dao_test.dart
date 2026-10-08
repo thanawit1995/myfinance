@@ -223,4 +223,74 @@ void main() {
       expect(updatedAcc?.name, isNot(equals(originalName)));
     });
   });
+
+  group('AccountsDao - setDefaultAccount & Default Ordering Tests', () {
+    test('setDefaultAccount ตั้งบัญชีเป็นบัญชีหลักได้ และ reset บัญชีอื่น', () async {
+      final allAccounts = await db.accountsDao.getActiveAccounts();
+      expect(allAccounts, isNotEmpty);
+
+      final target = allAccounts.first;
+
+      // ตั้งเป็นบัญชีหลัก
+      await db.accountsDao.setDefaultAccount(target.id);
+
+      // ตรวจว่า target เป็น isDefault = true
+      final updated = await db.accountsDao.getAccountById(target.id);
+      expect(updated?.isDefault, isTrue);
+
+      // ตรวจว่าบัญชีอื่นทั้งหมด isDefault = false
+      final rest = allAccounts.where((a) => a.id != target.id).toList();
+      for (final acc in rest) {
+        final a = await db.accountsDao.getAccountById(acc.id);
+        expect(a?.isDefault, isFalse,
+            reason: 'บัญชี ${acc.name} ควรเป็น isDefault=false');
+      }
+    });
+
+    test('setDefaultAccount เปลี่ยนบัญชีหลักจากบัญชีหนึ่งไปอีกบัญชีได้ถูกต้อง', () async {
+      final allAccounts = await db.accountsDao.getActiveAccounts();
+      expect(allAccounts.length, greaterThanOrEqualTo(2));
+
+      final first = allAccounts[0];
+      final second = allAccounts[1];
+
+      // ตั้ง first เป็นบัญชีหลักก่อน
+      await db.accountsDao.setDefaultAccount(first.id);
+      var firstAcc = await db.accountsDao.getAccountById(first.id);
+      expect(firstAcc?.isDefault, isTrue);
+
+      // เปลี่ยนไปที่ second
+      await db.accountsDao.setDefaultAccount(second.id);
+
+      // second ต้องเป็น true
+      final secondAcc = await db.accountsDao.getAccountById(second.id);
+      expect(secondAcc?.isDefault, isTrue);
+
+      // first ต้องถูก reset เป็น false
+      firstAcc = await db.accountsDao.getAccountById(first.id);
+      expect(firstAcc?.isDefault, isFalse,
+          reason: 'บัญชีเดิมต้องถูก reset isDefault=false เมื่อตั้งบัญชีใหม่เป็นหลัก');
+    });
+
+    test('getActiveAccounts เรียงบัญชีหลักไว้ลำดับแรก', () async {
+      final allAccounts = await db.accountsDao.getActiveAccounts();
+      expect(allAccounts.length, greaterThanOrEqualTo(2));
+
+      // ตั้งบัญชีสุดท้ายเป็นบัญชีหลัก
+      final lastAcc = allAccounts.last;
+      await db.accountsDao.setDefaultAccount(lastAcc.id);
+
+      final ordered = await db.accountsDao.getActiveAccounts();
+
+      // บัญชีหลักต้องอยู่ลำดับแรก
+      expect(ordered.first.id, equals(lastAcc.id),
+          reason: 'บัญชีหลักต้องปรากฏเป็นลำดับแรกใน getActiveAccounts()');
+      expect(ordered.first.isDefault, isTrue);
+
+      // บัญชีที่เหลือต้อง isDefault = false
+      for (int i = 1; i < ordered.length; i++) {
+        expect(ordered[i].isDefault, isFalse);
+      }
+    });
+  });
 }

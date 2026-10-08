@@ -280,6 +280,39 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        if (account.isDefault) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.primaryContainer,
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
+                                width: 0.8,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.star,
+                                  size: 10,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  isThai ? 'บัญชีหลัก' : 'Default',
+                                  style: TextStyle(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         if (isUsd) ...[
                           const SizedBox(width: 6),
                           Container(
@@ -535,6 +568,61 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                   border: const OutlineInputBorder(),
                 ),
               ),
+              const SizedBox(height: 12),
+              if (!account.isDefault)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.star_outline, color: Colors.amber),
+                  title: Text(
+                    isThai ? 'ตั้งเป็นบัญชีหลัก' : 'Set as Default Account',
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    isThai
+                        ? 'จะแสดงเป็นตัวเลือกแรกเสมอเมื่อบันทึกรายการด่วน'
+                        : 'Will appear first in Quick Add by default',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  trailing: TextButton(
+                    onPressed: () async {
+                      await ref.read(accountsDaoProvider).setDefaultAccount(account.id);
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop(false);
+                      }
+                      if (mounted) {
+                        setState(() {});
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(isThai
+                                ? 'ตั้ง "${account.name}" เป็นบัญชีหลักแล้ว'
+                                : 'Set "${account.name}" as default account'),
+                          ),
+                        );
+                      }
+                    },
+                    child: Text(isThai ? 'ตั้งค่าทันที' : 'Set now'),
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.star, color: Colors.amber, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          isThai ? 'บัญชีนี้เป็นบัญชีหลักอยู่ในปัจจุบัน' : 'This is currently the default account',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
           actions: [

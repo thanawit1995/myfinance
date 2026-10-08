@@ -1351,12 +1351,44 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
                           );
                         },
                       ),
-                      title: Text(
-                        acc.name,
-                        style: TextStyle(
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                          fontSize: 14,
-                        ),
+                      title: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              acc.name,
+                              style: TextStyle(
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (acc.isDefault) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.star, size: 10, color: Theme.of(context).colorScheme.primary),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    isThai ? 'บัญชีหลัก' : 'Default',
+                                    style: TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: Theme.of(context).colorScheme.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       subtitle: Text(
                         '${acc.currencyCode} • ${isCreditCard ? (isThai ? "บัตรเครดิต" : "Credit Card") : (isThai ? "บัญชีเงินฝาก" : "Bank Account")}',

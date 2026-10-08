@@ -83,7 +83,7 @@ class VaultHomeScreen extends ConsumerWidget {
                   momChangePercent: data.momChangePercent,
                   cashFlowMonthSatang: data.cashFlowMonthSatang,
                   totalIncomeSatang: data.totalIncomeMonthSatang,
-                  totalExpenseSatang: data.totalExpenseMonthSatang,
+                  totalExpenseSatang: data.totalLivingExpenseMonthSatang,
                   remainingBudgetSatang: data.remainingBudgetSatang,
                   totalBudgetSatang: data.totalBudgetMonthSatang,
                   portfolioValueSatang: data.portfolioValueSatang,
@@ -150,7 +150,7 @@ class VaultHomeScreen extends ConsumerWidget {
                     dailyExpenses: data.dailyExpenses,
                     currentDay: now.day,
                     daysInMonth: DateTime(now.year, now.month + 1, 0).day,
-                    totalExpenseSatang: data.totalExpenseMonthSatang,
+                    totalExpenseSatang: data.totalLivingExpenseMonthSatang,
                     totalBudgetSatang: data.totalBudgetMonthSatang,
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const MonthlySummaryScreen()),
@@ -1062,7 +1062,7 @@ class VaultHomeScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final remainingSatang = data.remainingBudgetSatang;
     final totalBudgetSatang = data.totalBudgetMonthSatang;
-    final totalExpenseSatang = data.totalExpenseMonthSatang;
+    final totalExpenseSatang = data.totalLivingExpenseMonthSatang;
     final hasBudget = totalBudgetSatang > 0;
 
     final percentRemaining = hasBudget
@@ -2100,12 +2100,19 @@ class VaultHomeScreen extends ConsumerWidget {
 
     int totalIncome = 0;
     int totalExpense = 0;
+    int totalLivingExpense = 0;
     for (final t in monthTx) {
       if (t.transactionType == 'income') {
         if (!t.isCleared) continue;
         totalIncome += t.amountThbSatang;
       } else if (t.transactionType == 'expense') {
-        totalExpense += (t.amountThbSatang + t.feeThbSatang);
+        final expAmount = t.amountThbSatang + t.feeThbSatang;
+        totalExpense += expAmount;
+        final isInvBuy = (t.tag != null && t.tag!.startsWith('investment_buy:')) ||
+            (t.categoryId == 'cat-exp-0000-4000-8000-000000000099');
+        if (!isInvBuy) {
+          totalLivingExpense += expAmount;
+        }
       }
     }
     final cashFlow = totalIncome - totalExpense;
@@ -2116,9 +2123,13 @@ class VaultHomeScreen extends ConsumerWidget {
     }
     for (final t in monthTx) {
       if (t.transactionType == 'expense') {
-        final d = t.transactionDate.day;
-        if (d <= now.day) {
-          dailyExpenses[d] = (dailyExpenses[d] ?? 0) + (t.amountThbSatang + t.feeThbSatang);
+        final isInvBuy = (t.tag != null && t.tag!.startsWith('investment_buy:')) ||
+            (t.categoryId == 'cat-exp-0000-4000-8000-000000000099');
+        if (!isInvBuy) {
+          final d = t.transactionDate.day;
+          if (d <= now.day) {
+            dailyExpenses[d] = (dailyExpenses[d] ?? 0) + (t.amountThbSatang + t.feeThbSatang);
+          }
         }
       }
     }
@@ -2129,7 +2140,7 @@ class VaultHomeScreen extends ConsumerWidget {
     for (final b in budgets) {
       totalBudget += b.limitSatang;
     }
-    final remainingBudget = totalBudget > 0 ? (totalBudget - totalExpense).clamp(0, totalBudget) : 0;
+    final remainingBudget = totalBudget > 0 ? (totalBudget - totalLivingExpense).clamp(0, totalBudget) : 0;
 
     // 5. Credit Cards (Total outstanding debt across all cycles)
     int ccDebt = 0;
@@ -2249,6 +2260,7 @@ class VaultHomeScreen extends ConsumerWidget {
       totalIncomeMonthSatang: totalIncome,
       totalBudgetMonthSatang: totalBudget,
       totalExpenseMonthSatang: totalExpense,
+      totalLivingExpenseMonthSatang: totalLivingExpense,
       remainingBudgetSatang: remainingBudget,
       portfolioValueSatang: portValue,
       portfolioReturnPercent: portReturnPercent,
@@ -2283,6 +2295,7 @@ class _VaultHomeData {
   final int totalIncomeMonthSatang;
   final int totalBudgetMonthSatang;
   final int totalExpenseMonthSatang;
+  final int totalLivingExpenseMonthSatang;
   final int remainingBudgetSatang;
   final int portfolioValueSatang;
   final double portfolioReturnPercent;
@@ -2306,6 +2319,7 @@ class _VaultHomeData {
     required this.totalIncomeMonthSatang,
     required this.totalBudgetMonthSatang,
     required this.totalExpenseMonthSatang,
+    required this.totalLivingExpenseMonthSatang,
     required this.remainingBudgetSatang,
     required this.portfolioValueSatang,
     required this.portfolioReturnPercent,

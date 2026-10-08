@@ -510,7 +510,8 @@ class _BuySellTradeScreenState extends ConsumerState<BuySellTradeScreen> {
                         ],
                         decoration: InputDecoration(
                           labelText: isThai ? 'ราคา/หน่วย ($_currency) *' : 'Price/Unit ($_currency) *',
-                          hintText: isThai ? 'เช่น 65.50' : 'e.g. 65.50',
+                          hintText: isThai ? 'เช่น 65.50 หรือ 12.3456' : 'e.g. 65.50 or 12.3456',
+                          helperText: isThai ? 'รองรับทศนิยมสูงสุด 4 ตำแหน่ง' : 'Supports up to 4 decimal places',
                           border: const OutlineInputBorder(),
                         ),
                         validator: (val) {
@@ -609,8 +610,8 @@ class _BuySellTradeScreenState extends ConsumerState<BuySellTradeScreen> {
                     final fx = Decimal.tryParse(_fxRateController.text.trim()) ?? Decimal.one;
                     final fee = double.tryParse(_feeController.text.trim()) ?? 0.0;
 
-                    final origTotalSatang = (q * p * Decimal.fromInt(100)).round().toBigInt().toInt();
-                    final thbTotalSatang = (Decimal.fromInt(origTotalSatang) * fx).round().toBigInt().toInt() +
+                    final totalOriginalSatang = (q * p * Decimal.fromInt(100)).round().toBigInt().toInt();
+                    final thbTotalSatang = (Decimal.fromInt(totalOriginalSatang) * fx).round().toBigInt().toInt() +
                         (_isBuy ? (fee * 100).round() : -(fee * 100).round());
 
                     final moneyPreview = Money(thbTotalSatang > 0 ? thbTotalSatang : 0);

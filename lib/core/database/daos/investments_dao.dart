@@ -115,6 +115,7 @@ class InvestmentTradeRecord {
   final Asset? asset;
   final Decimal quantity;
   final int priceOriginalSatang;
+  final Decimal? pricePerUnitOriginal;
   final String currencyCode;
   final Decimal fxRate;
   final int totalThbSatang;
@@ -131,6 +132,7 @@ class InvestmentTradeRecord {
     this.asset,
     required this.quantity,
     required this.priceOriginalSatang,
+    this.pricePerUnitOriginal,
     required this.currencyCode,
     required this.fxRate,
     required this.totalThbSatang,
@@ -1479,11 +1481,16 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
       int? costThbSatang;
       int? realizedGainLoss;
 
+      Decimal? pricePerUnitOriginal;
+
       if (isBuy) {
         final lot = lotByTxMap[tx.id];
         if (lot != null) {
           qty = Decimal.parse(lot.quantity);
           priceOriginalSatang = lot.costPerUnitOriginalSatang;
+          if (lot.pricePerUnitOriginal != null) {
+            pricePerUnitOriginal = Decimal.tryParse(lot.pricePerUnitOriginal!);
+          }
         } else if (tx.amountOriginalSatang > 0) {
           priceOriginalSatang = tx.amountOriginalSatang;
           qty = Decimal.one;
@@ -1500,8 +1507,9 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
         costThbSatang = sumCost;
         realizedGainLoss = sumRealized;
         if (qty > Decimal.zero) {
-          final priceDec = Decimal.fromInt(tx.amountOriginalSatang) / qty;
-          priceOriginalSatang = priceDec.round().toInt();
+          final priceDec = (Decimal.fromInt(tx.amountOriginalSatang) / qty).toDecimal(scaleOnInfinitePrecision: 2);
+          priceOriginalSatang = priceDec.round().toBigInt().toInt();
+          pricePerUnitOriginal = (Decimal.fromInt(tx.amountOriginalSatang) / (qty * Decimal.fromInt(100))).toDecimal(scaleOnInfinitePrecision: 4);
         }
       }
 
@@ -1512,6 +1520,7 @@ class InvestmentsDao extends DatabaseAccessor<AppDatabase> with _$InvestmentsDao
         asset: asset,
         quantity: qty,
         priceOriginalSatang: priceOriginalSatang,
+        pricePerUnitOriginal: pricePerUnitOriginal,
         currencyCode: tx.currencyCode,
         fxRate: Decimal.tryParse(tx.fxRate) ?? Decimal.one,
         totalThbSatang: tx.amountThbSatang,

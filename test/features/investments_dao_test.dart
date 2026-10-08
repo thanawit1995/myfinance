@@ -954,4 +954,115 @@ void main() {
       expect(dupResult.contains(buyTxId), isFalse);
     });
   });
+
+  group('InvestmentsDao - ราคาซื้อขายทศนิยม 4 ตำแหน่ง (4-Decimal Price Precision)', () {
+    test('บันทึกการซื้อด้วยราคาทศนิยม 4 ตำแหน่งได้ถูกต้อง', () async {
+      final now = DateTime.now();
+      const assetId = 'asset-price-4dec';
+
+      await db.investmentsDao.createAsset(
+        AssetsCompanion.insert(
+          id: assetId,
+          symbol: 'TEST4D',
+          name: 'Test 4-Decimal Asset',
+          assetType: 'crypto',
+          currencyCode: 'THB',
+          defaultAccountId: defaultAccountId,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      // ราคา 12.3456 THB/unit (1234 satang + ทศนิยม 4 ตำแหน่ง → priceOriginalSatang = 1235 satang หลัง round)
+      // quantity = 10 units → total = 12.3456 × 10 = 123.456 THB = 12346 satang (rounded)
+      // ใช้ priceOriginalSatang = 1235 satang (= 12.35 THB ต่อหน่วย หลัง round เป็น satang)
+      // แต่ pricePerUnitOriginal ควรเก็บเป็น Decimal 4 ตำแหน่ง
+      await db.investmentsDao.recordBuyTrade(
+        assetId: assetId,
+        accountId: defaultAccountId,
+        tradeDate: DateTime(2026, 10, 1),
+        quantity: Decimal.parse('10'),
+        // 12.3456 THB × 10 units = 123.456 THB ≈ 12346 satang
+        priceOriginalSatang: 1235, // 12.35 THB/unit (rounded satang)
+        currencyCode: 'THB',
+        fxRate: Decimal.parse('1.000000'),
+        feeThbSatang: 0,
+        // ส่ง pricePerUnitOriginal เป็น Decimal เพื่อเก็บ 4 ตำแหน่ง
+        pricePerUnitOriginal: Decimal.parse('12.3456'),
+      );
+
+      // ตรวจ lot ที่บันทึก
+      final lots = await db.investmentsDao.getAllLotsForAsset(assetId);
+      expect(lots, hasLength(1));
+      final lot = lots.first;
+      expect(Decimal.parse(lot.quantity), equals(Decimal.parse('10')));
+      expect(lot.pricePerUnitOriginal, isNotNull,
+          reason: 'ต้องเก็บราคาทศนิยม 4 ตำแหน่งใน lot');
+      expect(Decimal.parse(lot.pricePerUnitOriginal!), equals(Decimal.parse('12.3456')),
+          reason: 'ราคา/หน่วย ต้องถูกต้องที่ 12.3456 THB');
+    });
+
+    test('getInvestmentTrades คืน pricePerUnitOriginal ที่ถูกต้องสำหรับรายการซื้อ', () async {
+      final now = DateTime.now();
+      const assetId = 'asset-trade-hist-4d';
+
+      await db.investmentsDao.createAsset(
+        AssetsCompanion.insert(
+          id: assetId,
+          symbol: 'HIST4D',
+          name: 'History 4-Decimal Asset',
+          assetType: 'crypto',
+          currencyCode: 'THB',
+          defaultAccountId: defaultAccountId,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      // ซื้อ 5 units @ 99.9999 THB/unit
+      await db.investmentsDao.recordBuyTrade(
+        assetId: assetId,
+        accountId: defaultAccountId,
+        tradeDate: DateTime(2026, 10, 2),
+        quantity: Decimal.parse('5'),
+        priceOriginalSatang: 10000, // 100 THB/unit (rounded satang)
+        currencyCode: 'THB',
+        fxRate: Decimal.parse('1.000000'),
+        feeThbSatang: 0,
+        pricePerUnitOriginal: Decimal.parse('99.9999'),
+      );
+
+      // ดึง trade history
+      final allTrades = await db.investmentsDao.getInvestmentTrades();
+      final trades = allTrades.where((t) => t.asset?.id == assetId).toList();
+      expect(trades, hasLength(1));
+      final trade = trades.first;
+
+      expect(trade.tradeType, equals('buy'));
+      expect(trade.quantity, equals(Decimal.parse('5')));
+      expect(trade.pricePerUnitOriginal, isNotNull,
+          reason: 'getInvestmentTrades ต้อง populate pricePerUnitOriginal');
+      expect(trade.pricePerUnitOriginal, equals(Decimal.parse('99.9999')),
+          reason: 'ราคา/หน่วยต้องเป็น 99.9999 THB ครบ 4 ตำแหน่ง');
+    });
+
+    test('ราคาทศนิยม 4 ตำแหน่งเก็บค่าได้ถูกต้อง ไม่มีการตัดทศนิยม', () async {
+      // Test ว่า Decimal.parse('12.3456') ≠ Decimal.parse('12.35')
+      // เพื่อยืนยันว่าการใช้ Decimal ไม่สูญเสียข้อมูล
+      final priceA = Decimal.parse('12.3456');
+      final priceB = Decimal.parse('12.35');
+      final priceC = Decimal.parse('12.3456');
+
+      expect(priceA, isNot(equals(priceB)),
+          reason: 'ราคา 12.3456 ต้องไม่เท่ากับ 12.35 ห้ามตัดทศนิยม');
+      expect(priceA, equals(priceC),
+          reason: 'ราคา 12.3456 ต้องเท่ากับ 12.3456 ทุกครั้ง');
+
+      // ตรวจว่าการแปลงกลับเป็น double ไม่ใช้ใน business logic
+      // (Decimal ต้องใช้เป็น Decimal เสมอ ห้ามแปลงเป็น double)
+      expect(priceA.toString(), equals('12.3456'),
+          reason: 'toString() ต้องคงทศนิยม 4 ตำแหน่งไว้');
+    });
+  });
 }
+

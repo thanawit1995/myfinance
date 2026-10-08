@@ -73,7 +73,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.connection);
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration {
@@ -172,6 +172,9 @@ class AppDatabase extends _$AppDatabase {
           await m.createTable(investmentPortfolios);
           await m.addColumn(assets, assets.portfolioId);
         }
+        if (from < 13) {
+          await m.addColumn(accounts, accounts.isDefault);
+        }
       },
       beforeOpen: (details) async {
         await customStatement('PRAGMA foreign_keys = ON;');
@@ -233,6 +236,7 @@ class AppDatabase extends _$AppDatabase {
     await _safeAddColumn(m, assetPrices, assetPrices.marketPriceThb);
     await _safeAddColumn(m, categories, categories.sortOrder);
     await _safeAddColumn(m, accounts, accounts.icon);
+    await _safeAddColumn(m, accounts, accounts.isDefault);
     await _safeAddColumn(m, assets, assets.icon);
     await _safeAddColumn(m, assets, assets.portfolioId);
   }

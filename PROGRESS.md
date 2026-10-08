@@ -1,6 +1,25 @@
 # บันทึกความคืบหน้าโครงการ MyFinance (PROGRESS.md)
 
-อัปเดตล่าสุด: 5 ตุลาคม 2026 (ปรับปรุงระบบแจ้งเตือนรายการประจำ, Filter รับทราบรายการ, แจ้งเตือน Due Today หน้า Home)
+อัปเดตล่าสุด: 8 ตุลาคม 2026 (ฟีเจอร์ราคาซื้อขาย 4 ตำแหน่ง, Master Budget ไม่รวมลงทุน, ระบบบัญชีหลัก)
+
+- [x] **4-Decimal Investment Price, Non-Investment Master Budget & Default Account System (8 ต.ค. 2026)**:
+  - **1. ซื้อขายสินทรัพย์สามารถตั้งราคาได้ถึงทศนิยม 4 หลัก (`buy_sell_trade_dialog.dart`, `investments_dao.dart`, `portfolio_screen.dart`)**:
+    - ฟอร์มซื้อขายสินทรัพย์รองรับการกรอกราคาทศนิยมสูงสุด 4 ตำแหน่ง (เช่น 35.1234 บาท/หน่วย หรือ $0.0055) พร้อมข้อความแนะนำ `helperText`
+    - เพิ่มคอลัมน์และฟิลด์ `pricePerUnitOriginal` ในโครงสร้าง Lot และ `InvestmentTradeRecord` เพื่อรักษาความละเอียด 4-8 ตำแหน่งไว้ ไม่ถูกตัดทศนิยม
+    - หน้า Trade History แสดงราคาต่อหน่วยตามทศนิยม 4 ตำแหน่งที่แท้จริง
+  - **2. Master Budget & Expense Trend คิดเฉพาะรายจ่ายที่ไม่ใช่การลงทุน (`vault_home_screen.dart`, `lumi_desktop_layout.dart`)**:
+    - แยกยอด `totalLivingExpense` (รายจ่ายเพื่อการดำรงชีพ) ออกจากยอดรวมรายจ่าย โดยกรองรายการที่มี tag `investment_buy:` หรือหมวดหมู่การลงทุน (`cat-exp-0000-4000-8000-000000000099`) ออก
+    - งบประมาณคงเหลือ (`remainingBudget`) คำนวณจาก `totalBudget - totalLivingExpense` ป้องกันไม่ให้การลงทุนส่งผลให้งบประมาณติดลบหรือเตือนงบหมด
+    - กราฟแนวโน้มรายจ่าย (`dailyExpenses` และ `ExpenseTrendProjectionCard`) แสดงเฉพาะรายจ่ายจริง ไม่นำเงินลงทุนมารวมในกราฟแท่งและแนวโน้ม
+  - **3. ระบบตั้งบัญชีหลัก (Default Account) และแสดงเป็นชื่อแรก (`accounts_table.dart`, `accounts_dao.dart`, `accounts_screen.dart`, `quick_add_screen.dart`)**:
+    - ปรับ Schema SQLite v13: เพิ่มคอลัมน์ `is_default` (boolean) ในตาราง `accounts` พร้อม Migration v12 -> v13 ปลอดภัย 100%
+    - เพิ่มฟังก์ชัน `setDefaultAccount(accountId)` ใน `AccountsDao` รีเซ็ตบัญชีอื่นและตั้งบัญชีเป้าหมายเป็นบัญชีหลัก
+    - ปรับ `getActiveAccounts()` และ `watchActiveAccounts()` ให้ ORDER BY `is_default DESC, created_at ASC` ทำให้บัญชีหลักปรากฏเป็นลำดับแรกเสมอใน Quick Add Account Picker
+    - เพิ่มปุ่ม "ตั้งเป็นบัญชีหลัก" ใน Dialog แก้ไขบัญชี และป้าย Badge "บัญชีหลัก ⭐" ในหน้ารายการบัญชีและ Bottom Sheet
+  - **4. การทดสอบและการรับรองคุณภาพ**:
+    - เพิ่ม Unit Tests ครอบคลุมทั้ง 3 ฟีเจอร์: `accounts_dao_test.dart`, `investments_dao_test.dart`, `master_budget_living_expense_test.dart`
+    - `flutter analyze`: **0 errors, 0 warnings** (No issues found)
+    - `flutter test`: ผ่านทั้งหมด **202/202 tests passed** (100%)
 
 - [x] **Recurring Notification & Attention Insight Overhaul (5 ต.ค. 2026)**:
   - **1. แก้ไขปัญหารายการแจ้งเตือนเก่าไม่หายไปหลังกดติ๊กถูก / รับทราบทั้งหมด (`vault_home_screen.dart`)**:

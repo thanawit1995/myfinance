@@ -13,22 +13,51 @@ class AccountsDao extends DatabaseAccessor<AppDatabase> with _$AccountsDaoMixin 
   Stream<List<Account>> watchActiveAccounts() {
     return (select(accounts)
           ..where((a) => a.isActive.equals(true) & a.deletedAt.isNull())
-          ..orderBy([(a) => OrderingTerm(expression: a.createdAt)]))
+          ..orderBy([
+            (a) => OrderingTerm(expression: a.isDefault, mode: OrderingMode.desc),
+            (a) => OrderingTerm(expression: a.createdAt),
+          ]))
         .watch();
   }
 
   Future<List<Account>> getActiveAccounts() {
     return (select(accounts)
           ..where((a) => a.isActive.equals(true) & a.deletedAt.isNull())
-          ..orderBy([(a) => OrderingTerm(expression: a.createdAt)]))
+          ..orderBy([
+            (a) => OrderingTerm(expression: a.isDefault, mode: OrderingMode.desc),
+            (a) => OrderingTerm(expression: a.createdAt),
+          ]))
         .get();
   }
 
   Future<List<Account>> getAllAccounts() {
     return (select(accounts)
           ..where((a) => a.deletedAt.isNull())
-          ..orderBy([(a) => OrderingTerm(expression: a.createdAt)]))
+          ..orderBy([
+            (a) => OrderingTerm(expression: a.isDefault, mode: OrderingMode.desc),
+            (a) => OrderingTerm(expression: a.createdAt),
+          ]))
         .get();
+  }
+
+  Future<void> setDefaultAccount(String accountId) async {
+    final now = DateTime.now();
+    await transaction(() async {
+      // 1. Reset all accounts isDefault to false
+      await update(accounts).write(
+        AccountsCompanion(
+          isDefault: const Value(false),
+          updatedAt: Value(now),
+        ),
+      );
+      // 2. Set the target account isDefault to true
+      await (update(accounts)..where((a) => a.id.equals(accountId))).write(
+        AccountsCompanion(
+          isDefault: const Value(true),
+          updatedAt: Value(now),
+        ),
+      );
+    });
   }
 
   Future<Account?> getAccountById(String id) {

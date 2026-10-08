@@ -1,6 +1,15 @@
 # บันทึกความคืบหน้าโครงการ MyFinance (PROGRESS.md)
 
-อัปเดตล่าสุด: 8 ตุลาคม 2026 (มาสคอต Lumi ตัวใหญ่หน้า Home เปลี่ยนอารมณ์ตามสถานะงบประมาณ Smile/Warning/Shock, แยกกิจกรรมพอร์ตการลงทุนและผลผลิตจากสินทรัพย์ใน Financial Summary)
+อัปเดตล่าสุด: 8 ตุลาคม 2026 (แก้ไข SQLite Migration Error Duplicate Column is_default ให้ปลอดภัย 100%, มาสคอต Lumi ตัวใหญ่หน้า Home เปลี่ยนอารมณ์ตามสถานะงบประมาณ Smile/Warning/Shock)
+
+- [x] **Database Migration Idempotency & Duplicate Column Prevention (8 ต.ค. 2026)**:
+  - **1. ป้องกันข้อผิดพลาด `duplicate column name: is_default` ใน SQLite (`app_database.dart`)**:
+    - ปรับปรุงขั้นตอน `onUpgrade` (from < 13 และทุกเวอร์ชัน) ให้เรียกผ่าน `_safeAddColumn` และ `_safeCreateTable`
+    - หากคอลัมน์หรือตารางมีอยู่แล้วในฐานข้อมูล (เช่น จากการ Sync คลาวด์, กู้คืนไฟล์สำรอง, หรือ snapshot ก่อนหน้า) จะไม่เกิดข้อผิดพลาด `SqliteException(1): duplicate column name` และระบบจะดำเนินการอัปเกรด Schema ต่อจนสำเร็จสมบูรณ์
+  - **2. เพิ่ม Unit Test ตรวจสอบความปลอดภัยของการอัปเกรดฐานข้อมูล (`test/core/database_test.dart`)**:
+    - เพิ่มการทดสอบกรณี `onUpgrade` จากเวอร์ชัน 12 ไป 13 ขณะที่มีคอลัมน์ `is_default` อยู่แล้วในตาราง `accounts` ยืนยันว่าทำงานสำเร็จและไม่โยน Exception
+    - `flutter analyze`: **0 errors, 0 warnings**
+    - `flutter test`: ผ่านทั้งหมด **210/210 tests passed** (100%)
 
 - [x] **Lumi Home Hero Mascot Dynamic Emotion, Upsize & Behind-Bar Layering (8 ต.ค. 2026)**:
   - **1. นำเข้าไฟล์ภาพมาสคอต Lumi & น้องแมวแบบโปร่งใส (Transparent PNG)**:

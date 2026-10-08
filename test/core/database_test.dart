@@ -140,5 +140,12 @@ void main() {
       final txList = await db.select(db.transactions).get();
       expect(txList, isA<List>());
     });
+
+    test('onUpgrade from 12 to 13 succeeds even if is_default column already exists in accounts table', () async {
+      // Column is_default already exists in this in-memory database instance
+      final migrator = db.createMigrator();
+      // Calling onUpgrade with from = 12 should not throw duplicate column name: is_default
+      await expectLater(db.migration.onUpgrade(migrator, 12, 13), completes);
+    });
   });
 }

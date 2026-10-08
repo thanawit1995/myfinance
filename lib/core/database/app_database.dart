@@ -104,76 +104,78 @@ class AppDatabase extends _$AppDatabase {
       },
       onUpgrade: (Migrator m, int from, int to) async {
         if (from < 2) {
-          await m.addColumn(transactions, transactions.feeThbSatang);
-          await m.addColumn(transactions, transactions.tag);
+          await _safeAddColumn(m, transactions, transactions.feeThbSatang);
+          await _safeAddColumn(m, transactions, transactions.tag);
         }
         if (from < 3) {
-          await m.addColumn(assets, assets.market);
-          await m.addColumn(assets, assets.note);
-          await m.addColumn(assets, assets.extraDetailsJson);
-          await m.addColumn(investmentLots, investmentLots.totalCostThbSatang);
-          await m.addColumn(investmentLots, investmentLots.remainingCostThbSatang);
-          await m.addColumn(investmentSales, investmentSales.priceGainLossThbSatang);
-          await m.addColumn(investmentSales, investmentSales.fxGainLossThbSatang);
-          await m.addColumn(investmentSales, investmentSales.sellFxRate);
-          await m.addColumn(investmentSales, investmentSales.buyFxRate);
-          await m.createTable(investmentIncomes);
+          await _safeAddColumn(m, assets, assets.market);
+          await _safeAddColumn(m, assets, assets.note);
+          await _safeAddColumn(m, assets, assets.extraDetailsJson);
+          await _safeAddColumn(m, investmentLots, investmentLots.totalCostThbSatang);
+          await _safeAddColumn(m, investmentLots, investmentLots.remainingCostThbSatang);
+          await _safeAddColumn(m, investmentSales, investmentSales.priceGainLossThbSatang);
+          await _safeAddColumn(m, investmentSales, investmentSales.fxGainLossThbSatang);
+          await _safeAddColumn(m, investmentSales, investmentSales.sellFxRate);
+          await _safeAddColumn(m, investmentSales, investmentSales.buyFxRate);
+          await _safeCreateTable(m, investmentIncomes);
         }
         if (from < 4) {
-          await m.createTable(liabilities);
-          await m.createTable(insurancePolicies);
-          await m.addColumn(recurringRules, recurringRules.intervalUnits);
-          await m.addColumn(recurringRules, recurringRules.autoPost);
-          await m.addColumn(recurringRules, recurringRules.lastPostedDate);
-          await m.addColumn(recurringRules, recurringRules.note);
-          await m.addColumn(financialHealthSettings, financialHealthSettings.warningValue);
+          await _safeCreateTable(m, liabilities);
+          await _safeCreateTable(m, insurancePolicies);
+          await _safeAddColumn(m, recurringRules, recurringRules.intervalUnits);
+          await _safeAddColumn(m, recurringRules, recurringRules.autoPost);
+          await _safeAddColumn(m, recurringRules, recurringRules.lastPostedDate);
+          await _safeAddColumn(m, recurringRules, recurringRules.note);
+          await _safeAddColumn(m, financialHealthSettings, financialHealthSettings.warningValue);
         }
         if (from < 5) {
-          await m.createTable(projects);
+          await _safeCreateTable(m, projects);
         }
         if (from < 6) {
-          await m.createTable(taxRules);
-          await m.createTable(taxResidencyRecords);
-          await m.addColumn(transactions, transactions.taxCategory);
-          await m.addColumn(transactions, transactions.withholdingTaxSatang);
-          await m.addColumn(foreignRemittances, foreignRemittances.destinationAccountId);
-          await m.addColumn(foreignRemittances, foreignRemittances.incomeSourceType);
-          await m.addColumn(foreignRemittances, foreignRemittances.isPrincipal);
-          await m.addColumn(foreignRemittances, foreignRemittances.taxYearRemitted);
-          await m.addColumn(foreignRemittances, foreignRemittances.taxableReason);
-          await SeedData.insertTaxRulesSeedData(this);
+          await _safeCreateTable(m, taxRules);
+          await _safeCreateTable(m, taxResidencyRecords);
+          await _safeAddColumn(m, transactions, transactions.taxCategory);
+          await _safeAddColumn(m, transactions, transactions.withholdingTaxSatang);
+          await _safeAddColumn(m, foreignRemittances, foreignRemittances.destinationAccountId);
+          await _safeAddColumn(m, foreignRemittances, foreignRemittances.incomeSourceType);
+          await _safeAddColumn(m, foreignRemittances, foreignRemittances.isPrincipal);
+          await _safeAddColumn(m, foreignRemittances, foreignRemittances.taxYearRemitted);
+          await _safeAddColumn(m, foreignRemittances, foreignRemittances.taxableReason);
+          try {
+            await SeedData.insertTaxRulesSeedData(this);
+          } catch (_) {}
         }
         if (from < 7) {
-          await m.createTable(importBatches);
-          await m.createTable(conflictLogs);
-          await m.addColumn(transactions, transactions.importBatchId);
-          await m.addColumn(transactions, transactions.syncVersion);
-          await m.addColumn(accounts, accounts.syncVersion);
-          await m.addColumn(categories, categories.syncVersion);
+          await _safeCreateTable(m, importBatches);
+          await _safeCreateTable(m, conflictLogs);
+          await _safeAddColumn(m, transactions, transactions.importBatchId);
+          await _safeAddColumn(m, transactions, transactions.syncVersion);
+          await _safeAddColumn(m, accounts, accounts.syncVersion);
+          await _safeAddColumn(m, categories, categories.syncVersion);
         }
         if (from < 8) {
-          await m.addColumn(transactions, transactions.workPeriod);
-          await m.addColumn(transactions, transactions.expectedAmountSatang);
+          await _safeAddColumn(m, transactions, transactions.workPeriod);
+          await _safeAddColumn(m, transactions, transactions.expectedAmountSatang);
         }
         if (from < 9) {
-          await m.addColumn(investmentLots, investmentLots.pricePerUnitOriginal);
-          await m.addColumn(investmentLots, investmentLots.pricePerUnitThb);
-          await m.addColumn(assetPrices, assetPrices.marketPriceOriginal);
-          await m.addColumn(assetPrices, assetPrices.marketPriceThb);
+          await _safeAddColumn(m, investmentLots, investmentLots.pricePerUnitOriginal);
+          await _safeAddColumn(m, investmentLots, investmentLots.pricePerUnitThb);
+          await _safeAddColumn(m, assetPrices, assetPrices.marketPriceOriginal);
+          await _safeAddColumn(m, assetPrices, assetPrices.marketPriceThb);
         }
         if (from < 10) {
-          await m.addColumn(categories, categories.sortOrder);
+          await _safeAddColumn(m, categories, categories.sortOrder);
         }
         if (from < 11) {
-          await m.addColumn(accounts, accounts.icon);
-          await m.addColumn(assets, assets.icon);
+          await _safeAddColumn(m, accounts, accounts.icon);
+          await _safeAddColumn(m, assets, assets.icon);
         }
         if (from < 12) {
-          await m.createTable(investmentPortfolios);
-          await m.addColumn(assets, assets.portfolioId);
+          await _safeCreateTable(m, investmentPortfolios);
+          await _safeAddColumn(m, assets, assets.portfolioId);
         }
         if (from < 13) {
-          await m.addColumn(accounts, accounts.isDefault);
+          await _safeAddColumn(m, accounts, accounts.isDefault);
         }
       },
       beforeOpen: (details) async {
@@ -197,6 +199,12 @@ class AppDatabase extends _$AppDatabase {
   Future<void> _safeAddColumn(Migrator m, dynamic table, GeneratedColumn col) async {
     try {
       await m.addColumn(table, col);
+    } catch (_) {}
+  }
+
+  Future<void> _safeCreateTable(Migrator m, TableInfo table) async {
+    try {
+      await m.createTable(table);
     } catch (_) {}
   }
 

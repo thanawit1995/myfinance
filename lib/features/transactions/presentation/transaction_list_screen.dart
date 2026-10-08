@@ -7,6 +7,7 @@ import '../../../../core/database/database_provider.dart';
 import '../../../../core/database/daos/transactions_dao.dart';
 import '../../../../core/money/money.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/category_icon_helper.dart';
 import '../../../../core/widgets/category_name_helper.dart';
 import '../../investments/presentation/portfolio_screen.dart';
 import 'edit_transaction_dialog.dart';
@@ -43,6 +44,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
 
   List<Transaction>? _transactions;
   Map<String, Account> _accountsMap = {};
+  Map<String, Category> _categoriesMap = {};
   bool _isLoading = false;
   StreamSubscription? _dbSubscription;
 
@@ -73,6 +75,8 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
     try {
       final accounts = await ref.read(accountsDaoProvider).getAllAccounts();
       final accountsMap = {for (final a in accounts) a.id: a};
+      final categories = await ref.read(categoriesDaoProvider).getAllCategories();
+      final categoriesMap = {for (final c in categories) c.id: c};
       final list = await ref.read(transactionsDaoProvider).searchTransactions(
         query: _searchController.text.trim().isEmpty ? null : _searchController.text.trim(),
         startDate: _selectedDateRange?.start,
@@ -85,6 +89,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
       if (mounted) {
         setState(() {
           _accountsMap = accountsMap;
+          _categoriesMap = categoriesMap;
           _transactions = list;
           _isLoading = false;
         });
@@ -100,6 +105,8 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
     try {
       final accounts = await ref.read(accountsDaoProvider).getAllAccounts();
       final accountsMap = {for (final a in accounts) a.id: a};
+      final categories = await ref.read(categoriesDaoProvider).getAllCategories();
+      final categoriesMap = {for (final c in categories) c.id: c};
       final list = await ref.read(transactionsDaoProvider).searchTransactions(
         query: _searchController.text.trim().isEmpty ? null : _searchController.text.trim(),
         startDate: _selectedDateRange?.start,
@@ -112,6 +119,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
       if (mounted) {
         setState(() {
           _accountsMap = accountsMap;
+          _categoriesMap = categoriesMap;
           _transactions = list;
         });
       }
@@ -421,21 +429,54 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
 
   Widget _buildTransactionTile(BuildContext context, Transaction tx, bool isThai) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final isExpense = tx.transactionType == 'expense';
     final isIncome = tx.transactionType == 'income';
 
     final money = Money(tx.amountThbSatang);
 
-    final color = isExpense
-        ? AppTheme.expenseColor(context)
-        : (isIncome ? AppTheme.incomeColor(context) : AppTheme.transferColor(context));
-    final icon = isExpense
-        ? Icons.arrow_upward_rounded
-        : (isIncome ? Icons.arrow_downward_rounded : Icons.swap_horiz_rounded);
+    final category = tx.categoryId != null ? _categoriesMap[tx.categoryId] : null;
 
-    final defaultNote = isExpense
-        ? (isThai ? 'รายจ่าย' : 'Expense')
-        : (isIncome ? (isThai ? 'รายรับ' : 'Income') : (isThai ? 'โอนเงิน' : 'Transfer'));
+    // Semantic amount color: ฟ้า (light blue) สำหรับรายรับ และ แดง (coral red) สำหรับรายจ่าย ตาม reference app
+    final Color amountColor = isExpense
+        ? const Color(0xFFEF5350)
+        : (isIncome ? const Color(0xFF4FC3F7) : (isDark ? const Color(0xFF90CAF9) : const Color(0xFF1976D2)));
+
+    // Accent tint color for icon badge
+    final badgeColor = isExpense
+        ? const Color(0xFFFF5252)
+        : (isIncome ? const Color(0xFF00B0FF) : const Color(0xFF7E57C2));
+
+    final Widget leadingWidget;
+    if (category?.icon != null && category!.icon!.isNotEmpty) {
+      leadingWidget = CircleAvatar(
+        radius: 20,
+        backgroundColor: badgeColor.withValues(alpha: 0.14),
+        child: CategoryIconHelper.buildIconWidget(
+          category.icon,
+          size: 20,
+          color: badgeColor,
+        ),
+      );
+    } else {
+      leadingWidget = CircleAvatar(
+        radius: 20,
+        backgroundColor: badgeColor.withValues(alpha: 0.14),
+        child: Icon(
+          isExpense
+              ? Icons.arrow_upward_rounded
+              : (isIncome ? Icons.arrow_downward_rounded : Icons.swap_horiz_rounded),
+          color: badgeColor,
+          size: 20,
+        ),
+      );
+    }
+
+    final defaultNote = category != null
+        ? (isThai ? category.nameTh : (category.nameEn.trim().isNotEmpty ? category.nameEn : category.nameTh))
+        : (isExpense
+            ? (isThai ? 'รายจ่าย' : 'Expense')
+            : (isIncome ? (isThai ? 'รายรับ' : 'Income') : (isThai ? 'โอนเงิน' : 'Transfer')));
 
     final sourceAcc = tx.sourceAccountId != null ? _accountsMap[tx.sourceAccountId] : null;
     final isCredit = sourceAcc?.accountType == 'credit_card';
@@ -576,15 +617,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-      leading: Container(
-        width: 38,
-        height: 38,
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: color, size: 18),
-      ),
+      leading: leadingWidget,
       title: Text(
         tx.note?.isNotEmpty == true ? tx.note! : defaultNote,
         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
@@ -596,7 +629,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
         children: [
           Text(
             isExpense ? '-${money.format(symbol: '฿')}' : (isIncome ? '+${money.format(symbol: '฿')}' : money.format(symbol: '฿')),
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: color),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: amountColor),
           ),
           if (tx.feeThbSatang > 0)
             Text(

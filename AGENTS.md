@@ -74,6 +74,7 @@
 - ถ้ามีจุดที่ต้องตัดสินใจแล้วกระทบ schema หรือ business logic → **หยุดถามก่อน ห้ามเดา**
 - ทำทีละ Phase ห้ามข้ามไป Phase ถัดไปเอง
 - หลังจบแต่ละ Phase ให้อัปเดต `PROGRESS.md` (ทำอะไรไปแล้ว / เหลืออะไร / รู้ปัญหาอะไร)
+- **ทุกครั้งที่จบงาน ต้องทำ git commit และ push ขึ้น GitHub เสมอ** (ตรวจสอบให้ working tree clean ทุกครั้ง)
 
 ## 9. Tech stack & แพลตฟอร์มเป้าหมาย (ล็อกแล้ว ห้ามเปลี่ยนโดยไม่ถาม)
 - Flutter 3.x / Dart 3.x · drift (SQLite) · riverpod · go_router · decimal

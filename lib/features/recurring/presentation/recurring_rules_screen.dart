@@ -250,38 +250,38 @@ class _RulesListTabState extends ConsumerState<_RulesListTab> {
                                   : null;
 
                               return Card(
-                                margin: const EdgeInsets.only(bottom: 8),
+                                margin: const EdgeInsets.only(bottom: 10),
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  side: BorderSide(color: VaultTheme.border(context), width: 0.75),
+                                  borderRadius: BorderRadius.circular(14),
+                                  side: BorderSide(color: VaultTheme.border(context), width: 0.8),
                                 ),
                                 child: InkWell(
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(14),
                                   onTap: () async {
                                     final edited = await RecurringRuleDialog.show(context, rule: rule);
                                     if (edited == true) widget.onChanged();
                                   },
                                   child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        // Row 1: Avatar + Title (Full width) + Amount
+                                        // Row 1: Avatar + Title (Full width) + Switch + Menu
                                         Row(
                                           children: [
                                             CircleAvatar(
-                                              radius: 15,
-                                              backgroundColor: _getTypeColor(rule.transactionType).withValues(alpha: 0.12),
+                                              radius: 16,
+                                              backgroundColor: _getTypeColor(rule.transactionType, context).withValues(alpha: 0.15),
                                               child: Icon(
                                                 rule.transactionType == 'income'
                                                     ? Icons.arrow_downward_rounded
                                                     : (rule.transactionType == 'expense'
                                                         ? Icons.arrow_upward_rounded
                                                         : Icons.swap_horiz_rounded),
-                                                size: 15,
-                                                color: _getTypeColor(rule.transactionType),
+                                                size: 16,
+                                                color: _getTypeColor(rule.transactionType, context),
                                               ),
                                             ),
                                             const SizedBox(width: 10),
@@ -290,103 +290,17 @@ class _RulesListTabState extends ConsumerState<_RulesListTab> {
                                                 rule.title,
                                                 style: TextStyle(
                                                   fontFamily: VaultTheme.fontFamily,
-                                                  fontSize: 14,
+                                                  fontSize: 15,
                                                   fontWeight: FontWeight.bold,
                                                   color: VaultTheme.primaryText(context),
-                                                ),
-                                                maxLines: 2,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Text(
-                                              Money(rule.amountSatang).format(symbol: '฿'),
-                                              style: VaultTheme.tabular(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.bold,
-                                                color: _getTypeColor(rule.transactionType),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 6),
-                                        // Row 2: Badge + Frequency & Next Date + Action / Switch / Menu
-                                        Row(
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                              decoration: BoxDecoration(
-                                                color: rule.autoPost
-                                                    ? (VaultTheme.isDark(context)
-                                                        ? Colors.green.withValues(alpha: 0.25)
-                                                        : Colors.green.withValues(alpha: 0.12))
-                                                    : (VaultTheme.isDark(context)
-                                                        ? Colors.amber.withValues(alpha: 0.25)
-                                                        : Colors.amber.withValues(alpha: 0.18)),
-                                                borderRadius: BorderRadius.circular(4),
-                                              ),
-                                              child: Text(
-                                                rule.autoPost ? 'Auto' : (isThai ? 'รอยืนยัน' : 'Manual'),
-                                                style: TextStyle(
-                                                  fontSize: 9.5,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: rule.autoPost
-                                                      ? (VaultTheme.isDark(context)
-                                                          ? Colors.greenAccent
-                                                          : Colors.green.shade800)
-                                                      : (VaultTheme.isDark(context)
-                                                          ? Colors.amber.shade300
-                                                          : Colors.brown.shade800),
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Expanded(
-                                              child: Text(
-                                                '${_formatFrequency(rule, isThai)} • ${isThai ? "รอบถัดไป: " : "Next: "}${DateFormat('d MMM', isThai ? 'th' : 'en_US').format(rule.nextRunDate)}'
-                                                '${sourceAcc != null ? " • ${rule.transactionType == 'transfer' && destAcc != null ? '${sourceAcc.name} → ${destAcc.name}' : sourceAcc.name}" : ""}',
-                                                style: TextStyle(
-                                                  fontFamily: VaultTheme.fontFamily,
-                                                  fontSize: 11.5,
-                                                  color: isDue ? Colors.red.shade700 : VaultTheme.secondaryText(context),
-                                                  fontWeight: isDue ? FontWeight.w600 : FontWeight.normal,
                                                 ),
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                               ),
                                             ),
-                                            if (isDue && !rule.autoPost && rule.isActive) ...[
-                                              const SizedBox(width: 4),
-                                              SizedBox(
-                                                height: 24,
-                                                child: FilledButton.tonal(
-                                                  style: FilledButton.styleFrom(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 0),
-                                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                                  ),
-                                                  onPressed: () async {
-                                                    await dao.postSingleOccurrence(rule.id, rule.nextRunDate);
-                                                    if (context.mounted) {
-                                                      ScaffoldMessenger.of(context).showSnackBar(
-                                                        SnackBar(
-                                                          content: Text(isThai
-                                                              ? 'บันทึกรายการ "${rule.title}" เรียบร้อยแล้ว'
-                                                              : 'Recorded "${rule.title}"'),
-                                                        ),
-                                                      );
-                                                    }
-                                                    widget.onChanged();
-                                                  },
-                                                  child: Text(
-                                                    isThai ? 'ทำรายการ' : 'Post',
-                                                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                            const SizedBox(width: 2),
+                                            const SizedBox(width: 6),
                                             Transform.scale(
-                                              scale: 0.72,
+                                              scale: 0.76,
                                               alignment: Alignment.centerRight,
                                               child: Switch(
                                                 value: rule.isActive,
@@ -397,7 +311,7 @@ class _RulesListTabState extends ConsumerState<_RulesListTab> {
                                               ),
                                             ),
                                             PopupMenuButton<String>(
-                                              icon: Icon(Icons.more_vert, size: 16, color: VaultTheme.secondaryText(context)),
+                                              icon: Icon(Icons.more_vert, size: 18, color: VaultTheme.secondaryText(context)),
                                               padding: EdgeInsets.zero,
                                               constraints: const BoxConstraints(),
                                               tooltip: isThai ? 'ตัวเลือก' : 'Options',
@@ -457,6 +371,101 @@ class _RulesListTabState extends ConsumerState<_RulesListTab> {
                                             ),
                                           ],
                                         ),
+                                        const SizedBox(height: 8),
+
+                                        // Row 2: Amount (large, high contrast) + Action button if due & manual
+                                        Row(
+                                          children: [
+                                            Text(
+                                              Money(rule.amountSatang).format(symbol: '฿'),
+                                              style: VaultTheme.tabular(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                                color: _getTypeColor(rule.transactionType, context),
+                                              ),
+                                            ),
+                                            const Spacer(),
+                                            if (isDue && !rule.autoPost && rule.isActive) ...[
+                                              SizedBox(
+                                                height: 28,
+                                                child: FilledButton.tonal(
+                                                  style: FilledButton.styleFrom(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                  ),
+                                                  onPressed: () async {
+                                                    await dao.postSingleOccurrence(rule.id, rule.nextRunDate);
+                                                    if (context.mounted) {
+                                                      ScaffoldMessenger.of(context).showSnackBar(
+                                                        SnackBar(
+                                                          content: Text(isThai
+                                                              ? 'บันทึกรายการ "${rule.title}" เรียบร้อยแล้ว'
+                                                              : 'Recorded "${rule.title}"'),
+                                                        ),
+                                                      );
+                                                    }
+                                                    widget.onChanged();
+                                                  },
+                                                  child: Text(
+                                                    isThai ? 'ทำรายการ' : 'Post',
+                                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+
+                                        // Row 3: Auto/Manual Badge + Frequency & Next run date (Full Width!)
+                                        Row(
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                                              decoration: BoxDecoration(
+                                                color: rule.autoPost
+                                                    ? (VaultTheme.isDark(context)
+                                                        ? Colors.green.withValues(alpha: 0.25)
+                                                        : Colors.green.withValues(alpha: 0.12))
+                                                    : (VaultTheme.isDark(context)
+                                                        ? Colors.amber.withValues(alpha: 0.25)
+                                                        : Colors.amber.withValues(alpha: 0.18)),
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                rule.autoPost ? 'Auto' : (isThai ? 'รอยืนยัน' : 'Manual'),
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: rule.autoPost
+                                                      ? (VaultTheme.isDark(context)
+                                                          ? Colors.greenAccent
+                                                          : Colors.green.shade800)
+                                                      : (VaultTheme.isDark(context)
+                                                          ? Colors.amber.shade300
+                                                          : Colors.brown.shade800),
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                '${_formatFrequency(rule, isThai)} • ${isThai ? "รอบถัดไป: " : "Next: "}${DateFormat('d MMM yyyy', isThai ? 'th' : 'en_US').format(rule.nextRunDate)}'
+                                                '${sourceAcc != null ? " • ${rule.transactionType == 'transfer' && destAcc != null ? '${sourceAcc.name} → ${destAcc.name}' : sourceAcc.name}" : ""}',
+                                                style: TextStyle(
+                                                  fontFamily: VaultTheme.fontFamily,
+                                                  fontSize: 12,
+                                                  color: isDue
+                                                      ? (VaultTheme.isDark(context) ? const Color(0xFFFF8A80) : Colors.red.shade700)
+                                                      : VaultTheme.secondaryText(context),
+                                                  fontWeight: isDue ? FontWeight.w600 : FontWeight.normal,
+                                                ),
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ],
                                     ),
                                   ),
@@ -472,16 +481,17 @@ class _RulesListTabState extends ConsumerState<_RulesListTab> {
     );
   }
 
-  Color _getTypeColor(String type) {
+  Color _getTypeColor(String type, BuildContext context) {
+    final isDark = VaultTheme.isDark(context);
     switch (type) {
       case 'income':
-        return Colors.green.shade700;
+        return isDark ? const Color(0xFF4ADE80) : const Color(0xFF1B8A44);
       case 'expense':
-        return Colors.red.shade700;
+        return isDark ? const Color(0xFFFF6E82) : const Color(0xFFD32F2F);
       case 'transfer':
-        return Colors.blue.shade700;
+        return isDark ? const Color(0xFF60A5FA) : const Color(0xFF1976D2);
       default:
-        return Colors.grey.shade700;
+        return VaultTheme.secondaryText(context);
     }
   }
 
@@ -528,7 +538,6 @@ class _ProjectionTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dao = ref.watch(recurringTransactionsDaoProvider);
-    final theme = Theme.of(context);
     final isThai = Localizations.localeOf(context).languageCode == 'th';
 
     return FutureBuilder(
@@ -680,47 +689,54 @@ class _ProjectionTab extends ConsumerWidget {
               ...items.map((item) {
                 final isIncome = item.rule.transactionType == 'income';
                 final isExpense = item.rule.transactionType == 'expense';
+                final itemColor = isIncome
+                    ? VaultTheme.positive(context)
+                    : (isExpense
+                        ? VaultTheme.negative(context)
+                        : (VaultTheme.isDark(context) ? const Color(0xFF60A5FA) : const Color(0xFF1976D2)));
 
                 return Card(
                   margin: const EdgeInsets.only(bottom: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: VaultTheme.border(context), width: 0.75),
+                  ),
                   child: ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: isIncome
-                          ? Colors.green.shade50
-                          : (isExpense ? Colors.red.shade50 : Colors.blue.shade50),
+                      backgroundColor: itemColor.withValues(alpha: 0.15),
                       child: Icon(
                         isIncome ? Icons.arrow_downward : (isExpense ? Icons.arrow_upward : Icons.swap_horiz),
-                        color: isIncome
-                            ? Colors.green.shade700
-                            : (isExpense ? Colors.red.shade700 : Colors.blue.shade700),
+                        color: itemColor,
                         size: 20,
                       ),
                     ),
                     title: Text(
                       item.rule.title,
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: VaultTheme.primaryText(context),
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     subtitle: Text(
                       '${isThai ? "กำหนด: " : "Due: "}${DateFormat('dd/MM/yyyy').format(item.projectedDate)} (${item.rule.autoPost ? "Auto-Post" : (isThai ? "รอยืนยัน" : "Manual")})',
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      style: TextStyle(fontSize: 12, color: VaultTheme.secondaryText(context)),
                     ),
                     trailing: Text(
                       Money(item.rule.amountSatang).format(symbol: '฿'),
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
-                        color: isIncome
-                            ? Colors.green.shade700
-                            : (isExpense ? Colors.red.shade700 : theme.colorScheme.onSurface),
+                        color: itemColor,
                       ),
                     ),
                   ),
                 );
               }),
-            const SizedBox(height: 60),
+            const SizedBox(height: 100),
           ],
         );
       },

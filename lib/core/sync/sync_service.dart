@@ -1085,19 +1085,53 @@ class SyncService extends StateNotifier<SyncState> {
           final payload = localRows.map((r) => {
             'id': r.id,
             'user_id': userId,
+            'title': r.title,
             'name': r.title,
             'transaction_type': r.transactionType,
+            'source_account_id': r.sourceAccountId,
             'account_id': r.sourceAccountId,
+            'destination_account_id': r.destinationAccountId,
             'category_id': r.categoryId,
             'amount_satang': r.amountSatang,
+            'currency_code': r.currencyCode,
             'frequency': r.frequency,
+            'day_of_month': r.dayOfMonth,
+            'next_run_date': r.nextRunDate.toUtc().toIso8601String(),
+            'end_date': r.endDate?.toUtc().toIso8601String(),
             'is_active': r.isActive,
+            'interval_units': r.intervalUnits,
+            'auto_post': r.autoPost,
+            'last_posted_date': r.lastPostedDate?.toUtc().toIso8601String(),
             'note': r.note,
             'created_at': r.createdAt.toUtc().toIso8601String(),
             'updated_at': r.updatedAt.toUtc().toIso8601String(),
             'deleted_at': r.deletedAt?.toUtc().toIso8601String(),
           }).toList();
-          await _supabase.from('recurring_rules').upsert(payload, onConflict: 'id');
+
+          try {
+            await _supabase.from('recurring_rules').upsert(payload, onConflict: 'id');
+          } catch (e) {
+            // Fallback for minimal cloud schema
+            final fallbackPayload = localRows.map((r) => {
+              'id': r.id,
+              'user_id': userId,
+              'title': r.title,
+              'name': r.title,
+              'transaction_type': r.transactionType,
+              'source_account_id': r.sourceAccountId,
+              'account_id': r.sourceAccountId,
+              'category_id': r.categoryId,
+              'amount_satang': r.amountSatang,
+              'frequency': r.frequency,
+              'next_run_date': r.nextRunDate.toUtc().toIso8601String(),
+              'is_active': r.isActive,
+              'note': r.note,
+              'created_at': r.createdAt.toUtc().toIso8601String(),
+              'updated_at': r.updatedAt.toUtc().toIso8601String(),
+              'deleted_at': r.deletedAt?.toUtc().toIso8601String(),
+            }).toList();
+            await _supabase.from('recurring_rules').upsert(fallbackPayload, onConflict: 'id');
+          }
         }
       }
 
@@ -1108,37 +1142,69 @@ class SyncService extends StateNotifier<SyncState> {
       final cloudRows = await query as List<dynamic>;
 
       if (cloudRows.isNotEmpty) {
+        final existingLocalRules = await _db.select(_db.recurringRules).get();
+        final localMap = {for (final r in existingLocalRules) r.id: r};
+
         await _db.batch((batch) {
           for (final r in cloudRows) {
             final row = r as Map<String, dynamic>;
+            final id = row['id'] as String;
+            final local = localMap[id];
+            final cloudUpdatedAt = DateTime.parse(row['updated_at'] as String).toLocal();
+
+            // Conflict check: if local is newer or equal, keep local state
+            if (local != null && !cloudUpdatedAt.isAfter(local.updatedAt)) {
+              continue;
+            }
+
+            // Never overwrite local nextRunDate or lastPostedDate with null or today
+            DateTime nextRun;
+            if (row['next_run_date'] != null) {
+              nextRun = DateTime.parse(row['next_run_date'] as String).toLocal();
+            } else if (local != null) {
+              nextRun = local.nextRunDate;
+            } else {
+              nextRun = DateTime.now();
+            }
+
+            DateTime? lastPosted;
+            if (row['last_posted_date'] != null) {
+              lastPosted = DateTime.parse(row['last_posted_date'] as String).toLocal();
+            } else if (local != null) {
+              lastPosted = local.lastPostedDate;
+            }
+
             batch.insert(
               _db.recurringRules,
               RecurringRulesCompanion(
-                id: Value(row['id'] as String),
-                title: Value(row['title'] as String? ?? row['name'] as String? ?? ''),
-                transactionType: Value(row['transaction_type'] as String? ?? 'expense'),
-                sourceAccountId: Value(row['source_account_id'] as String? ?? row['account_id'] as String? ?? ''),
-                destinationAccountId: Value(row['destination_account_id'] as String?),
-                categoryId: Value(row['category_id'] as String?),
-                amountSatang: Value((row['amount_satang'] as num?)?.toInt() ?? 0),
-                currencyCode: Value(row['currency_code'] as String? ?? 'THB'),
-                frequency: Value(row['frequency'] as String? ?? 'monthly'),
-                dayOfMonth: Value(row['day_of_month'] as int?),
-                nextRunDate: Value(row['next_run_date'] != null ? DateTime.parse(row['next_run_date'] as String).toLocal() : DateTime.now()),
-                endDate: Value(row['end_date'] != null ? DateTime.parse(row['end_date'] as String).toLocal() : null),
-                isActive: Value(row['is_active'] as bool? ?? true),
-                intervalUnits: Value(row['interval_units'] as int? ?? 1),
-                autoPost: Value(row['auto_post'] as bool? ?? true),
-                lastPostedDate: Value(row['last_posted_date'] != null ? DateTime.parse(row['last_posted_date'] as String).toLocal() : null),
-                note: Value(row['note'] as String?),
+                id: Value(id),
+                title: Value(row['title'] as String? ?? row['name'] as String? ?? (local?.title ?? '')),
+                transactionType: Value(row['transaction_type'] as String? ?? (local?.transactionType ?? 'expense')),
+                sourceAccountId: Value(row['source_account_id'] as String? ?? row['account_id'] as String? ?? (local?.sourceAccountId ?? '')),
+                destinationAccountId: Value(row['destination_account_id'] as String? ?? local?.destinationAccountId),
+                categoryId: Value(row['category_id'] as String? ?? local?.categoryId),
+                amountSatang: Value((row['amount_satang'] as num?)?.toInt() ?? (local?.amountSatang ?? 0)),
+                currencyCode: Value(row['currency_code'] as String? ?? (local?.currencyCode ?? 'THB')),
+                frequency: Value(row['frequency'] as String? ?? (local?.frequency ?? 'monthly')),
+                dayOfMonth: Value(row['day_of_month'] as int? ?? local?.dayOfMonth),
+                nextRunDate: Value(nextRun),
+                endDate: Value(row['end_date'] != null ? DateTime.parse(row['end_date'] as String).toLocal() : local?.endDate),
+                isActive: Value(row['is_active'] as bool? ?? (local?.isActive ?? true)),
+                intervalUnits: Value(row['interval_units'] as int? ?? (local?.intervalUnits ?? 1)),
+                autoPost: Value(row['auto_post'] as bool? ?? (local?.autoPost ?? true)),
+                lastPostedDate: Value(lastPosted),
+                note: Value(row['note'] as String? ?? local?.note),
                 createdAt: Value(DateTime.parse(row['created_at'] as String).toLocal()),
-                updatedAt: Value(DateTime.parse(row['updated_at'] as String).toLocal()),
-                deletedAt: Value(row['deleted_at'] != null ? DateTime.parse(row['deleted_at'] as String).toLocal() : null),
+                updatedAt: Value(cloudUpdatedAt),
+                deletedAt: Value(row['deleted_at'] != null ? DateTime.parse(row['deleted_at'] as String).toLocal() : local?.deletedAt),
               ),
               mode: InsertMode.insertOrReplace,
             );
           }
         });
+
+        // Trigger deduplication after pulling rules
+        await _db.transactionsDao.deduplicateTransactions();
       }
     } catch (e) {
       debugPrint('[Sync] Recurring rules sync info: $e');

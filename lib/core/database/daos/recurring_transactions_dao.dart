@@ -129,6 +129,34 @@ class RecurringTransactionsDao extends DatabaseAccessor<AppDatabase> with _$Recu
       DateTime? lastPosted;
 
       for (final dueDate in dueDates) {
+        // Idempotency check: see if a transaction for this rule has already been posted on dueDate
+        final dayStart = DateTime(dueDate.year, dueDate.month, dueDate.day);
+        final dayEnd = DateTime(dueDate.year, dueDate.month, dueDate.day, 23, 59, 59, 999);
+
+        final existingTxs = await (select(transactions)
+              ..where((t) =>
+                  t.deletedAt.isNull() &
+                  t.transactionDate.isBiggerOrEqualValue(dayStart) &
+                  t.transactionDate.isSmallerOrEqualValue(dayEnd) &
+                  t.transactionType.equals(rule.transactionType) &
+                  t.amountOriginalSatang.equals(rule.amountSatang) &
+                  (t.sourceAccountId.equals(rule.sourceAccountId) | t.sourceAccountId.isNull())))
+            .get();
+
+        final hasAlreadyPosted = existingTxs.any((t) {
+          final tTag = t.tag ?? '';
+          final tNote = t.note ?? '';
+          return tTag.contains('recurring_auto') ||
+              tTag.contains('recurring_manual_confirmed') ||
+              tNote.contains(rule.title) ||
+              (rule.note != null && rule.note!.isNotEmpty && tNote.contains(rule.note!));
+        });
+
+        if (hasAlreadyPosted) {
+          lastPosted = dueDate;
+          continue;
+        }
+
         final txId = _uuid.v4();
 
         String? workPeriod;
@@ -230,6 +258,11 @@ class RecurringTransactionsDao extends DatabaseAccessor<AppDatabase> with _$Recu
       }
     }
 
+    // Always clean up any existing duplicate entries
+    try {
+      await attachedDatabase.transactionsDao.deduplicateTransactions();
+    } catch (_) {}
+
     return postedCount;
   }
 
@@ -278,27 +311,52 @@ class RecurringTransactionsDao extends DatabaseAccessor<AppDatabase> with _$Recu
       cleanNote = 'ยืนยันจากกฎ: ${rule.title}';
     }
 
-    await into(transactions).insert(
-      TransactionsCompanion.insert(
-        id: txId,
-        transactionType: rule.transactionType,
-        amountOriginalSatang: rule.amountSatang,
-        currencyCode: rule.currencyCode,
-        amountThbSatang: rule.amountSatang,
-        sourceAccountId: Value(rule.sourceAccountId),
-        destinationAccountId: Value(rule.destinationAccountId),
-        categoryId: Value(rule.categoryId),
-        transactionDate: dueDate,
-        workPeriod: Value(workPeriod),
-        expectedAmountSatang: Value(expectedAmountSatang),
-        isCleared: Value(isCleared),
-        taxCategory: Value(taxCat),
-        note: Value(cleanNote),
-        tag: const Value('recurring_manual_confirmed'),
-        createdAt: now,
-        updatedAt: now,
-      ),
-    );
+    // Idempotency check: see if a transaction for this rule has already been posted on dueDate
+    final dayStart = DateTime(dueDate.year, dueDate.month, dueDate.day);
+    final dayEnd = DateTime(dueDate.year, dueDate.month, dueDate.day, 23, 59, 59, 999);
+
+    final existingTxs = await (select(transactions)
+          ..where((t) =>
+              t.deletedAt.isNull() &
+              t.transactionDate.isBiggerOrEqualValue(dayStart) &
+              t.transactionDate.isSmallerOrEqualValue(dayEnd) &
+              t.transactionType.equals(rule.transactionType) &
+              t.amountOriginalSatang.equals(rule.amountSatang) &
+              (t.sourceAccountId.equals(rule.sourceAccountId) | t.sourceAccountId.isNull())))
+        .get();
+
+    final hasAlreadyPosted = existingTxs.any((t) {
+      final tTag = t.tag ?? '';
+      final tNote = t.note ?? '';
+      return tTag.contains('recurring_auto') ||
+          tTag.contains('recurring_manual_confirmed') ||
+          tNote.contains(rule.title) ||
+          (rule.note != null && rule.note!.isNotEmpty && tNote.contains(rule.note!));
+    });
+
+    if (!hasAlreadyPosted) {
+      await into(transactions).insert(
+        TransactionsCompanion.insert(
+          id: txId,
+          transactionType: rule.transactionType,
+          amountOriginalSatang: rule.amountSatang,
+          currencyCode: rule.currencyCode,
+          amountThbSatang: rule.amountSatang,
+          sourceAccountId: Value(rule.sourceAccountId),
+          destinationAccountId: Value(rule.destinationAccountId),
+          categoryId: Value(rule.categoryId),
+          transactionDate: dueDate,
+          workPeriod: Value(workPeriod),
+          expectedAmountSatang: Value(expectedAmountSatang),
+          isCleared: Value(isCleared),
+          taxCategory: Value(taxCat),
+          note: Value(cleanNote),
+          tag: const Value('recurring_manual_confirmed'),
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+    }
 
     final nextDate = RecurringEngine.computeNextRunDate(
       frequency: rule.frequency,

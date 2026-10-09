@@ -1,8 +1,39 @@
 # บันทึกความคืบหน้าโครงการ MyFinance (PROGRESS.md)
 
-อัปเดตล่าสุด: 9 ตุลาคม 2026 (ปรับปรุงความคมชัดของ Budget Bar ในโหมดกลางคืน: เพิ่มเส้นขอบรางหลอด, ปรับสีรางหลอด, เพิ่มความสูงหลอดเป็น 11px, เพิ่มเงาเรืองแสงสีชมพู Luminous Glow, และปรับสีตัวหนังสือให้อ่านง่าย)
+อัปเดตล่าสุด: 9 ตุลาคม 2026 (แก้ไขระบบ Recurring สร้างรายการซ้ำ, ย้ายตัวเลขเปอร์เซ็นต์งบประมาณไม่ให้โดนมาสคอตบัง, และปรับปรุง UI หน้า รายการอัตโนมัติ ให้อ่านง่าย คมชัดในโหมดมืด พร้อมรองรับจอมือถือ)
 
-- [x] **Lumi Budget Bar Night Mode Contrast & Glow Enhancement (9 ต.ค. 2026)**:
+- [x] **Recurring Auto-Post Duplication Fix & Recurring UI Typography Overhaul (9 ต.ค. 2026)**:
+  - **1. แก้ไขบั๊กตัวเลขเปอร์เซ็นต์งบประมาณโดนมาสคอตบดบัง (`budget_hero_card.dart`)**:
+    - ย้ายตำแหน่งตัวเลขเปอร์เซ็นต์ `$percentUsed%` จากขวาสุดมาอยู่ด้านซ้ายข้างข้อความ "ความคืบหน้าการใช้เงิน" ในรูปแบบ Badge Pill เด่นชัด
+    - วางหลอด Progress Bar เต็มความกว้างด้านล่าง ทำให้ตัวเลขไม่ถูกมาสคอตตัวใหญ่ที่อยู่ครึ่งขวาของการ์ดทับบดบังอีกต่อไปบนทุกขนาดหน้าจอ
+  - **2. แก้ไขปัญหาระบบ Recurring สร้างรายการซ้ำ (`recurring_transactions_dao.dart`, `sync_service.dart`)**:
+    - **สาเหตุรากเหง้า (Root Cause)**: ใน `SyncService._syncRecurring`: การ Push ไปยังคลาวด์ไม่ได้ส่ง `next_run_date` และ `last_posted_date` ขึ้นไป ทำให้เมื่อ Pull กลับมา ค่าคลาวด์เป็นค่าว่าง (null) ส่งผลให้โค้ดเซ็ต `nextRunDate = DateTime.now()` และ `lastPostedDate = null` แล้วทำ `InsertMode.insertOrReplace` ทับข้อมูลในเครื่องทุกครั้งที่เปิดแอป ทำให้ `processDueRules()` คิดว่าเป็นรอบที่ต้องทำรายการใหม่เรื่อยๆ
+    - **การแก้ไขใน `SyncService`**:
+      - Push ข้อมูล `recurring_rules` ครบถ้วนทุกคอลัมน์ (`title`, `source_account_id`, `destination_account_id`, `next_run_date`, `last_posted_date`, `auto_post`, `interval_units` ฯลฯ)
+      - ในขั้นตอน Pull: เปรียบเทียบ `updatedAt` หากข้อมูลในเครื่องใหม่กว่าหรือเท่ากันจะไม่เขียนทับ และไม่แทนที่ `nextRunDate` หรือ `lastPostedDate` ด้วยค่า null หรือวันนี้เด็ดขาด
+    - **การรับประกันความปลอดภัยระดับฐานข้อมูล (Database Idempotency Check)**:
+      - ใน `RecurringTransactionsDao.processDueRules()` และ `postSingleOccurrence()`: เพิ่มการตรวจสอบในตาราง `transactions` ก่อนเพิ่มรายการ หากในวันเดียวกันมีรายการของกฎนี้อยู่แล้ว (ตรงตามประเภท, จำนวนเงิน, บัญชี, และแท็ก/บันทึก) ระบบจะข้ามการสร้างรายการซ้ำและขยับ `lastPostedDate` พร้อมคำนวณ `nextRunDate` ในรอบถัดไปทันที
+      - เรียก `TransactionsDao.deduplicateTransactions()` อัตโนมัติ เพื่อล้างรายการที่เคยสร้างซ้ำไว้ก่อนหน้านี้ให้เหลือเพียงรายการเดียว
+  - **3. ปรับปรุง Typography และ Layout หน้า Recurring Rules (`recurring_rules_screen.dart`, `recurring_rule_dialog.dart`)**:
+    - **ความคมชัดและสีตัวอักษรในโหมดกลางคืน (Dark Mode Contrast)**:
+      - ปรับปรุง `_getTypeColor()`: เปลี่ยนสีตัวเลขรายจ่ายจากสีแดงมืด (`Colors.red.shade700`) เป็นสีชมพูคอรัลสว่างสดใส `Color(0xFFFF6E82)` ทำให้อ่านตัวเลขได้ชัดเจน 100% บนพื้นหลังสีเข้ม
+      - รายรับใช้สีเขียวมิ้นต์ `Color(0xFF4ADE80)`, โอนเงินใช้สีฟ้าสว่าง `Color(0xFF60A5FA)`
+      - ปรับสีข้อความกำกับใน Switch และ Dialog ให้อ่านง่าย สบายตา
+    - **จัดโครงสร้างการ์ดใหม่ (No Text Truncation & Ample Space)**:
+      - แถวที่ 1: ไอคอน + ชื่อกฎ + สวิตช์เปิดปิด + ปุ่มเมนู 3 จุด
+      - แถวที่ 2: จำนวนเงินขนาด 16px คมชัด พร้อมปุ่ม "ทำรายการ" (หากถึงกำหนด)
+      - แถวที่ 3: ป้าย Auto / รอยืนยัน + ข้อความความถี่, วันที่รอบถัดไป, และชื่อบัญชีเต็มความกว้าง ไม่ถูกบีบหรือตัดคำ ("รอบถัดไ...")
+      - เพิ่มระยะเว้นว่างด้านล่าง `100px` ในหน้ารายการ เพื่อไม่ให้ปุ่มลอย FAB บดบังการ์ดสุดท้าย
+    - **ปรับฟอร์มในไดอะล็อก (`RecurringRuleDialog`)**:
+      - เรียงช่องกรอก ประเภทรายการ, จำนวนเงิน, ความถี่, ทุกๆ รอบ, บัญชี เป็นแบบเต็มความกว้าง (Full Width Stack) ป้องกันปัญหาชื่อหัวข้อโดนตัดคำบนหน้าจอมือถือ
+  - **4. การทดสอบและการรับรองคุณภาพ**:
+    - เพิ่ม Unit Test ใหม่ใน `test/features/recurring_dao_idempotency_test.dart` ครอบคลุม:
+      1. การรัน `processDueRules` ซ้ำในวันเดียวกันไม่สร้างรายการซ้ำ
+      2. แม้ Sync จะรีเซ็ต `lastPostedDate = null` รายการธุรกรรมเดิมที่มีอยู่ก็ป้องกันการสร้างซ้ำและเลื่อนรอบไปเดือนถัดไปได้อย่างถูกต้อง
+      3. `deduplicateTransactions` ล้างรายการซ้ำที่เคยเกิดขึ้นได้อย่างแม่นยำ
+    - `flutter analyze`: **0 errors, 0 warnings** (No issues found)
+    - `flutter test`: ผ่านทั้งหมด **216/216 tests passed** (100%)
+    - คอมไพล์ Web Release อัปเดตโฟลเดอร์ `docs/` สำหรับ GitHub Pages เรียบร้อย
   - **1. ปรับปรุงความคมชัดของรางหลอดงบประมาณ (Track Contrast & Border)**:
     - ในโหมดกลางคืน (`isDark`):
       - เพิ่มเส้นขอบรางหลอดสีขาวละมุน `Border.all(color: Colors.white.withValues(alpha: 0.28), width: 1.0)` รอบหลอดงบประมาณ เพื่อให้เห็นขอบเขตทั้งหมดของหลอด 0% - 100% ได้อย่างชัดเจน

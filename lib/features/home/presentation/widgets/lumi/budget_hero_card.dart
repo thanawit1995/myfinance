@@ -269,84 +269,98 @@ class BudgetHeroCard extends ConsumerWidget {
 
                         if (hasBudget) ...[
                           const SizedBox(height: 14),
-                          // Progress bar with inline percent used on the right
+                          // Progress bar with inline percent badge on the left
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                l10n?.spendingProgress ?? 'ความคืบหน้าการใช้เงิน',
-                                style: TextStyle(
-                                  fontFamily: VaultTheme.fontFamily,
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDark ? const Color(0xFFD8C7D2) : const Color(0xFF87767F),
-                                ),
-                              ),
-                              const SizedBox(height: 6),
                               Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Expanded(
-                                    child: Container(
-                                      height: isDark ? 11 : 9,
-                                      width: double.infinity,
-                                      decoration: BoxDecoration(
-                                        color: isDark ? const Color(0xFF382536) : Colors.white.withValues(alpha: 0.9),
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: isDark
-                                            ? Border.all(
-                                                color: Colors.white.withValues(alpha: 0.28),
-                                                width: 1.0,
-                                              )
-                                            : null,
+                                  Text(
+                                    l10n?.spendingProgress ?? 'ความคืบหน้าการใช้เงิน',
+                                    style: TextStyle(
+                                      fontFamily: VaultTheme.fontFamily,
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: isDark ? const Color(0xFFD8C7D2) : const Color(0xFF87767F),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: isDark
+                                          ? const Color(0xFF3D273B)
+                                          : const Color(0xFFFF5B9A).withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: isDark
+                                            ? const Color(0xFFFF75A9).withValues(alpha: 0.35)
+                                            : const Color(0xFFFFD1E3),
+                                        width: 0.8,
                                       ),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(isDark ? 9 : 10),
-                                        child: Align(
-                                          alignment: Alignment.centerLeft,
-                                          child: FractionallySizedBox(
-                                            widthFactor: progressRatio,
-                                            heightFactor: 1.0,
-                                            child: Container(
-                                              decoration: BoxDecoration(
-                                                gradient: LinearGradient(
-                                                  colors: (isOverBudget || isWarning)
-                                                      ? [const Color(0xFFFF6E82), const Color(0xFFE64A63)]
-                                                      : (isDark
-                                                          ? [const Color(0xFFFFC27A), const Color(0xFFFF64A2)]
-                                                          : [const Color(0xFFFFB86A), const Color(0xFFFF5B9A)]),
-                                                  begin: Alignment.centerLeft,
-                                                  end: Alignment.centerRight,
-                                                ),
-                                                borderRadius: BorderRadius.circular(10),
-                                                boxShadow: isDark
-                                                    ? [
-                                                        BoxShadow(
-                                                          color: (isOverBudget || isWarning)
-                                                              ? const Color(0xFFFF6E82).withValues(alpha: 0.5)
-                                                              : const Color(0xFFFF5B9A).withValues(alpha: 0.45),
-                                                          blurRadius: 6,
-                                                        ),
-                                                      ]
-                                                    : null,
-                                              ),
-                                            ),
+                                    ),
+                                    child: Text(
+                                      '$percentUsed%',
+                                      style: VaultTheme.tabular(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w800,
+                                        color: (isOverBudget || isWarning)
+                                            ? (isDark ? const Color(0xFFFF7A8F) : const Color(0xFFE64A63))
+                                            : (isDark ? const Color(0xFFFF7DB0) : const Color(0xFFFF5B9A)),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Container(
+                                height: isDark ? 11 : 9,
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF382536) : Colors.white.withValues(alpha: 0.9),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: isDark
+                                      ? Border.all(
+                                          color: Colors.white.withValues(alpha: 0.28),
+                                          width: 1.0,
+                                        )
+                                      : null,
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(isDark ? 9 : 10),
+                                  child: Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: FractionallySizedBox(
+                                      widthFactor: progressRatio,
+                                      heightFactor: 1.0,
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: (isOverBudget || isWarning)
+                                                ? [const Color(0xFFFF6E82), const Color(0xFFE64A63)]
+                                                : (isDark
+                                                    ? [const Color(0xFFFFC27A), const Color(0xFFFF64A2)]
+                                                    : [const Color(0xFFFFB86A), const Color(0xFFFF5B9A)]),
+                                            begin: Alignment.centerLeft,
+                                            end: Alignment.centerRight,
                                           ),
+                                          borderRadius: BorderRadius.circular(10),
+                                          boxShadow: isDark
+                                              ? [
+                                                  BoxShadow(
+                                                    color: (isOverBudget || isWarning)
+                                                        ? const Color(0xFFFF6E82).withValues(alpha: 0.5)
+                                                        : const Color(0xFFFF5B9A).withValues(alpha: 0.45),
+                                                    blurRadius: 6,
+                                                  ),
+                                                ]
+                                              : null,
                                         ),
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    '$percentUsed%',
-                                    style: VaultTheme.tabular(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w800,
-                                      color: (isOverBudget || isWarning)
-                                          ? (isDark ? const Color(0xFFFF7A8F) : const Color(0xFFE64A63))
-                                          : (isDark ? const Color(0xFFFF7DB0) : const Color(0xFFFF5B9A)),
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
                             ],
                           ),

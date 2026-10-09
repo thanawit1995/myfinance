@@ -247,6 +247,7 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
   Widget build(BuildContext context) {
     final isEditing = widget.ruleToEdit != null;
     final isThai = Localizations.localeOf(context).languageCode == 'th';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final freqLabels = {
       'daily': isThai ? 'รายวัน (Daily)' : 'Daily',
@@ -285,100 +286,83 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
                             : null,
                       ),
                       const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              initialValue: _transactionType,
-                              decoration: InputDecoration(
-                                labelText: isThai ? 'ประเภทรายการ' : 'Type',
-                                isDense: true,
-                                border: const OutlineInputBorder(),
-                              ),
-                              items: [
-                                DropdownMenuItem(
-                                  value: 'expense',
-                                  child: Text(isThai ? 'รายจ่าย (Expense)' : 'Expense'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'income',
-                                  child: Text(isThai ? 'รายรับ (Income)' : 'Income'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'transfer',
-                                  child: Text(isThai ? 'โอนเงิน (Transfer)' : 'Transfer'),
-                                ),
-                              ],
-                              onChanged: (val) {
-                                if (val != null) _onTransactionTypeChanged(val);
-                              },
-                            ),
+                      DropdownButtonFormField<String>(
+                        initialValue: _transactionType,
+                        decoration: InputDecoration(
+                          labelText: isThai ? 'ประเภทรายการ' : 'Type',
+                          isDense: true,
+                          border: const OutlineInputBorder(),
+                        ),
+                        items: [
+                          DropdownMenuItem(
+                            value: 'expense',
+                            child: Text(isThai ? 'รายจ่าย (Expense)' : 'Expense'),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _amountController,
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
-                              decoration: InputDecoration(
-                                labelText: isThai ? 'จำนวนเงิน (บาท) *' : 'Amount (THB) *',
-                                hintText: '0.00',
-                                suffixText: '฿',
-                                isDense: true,
-                                border: const OutlineInputBorder(),
-                              ),
-                              validator: (v) {
-                                if (v == null || v.trim().isEmpty) {
-                                  return isThai ? 'กรุณาระบุจำนวนเงิน' : 'Amount required';
-                                }
-                                if (double.tryParse(v.trim()) == null) {
-                                  return isThai ? 'ตัวเลขไม่ถูกต้อง' : 'Invalid number';
-                                }
-                                return null;
-                              },
-                            ),
+                          DropdownMenuItem(
+                            value: 'income',
+                            child: Text(isThai ? 'รายรับ (Income)' : 'Income'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'transfer',
+                            child: Text(isThai ? 'โอนเงิน (Transfer)' : 'Transfer'),
                           ),
                         ],
+                        onChanged: (val) {
+                          if (val != null) _onTransactionTypeChanged(val);
+                        },
                       ),
                       const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              initialValue: _frequency,
-                              decoration: InputDecoration(
-                                labelText: isThai ? 'ความถี่รอบรายการ' : 'Frequency',
-                                isDense: true,
-                                border: const OutlineInputBorder(),
-                              ),
-                              items: freqLabels.entries
-                                  .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
-                                  .toList(),
-                              onChanged: (val) {
-                                if (val != null) setState(() => _frequency = val);
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          SizedBox(
-                            width: 130,
-                            child: TextFormField(
-                              controller: _intervalController,
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                              decoration: InputDecoration(
-                                labelText: isThai ? 'ทุกๆ (รอบ)' : 'Interval',
-                                hintText: '1',
-                                suffixText: isThai ? 'รอบ' : 'cycle(s)',
-                                isDense: true,
-                                border: const OutlineInputBorder(),
-                              ),
-                              validator: (v) => (v == null || int.tryParse(v.trim()) == null || int.parse(v.trim()) <= 0)
-                                  ? '>= 1'
-                                  : null,
-                            ),
-                          ),
-                        ],
+                      TextFormField(
+                        controller: _amountController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+                        decoration: InputDecoration(
+                          labelText: isThai ? 'จำนวนเงิน (บาท) *' : 'Amount (THB) *',
+                          hintText: '0.00',
+                          suffixText: '฿',
+                          isDense: true,
+                          border: const OutlineInputBorder(),
+                        ),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) {
+                            return isThai ? 'กรุณาระบุจำนวนเงิน' : 'Amount required';
+                          }
+                          if (double.tryParse(v.trim()) == null) {
+                            return isThai ? 'ตัวเลขไม่ถูกต้อง' : 'Invalid number';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: _frequency,
+                        decoration: InputDecoration(
+                          labelText: isThai ? 'ความถี่รอบรายการ' : 'Frequency',
+                          isDense: true,
+                          border: const OutlineInputBorder(),
+                        ),
+                        items: freqLabels.entries
+                            .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                            .toList(),
+                        onChanged: (val) {
+                          if (val != null) setState(() => _frequency = val);
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _intervalController,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        decoration: InputDecoration(
+                          labelText: isThai ? 'ความถี่ทุกๆ (จำนวนรอบ)' : 'Interval (Cycle)',
+                          hintText: '1',
+                          suffixText: isThai ? 'รอบ' : 'cycle(s)',
+                          isDense: true,
+                          border: const OutlineInputBorder(),
+                        ),
+                        validator: (v) => (v == null || int.tryParse(v.trim()) == null || int.parse(v.trim()) <= 0)
+                            ? (isThai ? 'ต้องมากกว่าหรือเท่ากับ 1' : '>= 1')
+                            : null,
                       ),
                       if (_frequency == 'monthly' || _frequency == 'yearly') ...[
                         const SizedBox(height: 12),
@@ -409,43 +393,35 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
                         ),
                       ],
                       const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: DropdownButtonFormField<String?>(
-                              initialValue: _sourceAccountId,
-                              decoration: InputDecoration(
-                                labelText: _transactionType == 'income'
-                                    ? (isThai ? 'เข้าบัญชี' : 'To Account')
-                                    : (isThai ? 'จากบัญชี' : 'From Account'),
-                                isDense: true,
-                                border: const OutlineInputBorder(),
-                              ),
-                              items: _accounts
-                                  .map((a) => DropdownMenuItem(value: a.id, child: Text(a.name)))
-                                  .toList(),
-                              onChanged: (val) => setState(() => _sourceAccountId = val),
-                            ),
-                          ),
-                          if (_transactionType == 'transfer') ...[
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: DropdownButtonFormField<String?>(
-                                initialValue: _destinationAccountId,
-                                decoration: InputDecoration(
-                                  labelText: isThai ? 'ไปยังบัญชี' : 'To Account',
-                                  isDense: true,
-                                  border: const OutlineInputBorder(),
-                                ),
-                                items: _accounts
-                                    .map((a) => DropdownMenuItem(value: a.id, child: Text(a.name)))
-                                    .toList(),
-                                onChanged: (val) => setState(() => _destinationAccountId = val),
-                              ),
-                            ),
-                          ],
-                        ],
+                      DropdownButtonFormField<String?>(
+                        initialValue: _sourceAccountId,
+                        decoration: InputDecoration(
+                          labelText: _transactionType == 'income'
+                              ? (isThai ? 'เข้าบัญชี' : 'To Account')
+                              : (isThai ? 'จากบัญชี' : 'From Account'),
+                          isDense: true,
+                          border: const OutlineInputBorder(),
+                        ),
+                        items: _accounts
+                            .map((a) => DropdownMenuItem(value: a.id, child: Text(a.name)))
+                            .toList(),
+                        onChanged: (val) => setState(() => _sourceAccountId = val),
                       ),
+                      if (_transactionType == 'transfer') ...[
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String?>(
+                          initialValue: _destinationAccountId,
+                          decoration: InputDecoration(
+                            labelText: isThai ? 'ไปยังบัญชี' : 'To Account',
+                            isDense: true,
+                            border: const OutlineInputBorder(),
+                          ),
+                          items: _accounts
+                              .map((a) => DropdownMenuItem(value: a.id, child: Text(a.name)))
+                              .toList(),
+                          onChanged: (val) => setState(() => _destinationAccountId = val),
+                        ),
+                      ],
                       if (_transactionType != 'transfer') ...[
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String?>(
@@ -474,14 +450,14 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
                           Expanded(
                             child: OutlinedButton.icon(
                               style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
                               onPressed: _pickNextRunDate,
-                              icon: const Icon(Icons.event, size: 18),
+                              icon: const Icon(Icons.event, size: 16),
                               label: Text(
                                 '${isThai ? "รอบถัดไป: " : "Next: "}${DateFormat('dd/MM/yyyy').format(_nextRunDate)}',
-                                style: const TextStyle(fontSize: 12),
+                                style: const TextStyle(fontSize: 11.5),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -491,16 +467,16 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
                           Expanded(
                             child: OutlinedButton.icon(
                               style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
                               onPressed: _pickEndDate,
-                              icon: const Icon(Icons.stop_circle_outlined, size: 18),
+                              icon: const Icon(Icons.stop_circle_outlined, size: 16),
                               label: Text(
                                 _endDate != null
                                     ? '${isThai ? "สิ้นสุด: " : "End: "}${DateFormat('dd/MM/yyyy').format(_endDate!)}'
                                     : (isThai ? 'ไม่มีวันสิ้นสุด' : 'No End Date'),
-                                style: const TextStyle(fontSize: 12),
+                                style: const TextStyle(fontSize: 11.5),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -519,23 +495,23 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.amber.withValues(alpha: 0.08),
+                            color: isDark ? Colors.amber.withValues(alpha: 0.12) : Colors.amber.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                            border: Border.all(color: isDark ? Colors.amber.shade700 : Colors.amber.withValues(alpha: 0.3)),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
                                 children: [
-                                  Icon(Icons.pending_actions_rounded, size: 18, color: Colors.amber.shade800),
+                                  Icon(Icons.pending_actions_rounded, size: 18, color: isDark ? Colors.amber.shade300 : Colors.amber.shade800),
                                   const SizedBox(width: 8),
                                   Text(
                                     isThai ? 'การตั้งค่ารายรับค้างรับ & ภาษี' : 'Accrued Income & Tax Settings',
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 13,
-                                      color: Colors.amber.shade900,
+                                      color: isDark ? Colors.amber.shade300 : Colors.amber.shade900,
                                     ),
                                   ),
                                 ],
@@ -552,7 +528,7 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
                                   isThai
                                       ? 'ระบบจะตั้งเป็นเงินค้างรับไว้ก่อน (ยังไม่นับยอดเงินเข้าบัญชีจริง จนกว่าจะกดเคลียร์ยอดเงินเข้า)'
                                       : 'Recorded as uncleared accrued income until cleared',
-                                  style: const TextStyle(fontSize: 11),
+                                  style: TextStyle(fontSize: 11, color: isDark ? Colors.white70 : Colors.black87),
                                 ),
                                 value: _isAccrued,
                                 onChanged: (val) => setState(() => _isAccrued = val),
@@ -618,7 +594,10 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
                       const SizedBox(height: 12),
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: Text(isThai ? 'บันทึกอัตโนมัติ (Auto-Post)' : 'Auto-Post'),
+                        title: Text(
+                          isThai ? 'บันทึกอัตโนมัติ (Auto-Post)' : 'Auto-Post',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
                         subtitle: Text(
                           _autoPost
                               ? (isThai
@@ -627,7 +606,10 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
                               : (isThai
                                   ? 'ระบบจะรอให้คุณกดยืนยันการทำรายการด้วยตนเองก่อนบันทึก'
                                   : 'Requires manual confirmation before posting'),
-                          style: const TextStyle(fontSize: 11.5),
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: isDark ? Colors.white70 : Colors.black87,
+                          ),
                         ),
                         value: _autoPost,
                         onChanged: (val) => setState(() => _autoPost = val),

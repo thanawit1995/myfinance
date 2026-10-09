@@ -36,21 +36,27 @@ class BudgetHeroCard extends ConsumerWidget {
     final isOverBudget = hasBudget && (remainingSatang < 0 || totalExpenseSatang > totalBudgetSatang);
     final isWarning = hasBudget && !isOverBudget && percentRemaining <= 20;
 
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     final String defaultMascotAsset;
     if (isOverBudget) {
-      defaultMascotAsset = 'assets/images/lumi_mascot_shock.png';
+      defaultMascotAsset = isDark
+          ? 'assets/images/lumi_mascot_shock_dark.png'
+          : 'assets/images/lumi_mascot_shock.png';
     } else if (isWarning) {
-      defaultMascotAsset = 'assets/images/lumi_mascot_warning.png';
+      defaultMascotAsset = isDark
+          ? 'assets/images/lumi_mascot_warning_dark.png'
+          : 'assets/images/lumi_mascot_warning.png';
     } else {
-      defaultMascotAsset = 'assets/images/lumi_mascot_smile.png';
+      defaultMascotAsset = isDark
+          ? 'assets/images/lumi_mascot_smile_dark.png'
+          : 'assets/images/lumi_mascot_smile.png';
     }
 
     final progressRatio = hasBudget
         ? (totalExpenseSatang / totalBudgetSatang).clamp(0.0, 1.0)
         : 0.0;
-
-    final isThai = Localizations.localeOf(context).languageCode == 'th';
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final customBgData = ref.watch(customCardBgProvider);
     final hasCustomBg = customBgData != null && customBgData.isNotEmpty;

@@ -1078,13 +1078,21 @@ class VaultHomeScreen extends ConsumerWidget {
         ? (totalExpenseSatang / totalBudgetSatang).clamp(0.0, 1.0)
         : 0.0;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     final String lumiMascotAsset;
     if (isOverBudget) {
-      lumiMascotAsset = 'assets/images/lumi_mascot_shock.png';
+      lumiMascotAsset = isDark
+          ? 'assets/images/lumi_mascot_shock_dark.png'
+          : 'assets/images/lumi_mascot_shock.png';
     } else if (isWarning) {
-      lumiMascotAsset = 'assets/images/lumi_mascot_warning.png';
+      lumiMascotAsset = isDark
+          ? 'assets/images/lumi_mascot_warning_dark.png'
+          : 'assets/images/lumi_mascot_warning.png';
     } else {
-      lumiMascotAsset = 'assets/images/lumi_mascot_smile.png';
+      lumiMascotAsset = isDark
+          ? 'assets/images/lumi_mascot_smile_dark.png'
+          : 'assets/images/lumi_mascot_smile.png';
     }
 
     final isLumi = VaultTheme.isLumi(context);

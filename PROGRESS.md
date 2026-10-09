@@ -1,6 +1,24 @@
 # บันทึกความคืบหน้าโครงการ MyFinance (PROGRESS.md)
 
-อัปเดตล่าสุด: 8 ตุลาคม 2026 (แก้ไข SQLite Migration Error Duplicate Column is_default ให้ปลอดภัย 100%, มาสคอต Lumi ตัวใหญ่หน้า Home เปลี่ยนอารมณ์ตามสถานะงบประมาณ Smile/Warning/Shock)
+อัปเดตล่าสุด: 9 ตุลาคม 2026 (มาสคอต Lumi ตัวใหญ่หน้า Home และหน้า Settings รองรับการเปลี่ยนภาพตามโหมดกลางวัน/กลางคืน Smile/Warning/Shock ทั้ง Light Mode และ Dark Mode)
+
+- [x] **Lumi Home Hero Mascot Dark Mode Support (9 ต.ค. 2026)**:
+  - **1. นำเข้าไฟล์ภาพมาสคอต Lumi โหมดกลางคืน (Transparent PNG 500x500 พิกเซล)**:
+    - คัดลอกจากโฟลเดอร์ `lumi_image/` เข้าสู่ `assets/images/`:
+      - `lumi_mascot_smile_dark.png`: มาสคอตยิ้มสดใส กอดน้องแมว สำหรับโหมดกลางคืน (Twilight Bloom)
+      - `lumi_mascot_warning_dark.png`: มาสคอตกังวล สงสัย ถือโทรศัพท์พร้อมเครื่องหมายเตือน สำหรับโหมดกลางคืน
+      - `lumi_mascot_shock_dark.png`: มาสคอตตกใจสุดขีด ถือโทรศัพท์พร้อมเครื่องหมายตกใจ สำหรับโหมดกลางคืน
+  - **2. แสดงผลรูปมาสคอตตัวใหญ่สลับตามโหมดกลางวัน/กลางคืนอัตโนมัติ (`budget_hero_card.dart`, `vault_home_screen.dart`, `settings_screen.dart`)**:
+    - **`BudgetHeroCard`**: ตรวจจับ `isDark` (`Theme.of(context).brightness == Brightness.dark`) และสลับ asset path อัตโนมัติ:
+      - เกินงบ: `lumi_mascot_shock_dark.png` (กลางคืน) / `lumi_mascot_shock.png` (กลางวัน)
+      - เตือน (<=20%): `lumi_mascot_warning_dark.png` (กลางคืน) / `lumi_mascot_warning.png` (กลางวัน)
+      - ปกติ (>20%): `lumi_mascot_smile_dark.png` (กลางคืน) / `lumi_mascot_smile.png` (กลางวัน)
+    - **`vault_home_screen.dart`**: ฟังก์ชัน `_buildMasterBudgetCard` สลับ asset path ตาม `isDark` เช่นกัน
+    - **`settings_screen.dart`**: ปรับรูปตัวอย่างมาสคอตใหญ่ (Default mascot preview thumbnail) และกรอบพื้นหลังให้รองรับโหมดกลางคืนอย่างสวยงาม
+  - **3. การทดสอบและการรับรองคุณภาพ**:
+    - เพิ่ม Widget Tests ใน `lumi_home_dashboard_test.dart` ครอบคลุมการแสดงผลรูปภาพ Dark Mode ทั้ง 3 สถานะ (Smile, Warning, Shock)
+    - `flutter analyze`: **0 errors, 0 warnings** (No issues found)
+    - `flutter test`: ผ่านทั้งหมด **213/213 tests passed** (100%)
 
 - [x] **Database Migration Idempotency & Duplicate Column Prevention (8 ต.ค. 2026)**:
   - **1. ป้องกันข้อผิดพลาด `duplicate column name: is_default` ใน SQLite (`app_database.dart`)**:

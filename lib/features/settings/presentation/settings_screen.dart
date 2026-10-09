@@ -195,6 +195,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 builder: (ctx, ref, _) {
                   final customData = ref.watch(customMascotProvider);
                   final hasCustom = customData != null && customData.isNotEmpty;
+                  final isDark = Theme.of(ctx).brightness == Brightness.dark;
+                  final defaultMascot = isDark
+                      ? 'assets/images/lumi_mascot_smile_dark.png'
+                      : 'assets/images/lumi_mascot_smile.png';
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     child: Row(
@@ -203,12 +207,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           width: 60,
                           height: 66,
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: isDark ? const Color(0xFF261925) : Colors.white,
                             borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: const Color(0xFFFFD1E3), width: 1.5),
+                            border: Border.all(
+                              color: isDark ? const Color(0xFF4A3448) : const Color(0xFFFFD1E3),
+                              width: 1.5,
+                            ),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFFFF5C9D).withValues(alpha: 0.15),
+                                color: isDark
+                                    ? Colors.black.withValues(alpha: 0.3)
+                                    : const Color(0xFFFF5C9D).withValues(alpha: 0.15),
                                 blurRadius: 8,
                                 offset: const Offset(0, 2),
                               ),
@@ -220,9 +229,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 ? Image.memory(
                                     base64Decode(customData.contains(',') ? customData.split(',').last : customData),
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, _, _) => Image.asset('assets/images/lumi_mascot_smile.png', fit: BoxFit.contain),
+                                    errorBuilder: (_, _, _) => Image.asset(defaultMascot, fit: BoxFit.contain),
                                   )
-                                : Image.asset('assets/images/lumi_mascot_smile.png', fit: BoxFit.contain),
+                                : Image.asset(defaultMascot, fit: BoxFit.contain),
                           ),
                         ),
                         const SizedBox(width: 14),

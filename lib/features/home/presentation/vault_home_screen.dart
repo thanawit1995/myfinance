@@ -1261,9 +1261,11 @@ class VaultHomeScreen extends ConsumerWidget {
                       child: LinearProgressIndicator(
                         value: progressRatio,
                         minHeight: 12,
-                        backgroundColor: Colors.white.withValues(alpha: 0.7),
+                        backgroundColor: isDark ? const Color(0xFF382536) : Colors.white.withValues(alpha: 0.7),
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          isWarning ? VaultTheme.negative(context) : const Color(0xFFFF5C9D),
+                          isWarning
+                              ? VaultTheme.negative(context)
+                              : (isDark ? const Color(0xFFFF7DB0) : const Color(0xFFFF5C9D)),
                         ),
                       ),
                     ),
@@ -1271,11 +1273,11 @@ class VaultHomeScreen extends ConsumerWidget {
                   const SizedBox(width: 12),
                   Text(
                     '${(progressRatio * 100).toInt()}%',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: VaultTheme.fontFamily,
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF2B2338),
+                      color: isDark ? Colors.white : const Color(0xFF2B2338),
                     ),
                   ),
                 ],

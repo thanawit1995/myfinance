@@ -275,43 +275,63 @@ class BudgetHeroCard extends ConsumerWidget {
                             children: [
                               Text(
                                 l10n?.spendingProgress ?? 'ความคืบหน้าการใช้เงิน',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontFamily: VaultTheme.fontFamily,
                                   fontSize: 11.5,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFF87767F),
+                                  color: isDark ? const Color(0xFFD8C7D2) : const Color(0xFF87767F),
                                 ),
                               ),
                               const SizedBox(height: 6),
                               Row(
                                 children: [
                                   Expanded(
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(10),
-                                      child: Stack(
-                                        children: [
-                                          Container(
-                                            height: 9,
-                                            width: double.infinity,
-                                            color: isDark ? Colors.white.withValues(alpha: 0.12) : Colors.white.withValues(alpha: 0.9),
-                                          ),
-                                          FractionallySizedBox(
+                                    child: Container(
+                                      height: isDark ? 11 : 9,
+                                      width: double.infinity,
+                                      decoration: BoxDecoration(
+                                        color: isDark ? const Color(0xFF382536) : Colors.white.withValues(alpha: 0.9),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: isDark
+                                            ? Border.all(
+                                                color: Colors.white.withValues(alpha: 0.28),
+                                                width: 1.0,
+                                              )
+                                            : null,
+                                      ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(isDark ? 9 : 10),
+                                        child: Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: FractionallySizedBox(
                                             widthFactor: progressRatio,
+                                            heightFactor: 1.0,
                                             child: Container(
-                                              height: 9,
                                               decoration: BoxDecoration(
                                                 gradient: LinearGradient(
                                                   colors: (isOverBudget || isWarning)
                                                       ? [const Color(0xFFFF6E82), const Color(0xFFE64A63)]
-                                                      : [const Color(0xFFFFB86A), const Color(0xFFFF5B9A)],
+                                                      : (isDark
+                                                          ? [const Color(0xFFFFC27A), const Color(0xFFFF64A2)]
+                                                          : [const Color(0xFFFFB86A), const Color(0xFFFF5B9A)]),
                                                   begin: Alignment.centerLeft,
                                                   end: Alignment.centerRight,
                                                 ),
                                                 borderRadius: BorderRadius.circular(10),
+                                                boxShadow: isDark
+                                                    ? [
+                                                        BoxShadow(
+                                                          color: (isOverBudget || isWarning)
+                                                              ? const Color(0xFFFF6E82).withValues(alpha: 0.5)
+                                                              : const Color(0xFFFF5B9A).withValues(alpha: 0.45),
+                                                          blurRadius: 6,
+                                                        ),
+                                                      ]
+                                                    : null,
                                               ),
                                             ),
                                           ),
-                                        ],
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -319,11 +339,11 @@ class BudgetHeroCard extends ConsumerWidget {
                                   Text(
                                     '$percentUsed%',
                                     style: VaultTheme.tabular(
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
                                       color: (isOverBudget || isWarning)
-                                          ? const Color(0xFFE64A63)
-                                          : const Color(0xFFFF5B9A),
+                                          ? (isDark ? const Color(0xFFFF7A8F) : const Color(0xFFE64A63))
+                                          : (isDark ? const Color(0xFFFF7DB0) : const Color(0xFFFF5B9A)),
                                     ),
                                   ),
                                 ],

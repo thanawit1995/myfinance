@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/database/database_provider.dart';
+import '../../../../core/widgets/category_color_helper.dart';
 import '../../../../core/widgets/category_icon_helper.dart';
 
 class CategoryFormDialog extends ConsumerStatefulWidget {
@@ -46,6 +47,7 @@ class _CategoryFormDialogState extends ConsumerState<CategoryFormDialog> {
   final List<String> _commonIcons = CategoryIconHelper.allIcons;
 
   late String _selectedIcon;
+  late Color _selectedColor;
 
   @override
   void initState() {
@@ -55,6 +57,11 @@ class _CategoryFormDialogState extends ConsumerState<CategoryFormDialog> {
     _nameEnController = TextEditingController(text: c?.nameEn ?? '');
     _categoryType = c?.categoryType ?? widget.initialType ?? 'expense';
     _selectedIcon = c?.icon ?? _commonIcons.first;
+    _selectedColor = CategoryColorHelper.getColor(
+      c?.color,
+      categoryName: c?.nameTh,
+      iconName: c?.icon,
+    );
   }
 
   @override
@@ -166,6 +173,7 @@ class _CategoryFormDialogState extends ConsumerState<CategoryFormDialog> {
 
     if (widget.categoryToEdit == null) {
       // Create
+      final colorHex = CategoryColorHelper.toHex(_selectedColor);
       final newId = const Uuid().v4();
       await dao.createCategory(
         CategoriesCompanion.insert(
@@ -174,6 +182,7 @@ class _CategoryFormDialogState extends ConsumerState<CategoryFormDialog> {
           nameEn: nameEn,
           categoryType: _categoryType,
           icon: drift.Value(_selectedIcon),
+          color: drift.Value(colorHex),
           isSystem: const drift.Value(false),
           isActive: const drift.Value(true),
           createdAt: now,
@@ -188,12 +197,14 @@ class _CategoryFormDialogState extends ConsumerState<CategoryFormDialog> {
     } else {
       // Update
       final existing = widget.categoryToEdit!;
+      final colorHex = CategoryColorHelper.toHex(_selectedColor);
       await dao.updateCategory(
         existing.toCompanion(true).copyWith(
           nameTh: drift.Value(nameTh),
           nameEn: drift.Value(nameEn),
           categoryType: drift.Value(_categoryType),
           icon: drift.Value(_selectedIcon),
+          color: drift.Value(colorHex),
           updatedAt: drift.Value(now),
         ),
       );
@@ -268,6 +279,68 @@ class _CategoryFormDialogState extends ConsumerState<CategoryFormDialog> {
                     border: const OutlineInputBorder(),
                   ),
                 ),
+                const SizedBox(height: 16),
+                Center(
+                  child: Column(
+                    children: [
+                      CategoryColorHelper.buildCategorySquircleBadge(
+                        context,
+                        icon: _selectedIcon,
+                        color: _selectedColor,
+                        size: 58,
+                        iconSize: 28,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        isThai ? 'ตัวอย่างการแสดงผลไอคอน' : 'Icon Preview',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  isThai ? 'เลือกสีประจำหมวดหมู่:' : 'Choose Category Color:',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: CategoryColorHelper.palette.map((c) {
+                    final isSelected = c.toARGB32() == _selectedColor.toARGB32();
+                    return InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () => setState(() => _selectedColor = c),
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: c,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isSelected ? Colors.black : Colors.white.withValues(alpha: 0.6),
+                            width: isSelected ? 2.5 : 1.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: c.withValues(alpha: 0.35),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: isSelected
+                            ? const Icon(Icons.check, size: 18, color: Colors.white)
+                            : null,
+                      ),
+                    );
+                  }).toList(),
+                ),
                 const SizedBox(height: 18),
                 Text(
                   isThai ? 'เลือกไอคอนสัญลักษณ์:' : 'Choose an icon:',
@@ -309,12 +382,12 @@ class _CategoryFormDialogState extends ConsumerState<CategoryFormDialog> {
                                   padding: const EdgeInsets.all(7),
                                   decoration: BoxDecoration(
                                     color: isSelected
-                                        ? Theme.of(context).colorScheme.primaryContainer
+                                        ? _selectedColor.withValues(alpha: 0.18)
                                         : Colors.grey.shade100,
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
                                       color: isSelected
-                                          ? Theme.of(context).colorScheme.primary
+                                          ? _selectedColor
                                           : Colors.grey.shade300,
                                       width: isSelected ? 2 : 1,
                                     ),
@@ -323,7 +396,7 @@ class _CategoryFormDialogState extends ConsumerState<CategoryFormDialog> {
                                     CategoryIconHelper.getIcon(iconName),
                                     size: 22,
                                     color: isSelected
-                                        ? Theme.of(context).colorScheme.primary
+                                        ? _selectedColor
                                         : Colors.grey.shade700,
                                   ),
                                 ),

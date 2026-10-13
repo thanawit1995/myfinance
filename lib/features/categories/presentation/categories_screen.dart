@@ -4,7 +4,7 @@ import '../../../../core/database/app_database.dart';
 import '../../../../core/database/daos/categories_dao.dart';
 import '../../../../core/database/database_provider.dart';
 import '../../../../core/theme/vault_theme.dart';
-import '../../../../core/widgets/category_icon_helper.dart';
+import '../../../../core/widgets/category_color_helper.dart';
 import '../../../../l10n/app_localizations.dart';
 import 'category_form_dialog.dart';
 
@@ -321,23 +321,17 @@ class _CategoryListViewState extends ConsumerState<_CategoryListView> {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Row(
           children: [
-            CircleAvatar(
-              radius: 20,
-              backgroundColor: (showInactive
-                      ? Colors.grey
-                      : isExpense
-                          ? const Color(0xFFFF5C9D)
-                          : Colors.green)
-                  .withValues(alpha: 0.15),
-              child: Icon(
-                CategoryIconHelper.getIcon(cat.icon),
-                size: 20,
-                color: showInactive
-                    ? Colors.grey
-                    : isExpense
-                        ? const Color(0xFFFF5C9D)
-                        : Colors.green,
+            CategoryColorHelper.buildCategorySquircleBadge(
+              context,
+              icon: cat.icon,
+              color: CategoryColorHelper.getColor(
+                cat.color,
+                categoryName: cat.nameTh,
+                iconName: cat.icon,
               ),
+              size: 42,
+              iconSize: 22,
+              isInactive: showInactive,
             ),
             const SizedBox(width: 12),
             Expanded(

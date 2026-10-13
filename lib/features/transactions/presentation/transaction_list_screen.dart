@@ -7,7 +7,7 @@ import '../../../../core/database/database_provider.dart';
 import '../../../../core/database/daos/transactions_dao.dart';
 import '../../../../core/money/money.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/category_icon_helper.dart';
+import '../../../../core/widgets/category_color_helper.dart';
 import '../../../../core/widgets/category_name_helper.dart';
 import '../../investments/presentation/portfolio_screen.dart';
 import 'edit_transaction_dialog.dart';
@@ -442,31 +442,42 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
         ? const Color(0xFFEF5350)
         : (isIncome ? const Color(0xFF4FC3F7) : (isDark ? const Color(0xFF90CAF9) : const Color(0xFF1976D2)));
 
-    // Accent tint color for icon badge
-    final badgeColor = isExpense
-        ? const Color(0xFFFF5252)
-        : (isIncome ? const Color(0xFF00B0FF) : const Color(0xFF7E57C2));
+    final catColor = CategoryColorHelper.getColor(
+      category?.color,
+      categoryName: category?.nameTh,
+      iconName: category?.icon,
+    );
 
     final Widget leadingWidget;
-    if (category?.icon != null && category!.icon!.isNotEmpty) {
-      leadingWidget = CircleAvatar(
-        radius: 20,
-        backgroundColor: badgeColor.withValues(alpha: 0.14),
-        child: CategoryIconHelper.buildIconWidget(
-          category.icon,
-          size: 20,
-          color: badgeColor,
-        ),
+    if (category != null && category.icon != null && category.icon!.isNotEmpty) {
+      leadingWidget = CategoryColorHelper.buildCategorySquircleBadge(
+        context,
+        icon: category.icon,
+        color: catColor,
+        size: 40,
+        iconSize: 20,
       );
     } else {
-      leadingWidget = CircleAvatar(
-        radius: 20,
-        backgroundColor: badgeColor.withValues(alpha: 0.14),
+      final fallbackColor = isExpense
+          ? const Color(0xFFFF5252)
+          : (isIncome ? const Color(0xFF00B0FF) : const Color(0xFF7E57C2));
+      leadingWidget = Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: fallbackColor.withValues(alpha: isDark ? 0.22 : 0.14),
+          borderRadius: BorderRadius.circular(13),
+          border: Border.all(
+            color: fallbackColor.withValues(alpha: isDark ? 0.45 : 0.3),
+            width: 1.0,
+          ),
+        ),
+        alignment: Alignment.center,
         child: Icon(
           isExpense
               ? Icons.arrow_upward_rounded
               : (isIncome ? Icons.arrow_downward_rounded : Icons.swap_horiz_rounded),
-          color: badgeColor,
+          color: fallbackColor,
           size: 20,
         ),
       );

@@ -9,6 +9,8 @@ import '../../../../core/database/daos/projects_dao.dart';
 import '../../../../core/database/database_provider.dart';
 import '../../../../core/money/money.dart';
 import '../../../../core/theme/vault_theme.dart';
+import '../../../../core/widgets/budget_progress_bar.dart';
+import '../../../../core/widgets/category_color_helper.dart';
 import '../../../../core/widgets/category_icon_helper.dart';
 import '../../../../core/widgets/category_name_helper.dart';
 import '../../../../l10n/app_localizations.dart';
@@ -238,7 +240,6 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
         }
 
         final totalRemaining = totalLimit - totalSpent;
-        final totalProgress = totalLimit > 0 ? (totalSpent / totalLimit).clamp(0.0, 1.0) : 0.0;
 
         return ListView(
           padding: const EdgeInsets.all(16),
@@ -298,21 +299,11 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: LinearProgressIndicator(
-                      value: totalProgress,
-                      minHeight: 8,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        totalProgress >= 1.0
-                            ? VaultTheme.negative(context)
-                            : (totalProgress >= 0.8
-                                ? Colors.orange
-                                : (isLumi ? const Color(0xFFFF5C9D) : VaultTheme.accent(context))),
-                      ),
-                      backgroundColor: isLumi ? Colors.white.withValues(alpha: 0.6) : VaultTheme.border(context),
-                    ),
+                  BudgetProgressBar(
+                    spentSatang: totalSpent,
+                    limitSatang: totalLimit,
+                    height: 12,
+                    badgeFontSize: 12,
                   ),
                 ],
               ),
@@ -368,7 +359,11 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
       progressColor = const Color(0xFFFF5C9D);
     }
 
-    final percentDisplay = (b.percentUsed * 100).toStringAsFixed(0);
+    final categoryColor = CategoryColorHelper.getColor(
+      b.color,
+      categoryName: b.categoryNameTh,
+      iconName: b.icon,
+    );
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 6),
@@ -406,17 +401,12 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                   Expanded(
                     child: Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: progressColor.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            CategoryIconHelper.getIcon(b.icon),
-                            size: 18,
-                            color: progressColor,
-                          ),
+                        CategoryColorHelper.buildCategorySquircleBadge(
+                          context,
+                          icon: b.icon,
+                          color: categoryColor,
+                          size: 38,
+                          iconSize: 20,
                         ),
                         const SizedBox(width: 10),
                         Flexible(
@@ -467,7 +457,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    '${l10n?.spentLabel ?? (isThai ? 'ใช้ไป' : 'Spent')}: ${Money(b.spentSatang).format(symbol: '฿')} ($percentDisplay%)',
+                    '${l10n?.spentLabel ?? (isThai ? 'ใช้ไป' : 'Spent')}: ${Money(b.spentSatang).format(symbol: '฿')}',
                     style: VaultTheme.tabular(
                       fontSize: 13,
                       color: VaultTheme.secondaryText(context),
@@ -483,14 +473,11 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                 ],
               ),
               const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: LinearProgressIndicator(
-                  value: b.percentUsed.clamp(0.0, 1.0),
-                  minHeight: 6,
-                  valueColor: AlwaysStoppedAnimation<Color>(progressColor),
-                  backgroundColor: VaultTheme.border(context),
-                ),
+              BudgetProgressBar(
+                spentSatang: b.spentSatang,
+                limitSatang: b.limitSatang,
+                height: 10,
+                badgeFontSize: 11.5,
               ),
               const SizedBox(height: 8),
               Row(
@@ -581,7 +568,6 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
 
             final ps = projectStatuses[index];
             final p = ps.project;
-            final percent = (ps.percentUsed * 100).toStringAsFixed(0);
 
             Color progressColor = Colors.green.shade600;
             String statusText = isThai ? 'ปกติ' : 'Normal';
@@ -667,7 +653,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          '${isThai ? "ใช้ไป" : "Spent"}: ${Money(ps.spentSatang).format(symbol: "฿")} ($percent%)',
+                          '${isThai ? "ใช้ไป" : "Spent"}: ${Money(ps.spentSatang).format(symbol: "฿")}',
                           style: VaultTheme.tabular(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -684,14 +670,11 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                       ],
                     ),
                     const SizedBox(height: 8),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: LinearProgressIndicator(
-                        value: ps.percentUsed.clamp(0.0, 1.0),
-                        minHeight: 8,
-                        valueColor: AlwaysStoppedAnimation<Color>(progressColor),
-                        backgroundColor: VaultTheme.border(context),
-                      ),
+                    BudgetProgressBar(
+                      spentSatang: ps.spentSatang,
+                      limitSatang: p.targetBudgetSatang,
+                      height: 10,
+                      badgeFontSize: 11.5,
                     ),
                     const SizedBox(height: 6),
                     Align(

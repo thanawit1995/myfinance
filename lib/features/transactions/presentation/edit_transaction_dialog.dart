@@ -9,6 +9,7 @@ import '../../../../core/database/daos/transactions_dao.dart';
 import '../../../../core/database/database_provider.dart';
 import '../../../../core/services/widget_service.dart';
 import '../../../../core/theme/vault_theme.dart';
+import '../../../../core/widgets/category_color_helper.dart';
 import '../../../../core/widgets/category_icon_helper.dart';
 import '../../categories/presentation/category_picker_sheet.dart';
 
@@ -863,9 +864,21 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                           decoration: InputDecoration(
                             isDense: true,
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            labelText: 'หมวดหมู่',
                             prefixIcon: selectedCat != null
-                                ? Icon(CategoryIconHelper.getIcon(selectedCat.icon), size: 18)
+                                ? Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                    child: CategoryColorHelper.buildCategorySquircleBadge(
+                                      context,
+                                      icon: selectedCat.icon,
+                                      color: CategoryColorHelper.getColor(
+                                        selectedCat.color,
+                                        categoryName: selectedCat.nameTh,
+                                        iconName: selectedCat.icon,
+                                      ),
+                                      size: 26,
+                                      iconSize: 15,
+                                    ),
+                                  )
                                 : const Icon(Icons.category_outlined, size: 18),
                             prefixIconConstraints: const BoxConstraints(minWidth: 36),
                             suffixIcon: const Icon(Icons.chevron_right_rounded, size: 18),

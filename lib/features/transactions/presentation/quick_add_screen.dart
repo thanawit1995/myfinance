@@ -11,6 +11,7 @@ import '../../../../core/services/widget_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/vault_theme.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../../core/widgets/category_color_helper.dart';
 import '../../../../core/widgets/category_icon_helper.dart';
 import '../../categories/presentation/category_picker_sheet.dart';
 import '../../insurance/presentation/insurance_policy_form_dialog.dart';
@@ -998,7 +999,20 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
         decoration: InputDecoration(
           labelText: isThai ? 'หมวดหมู่ (Category)' : 'Category',
           prefixIcon: selectedCat != null
-              ? Icon(CategoryIconHelper.getIcon(selectedCat.icon), size: 20)
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  child: CategoryColorHelper.buildCategorySquircleBadge(
+                    context,
+                    icon: selectedCat.icon,
+                    color: CategoryColorHelper.getColor(
+                      selectedCat.color,
+                      categoryName: selectedCat.nameTh,
+                      iconName: selectedCat.icon,
+                    ),
+                    size: 28,
+                    iconSize: 16,
+                  ),
+                )
               : const Icon(Icons.category_outlined, size: 20),
           prefixIconConstraints: const BoxConstraints(minWidth: 36),
           suffixIcon: const Icon(Icons.chevron_right_rounded, size: 20),

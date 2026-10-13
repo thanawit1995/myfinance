@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/database/database_provider.dart';
 import '../../../../core/theme/vault_theme.dart';
-import '../../../../core/widgets/category_icon_helper.dart';
+import '../../../../core/widgets/category_color_helper.dart';
 import 'category_form_dialog.dart';
 
 class CategoryPickerSheet extends ConsumerStatefulWidget {
@@ -244,22 +244,16 @@ class _CategoryPickerSheetState extends ConsumerState<CategoryPickerSheet> {
                             return ListTile(
                               dense: true,
                               contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              leading: Container(
-                                width: 38,
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? theme.colorScheme.primary.withValues(alpha: 0.15)
-                                      : VaultTheme.surfaceSubtle(context),
-                                  borderRadius: BorderRadius.circular(10),
+                              leading: CategoryColorHelper.buildCategorySquircleBadge(
+                                context,
+                                icon: cat.icon,
+                                color: CategoryColorHelper.getColor(
+                                  cat.color,
+                                  categoryName: cat.nameTh,
+                                  iconName: cat.icon,
                                 ),
-                                child: Icon(
-                                  CategoryIconHelper.getIcon(cat.icon),
-                                  color: isSelected
-                                      ? theme.colorScheme.primary
-                                      : VaultTheme.primaryText(context),
-                                  size: 20,
-                                ),
+                                size: 38,
+                                iconSize: 20,
                               ),
                               title: Text(
                                 name,

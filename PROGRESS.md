@@ -1,6 +1,26 @@
 # บันทึกความคืบหน้าโครงการ MyFinance (PROGRESS.md)
 
-อัปเดตล่าสุด: 9 ตุลาคม 2026 (แก้ไขระบบ Recurring สร้างรายการซ้ำ, ย้ายตัวเลขเปอร์เซ็นต์งบประมาณไม่ให้โดนมาสคอตบัง, และปรับปรุง UI หน้า รายการอัตโนมัติ ให้อ่านง่าย คมชัดในโหมดมืด พร้อมรองรับจอมือถือ)
+อัปเดตล่าสุด: 13 ตุลาคม 2026 (ปรับปรุงตัวเลขเปอร์เซ็นต์ Budget Bar ต่อท้าย, เพิ่มสีสันสดใสให้ Category Icon พร้อม Color Picker, และสร้างไฟล์ติดตั้ง Android APK สำหรับ OPPO Find X9)
+
+- [x] **Budget Bar Trailing Percentage, Vibrant Category Icons & Android Release APK (13 ต.ค. 2026)**:
+  - **1. ออกแบบและพัฒนา Budget Progress Bar สไตล์ตัวเลขเปอร์เซ็นต์ต่อท้าย (`budget_progress_bar.dart`)**:
+    - สร้างวิดเจ็ต `BudgetProgressBar` พร้อมดีไซน์ขอบโค้งมนแบบแคปซูล (Rounded Capsule Track)
+    - แสดงป้ายเปอร์เซ็นต์ต่อท้ายหลอด (`Trailing Percentage Badge`) เด่นชัด คมชัด ไม่ล้นขอบจอ และไม่บดบังเนื้อหา
+    - รองรับสถานะปกติ (เขียว), เตือนใกล้หมด (เหลืองส้ม), และเกินงบประมาณ (แดงเรืองแสง) พร้อมรองรับทั้งกรณีงบประมาณเป็น 0 และกรณีใช้เกิน 100%
+    - ใช้งานในหน้าหลักงบประมาณ (`budget_screen.dart`) ทั้งการ์ดภาพรวมยอดรวม, รายการงบตามหมวดหมู่, และแท็บงบตามโปรเจกต์
+  - **2. เพิ่มสีสันสดใสให้ Category Icons และระบบ Palette Color Picker (`category_color_helper.dart`, `category_form_dialog.dart`, etc.)**:
+    - สร้าง `CategoryColorHelper` พร้อมชุดสีสดใส (Vibrant Curated Palette) 16 เฉดสี ทั้งสำหรับธีม VAULT และ Lumi
+    - แมปสีอัตโนมัติตามชื่อหมวดหมู่ภาษาไทย/อังกฤษ และมีระบบกำหนดสีคงที่แบบ Deterministic Hash กรณีหมวดหมู่ใหม่
+    - แสดงผลด้วยไอคอนกรอบ Squircle ทรงโค้งมนโมเดิร์น พร้อมเงาเรืองแสงสีละมุน (Soft Glow Effect) คอนทราสต์ชัดเจนทั้งโหมดสว่างและมืด
+    - เพิ่มแผงเลือกเฉดสี 16 สีในฟอร์มสร้าง/แก้ไขหมวดหมู่ (`category_form_dialog.dart`) พร้อมกล่องพรีวิวไอคอนแบบเรียลไทม์
+    - อัปเดตแสดงผลไอคอนสีสันสดใสทั่วทั้งแอป: หน้างบประมาณ (`budget_screen.dart`), หน้ารายการหมวดหมู่ (`categories_screen.dart`), ตัวเลือกหมวดหมู่ (`category_picker_sheet.dart`), หน้าบันทึกรายการด่วน (`quick_add_screen.dart`), หน้ารายการธุรกรรม (`transaction_list_screen.dart`) และหน้าแก้ไขรายการ (`edit_transaction_dialog.dart`)
+  - **3. บิลด์ Android Release APK สำหรับติดตั้งบนมือถือ OPPO Find X9 (`myfinance-release.apk`)**:
+    - รัน `flutter build apk --release` ผ่าน Gradle สำเร็จสมบูรณ์ ได้ไฟล์ติดตั้งขนาด 45.6MB
+    - คัดลอกไฟล์มาไว้ที่โฟลเดอร์หลักของโปรเจกต์: `c:\Projects\myfinance\myfinance-release.apk` สะดวกต่อการนำไปติดตั้ง
+  - **4. การทดสอบและการรับรองคุณภาพ**:
+    - เพิ่ม Unit Test และ Widget Test: `test/core/category_color_helper_test.dart` และ `test/features/budget_progress_bar_test.dart`
+    - `flutter test`: ผ่านทั้งหมด **225/225 tests passed** (100%)
+    - `flutter analyze`: **0 errors, 0 warnings** (No issues found)
 
 - [x] **Recurring Auto-Post Duplication Fix & Recurring UI Typography Overhaul (9 ต.ค. 2026)**:
   - **1. แก้ไขบั๊กตัวเลขเปอร์เซ็นต์งบประมาณโดนมาสคอตบดบัง (`budget_hero_card.dart`)**:

@@ -5,6 +5,7 @@ import '../../../../core/database/app_database.dart';
 import '../../../../core/database/database_provider.dart';
 import '../../../../core/money/money.dart';
 import '../../../../core/theme/vault_theme.dart';
+import '../../../../core/widgets/budget_progress_bar.dart';
 import '../../../../core/database/daos/investments_dao.dart';
 import '../../../../core/widgets/vault_add_sheet.dart';
 import '../../summary/presentation/monthly_summary_screen.dart';
@@ -1074,9 +1075,6 @@ class VaultHomeScreen extends ConsumerWidget {
 
     final isOverBudget = hasBudget && (remainingSatang < 0 || totalExpenseSatang > totalBudgetSatang);
     final isWarning = hasBudget && !isOverBudget && percentRemaining <= 20;
-    final progressRatio = hasBudget
-        ? (totalExpenseSatang / totalBudgetSatang).clamp(0.0, 1.0)
-        : 0.0;
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -1253,34 +1251,11 @@ class VaultHomeScreen extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: LinearProgressIndicator(
-                        value: progressRatio,
-                        minHeight: 12,
-                        backgroundColor: isDark ? const Color(0xFF382536) : Colors.white.withValues(alpha: 0.7),
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          isWarning
-                              ? VaultTheme.negative(context)
-                              : (isDark ? const Color(0xFFFF7DB0) : const Color(0xFFFF5C9D)),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    '${(progressRatio * 100).toInt()}%',
-                    style: TextStyle(
-                      fontFamily: VaultTheme.fontFamily,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? Colors.white : const Color(0xFF2B2338),
-                    ),
-                  ),
-                ],
+              BudgetProgressBar(
+                spentSatang: totalExpenseSatang,
+                limitSatang: totalBudgetSatang,
+                height: isDark ? 12.0 : 11.0,
+                opaqueBadge: true,
               ),
             ] else ...[
               Row(
@@ -1317,16 +1292,10 @@ class VaultHomeScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: progressRatio,
-                  minHeight: 6,
-                  backgroundColor: VaultTheme.border(context),
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    isWarning ? VaultTheme.negative(context) : VaultTheme.accent(context),
-                  ),
-                ),
+              BudgetProgressBar(
+                spentSatang: totalExpenseSatang,
+                limitSatang: totalBudgetSatang,
+                height: 10.0,
               ),
               const SizedBox(height: 10),
               Row(

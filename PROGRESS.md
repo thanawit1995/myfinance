@@ -1,6 +1,25 @@
 # บันทึกความคืบหน้าโครงการ MyFinance (PROGRESS.md)
 
-อัปเดตล่าสุด: 13 ตุลาคม 2026 (ปรับปรุงตัวเลขเปอร์เซ็นต์ Budget Bar ต่อท้าย, เพิ่มสีสันสดใสให้ Category Icon พร้อม Color Picker, และสร้างไฟล์ติดตั้ง Android APK สำหรับ OPPO Find X9)
+อัปเดตล่าสุด: 13 ตุลาคม 2026 (ปรับแต่งหลอดงบประมาณหน้า Home ให้เป็นสไตล์ตัวเลขต่อท้าย Unified Trailing Badge ทั้งธีม VAULT และ LUMI พร้อมอัปเดตไฟล์ติดตั้ง Android APK สำหรับ OPPO Find X9)
+
+- [x] **Home Screen Budget Bar Unification & Updated Android Release APK (13 ต.ค. 2026)**:
+  - **1. ปรับปรุงหลอดงบประมาณในหน้า Home ให้เป็นดีไซน์แคปซูลมนสไตล์ตัวเลขต่อท้าย (`BudgetProgressBar`)**:
+    - **ธีม LUMI (`budget_hero_card.dart`)**:
+      - เปลี่ยนแถบความคืบหน้าการใช้เงินเดิมมาใช้ `BudgetProgressBar` พร้อมป้ายเปอร์เซ็นต์ต่อท้ายหลอด `[=======   ] 38%` ในแถวเดียวกัน
+      - เพิ่มออปชัน `opaqueBadge` ให้ป้ายเปอร์เซ็นต์มีพื้นหลังทึบละมุน ป้องกันไม่ให้ภาพมาสคอตน้องแมวหรือพื้นหลังลวดลายการ์ดบดบังตัวเลขเปอร์เซ็นต์
+      - ตัดตัวแปรที่ซ้ำซ้อน (`percentUsed`, `progressRatio`) ออก ทำให้โค้ดกระชับ คลีน และบำรุงรักษาง่าย
+    - **ธีม VAULT (`vault_home_screen.dart`)**:
+      - ในการ์ด Master Budget (`_buildMasterBudgetCard`): แทนที่เส้นขีดบางเดิม 6px ด้วย `BudgetProgressBar` แคปซูลมนขนาด 10px ขอบคมชัด พร้อมป้ายตัวเลขเปอร์เซ็นต์ต่อท้ายในสไตล์ Quiet Luxury
+      - ใน fallback branch ของ Lumi ใน `vault_home_screen.dart`: อัปเดตมาใช้ `BudgetProgressBar` เป็นมาตรฐานเดียวกัน
+  - **2. ยกระดับ `BudgetProgressBar` Component (`budget_progress_bar.dart`)**:
+    - รองรับ `opaqueBadge` (Color alpha-blend กับพื้นผิวการ์ดตามสภาวะแสง) เพื่อความคมชัด 100% ในทุกระดับสายตา
+    - ปรับแต่งสีพื้นรางหลอด (Track) และเส้นขอบให้สวยงาม คอนทราสต์ตัดกันลงตัวทั้งในโหมดสว่างและโหมดมืด
+  - **3. อัปเดตไฟล์ติดตั้ง Android Release APK สำหรับ OPPO Find X9 (`myfinance-release.apk`)**:
+    - รัน `flutter build apk --release` อัปเดตไฟล์ติดตั้งเวอร์ชันล่าสุดขนาด 45.6MB ที่ `c:\Projects\myfinance\myfinance-release.apk`
+  - **4. การทดสอบและการรับรองคุณภาพ**:
+    - เพิ่ม Integration Widget Tests ใน `test/features/home_budget_bar_test.dart` ครอบคลุมการแสดงผลในธีม Lumi, Lumi Dark, และ VAULT Desktop/Mobile
+    - `flutter test`: ผ่านทั้งหมด **228/228 tests passed** (100%)
+    - `flutter analyze`: **0 errors, 0 warnings** (No issues found)
 
 - [x] **Budget Bar Trailing Percentage, Vibrant Category Icons & Android Release APK (13 ต.ค. 2026)**:
   - **1. ออกแบบและพัฒนา Budget Progress Bar สไตล์ตัวเลขเปอร์เซ็นต์ต่อท้าย (`budget_progress_bar.dart`)**:

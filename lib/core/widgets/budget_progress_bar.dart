@@ -14,6 +14,7 @@ class BudgetProgressBar extends StatelessWidget {
   final bool showTrailingBadge;
   final double badgeFontSize;
   final EdgeInsetsGeometry? padding;
+  final bool opaqueBadge;
 
   const BudgetProgressBar({
     super.key,
@@ -24,6 +25,7 @@ class BudgetProgressBar extends StatelessWidget {
     this.showTrailingBadge = true,
     this.badgeFontSize = 11.5,
     this.padding,
+    this.opaqueBadge = false,
   });
 
   int get percent {
@@ -49,7 +51,7 @@ class BudgetProgressBar extends StatelessWidget {
     } else if (isWarning) {
       return isDark ? const Color(0xFFFBBF24) : Colors.orange.shade700;
     } else if (isLumi) {
-      return const Color(0xFFFF5C9D);
+      return isDark ? const Color(0xFFFF7DB0) : const Color(0xFFFF5C9D);
     } else {
       return isDark ? const Color(0xFF6CA68A) : Colors.green.shade600;
     }
@@ -58,16 +60,25 @@ class BudgetProgressBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = VaultTheme.isDark(context);
+    final isLumi = VaultTheme.isLumi(context);
     final progressColor = resolveProgressColor(context);
+
+    final trackColor = isLumi
+        ? (isDark ? const Color(0xFF382536) : Colors.white.withValues(alpha: 0.85))
+        : (isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06));
+
+    final trackBorderColor = isLumi
+        ? (isDark ? Colors.white.withValues(alpha: 0.24) : const Color(0xFFFFD1E3))
+        : (isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.06));
 
     final barWidget = Container(
       height: height,
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
+        color: trackColor,
         borderRadius: BorderRadius.circular(height / 2),
         border: Border.all(
-          color: isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.06),
-          width: 0.5,
+          color: trackBorderColor,
+          width: 0.6,
         ),
       ),
       child: ClipRRect(
@@ -88,10 +99,20 @@ class BudgetProgressBar extends StatelessWidget {
       ),
     );
 
+    final Color badgeBg;
+    if (opaqueBadge) {
+      final surface = isDark
+          ? (isLumi ? const Color(0xFF2A1C29) : const Color(0xFF202023))
+          : (isLumi ? Colors.white : const Color(0xFFF8F9FA));
+      badgeBg = Color.alphaBlend(progressColor.withValues(alpha: isDark ? 0.25 : 0.15), surface);
+    } else {
+      badgeBg = progressColor.withValues(alpha: isDark ? 0.22 : 0.12);
+    }
+
     final badgeWidget = Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
-        color: progressColor.withValues(alpha: isDark ? 0.22 : 0.12),
+        color: badgeBg,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: progressColor.withValues(alpha: isDark ? 0.45 : 0.28),

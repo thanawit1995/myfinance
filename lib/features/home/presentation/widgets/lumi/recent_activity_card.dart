@@ -3,17 +3,20 @@ import 'package:intl/intl.dart';
 import '../../../../../core/database/app_database.dart';
 import '../../../../../core/money/money.dart';
 import '../../../../../core/theme/vault_theme.dart';
+import '../../../../../core/widgets/category_color_helper.dart';
 import '../../../../../l10n/app_localizations.dart';
 import '../../../../transactions/presentation/edit_transaction_dialog.dart';
 
 class RecentActivityCard extends StatelessWidget {
   final List<Transaction> transactions;
+  final Map<String, Category> categoriesMap;
   final VoidCallback onViewAll;
   final VoidCallback onAddTransaction;
 
   const RecentActivityCard({
     super.key,
     required this.transactions,
+    this.categoriesMap = const {},
     required this.onViewAll,
     required this.onAddTransaction,
   });
@@ -149,21 +152,22 @@ class RecentActivityCard extends StatelessWidget {
             ? (l10n?.transfer ?? 'โอนเงิน')
             : (isIncome ? (l10n?.income ?? 'รายรับ') : (l10n?.expense ?? 'รายจ่าย')));
 
-    final iconColor = isIncome
-        ? (isDark ? const Color(0xFF81C784) : const Color(0xFF2E8B57))
-        : (isTransfer
-            ? (isDark ? const Color(0xFF64B5F6) : const Color(0xFF1976D2))
-            : const Color(0xFFFF5B9A));
+    final cat = categoriesMap[tx.categoryId];
+    final Color catColor;
+    final String catIcon;
 
-    final iconBgColor = isIncome
-        ? (isDark ? const Color(0xFF1A3324) : const Color(0xFFF0FAF2))
-        : (isTransfer
-            ? (isDark ? const Color(0xFF192A3D) : const Color(0xFFEEF8FF))
-            : (isDark ? const Color(0xFF391A29) : const Color(0xFFFFF0F5)));
-
-    final iconData = isIncome
-        ? Icons.arrow_downward_rounded
-        : (isTransfer ? Icons.swap_horiz_rounded : Icons.shopping_bag_outlined);
+    if (isIncome) {
+      catColor = cat != null
+          ? CategoryColorHelper.getColor(cat.color, categoryName: cat.nameTh, iconName: cat.icon)
+          : const Color(0xFF10AC84);
+      catIcon = cat?.icon ?? 'payments';
+    } else if (isTransfer) {
+      catColor = const Color(0xFF54A0FF);
+      catIcon = 'swap_horiz';
+    } else {
+      catColor = CategoryColorHelper.getColor(cat?.color, categoryName: cat?.nameTh, iconName: cat?.icon);
+      catIcon = cat?.icon ?? 'shopping_bag';
+    }
 
     return InkWell(
       borderRadius: BorderRadius.circular(12),
@@ -177,15 +181,12 @@ class RecentActivityCard extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
         child: Row(
         children: [
-          // Pastel icon bubble
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: iconBgColor,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(iconData, color: iconColor, size: 20),
+          CategoryColorHelper.buildCategorySquircleBadge(
+            context,
+            icon: catIcon,
+            color: catColor,
+            size: 40,
+            iconSize: 20,
           ),
           const SizedBox(width: 12),
 

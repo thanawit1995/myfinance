@@ -11,7 +11,6 @@ import '../../../../core/money/money.dart';
 import '../../../../core/theme/vault_theme.dart';
 import '../../../../core/widgets/budget_progress_bar.dart';
 import '../../../../core/widgets/category_color_helper.dart';
-import '../../../../core/widgets/category_icon_helper.dart';
 import '../../../../core/widgets/category_name_helper.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../categories/presentation/categories_screen.dart';
@@ -849,8 +848,14 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                                     value: c.id,
                                     child: Row(
                                       children: [
-                                        Icon(CategoryIconHelper.getIcon(c.icon), size: 18),
-                                        const SizedBox(width: 8),
+                                        CategoryColorHelper.buildCategorySquircleBadge(
+                                          context,
+                                          icon: c.icon,
+                                          color: CategoryColorHelper.getColor(c.color, categoryName: c.nameTh, iconName: c.icon),
+                                          size: 26,
+                                          iconSize: 15,
+                                        ),
+                                        const SizedBox(width: 10),
                                         Expanded(
                                           child: Text(
                                             c.localizedName(context),
@@ -963,8 +968,14 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> with SingleTickerPr
                                       value: c.id,
                                       child: Row(
                                         children: [
-                                          Icon(CategoryIconHelper.getIcon(c.icon), size: 18),
-                                          const SizedBox(width: 8),
+                                          CategoryColorHelper.buildCategorySquircleBadge(
+                                            context,
+                                            icon: c.icon,
+                                            color: CategoryColorHelper.getColor(c.color, categoryName: c.nameTh, iconName: c.icon),
+                                            size: 26,
+                                            iconSize: 15,
+                                          ),
+                                          const SizedBox(width: 10),
                                           Expanded(
                                             child: Text(
                                               c.localizedName(context),

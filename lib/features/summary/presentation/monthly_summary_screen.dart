@@ -6,7 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/database/database_provider.dart';
 import '../../../../core/money/money.dart';
 import '../../../../core/theme/vault_theme.dart';
-import '../../../../core/widgets/category_icon_helper.dart';
+import '../../../../core/widgets/category_color_helper.dart';
 import '../../transactions/presentation/transaction_list_screen.dart';
 
 enum ReportGranularity {
@@ -1617,16 +1617,14 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
                               children: [
                                 Row(
                                   children: [
-                                    CircleAvatar(
-                                      radius: 14,
-                                      backgroundColor: color.withValues(alpha: 0.12),
-                                      child: Icon(
-                                        CategoryIconHelper.getIcon(item.icon),
-                                        size: 15,
-                                        color: color,
-                                      ),
+                                    CategoryColorHelper.buildCategorySquircleBadge(
+                                      context,
+                                      icon: item.icon,
+                                      color: color,
+                                      size: 30,
+                                      iconSize: 16,
                                     ),
-                                    const SizedBox(width: 8),
+                                    const SizedBox(width: 10),
                                     Expanded(
                                       child: Text(
                                         item.name,

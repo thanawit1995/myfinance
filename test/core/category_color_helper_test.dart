@@ -45,5 +45,26 @@ void main() {
       final colorA2 = CategoryColorHelper.getColor(null, categoryName: 'ของเล่นแมวแปลกๆ');
       expect(colorA1, colorA2);
     });
+
+    testWidgets('buildCategorySquircleBadge renders squircle tile and icon', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => CategoryColorHelper.buildCategorySquircleBadge(
+                context,
+                icon: 'restaurant',
+                color: const Color(0xFFFF6B6B),
+                size: 44,
+                iconSize: 22,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byType(Container), findsWidgets);
+      expect(find.byIcon(Icons.restaurant), findsOneWidget);
+    });
   });
 }

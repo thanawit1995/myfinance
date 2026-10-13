@@ -57,7 +57,7 @@ class CategoriesDao extends DatabaseAccessor<AppDatabase> with _$CategoriesDaoMi
         nameEn: 'GPF Pension Fund',
         categoryType: 'expense',
         icon: const Value('account_balance'),
-        color: const Value('0xFF4CAF50'),
+        color: const Value('0xFF27AE60'),
         isSystem: const Value(true),
         createdAt: now,
         updatedAt: now,
@@ -68,7 +68,7 @@ class CategoriesDao extends DatabaseAccessor<AppDatabase> with _$CategoriesDaoMi
         nameEn: 'Life & Savings Insurance',
         categoryType: 'expense',
         icon: const Value('health_and_safety'),
-        color: const Value('0xFF009688'),
+        color: const Value('0xFF10AC84'),
         isSystem: const Value(true),
         createdAt: now,
         updatedAt: now,
@@ -86,6 +86,98 @@ class CategoriesDao extends DatabaseAccessor<AppDatabase> with _$CategoriesDaoMi
 
     // Update standard tax types for existing databases
     await updateStandardIncomeCategoryTaxTypes();
+    // Update default categories with vibrant colors
+    await updateDefaultCategoryColors();
+  }
+
+  Future<void> updateDefaultCategoryColors() async {
+    const defaultColorMap = <String, String>{
+      // Incomes
+      'cat-inc-0000-4000-8000-000000000001': '0xFF10AC84',
+      'cat-inc-0000-4000-8000-000000000002': '0xFF1DD1A1',
+      'cat-inc-0000-4000-8000-000000000003': '0xFFFECA57',
+      'cat-inc-0000-4000-8000-000000000004': '0xFFFF9F43',
+      'cat-inc-0000-4000-8000-000000000005': '0xFF00D2D3',
+      'cat-inc-0000-4000-8000-000000000099': '0xFF27AE60',
+      // Expenses
+      'cat-exp-0000-4000-8000-000000000001': '0xFFFF6B6B',
+      'cat-exp-0000-4000-8000-000000000002': '0xFFFF9F43',
+      'cat-exp-0000-4000-8000-000000000003': '0xFF2E86DE',
+      'cat-exp-0000-4000-8000-000000000004': '0xFF00D2D3',
+      'cat-exp-0000-4000-8000-000000000005': '0xFFEE5253',
+      'cat-exp-0000-4000-8000-000000000006': '0xFF9B59B6',
+      'cat-exp-0000-4000-8000-000000000007': '0xFF5F27CD',
+      'cat-exp-0000-4000-8000-000000000008': '0xFF34495E',
+      'cat-exp-0000-4000-8000-000000000009': '0xFF54A0FF',
+      'cat-exp-0000-4000-8000-000000000010': '0xFFE056FD',
+      'cat-exp-0000-4000-8000-000000000011': '0xFFFF6B8B',
+      'cat-exp-0000-4000-8000-000000000012': '0xFFA0522D',
+      'cat-exp-0000-4000-8000-000000000013': '0xFF2E86DE',
+      'cat-exp-0000-4000-8000-000000000014': '0xFF27AE60',
+      'cat-exp-0000-4000-8000-000000000015': '0xFF10AC84',
+      // Transfer
+      'cat-trf-0000-4000-8000-000000000001': '0xFF54A0FF',
+    };
+
+    const nameColorMap = <String, String>{
+      'อาหารและเครื่องดื่ม': '0xFFFF6B6B',
+      'Food & Dining': '0xFFFF6B6B',
+      'ที่อยู่อาศัย': '0xFFFF9F43',
+      'Housing': '0xFFFF9F43',
+      'การเดินทาง': '0xFF2E86DE',
+      'Transportation': '0xFF2E86DE',
+      'สาธารณูปโภค': '0xFF00D2D3',
+      'Utilities': '0xFF00D2D3',
+      'สุขภาพและรักษาพยาบาล': '0xFFEE5253',
+      'Healthcare': '0xFFEE5253',
+      'ช้อปปิ้ง': '0xFF9B59B6',
+      'Shopping': '0xFF9B59B6',
+      'บันเทิงและการพักผ่อน': '0xFF5F27CD',
+      'Entertainment': '0xFF5F27CD',
+      'การศึกษาและพัฒนาตนเอง': '0xFF34495E',
+      'Education': '0xFF34495E',
+      'ค่าธรรมเนียมและการเงิน': '0xFF54A0FF',
+      'Financial Fees': '0xFF54A0FF',
+      'ค่าใช้จ่ายอื่นๆ': '0xFFE056FD',
+      'Other Expense': '0xFFE056FD',
+      'ของขวัญ / ของฝาก': '0xFFFF6B8B',
+      'Gifts': '0xFFFF6B8B',
+      'ยูซุ': '0xFFA0522D',
+      'Yuzu': '0xFFA0522D',
+      'ท่องเที่ยว': '0xFF2E86DE',
+      'Travel': '0xFF2E86DE',
+      'เงินสะสม กบข.': '0xFF27AE60',
+      'GPF Pension Fund': '0xFF27AE60',
+      'เบี้ยประกันชีวิตและออมทรัพย์': '0xFF10AC84',
+      'Life & Savings Insurance': '0xFF10AC84',
+      'เงินเดือน': '0xFF10AC84',
+      'Salary': '0xFF10AC84',
+      'รับจ้าง / ค่าอยู่เวร': '0xFF1DD1A1',
+      'Freelance / Shift': '0xFF1DD1A1',
+      'ดอกเบี้ยและเงินปันผล': '0xFFFECA57',
+      'Interest & Dividends': '0xFFFECA57',
+      'ธุรกิจ / ขายของ': '0xFFFF9F43',
+      'Business / Sales': '0xFFFF9F43',
+      'รายรับอื่นๆ': '0xFF00D2D3',
+      'Other Income': '0xFF00D2D3',
+      'ขายสินทรัพย์': '0xFF27AE60',
+      'Asset Sale': '0xFF27AE60',
+      'โอนเงินระหว่างบัญชี': '0xFF54A0FF',
+      'Account Transfer': '0xFF54A0FF',
+    };
+
+    for (final entry in defaultColorMap.entries) {
+      await (update(categories)..where((c) => c.id.equals(entry.key)))
+          .write(CategoriesCompanion(color: Value(entry.value)));
+    }
+
+    for (final entry in nameColorMap.entries) {
+      await (update(categories)
+            ..where((c) =>
+                c.isSystem.equals(true) &
+                (c.nameTh.equals(entry.key) | c.nameEn.equals(entry.key))))
+          .write(CategoriesCompanion(color: Value(entry.value)));
+    }
   }
 
   Future<void> updateStandardIncomeCategoryTaxTypes() async {

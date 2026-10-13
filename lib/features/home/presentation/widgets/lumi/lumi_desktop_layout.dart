@@ -30,6 +30,7 @@ class LumiHomeDataBundle {
   final Map<int, int> dailyExpenses;
   final int currentDay;
   final int daysInMonth;
+  final Map<String, Category> categoriesMap;
 
   const LumiHomeDataBundle({
     required this.netWorthSatang,
@@ -53,6 +54,7 @@ class LumiHomeDataBundle {
     this.dailyExpenses = const {},
     this.currentDay = 1,
     this.daysInMonth = 30,
+    this.categoriesMap = const {},
   });
 }
 
@@ -191,6 +193,7 @@ class LumiDesktopLayout extends StatelessWidget {
                         // Recent Activity Card
                         RecentActivityCard(
                           transactions: data.recentTransactions,
+                          categoriesMap: data.categoriesMap,
                           onViewAll: onNavigateToMoney,
                           onAddTransaction: onAddTransaction,
                         ),
@@ -258,6 +261,7 @@ class LumiDesktopLayout extends StatelessWidget {
                   const SizedBox(height: 16),
                   RecentActivityCard(
                     transactions: data.recentTransactions,
+                    categoriesMap: data.categoriesMap,
                     onViewAll: onNavigateToMoney,
                     onAddTransaction: onAddTransaction,
                   ),

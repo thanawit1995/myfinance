@@ -6,6 +6,7 @@ import '../../../../core/database/database_provider.dart';
 import '../../../../core/money/money.dart';
 import '../../../../core/theme/vault_theme.dart';
 import '../../../../core/widgets/budget_progress_bar.dart';
+import '../../../../core/widgets/category_color_helper.dart';
 import '../../../../core/database/daos/investments_dao.dart';
 import '../../../../core/widgets/vault_add_sheet.dart';
 import '../../summary/presentation/monthly_summary_screen.dart';
@@ -101,6 +102,7 @@ class VaultHomeScreen extends ConsumerWidget {
                   dailyExpenses: data.dailyExpenses,
                   currentDay: now.day,
                   daysInMonth: DateTime(now.year, now.month + 1, 0).day,
+                  categoriesMap: data.categoriesMap,
                 );
 
                 return LumiDesktopLayout(
@@ -1995,25 +1997,34 @@ class VaultHomeScreen extends ConsumerWidget {
                       ref.read(transactionsVersionProvider.notifier).state++;
                     }
                   },
-                  leading: isLumi
-                      ? Container(
-                          width: 38,
-                          height: 38,
-                          decoration: BoxDecoration(
-                            color: isIncome
-                                ? const Color(0xFFE8F5EE)
-                                : (isExpense ? const Color(0xFFFFECF0) : const Color(0xFFEFF4F9)),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            isIncome
-                                ? Icons.arrow_downward_rounded
-                                : (isExpense ? Icons.arrow_upward_rounded : Icons.swap_horiz_rounded),
-                            size: 20,
-                            color: amountColor,
-                          ),
-                        )
-                      : null,
+                  leading: Builder(
+                    builder: (context) {
+                      final cat = data.categoriesMap[tx.categoryId];
+                      final Color catColor;
+                      final String catIcon;
+
+                      if (isIncome) {
+                        catColor = cat != null
+                            ? CategoryColorHelper.getColor(cat.color, categoryName: cat.nameTh, iconName: cat.icon)
+                            : const Color(0xFF10AC84);
+                        catIcon = cat?.icon ?? 'payments';
+                      } else if (isTransfer) {
+                        catColor = const Color(0xFF54A0FF);
+                        catIcon = 'swap_horiz';
+                      } else {
+                        catColor = CategoryColorHelper.getColor(cat?.color, categoryName: cat?.nameTh, iconName: cat?.icon);
+                        catIcon = cat?.icon ?? 'shopping_bag';
+                      }
+
+                      return CategoryColorHelper.buildCategorySquircleBadge(
+                        context,
+                        icon: catIcon,
+                        color: catColor,
+                        size: 38,
+                        iconSize: 20,
+                      );
+                    },
+                  ),
                   title: Text(
                     tx.note?.isNotEmpty == true
                         ? tx.note!
@@ -2248,6 +2259,10 @@ class VaultHomeScreen extends ConsumerWidget {
       attentionWarn = true;
     }
 
+    // 11. Categories map for vibrant category badges
+    final allCategories = await ref.read(categoriesDaoProvider).getAllCategories();
+    final categoriesMap = {for (final c in allCategories) c.id: c};
+
     return _VaultHomeData(
       netWorthSatang: netWorth,
       totalCashSatang: totalCash,
@@ -2272,6 +2287,7 @@ class VaultHomeScreen extends ConsumerWidget {
       accruedIncomeCount: accruedList.length,
       unreadRecurringCount: unreadRecurring,
       dailyExpenses: dailyExpenses,
+      categoriesMap: categoriesMap,
     );
   }
 
@@ -2308,6 +2324,7 @@ class _VaultHomeData {
   final int accruedIncomeCount;
   final int unreadRecurringCount;
   final Map<int, int> dailyExpenses;
+  final Map<String, Category> categoriesMap;
 
   const _VaultHomeData({
     required this.netWorthSatang,
@@ -2333,5 +2350,6 @@ class _VaultHomeData {
     required this.accruedIncomeCount,
     required this.unreadRecurringCount,
     required this.dailyExpenses,
+    this.categoriesMap = const {},
   });
 }

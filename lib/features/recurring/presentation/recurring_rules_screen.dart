@@ -25,7 +25,7 @@ class _RecurringRulesScreenState extends ConsumerState<RecurringRulesScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
         final repaired = await ref.read(recurringTransactionsDaoProvider).repairErroneousAutoPostsAndAlignDates();
-        if (repaired > 0 && mounted) {
+        if (repaired.isNotEmpty && mounted) {
           _refresh();
         }
       } catch (_) {}

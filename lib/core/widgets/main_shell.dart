@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../database/database_provider.dart';
 import '../security/auth_provider.dart';
+import '../sync/sync_service.dart';
 import '../theme/app_theme_style.dart';
 import '../theme/vault_theme.dart';
 import 'pin_lock_dialog.dart';
@@ -71,8 +72,17 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
 
       try {
         final repaired = await ref.read(recurringTransactionsDaoProvider).repairErroneousAutoPostsAndAlignDates();
-        final posted = await ref.read(recurringTransactionsDaoProvider).processDueRules();
-        if ((repaired > 0 || posted > 0) && mounted) {
+        bool isSyncing = false;
+        try {
+          final syncState = ref.read(syncServiceProvider);
+          isSyncing = syncState.status == SyncStatus.syncing;
+        } catch (_) {}
+
+        int posted = 0;
+        if (!isSyncing) {
+          posted = await ref.read(recurringTransactionsDaoProvider).processDueRules();
+        }
+        if ((repaired.isNotEmpty || posted > 0) && mounted) {
           ref.read(transactionsVersionProvider.notifier).state++;
         }
       } catch (e) {

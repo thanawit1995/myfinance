@@ -701,6 +701,7 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
     } catch (_) {}
 
     final Map<String, Transaction> seen = {};
+    final Map<String, Transaction> seenRecurring = {};
     final List<String> duplicateIds = [];
 
     for (final tx in allTx) {
@@ -709,9 +710,20 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
         continue;
       }
 
-      final d = tx.transactionDate;
+      final d = tx.transactionDate.toLocal();
       final dateKey = '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-      final cleanNote = (tx.note ?? '').trim().toLowerCase();
+
+      String cleanNote = (tx.note ?? '').trim().toLowerCase();
+      cleanNote = cleanNote.replaceFirst('สร้างอัตโนมัติจากกฎ:', '').trim();
+      cleanNote = cleanNote.replaceFirst('auto-posted from rule:', '').trim();
+      cleanNote = cleanNote
+          .replaceAll(RegExp(r'\[work_period:[^\]]+\]'), '')
+          .replaceAll(RegExp(r'\[tax_cat:[^\]]+\]'), '')
+          .replaceAll('[accrued]', '')
+          .replaceAll(RegExp(r'\[dom:\d+\]'), '')
+          .replaceAll(RegExp(r'\[day_of_month:\d+\]'), '')
+          .trim();
+
       final tagStr = tx.tag ?? '';
 
       final String sig;
@@ -724,7 +736,22 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
         sig = '$dateKey|${tx.amountThbSatang}|${tx.transactionType}|${tx.sourceAccountId ?? ""}|$tagStr';
       }
 
+      bool isDup = false;
       if (seen.containsKey(sig)) {
+        isDup = true;
+      }
+
+      // Check recurring auto-posts on the same day with same amount & account
+      if (!isDup && tagStr.contains('recurring_auto')) {
+        final recSig = '$dateKey|${tx.amountThbSatang}|${tx.transactionType}|${tx.sourceAccountId ?? ""}';
+        if (seenRecurring.containsKey(recSig)) {
+          isDup = true;
+        } else {
+          seenRecurring[recSig] = tx;
+        }
+      }
+
+      if (isDup) {
         duplicateIds.add(tx.id);
       } else {
         seen[sig] = tx;

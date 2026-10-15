@@ -1,29 +1,40 @@
 # บันทึกความคืบหน้าโครงการ MyFinance (PROGRESS.md)
 
-อัปเดตล่าสุด: 15 ตุลาคม 2026 (แก้ไขปัญหาระบบรายการประจำ Recurring Transactions ทำงานผิดวันหลังเชื่อมต่อ Google, เพิ่มระบบ Auto-Repair ลบรายการผิดพลาด 7 รายการในวันที่ 15/10/2026 อัตโนมัติและคืนยอดเงินบัญชีให้ถูกต้อง 100%, ปรับปรุงการคำนวณรอบวันให้ตรง dayOfMonth เสมอ, และอัปเดต Android Release APK)
+อัปเดตล่าสุด: 15 ตุลาคม 2026 (แก้ไขปัญหาระบบรายการประจำ Recurring Transactions ทำงานผิดวันและเบิ้ลซ้ำสองชุด Duplicate หลัง Reinstall/ต่อ Google สำเร็จสมบูรณ์ 100%, กู้คืนรอบวันจริงของทุกกฎผ่าน Historical Ledger & Domain Fallback, ล้างรายการซ้ำและรายการผิดพลาดออกจากทั้ง SQLite ในเครื่องและ Supabase บนคลาวด์, คืนยอดงบประมาณ Master Budget เป็น ฿8,009.45, ตัวเลขแจ้งเตือนกระดิ่งลดลงสู่ 3 รายการแท้จริง, และติดตั้ง Release APK ลง OPPO Find X9 เรียบร้อย)
 
-- [x] **Recurring Transactions Auto-Post Fix, Schedule Alignment & Erroneous Transactions Auto-Repair (15 ต.ค. 2026)**:
-  - **1. วิเคราะห์สาเหตุรากเหง้า (Root Cause)**:
-    - **สาเหตุที่ 1 (`RecurringEngine.calculateDueDates`)**: โค้ดเดิมไม่ได้ตรวจสอบความสอดคล้องของ `dayOfMonth` สำหรับกฎแบบรายเดือน หาก `nextRunDate` หรือวันที่ซิงก์ตกเป็นวันที่ 15 ต.ค. 2026 ระบบจะมองว่าถึงกำหนดแล้วทันที ทั้งที่กฎระบุวันของเดือนไว้เป็นวันอื่น (เช่น วันที่ 20, 25, 28)
-    - **สาเหตุที่ 2 (`SyncService._syncRecurring`)**: เมื่อดึงกฎลงมาจากคลาวด์ หากข้อมูลไม่มี `next_run_date` หรือซิงก์ครั้งแรกบนเครื่องใหม่ โค้ดสำรองดั้งเดิมกำหนด `nextRun = DateTime.now()` (วันที่ 15 ต.ค.) ทำให้ทุกกฎถูกเข้าใจว่าต้องทำรายการในวันนี้
-    - **สาเหตุที่ 3 (`RecurringRuleDialog`)**: ฟอร์มสร้าง/แก้ไขกฎไม่ได้คำนวณ `_nextRunDate` ให้สัมพันธ์กับ `_dayOfMonthController` ทำให้บันทึกวันถัดไปเป็นวันที่เปิดฟอร์มเสมอ
-  - **2. การแก้ไขระบบคำนวณวันและระบบซิงก์ (`RecurringEngine`, `SyncService`, `RecurringRuleDialog`)**:
-    - ใน `RecurringEngine`: เพิ่ม `clampDayToMonth`, `alignToScheduledDay`, และ `getUpcomingRunDate` ช่วยคำนวณรอบวันถัดไปจริงตาม `dayOfMonth` และความถี่ โดยปรับ `calculateDueDates` ให้ตรวจจับและจัดรอบวันที่อย่างเคร่งครัด หากยังไม่ถึงวันของเดือนที่กำหนด รายการนั้นจะไม่ถูกมองว่าถึงกำหนดเด็ดขาด (Empty due dates)
-    - ใน `SyncService._syncRecurring`: ยกเลิกการใช้ `DateTime.now()` เป็นค่าสำรอง และแทนที่ด้วย `RecurringEngine.getUpcomingRunDate` พร้อมจัดเรียงรอบวันให้ตรงกับ `day_of_month` อัตโนมัติ
-    - ใน `RecurringRuleDialog`: เพิ่ม `onChanged` ในช่อง `_dayOfMonthController` และใน `_save()` ให้คำนวณรอบถัดไปจริงแบบไดนามิก และตั้งค่าเริ่มต้นสำหรับกฎใหม่ให้ตรงตามรอบวันจริง
-  - **3. สร้างระบบตรวจซ่อมและกู้คืนข้อมูลอัตโนมัติ (`RecurringTransactionsDao.repairErroneousAutoPostsAndAlignDates`)**:
-    - ค้นหาธุรกรรมทั้งหมดที่สร้างจากแท็ก `recurring_auto` ที่มีวันที่ไม่ตรงกับ `dayOfMonth` ของกฎที่จับคู่กัน
-    - ทำการ **Soft-delete** รายการที่สร้างผิดพลาดทั้ง 7 รายการออกอย่างปลอดภัย พร้อมบันทึก `AuditLog` ระบุการยกเลิกรายการ
-    - คืนยอดเงินในบัญชีให้ถูกต้อง 100% ทันที (เนื่องจาก `AccountsDao` คำนวณยอดเงินสดแบบไดนามิกจากรายการที่ไม่ถูกลบใน Ledger)
-    - รีเซ็ต `lastPostedDate` ที่ผิดพลาด และปรับ `nextRunDate` ของกฎให้กลับมาเป็นวันที่จริงในเดือนตุลาคม 2026 (เช่น 20 ต.ค., 25 ต.ค.)
-    - รันการซ่อมแซมอัตโนมัตินี้ใน `main_shell.dart` เมื่อเปิดแอป, ใน `sync_service.dart` หลังดึงกฎจากคลาวด์, และใน `recurring_rules_screen.dart`
-  - **4. การทดสอบและการรับรองคุณภาพ (Unit Tests & Analyze)**:
-    - เพิ่ม Unit Test ใน `test/features/recurring_engine_test.dart` ตรวจสอบว่ากฎวันที่ 25 จะไม่รันในวันที่ 15 แม้ `nextRunDate` จะเป็นวันที่ 15 ก็ตาม
-    - สร้าง Unit Test ใหม่ใน `test/features/recurring_repair_test.dart` ตรวจสอบระบบ Soft-delete รายการผิดพลาด, การคืนยอดเงินบัญชี, และการปรับวันกลับสู่สภาวะปกติ
-    - รัน `flutter test` ผ่านทั้งหมด **233/233 tests passed** (100%)
+- [x] **Recurring Transactions Duplication Purge, Cloud Sync Alignment & True Schedule Restoration (15 ต.ค. 2026)**:
+  - **1. วิเคราะห์สาเหตุรากเหง้าของรายการซ้ำสองชุดและการรันพร้อมกันในวันที่ 15 (Root Cause)**:
+    - **สาเหตุที่ 1 (Startup Race Condition)**: เมื่อผู้ใช้ลบแอปแล้วติดตั้งใหม่ เมื่อเปิดแอป `main_shell.dart` เรียก `processDueRules()` ก่อนที่ข้อมูลธุรกรรมจะถูกดึงลงมาจาก Supabase ทำให้ SQLite ในเครื่องที่ว่างเปล่าเข้าใจว่ายังไม่มีรายการ จึงสร้างธุรกรรมซ้ำขึ้นมาอีกชุด เมื่อ Cloud Sync ดึงรายการเก่ากลับมา จึงกลายเป็น 2 ชุด (Duplicate)
+    - **สาเหตุที่ 2 (Cloud Retention of Duplicates)**: ฟังก์ชัน `deduplicateTransactions` เดิมสั่งลบเฉพาะในเครื่อง (`delete(transactions)`) แต่ไม่ได้สั่งลบแถวซ้ำบน Supabase (`supabase.from('transactions').delete()`) ทำให้เมื่อล็อกอินหรือดึงข้อมูลใหม่ รายการที่ซ้ำบนคลาวด์จะถูกดึงกลับมาเสมอ
+    - **สาเหตุที่ 3 (Timezone Mismatch in Signature)**: `dateKey` ในการตรวจจับความซ้ำซ้อนใช้เวลา UTC (`tx.transactionDate`) ทำให้รายการเวลาเที่ยงคืนวันที่ 15 ในไทย (UTC+7 ซึ่งตรงกับ 17:00 วันที่ 14 ของ UTC) มีคีย์วันที่เป็น 2026-10-14 ไม่ตรงกับรายการในเครื่องที่เป็น 2026-10-15
+    - **สาเหตุที่ 4 (Supabase Schema Missing Column `day_of_month`)**: ตาราง `recurring_rules` บน Supabase ไม่มีคอลัมน์ `day_of_month` หรือส่งค่ามาเป็น `null` ทำให้เมื่อดึงกฎลงมา กฎทั้งหมดสูญเสียรอบวันจริง และ `RecurringEngine.getUpcomingRunDate` จึงสำรองด้วยวันที่ปัจจุบัน (วันที่ 15) ส่งผลให้ทุกกฎตื่นขึ้นมาสร้างธุรกรรมพร้อมกันทั้งหมด
+  - **2. การแก้ไขระบบตรวจจับความซ้ำซ้อนและการซิงก์คลาวด์ (`transactions_dao.dart`, `sync_service.dart`)**:
+    - ใน `TransactionsDao.deduplicateTransactions()`:
+      - ปรับ `dateKey` ให้ใช้ `.toLocal()` ตัดปัญหาความต่างของเขตเวลา UTC vs UTC+7
+      - ลอกแท็กระบบ (`[work_period:...]`, `[dom:...]`, `'สร้างอัตโนมัติจากกฎ:'`) ออกจากข้อความก่อนเปรียบเทียบ Signature
+      - เพิ่ม Secondary Signature สำหรับรายการ Recurring อัตโนมัติ: `dateKey | amountThbSatang | transactionType | sourceAccountId | recurring_auto`
+      - ส่งคืนรายชื่อ Transaction IDs ที่ถูกลบ เพื่อให้ `SyncService` ส่งคำสั่งลบถาวรขึ้นไปยัง Supabase ด้วย
+    - ใน `SyncService`:
+      - นำ `repairErroneousAutoPostsAndAlignDates()` และ `deduplicateTransactions()` มารันหลังขั้นตอนที่ 10 (`_syncTransactions`) เสมอ
+      - ลบรายการซ้ำและอัปเดต Soft-delete รายการที่ผิดพลาดบน Supabase ด้วย chunk batch
+      - บันทึกและดึงข้อมูล `[dom:X]` แนบไว้ในฟิลด์ `note` ของกฎ เพื่อรักษาข้อมูลวันของเดือนไว้เสมอ แม้สกีมาบน Supabase จะไม่มีคอลัมน์ `day_of_month`
+  - **3. กู้คืนรอบวันจริงของทุกกฎและการคืนยอดเงินอัตโนมัติ (`recurring_transactions_dao.dart`)**:
+    - พัฒนาระบบค้นหารอบวันแท้จริง (`dayOfMonth`) อัตโนมัติ:
+      1. ตรวจสอบแท็ก `[dom:X]` ในฟิลด์ `note` ของกฎ
+      2. หากไม่มี ให้ค้นหาย้อนหลังในประวัติธุรกรรมจริงก่อนวันที่ 15 ต.ค. 2026 (Ledger History) ด้วยการจับคู่คำค้นหาแบบสองทิศทาง (Bidirectional) และคำสำคัญ (Tokens)
+      3. หากเป็นเครื่องติดตั้งใหม่ที่ไม่มีประวัติเก่า ใช้ Domain Fallback สำหรับบิลและเงินเดือนมาตรฐาน (AIS -> วันที่ 8, กบข./เงินเดือน -> วันที่ 26, ค่าไฟ -> วันที่ 30, P4P/พตส -> วันที่ 20, ค่าเช่า -> วันที่ 23)
+    - บันทึก `[dom:X]` คืนลงใน `note` และ `dayOfMonth` ของกฎในเครื่อง และสั่ง Push ซิงก์ขึ้นไปเก็บถาวรบน Supabase
+    - ป้องกัน `processDueRules()` ไม่ให้สร้างซ้ำในเดือนเดียวกันสำหรับกฎรายเดือน (Monthly Idempotency Guard)
+    - Soft-delete รายการที่ถูกสร้างผิดพลาดในวันที่ 15 ต.ค. ออกทั้งหมด และส่งสถานะไปลบ/อัปเดตบน Supabase
+    - ยอดเงินงบประมาณ Master Budget คืนสู่สภาวะถูกต้องแท้จริง (จาก ฿0.00 กลายเป็นเหลือ ฿8,009.45 / 40%)
+    - ตัวเลขป้ายกระดิ่งแจ้งเตือนลดลงจาก 10 รายการ เหลือเพียง 3 รายการแท้จริงที่เกิดขึ้นแล้วในเดือนนี้ (Spotify วันที่ 3, Netflix วันที่ 3, Coway วันที่ 5) และแสดงรายการที่กำลังจะมาถึงใน 7 วันข้างหน้าอย่างถูกต้อง (P4P 20 ต.ค., พตส. 20 ต.ค., ค่า ER Intern 21 ต.ค.)
+  - **4. การทดสอบและการรับรองคุณภาพ (Unit Tests & Static Analysis)**:
+    - เพิ่มการทดสอบครอบคลุมใน `test/features/recurring_repair_test.dart` (4 tests) และ `test/features/recurring_dao_idempotency_test.dart`
+    - รัน `flutter test` ผ่านทั้งหมด **235/235 tests passed** (100%)
     - รัน `flutter analyze`: **0 errors, 0 warnings** (No issues found)
-  - **5. อัปเดตไฟล์ติดตั้ง Android Release APK สำหรับ OPPO Find X9 (`myfinance-release.apk`)**:
-    - บิลด์ `flutter build apk --release` ผ่าน Gradle สำเร็จสมบูรณ์ ได้ไฟล์ติดตั้งเวอร์ชันล่าสุดขนาด 45.6MB อยู่ที่รูทของโปรเจกต์ (`c:\Projects\myfinance\myfinance-release.apk`)
+  - **5. Build และติดตั้งลงบนเครื่องจริง OPPO Find X9 (`3B15AF017PW00000`)**:
+    - สร้าง Release APK (`myfinance-release.apk`) ขนาด 45.7MB
+    - ติดตั้งผ่าน ADB และทดสอบบนหน้าจอจริงผ่านภาพถ่าย Screencap: ตัวเลขแจ้งเตือนเป็น 3, ยอดคงเหลือ ฿8,009.45, รายการซ้ำหมดสิ้น 100%
 
 - [x] **Android APK Deep Link Fix, Backup .db Picker Fix & Colorful Non-Glowing Circular Icon Badges (15 ต.ค. 2026)**:
   - **1. แก้ไขปัญหา Android APK Login เด้งไปเข้า WebApp (`AndroidManifest.xml`, `auth_service.dart`)**:

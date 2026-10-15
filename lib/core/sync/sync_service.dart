@@ -178,6 +178,36 @@ class SyncService extends StateNotifier<SyncState> {
       await _syncRecurring(userId, lastSync);
       await _syncTransactions(userId, lastSync);
 
+      // Repair erroneous recurring auto-posts and push soft-deletes to Supabase
+      final repairedTxIds = await _db.recurringTransactionsDao.repairErroneousAutoPostsAndAlignDates();
+      if (repairedTxIds.isNotEmpty && _auth.isLoggedIn) {
+        const chunkSize = 150;
+        for (var i = 0; i < repairedTxIds.length; i += chunkSize) {
+          final chunk = repairedTxIds.sublist(i, math.min(i + chunkSize, repairedTxIds.length));
+          try {
+            await _supabase.from('transactions').update({
+              'deleted_at': DateTime.now().toUtc().toIso8601String(),
+              'updated_at': DateTime.now().toUtc().toIso8601String(),
+            }).inFilter('id', chunk);
+          } catch (_) {}
+        }
+        try {
+          await _syncRecurring(userId, null, pushOnly: true);
+        } catch (_) {}
+      }
+
+      // Auto-clean duplicates after pull to guarantee zero duplicate rows locally and on cloud
+      final dupTxIds = await _db.transactionsDao.deduplicateTransactions();
+      if (dupTxIds.isNotEmpty && _auth.isLoggedIn) {
+        const chunkSize = 150;
+        for (var i = 0; i < dupTxIds.length; i += chunkSize) {
+          final chunk = dupTxIds.sublist(i, math.min(i + chunkSize, dupTxIds.length));
+          try {
+            await _supabase.from('transactions').delete().inFilter('id', chunk);
+          } catch (_) {}
+        }
+      }
+
       final now = DateTime.now();
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_prefLastSync, now.toIso8601String());
@@ -207,6 +237,25 @@ class SyncService extends StateNotifier<SyncState> {
     state = state.copyWith(status: SyncStatus.syncing, errorMessage: null);
 
     try {
+      final repairedIds = await _db.recurringTransactionsDao.repairErroneousAutoPostsAndAlignDates();
+      if (_auth.isLoggedIn) {
+        if (repairedIds.isNotEmpty) {
+          const chunkSize = 150;
+          for (var i = 0; i < repairedIds.length; i += chunkSize) {
+            final chunk = repairedIds.sublist(i, math.min(i + chunkSize, repairedIds.length));
+            try {
+              await _supabase.from('transactions').update({
+                'deleted_at': DateTime.now().toUtc().toIso8601String(),
+                'updated_at': DateTime.now().toUtc().toIso8601String(),
+              }).inFilter('id', chunk);
+            } catch (_) {}
+          }
+        }
+        try {
+          await _syncRecurring(_auth.currentUser!.id, null, pushOnly: true);
+        } catch (_) {}
+      }
+
       final deletedIds = await _db.transactionsDao.deduplicateTransactions();
       debugPrint('[Sync] Deduplicated locally: ${deletedIds.length} duplicate items removed.');
 
@@ -214,7 +263,9 @@ class SyncService extends StateNotifier<SyncState> {
         const chunkSize = 150;
         for (var i = 0; i < deletedIds.length; i += chunkSize) {
           final chunk = deletedIds.sublist(i, math.min(i + chunkSize, deletedIds.length));
-          await _supabase.from('transactions').delete().inFilter('id', chunk);
+          try {
+            await _supabase.from('transactions').delete().inFilter('id', chunk);
+          } catch (_) {}
         }
         debugPrint('[Sync] Cleaned ${deletedIds.length} duplicate rows from Supabase.');
       }
@@ -613,8 +664,41 @@ class SyncService extends StateNotifier<SyncState> {
     // 10. Sync Transactions
     await _syncTransactions(userId, lastSync, pullOnly: pullOnly);
 
-    // 11. Auto-clean duplicates after pull to guarantee zero duplicate rows
-    await _db.transactionsDao.deduplicateTransactions();
+    // 11. Repair erroneous recurring auto-posts and push soft-deletes to Supabase
+    final repairedTxIds = await _db.recurringTransactionsDao.repairErroneousAutoPostsAndAlignDates();
+    if (_auth.isLoggedIn) {
+      if (repairedTxIds.isNotEmpty) {
+        const chunkSize = 150;
+        for (var i = 0; i < repairedTxIds.length; i += chunkSize) {
+          final chunk = repairedTxIds.sublist(i, math.min(i + chunkSize, repairedTxIds.length));
+          try {
+            await _supabase.from('transactions').update({
+              'deleted_at': DateTime.now().toUtc().toIso8601String(),
+              'updated_at': DateTime.now().toUtc().toIso8601String(),
+            }).inFilter('id', chunk);
+          } catch (e) {
+            debugPrint('[Sync] Error pushing soft-deletes for repaired transactions: $e');
+          }
+        }
+      }
+      try {
+        await _syncRecurring(userId, null, pushOnly: true);
+      } catch (_) {}
+    }
+
+    // 12. Auto-clean duplicates after pull to guarantee zero duplicate rows locally and on cloud
+    final dupTxIds = await _db.transactionsDao.deduplicateTransactions();
+    if (dupTxIds.isNotEmpty && _auth.isLoggedIn) {
+      const chunkSize = 150;
+      for (var i = 0; i < dupTxIds.length; i += chunkSize) {
+        final chunk = dupTxIds.sublist(i, math.min(i + chunkSize, dupTxIds.length));
+        try {
+          await _supabase.from('transactions').delete().inFilter('id', chunk);
+        } catch (e) {
+          debugPrint('[Sync] Error deleting duplicates from Supabase: $e');
+        }
+      }
+    }
 
     // Update Device State on Supabase (Active Device Wins)
     if (!pullOnly) {
@@ -1075,6 +1159,13 @@ class SyncService extends StateNotifier<SyncState> {
 
   // ─── 7. Recurring Rules ─────────────────────────────────────────────────────
 
+  static String? _encodeRuleNoteWithMeta(String? note, int? dayOfMonth) {
+    if (dayOfMonth == null) return note;
+    final base = (note ?? '').trim();
+    if (base.contains('[dom:') || base.contains('[day_of_month:')) return base;
+    return base.isEmpty ? '[dom:$dayOfMonth]' : '$base [dom:$dayOfMonth]';
+  }
+
   Future<void> _syncRecurring(String userId, DateTime? lastSync, {bool pushOnly = false, bool pullOnly = false}) async {
     try {
       if (!pullOnly) {
@@ -1103,7 +1194,7 @@ class SyncService extends StateNotifier<SyncState> {
             'interval_units': r.intervalUnits,
             'auto_post': r.autoPost,
             'last_posted_date': r.lastPostedDate?.toUtc().toIso8601String(),
-            'note': r.note,
+            'note': _encodeRuleNoteWithMeta(r.note, r.dayOfMonth),
             'created_at': r.createdAt.toUtc().toIso8601String(),
             'updated_at': r.updatedAt.toUtc().toIso8601String(),
             'deleted_at': r.deletedAt?.toUtc().toIso8601String(),
@@ -1126,7 +1217,7 @@ class SyncService extends StateNotifier<SyncState> {
               'frequency': r.frequency,
               'next_run_date': r.nextRunDate.toUtc().toIso8601String(),
               'is_active': r.isActive,
-              'note': r.note,
+              'note': _encodeRuleNoteWithMeta(r.note, r.dayOfMonth),
               'created_at': r.createdAt.toUtc().toIso8601String(),
               'updated_at': r.updatedAt.toUtc().toIso8601String(),
               'deleted_at': r.deletedAt?.toUtc().toIso8601String(),
@@ -1159,7 +1250,14 @@ class SyncService extends StateNotifier<SyncState> {
             }
 
             final freq = row['frequency'] as String? ?? (local?.frequency ?? 'monthly');
-            final dayOfMonth = row['day_of_month'] as int? ?? local?.dayOfMonth;
+            int? dayOfMonth = row['day_of_month'] as int? ?? local?.dayOfMonth;
+            final noteStr = (row['note'] as String?) ?? local?.note ?? '';
+            if (dayOfMonth == null && noteStr.isNotEmpty) {
+              final domMatch = RegExp(r'\[(?:dom|day_of_month):(\d+)\]').firstMatch(noteStr);
+              if (domMatch != null) {
+                dayOfMonth = int.tryParse(domMatch.group(1)!);
+              }
+            }
             final interval = (row['interval_units'] as int?) ?? (local?.intervalUnits ?? 1);
 
             // Never overwrite local nextRunDate or lastPostedDate with null or unaligned today

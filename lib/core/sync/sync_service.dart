@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../database/app_database.dart';
 import '../database/database_provider.dart';
+import '../../features/recurring/domain/recurring_engine.dart';
 import 'auth_service.dart';
 import 'cloud_vault_snapshot_helper.dart';
 
@@ -1157,14 +1158,32 @@ class SyncService extends StateNotifier<SyncState> {
               continue;
             }
 
-            // Never overwrite local nextRunDate or lastPostedDate with null or today
+            final freq = row['frequency'] as String? ?? (local?.frequency ?? 'monthly');
+            final dayOfMonth = row['day_of_month'] as int? ?? local?.dayOfMonth;
+            final interval = (row['interval_units'] as int?) ?? (local?.intervalUnits ?? 1);
+
+            // Never overwrite local nextRunDate or lastPostedDate with null or unaligned today
             DateTime nextRun;
             if (row['next_run_date'] != null) {
-              nextRun = DateTime.parse(row['next_run_date'] as String).toLocal();
+              final parsed = DateTime.parse(row['next_run_date'] as String).toLocal();
+              nextRun = RecurringEngine.alignToScheduledDay(
+                date: parsed,
+                frequency: freq,
+                dayOfMonth: dayOfMonth,
+              );
             } else if (local != null) {
-              nextRun = local.nextRunDate;
+              nextRun = RecurringEngine.alignToScheduledDay(
+                date: local.nextRunDate,
+                frequency: freq,
+                dayOfMonth: dayOfMonth,
+              );
             } else {
-              nextRun = DateTime.now();
+              nextRun = RecurringEngine.getUpcomingRunDate(
+                fromDate: DateTime.now(),
+                frequency: freq,
+                intervalUnits: interval,
+                dayOfMonth: dayOfMonth,
+              );
             }
 
             DateTime? lastPosted;
@@ -1203,7 +1222,8 @@ class SyncService extends StateNotifier<SyncState> {
           }
         });
 
-        // Trigger deduplication after pulling rules
+        // Trigger repair and deduplication after pulling rules
+        await _db.recurringTransactionsDao.repairErroneousAutoPostsAndAlignDates();
         await _db.transactionsDao.deduplicateTransactions();
       }
     } catch (e) {

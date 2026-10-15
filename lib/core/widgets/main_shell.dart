@@ -70,8 +70,9 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
       }
 
       try {
+        final repaired = await ref.read(recurringTransactionsDaoProvider).repairErroneousAutoPostsAndAlignDates();
         final posted = await ref.read(recurringTransactionsDaoProvider).processDueRules();
-        if (posted > 0 && mounted) {
+        if ((repaired > 0 || posted > 0) && mounted) {
           ref.read(transactionsVersionProvider.notifier).state++;
         }
       } catch (e) {

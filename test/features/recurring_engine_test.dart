@@ -126,5 +126,71 @@ void main() {
       // On Oct 10th, since nextRunDate is Nov 10th, dueDates is empty (cycle skipped as desired!)
       expect(dueDatesOnOct10, isEmpty);
     });
+
+    test('Strict day-of-month alignment: Rule for 25th does NOT trigger when today is 15th even if nextRunDate is 15th', () {
+      // Simulates the exact bug: nextRunDate was set to Oct 15th, today is Oct 15th, but dayOfMonth is 25th
+      final dueDatesOnOct15 = RecurringEngine.calculateDueDates(
+        nextRunDate: DateTime(2026, 10, 15),
+        frequency: 'monthly',
+        intervalUnits: 1,
+        dayOfMonth: 25,
+        now: DateTime(2026, 10, 15, 18, 0),
+      );
+
+      // Must be empty! It is NOT the 25th yet!
+      expect(dueDatesOnOct15, isEmpty);
+
+      // When Oct 25th actually arrives:
+      final dueDatesOnOct25 = RecurringEngine.calculateDueDates(
+        nextRunDate: DateTime(2026, 10, 15),
+        frequency: 'monthly',
+        intervalUnits: 1,
+        dayOfMonth: 25,
+        now: DateTime(2026, 10, 25, 10, 0),
+      );
+
+      // Must trigger exactly on Oct 25th!
+      expect(dueDatesOnOct25.length, equals(1));
+      expect(dueDatesOnOct25.first.day, equals(25));
+      expect(dueDatesOnOct25.first.month, equals(10));
+    });
+
+    test('getUpcomingRunDate correctly selects upcoming occurrence in current month or next month', () {
+      final now = DateTime(2026, 10, 15);
+
+      // Day 25 is later this month -> returns Oct 25th
+      final upcoming25 = RecurringEngine.getUpcomingRunDate(
+        fromDate: now,
+        frequency: 'monthly',
+        intervalUnits: 1,
+        dayOfMonth: 25,
+      );
+      expect(upcoming25.year, equals(2026));
+      expect(upcoming25.month, equals(10));
+      expect(upcoming25.day, equals(25));
+
+      // Day 10 has already passed this month -> returns Nov 10th
+      final upcoming10 = RecurringEngine.getUpcomingRunDate(
+        fromDate: now,
+        frequency: 'monthly',
+        intervalUnits: 1,
+        dayOfMonth: 10,
+      );
+      expect(upcoming10.year, equals(2026));
+      expect(upcoming10.month, equals(11));
+      expect(upcoming10.day, equals(10));
+
+      // Day 31 for February -> clamps to Feb 28th
+      final febFrom = DateTime(2026, 2, 1);
+      final upcomingFeb31 = RecurringEngine.getUpcomingRunDate(
+        fromDate: febFrom,
+        frequency: 'monthly',
+        intervalUnits: 1,
+        dayOfMonth: 31,
+      );
+      expect(upcomingFeb31.year, equals(2026));
+      expect(upcomingFeb31.month, equals(2));
+      expect(upcomingFeb31.day, equals(28));
+    });
   });
 }

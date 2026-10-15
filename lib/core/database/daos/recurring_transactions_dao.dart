@@ -110,6 +110,9 @@ class RecurringTransactionsDao extends DatabaseAccessor<AppDatabase> with _$Recu
   /// Idempotency guaranteed: never posts more than once for the same local calendar date.
   Future<int> processDueRules({DateTime? nowOverride}) async {
     final now = nowOverride ?? DateTime.now();
+    try {
+      await repairErroneousAutoPostsAndAlignDates();
+    } catch (_) {}
     final active = await getActiveRules();
     int postedCount = 0;
 
@@ -264,6 +267,125 @@ class RecurringTransactionsDao extends DatabaseAccessor<AppDatabase> with _$Recu
     } catch (_) {}
 
     return postedCount;
+  }
+
+  /// Repairs any auto-posted transactions that were generated on the wrong day of month
+  /// (e.g. from the Oct 15 2026 sync bug where all monthly rules triggered on the sync date)
+  /// and realigns each rule's nextRunDate to its proper upcoming scheduled day.
+  Future<int> repairErroneousAutoPostsAndAlignDates() async {
+    final now = DateTime.now();
+    final allRules = await (select(recurringRules)..where((r) => r.deletedAt.isNull())).get();
+
+    // Find all auto-posted transactions
+    final autoTxs = await (select(transactions)
+          ..where((t) =>
+              t.deletedAt.isNull() &
+              (t.tag.contains('recurring_auto') | t.tag.contains('recurring_manual_confirmed'))))
+        .get();
+
+    int repairedCount = 0;
+    final erroneousTxIds = <String>[];
+    final affectedRuleIds = <String>{};
+
+    for (final tx in autoTxs) {
+      // Find matching rule
+      RecurringRule? matchedRule;
+      for (final rule in allRules) {
+        final matchesType = tx.transactionType == rule.transactionType;
+        final matchesAmount = tx.amountOriginalSatang == rule.amountSatang;
+        final matchesAccount = rule.sourceAccountId == tx.sourceAccountId || tx.sourceAccountId == null;
+        final note = tx.note ?? '';
+        final matchesTitle = note.contains(rule.title) ||
+            (rule.note != null && rule.note!.isNotEmpty && note.contains(rule.note!));
+
+        if (matchesType && matchesAmount && matchesAccount && matchesTitle) {
+          matchedRule = rule;
+          break;
+        }
+      }
+
+      if (matchedRule != null) {
+        // If it's a monthly rule with dayOfMonth
+        if (matchedRule.frequency.toLowerCase() == 'monthly' && matchedRule.dayOfMonth != null) {
+          final txDate = tx.transactionDate.toLocal();
+          final daysInTxMonth = DateTime(txDate.year, txDate.month + 1, 0).day;
+          final expectedDay = matchedRule.dayOfMonth! > daysInTxMonth ? daysInTxMonth : matchedRule.dayOfMonth!;
+
+          // If the transaction date's day does NOT match the expected dayOfMonth
+          // it was posted on the wrong day!
+          if (txDate.day != expectedDay) {
+            erroneousTxIds.add(tx.id);
+            affectedRuleIds.add(matchedRule.id);
+          }
+        }
+      }
+    }
+
+    if (erroneousTxIds.isNotEmpty) {
+      // Soft-delete all erroneous transactions
+      await (update(transactions)..where((t) => t.id.isIn(erroneousTxIds))).write(
+        TransactionsCompanion(
+          deletedAt: Value(now),
+          updatedAt: Value(now),
+        ),
+      );
+
+      for (final txId in erroneousTxIds) {
+        await into(auditLogs).insert(
+          AuditLogsCompanion.insert(
+            id: _uuid.v4(),
+            entityTable: 'transactions',
+            entityId: txId,
+            action: 'SOFT_DELETE_ERRONEOUS_RECURRING',
+            changeTimestamp: now,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+      }
+      repairedCount = erroneousTxIds.length;
+    }
+
+    // Now re-align all rules to their true upcoming schedule
+    for (final rule in allRules) {
+      if (rule.frequency.toLowerCase() == 'monthly' && rule.dayOfMonth != null) {
+        final daysInNextRun = DateTime(rule.nextRunDate.year, rule.nextRunDate.month + 1, 0).day;
+        final expectedDay = rule.dayOfMonth! > daysInNextRun ? daysInNextRun : rule.dayOfMonth!;
+
+        final isAffected = affectedRuleIds.contains(rule.id);
+        final isUnaligned = rule.nextRunDate.day != expectedDay;
+
+        if (isAffected || isUnaligned) {
+          // Re-calculate the upcoming run date
+          final upcoming = RecurringEngine.getUpcomingRunDate(
+            fromDate: now,
+            frequency: rule.frequency,
+            intervalUnits: rule.intervalUnits,
+            dayOfMonth: rule.dayOfMonth,
+          );
+
+          DateTime? lastPosted = rule.lastPostedDate;
+          // If lastPostedDate was erroneously set to a day that doesn't match expectedDay
+          if (lastPosted != null) {
+            final daysInPostedMonth = DateTime(lastPosted.year, lastPosted.month + 1, 0).day;
+            final expectedPostedDay = rule.dayOfMonth! > daysInPostedMonth ? daysInPostedMonth : rule.dayOfMonth!;
+            if (lastPosted.day != expectedPostedDay) {
+              lastPosted = null;
+            }
+          }
+
+          await (update(recurringRules)..where((r) => r.id.equals(rule.id))).write(
+            RecurringRulesCompanion(
+              nextRunDate: Value(upcoming),
+              lastPostedDate: Value(lastPosted),
+              updatedAt: Value(now),
+            ),
+          );
+        }
+      }
+    }
+
+    return repairedCount;
   }
 
   /// Manually execute or confirm a single due recurring rule for a specific date

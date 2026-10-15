@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/database/database_provider.dart';
+import '../domain/recurring_engine.dart';
 
 class RecurringRuleDialog extends ConsumerStatefulWidget {
   final RecurringRule? ruleToEdit;
@@ -88,7 +89,14 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
     _sourceAccountId = item?.sourceAccountId;
     _destinationAccountId = item?.destinationAccountId;
     _categoryId = item?.categoryId;
-    _nextRunDate = item?.nextRunDate ?? DateTime.now();
+    final initialDay = item?.dayOfMonth ?? DateTime.now().day;
+    _nextRunDate = item?.nextRunDate ??
+        RecurringEngine.getUpcomingRunDate(
+          fromDate: DateTime.now(),
+          frequency: _frequency,
+          intervalUnits: item?.intervalUnits ?? 1,
+          dayOfMonth: initialDay,
+        );
     _endDate = item?.endDate;
     _autoPost = item?.autoPost ?? true;
 
@@ -174,6 +182,16 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
     final amountSatang = (amountBaht * 100).round();
     final intervalUnits = int.tryParse(_intervalController.text.trim()) ?? 1;
     final dayOfMonth = int.tryParse(_dayOfMonthController.text.trim());
+    DateTime effectiveNextRun = _nextRunDate;
+    if (_frequency == 'monthly' || _frequency == 'yearly') {
+      if (dayOfMonth != null) {
+        effectiveNextRun = RecurringEngine.alignToScheduledDay(
+          date: _nextRunDate,
+          frequency: _frequency,
+          dayOfMonth: dayOfMonth,
+        );
+      }
+    }
 
     String noteText = _noteController.text.trim();
     if (_transactionType == 'income') {
@@ -204,7 +222,7 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
           intervalUnits: drift.Value(intervalUnits),
           dayOfMonth: drift.Value(dayOfMonth),
           endDate: drift.Value(_endDate),
-          nextRunDate: _nextRunDate,
+          nextRunDate: effectiveNextRun,
           autoPost: drift.Value(_autoPost),
           sourceAccountId: _sourceAccountId!,
           destinationAccountId: drift.Value(_transactionType == 'transfer' ? _destinationAccountId : null),
@@ -227,7 +245,7 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
           intervalUnits: drift.Value(intervalUnits),
           dayOfMonth: drift.Value(dayOfMonth),
           endDate: drift.Value(_endDate),
-          nextRunDate: drift.Value(_nextRunDate),
+          nextRunDate: drift.Value(effectiveNextRun),
           autoPost: drift.Value(_autoPost),
           sourceAccountId: drift.Value(_sourceAccountId!),
           destinationAccountId: drift.Value(_transactionType == 'transfer' ? _destinationAccountId : null),
@@ -373,6 +391,20 @@ class _RecurringRuleDialogState extends ConsumerState<RecurringRuleDialog> {
                             FilteringTextInputFormatter.digitsOnly,
                             LengthLimitingTextInputFormatter(2),
                           ],
+                          onChanged: (val) {
+                            final d = int.tryParse(val.trim());
+                            if (d != null && d >= 1 && d <= 31) {
+                              final interval = int.tryParse(_intervalController.text.trim()) ?? 1;
+                              setState(() {
+                                _nextRunDate = RecurringEngine.getUpcomingRunDate(
+                                  fromDate: DateTime.now(),
+                                  frequency: _frequency,
+                                  intervalUnits: interval,
+                                  dayOfMonth: d,
+                                );
+                              });
+                            }
+                          },
                           decoration: InputDecoration(
                             labelText: isThai ? 'วันที่ทำรายการของเดือน (1-31)' : 'Day of Month (1-31)',
                             hintText: isThai

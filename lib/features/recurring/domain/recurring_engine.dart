@@ -44,6 +44,105 @@ class RecurringEngine {
     }
   }
 
+  /// Clamps a day of month to the valid range for that month (e.g. Feb 31 -> Feb 28/29).
+  static int clampDayToMonth(int year, int month, int targetDay) {
+    final daysInMonth = DateTime(year, month + 1, 0).day;
+    return targetDay > daysInMonth ? daysInMonth : (targetDay < 1 ? 1 : targetDay);
+  }
+
+  /// Aligns a given date to its exact scheduled calendar occurrence according to [frequency] and [dayOfMonth].
+  /// For 'monthly' and 'yearly': returns a DateTime with the clamped [dayOfMonth] in [date]'s month.
+  /// For 'daily' or 'weekly': returns [date].
+  static DateTime alignToScheduledDay({
+    required DateTime date,
+    required String frequency,
+    int? dayOfMonth,
+  }) {
+    if (dayOfMonth == null) return date;
+
+    switch (frequency.toLowerCase()) {
+      case 'monthly':
+      case 'yearly':
+        final clamped = clampDayToMonth(date.year, date.month, dayOfMonth);
+        return DateTime(date.year, date.month, clamped, date.hour, date.minute, date.second);
+      default:
+        return date;
+    }
+  }
+
+  /// Calculates the next upcoming scheduled date on or strictly after [fromDate].
+  /// If the occurrence in [fromDate]'s current cycle is already past, advances to the next cycle.
+  static DateTime getUpcomingRunDate({
+    required DateTime fromDate,
+    required String frequency,
+    required int intervalUnits,
+    int? dayOfMonth,
+  }) {
+    final interval = intervalUnits > 0 ? intervalUnits : 1;
+    final aligned = alignToScheduledDay(
+      date: fromDate,
+      frequency: frequency,
+      dayOfMonth: dayOfMonth,
+    );
+
+    switch (frequency.toLowerCase()) {
+      case 'monthly':
+        final targetDay = dayOfMonth ?? fromDate.day;
+        final clampedThisMonth = clampDayToMonth(fromDate.year, fromDate.month, targetDay);
+        final thisMonthOccurrence = DateTime(
+          fromDate.year,
+          fromDate.month,
+          clampedThisMonth,
+          fromDate.hour,
+          fromDate.minute,
+          fromDate.second,
+        );
+
+        final todayStart = DateTime(fromDate.year, fromDate.month, fromDate.day);
+        final occStart = DateTime(thisMonthOccurrence.year, thisMonthOccurrence.month, thisMonthOccurrence.day);
+
+        if (!occStart.isBefore(todayStart)) {
+          return thisMonthOccurrence;
+        }
+
+        return computeNextRunDate(
+          frequency: 'monthly',
+          intervalUnits: interval,
+          fromDate: thisMonthOccurrence,
+          dayOfMonth: dayOfMonth,
+        );
+
+      case 'yearly':
+        final targetDay = dayOfMonth ?? fromDate.day;
+        final clampedThisYear = clampDayToMonth(fromDate.year, fromDate.month, targetDay);
+        final thisYearOccurrence = DateTime(
+          fromDate.year,
+          fromDate.month,
+          clampedThisYear,
+          fromDate.hour,
+          fromDate.minute,
+          fromDate.second,
+        );
+
+        final todayStartYear = DateTime(fromDate.year, fromDate.month, fromDate.day);
+        final occStartYear = DateTime(thisYearOccurrence.year, thisYearOccurrence.month, thisYearOccurrence.day);
+
+        if (!occStartYear.isBefore(todayStartYear)) {
+          return thisYearOccurrence;
+        }
+
+        return computeNextRunDate(
+          frequency: 'yearly',
+          intervalUnits: interval,
+          fromDate: thisYearOccurrence,
+          dayOfMonth: dayOfMonth,
+        );
+
+      default:
+        return aligned;
+    }
+  }
+
   /// Checks if two dates fall on the same calendar day in the device's local timezone.
   static bool isSameLocalDate(DateTime a, DateTime b) {
     final aLocal = a.toLocal();
@@ -64,7 +163,11 @@ class RecurringEngine {
     int maxCatchUp = 60,
   }) {
     final dueDates = <DateTime>[];
-    var current = nextRunDate;
+    var current = alignToScheduledDay(
+      date: nextRunDate,
+      frequency: frequency,
+      dayOfMonth: dayOfMonth,
+    );
     int count = 0;
 
     while (current.isBefore(now) || isSameLocalDate(current, now)) {
@@ -103,7 +206,11 @@ class RecurringEngine {
   }) {
     final projections = <DateTime>[];
     final limit = DateTime.now().add(Duration(days: windowDays));
-    var current = nextRunDate;
+    var current = alignToScheduledDay(
+      date: nextRunDate,
+      frequency: frequency,
+      dayOfMonth: dayOfMonth,
+    );
     int count = 0;
 
     while (current.isBefore(limit) && count < 100) {

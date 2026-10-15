@@ -22,6 +22,14 @@ class _RecurringRulesScreenState extends ConsumerState<RecurringRulesScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final repaired = await ref.read(recurringTransactionsDaoProvider).repairErroneousAutoPostsAndAlignDates();
+        if (repaired > 0 && mounted) {
+          _refresh();
+        }
+      } catch (_) {}
+    });
   }
 
   @override

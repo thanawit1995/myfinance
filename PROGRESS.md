@@ -1,6 +1,29 @@
 # บันทึกความคืบหน้าโครงการ MyFinance (PROGRESS.md)
 
-อัปเดตล่าสุด: 15 ตุลาคม 2026 (แก้ไขปัญหา Android APK Login เด้งไป WebApp ด้วย Deep Link Intent Filter, แก้ไขการเลือกไฟล์สำรอง Backup .db บน Android, ปรับปรุงไอคอนหมวดหมู่เป็นวงกลม Colorful สไตล์ Flat ไร้เงาเรืองแสงตามภาพต้นแบบ, และอัปเดตไฟล์ติดตั้ง Android Release APK สำหรับ OPPO Find X9)
+อัปเดตล่าสุด: 15 ตุลาคม 2026 (แก้ไขปัญหาระบบรายการประจำ Recurring Transactions ทำงานผิดวันหลังเชื่อมต่อ Google, เพิ่มระบบ Auto-Repair ลบรายการผิดพลาด 7 รายการในวันที่ 15/10/2026 อัตโนมัติและคืนยอดเงินบัญชีให้ถูกต้อง 100%, ปรับปรุงการคำนวณรอบวันให้ตรง dayOfMonth เสมอ, และอัปเดต Android Release APK)
+
+- [x] **Recurring Transactions Auto-Post Fix, Schedule Alignment & Erroneous Transactions Auto-Repair (15 ต.ค. 2026)**:
+  - **1. วิเคราะห์สาเหตุรากเหง้า (Root Cause)**:
+    - **สาเหตุที่ 1 (`RecurringEngine.calculateDueDates`)**: โค้ดเดิมไม่ได้ตรวจสอบความสอดคล้องของ `dayOfMonth` สำหรับกฎแบบรายเดือน หาก `nextRunDate` หรือวันที่ซิงก์ตกเป็นวันที่ 15 ต.ค. 2026 ระบบจะมองว่าถึงกำหนดแล้วทันที ทั้งที่กฎระบุวันของเดือนไว้เป็นวันอื่น (เช่น วันที่ 20, 25, 28)
+    - **สาเหตุที่ 2 (`SyncService._syncRecurring`)**: เมื่อดึงกฎลงมาจากคลาวด์ หากข้อมูลไม่มี `next_run_date` หรือซิงก์ครั้งแรกบนเครื่องใหม่ โค้ดสำรองดั้งเดิมกำหนด `nextRun = DateTime.now()` (วันที่ 15 ต.ค.) ทำให้ทุกกฎถูกเข้าใจว่าต้องทำรายการในวันนี้
+    - **สาเหตุที่ 3 (`RecurringRuleDialog`)**: ฟอร์มสร้าง/แก้ไขกฎไม่ได้คำนวณ `_nextRunDate` ให้สัมพันธ์กับ `_dayOfMonthController` ทำให้บันทึกวันถัดไปเป็นวันที่เปิดฟอร์มเสมอ
+  - **2. การแก้ไขระบบคำนวณวันและระบบซิงก์ (`RecurringEngine`, `SyncService`, `RecurringRuleDialog`)**:
+    - ใน `RecurringEngine`: เพิ่ม `clampDayToMonth`, `alignToScheduledDay`, และ `getUpcomingRunDate` ช่วยคำนวณรอบวันถัดไปจริงตาม `dayOfMonth` และความถี่ โดยปรับ `calculateDueDates` ให้ตรวจจับและจัดรอบวันที่อย่างเคร่งครัด หากยังไม่ถึงวันของเดือนที่กำหนด รายการนั้นจะไม่ถูกมองว่าถึงกำหนดเด็ดขาด (Empty due dates)
+    - ใน `SyncService._syncRecurring`: ยกเลิกการใช้ `DateTime.now()` เป็นค่าสำรอง และแทนที่ด้วย `RecurringEngine.getUpcomingRunDate` พร้อมจัดเรียงรอบวันให้ตรงกับ `day_of_month` อัตโนมัติ
+    - ใน `RecurringRuleDialog`: เพิ่ม `onChanged` ในช่อง `_dayOfMonthController` และใน `_save()` ให้คำนวณรอบถัดไปจริงแบบไดนามิก และตั้งค่าเริ่มต้นสำหรับกฎใหม่ให้ตรงตามรอบวันจริง
+  - **3. สร้างระบบตรวจซ่อมและกู้คืนข้อมูลอัตโนมัติ (`RecurringTransactionsDao.repairErroneousAutoPostsAndAlignDates`)**:
+    - ค้นหาธุรกรรมทั้งหมดที่สร้างจากแท็ก `recurring_auto` ที่มีวันที่ไม่ตรงกับ `dayOfMonth` ของกฎที่จับคู่กัน
+    - ทำการ **Soft-delete** รายการที่สร้างผิดพลาดทั้ง 7 รายการออกอย่างปลอดภัย พร้อมบันทึก `AuditLog` ระบุการยกเลิกรายการ
+    - คืนยอดเงินในบัญชีให้ถูกต้อง 100% ทันที (เนื่องจาก `AccountsDao` คำนวณยอดเงินสดแบบไดนามิกจากรายการที่ไม่ถูกลบใน Ledger)
+    - รีเซ็ต `lastPostedDate` ที่ผิดพลาด และปรับ `nextRunDate` ของกฎให้กลับมาเป็นวันที่จริงในเดือนตุลาคม 2026 (เช่น 20 ต.ค., 25 ต.ค.)
+    - รันการซ่อมแซมอัตโนมัตินี้ใน `main_shell.dart` เมื่อเปิดแอป, ใน `sync_service.dart` หลังดึงกฎจากคลาวด์, และใน `recurring_rules_screen.dart`
+  - **4. การทดสอบและการรับรองคุณภาพ (Unit Tests & Analyze)**:
+    - เพิ่ม Unit Test ใน `test/features/recurring_engine_test.dart` ตรวจสอบว่ากฎวันที่ 25 จะไม่รันในวันที่ 15 แม้ `nextRunDate` จะเป็นวันที่ 15 ก็ตาม
+    - สร้าง Unit Test ใหม่ใน `test/features/recurring_repair_test.dart` ตรวจสอบระบบ Soft-delete รายการผิดพลาด, การคืนยอดเงินบัญชี, และการปรับวันกลับสู่สภาวะปกติ
+    - รัน `flutter test` ผ่านทั้งหมด **233/233 tests passed** (100%)
+    - รัน `flutter analyze`: **0 errors, 0 warnings** (No issues found)
+  - **5. อัปเดตไฟล์ติดตั้ง Android Release APK สำหรับ OPPO Find X9 (`myfinance-release.apk`)**:
+    - บิลด์ `flutter build apk --release` ผ่าน Gradle สำเร็จสมบูรณ์ ได้ไฟล์ติดตั้งเวอร์ชันล่าสุดขนาด 45.6MB อยู่ที่รูทของโปรเจกต์ (`c:\Projects\myfinance\myfinance-release.apk`)
 
 - [x] **Android APK Deep Link Fix, Backup .db Picker Fix & Colorful Non-Glowing Circular Icon Badges (15 ต.ค. 2026)**:
   - **1. แก้ไขปัญหา Android APK Login เด้งไปเข้า WebApp (`AndroidManifest.xml`, `auth_service.dart`)**:

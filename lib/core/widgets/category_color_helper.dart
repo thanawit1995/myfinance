@@ -166,10 +166,10 @@ class CategoryColorHelper {
     return '0x${color.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase()}';
   }
 
-  /// Builds a modern Squircle badge with clean card tile surface,
-  /// vibrant colored ambient glow shadow, subtle border, and vibrant icon glyph.
-  /// Matches the multi-colored component design system.
-  static Widget buildCategorySquircleBadge(
+  /// Builds a modern colorful flat circular badge matching the clean non-glowing
+  /// vector catalog design. Solid vibrant colored circular surface, crisp high-contrast
+  /// icon glyph, and strictly zero glow/shadow.
+  static Widget buildCategoryCircleBadge(
     BuildContext context, {
     required String? icon,
     required Color color,
@@ -178,44 +178,52 @@ class CategoryColorHelper {
     bool isInactive = false,
   }) {
     final isDark = VaultTheme.isDark(context);
-    final isLumi = VaultTheme.isLumi(context);
-    final badgeColor = isInactive ? Colors.grey : color;
+    final badgeColor = isInactive ? (isDark ? Colors.grey.shade700 : Colors.grey.shade400) : color;
 
-    final tileColor = isInactive
-        ? (isDark ? const Color(0xFF28282B) : const Color(0xFFF3F4F6))
-        : (isDark
-            ? (isLumi ? const Color(0xFF2A1E2B) : const Color(0xFF202024))
-            : Colors.white);
-
-    final glowShadow = isInactive
-        ? null
-        : BoxShadow(
-            color: badgeColor.withValues(alpha: isDark ? 0.38 : 0.26),
-            blurRadius: size * 0.28,
-            offset: const Offset(0, 3),
-            spreadRadius: 0.5,
-          );
+    // Determine icon color based on background luminance for 100% crisp contrast
+    final isBgLight = ThemeData.estimateBrightnessForColor(badgeColor) == Brightness.light;
+    final iconColor = isInactive
+        ? (isDark ? Colors.grey.shade400 : Colors.grey.shade700)
+        : (isBgLight ? const Color(0xFF2D3436) : Colors.white);
 
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: tileColor,
-        borderRadius: BorderRadius.circular(size * 0.32),
+        color: badgeColor,
+        shape: BoxShape.circle,
         border: Border.all(
-          color: isInactive
-              ? Colors.transparent
-              : badgeColor.withValues(alpha: isDark ? 0.35 : 0.20),
-          width: 1.0,
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.12)
+              : Colors.black.withValues(alpha: 0.05),
+          width: 0.8,
         ),
-        boxShadow: glowShadow != null ? [glowShadow] : null,
       ),
       alignment: Alignment.center,
       child: CategoryIconHelper.buildIconWidget(
         icon,
         size: iconSize,
-        color: badgeColor,
+        color: iconColor,
       ),
+    );
+  }
+
+  /// Backward-compatible alias for buildCategoryCircleBadge.
+  static Widget buildCategorySquircleBadge(
+    BuildContext context, {
+    required String? icon,
+    required Color color,
+    double size = 40,
+    double iconSize = 20,
+    bool isInactive = false,
+  }) {
+    return buildCategoryCircleBadge(
+      context,
+      icon: icon,
+      color: color,
+      size: size,
+      iconSize: iconSize,
+      isInactive: isInactive,
     );
   }
 }

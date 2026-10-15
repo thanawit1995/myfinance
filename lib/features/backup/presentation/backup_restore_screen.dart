@@ -519,13 +519,23 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
   Future<void> _handlePickAndRestore() async {
     final isThai = Localizations.localeOf(context).languageCode == 'th';
     final service = ref.read(backupRestoreServiceProvider);
-
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['db', 'sqlite', 'txt'],
-        withData: true,
-      );
+      FilePickerResult? result;
+      if (kIsWeb) {
+        result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['db', 'sqlite', 'txt'],
+          withData: true,
+        );
+      } else {
+        // On Android, FileType.custom with .db causes Android SAF to grey out .db files
+        // because Android does not have a registered system MIME type for .db.
+        // FileType.any allows selecting any file, and inspectBackupFile validates the SQLite / encrypted header.
+        result = await FilePicker.platform.pickFiles(
+          type: FileType.any,
+          withData: true,
+        );
+      }
 
       if (result == null || result.files.isEmpty) return;
 

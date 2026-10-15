@@ -46,12 +46,12 @@ void main() {
       expect(colorA1, colorA2);
     });
 
-    testWidgets('buildCategorySquircleBadge renders squircle tile and icon', (tester) async {
+    testWidgets('buildCategoryCircleBadge renders circular flat badge with zero glow', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
             body: Builder(
-              builder: (context) => CategoryColorHelper.buildCategorySquircleBadge(
+              builder: (context) => CategoryColorHelper.buildCategoryCircleBadge(
                 context,
                 icon: 'restaurant',
                 color: const Color(0xFFFF6B6B),
@@ -63,7 +63,12 @@ void main() {
         ),
       );
 
-      expect(find.byType(Container), findsWidgets);
+      final containerFinder = find.byType(Container).first;
+      expect(containerFinder, findsOneWidget);
+      final container = tester.widget<Container>(containerFinder);
+      final decoration = container.decoration as BoxDecoration?;
+      expect(decoration?.shape, BoxShape.circle);
+      expect(decoration?.boxShadow, isNull); // Strictly no glow
       expect(find.byIcon(Icons.restaurant), findsOneWidget);
     });
   });

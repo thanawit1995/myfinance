@@ -1,6 +1,32 @@
 # บันทึกความคืบหน้าโครงการ MyFinance (PROGRESS.md)
 
-อัปเดตล่าสุด: 13 ตุลาคม 2026 (อัปเดตไอคอนหมวดหมู่ทุกหมวดหมู่เป็นหลากสีสันสดใส Multi-Color สไตล์การ์ด Squircle มีเงาเรืองแสงรอบปุ่ม พร้อมอัปเดตสีฐานข้อมูลอัตโนมัติ และอัปเดตไฟล์ติดตั้ง Android Release APK สำหรับ OPPO Find X9)
+อัปเดตล่าสุด: 15 ตุลาคม 2026 (แก้ไขปัญหา Android APK Login เด้งไป WebApp ด้วย Deep Link Intent Filter, แก้ไขการเลือกไฟล์สำรอง Backup .db บน Android, ปรับปรุงไอคอนหมวดหมู่เป็นวงกลม Colorful สไตล์ Flat ไร้เงาเรืองแสงตามภาพต้นแบบ, และอัปเดตไฟล์ติดตั้ง Android Release APK สำหรับ OPPO Find X9)
+
+- [x] **Android APK Deep Link Fix, Backup .db Picker Fix & Colorful Non-Glowing Circular Icon Badges (15 ต.ค. 2026)**:
+  - **1. แก้ไขปัญหา Android APK Login เด้งไปเข้า WebApp (`AndroidManifest.xml`, `auth_service.dart`)**:
+    - **สาเหตุรากเหง้า (Root Cause)**: ใน `AndroidManifest.xml` ขาด `<intent-filter>` สำหรับรับ URL Scheme (`io.supabase.myfinance` และ `com.myfinance.myfinance`) ทำให้เมื่อยืนยันตัวตน Google OAuth บนเบราว์เซอร์เสร็จแล้ว ระบบ Android ไม่รู้ว่าต้องส่งผู้ใช้กลับมาเปิดแอปไหน และเซิร์ฟเวอร์ Supabase จึงเด้งไปเปิด Site URL ของ WebApp แทน
+    - **การแก้ไข**:
+      - เพิ่ม Intent Filter สำหรับ Deep Link Callback `io.supabase.myfinance://login-callback` และ `com.myfinance.myfinance://login-callback` ใน `AndroidManifest.xml` ภายใต้ MainActivity
+      - ปรับปรุง `AuthService.signInWithGoogle`: บน Mobile ให้ใช้ `LaunchMode.externalApplication` เพื่อให้เบราว์เซอร์ส่ง Intent กลับมายังแอปของระบบปฏิบัติการได้อย่างถูกต้อง แม่นยำ
+      - เพิ่มสิทธิ์ `READ_EXTERNAL_STORAGE` พร้อม `maxSdkVersion="32"` และเปิด `requestLegacyExternalStorage="true"` ใน `AndroidManifest.xml`
+  - **2. แก้ไขปัญหาการเลือก/อัปโหลดไฟล์สำรอง (Backup Restore) บน Android (`backup_restore_screen.dart`)**:
+    - **สาเหตุรากเหง้า (Root Cause)**: Android OS ไม่มีระบบจับคู่ MIME type อย่างเป็นทางการให้กับไฟล์นามสกุล `.db` หรือ `.sqlite` เมื่อโค้ดเดิมใช้ `FileType.custom` พร้อม `allowedExtensions: ['db', 'sqlite', 'txt']` ระบบ Storage Access Framework (SAF) ของ Android จึงทำการ "Gray out (ทำเป็นสีเทาและบล็อกไม่ให้แตะ)" ไฟล์ `.db` ทั้งหมด
+    - **การแก้ไข**:
+      - ปรับ `FilePicker.platform.pickFiles` บน Mobile/Android ให้ใช้ `FileType.any` ทำให้ระบบเปิดให้ผู้ใช้สามารถแตะเลือกไฟล์สำรอง `.db` ได้อย่างราบรื่น ไม่ติดบล็อกสีเทา
+      - ย้ายการตรวจสอบความถูกต้องของไฟล์มาอยู่ที่โค้ดระดับแอป โดยตรวจสอบทั้งนามสกุลและ Magic Header ของฐานข้อมูลจริง (`SQLite format 3` หรือไฟล์สำรองที่เข้ารหัสด้วย AES-256) ป้องกันการนำเข้าไฟล์ที่ไม่ถูกต้อง
+  - **3. ปรับปรุงไอคอนหมวดหมู่เป็นทรงกลม Colorful แบบไม่เรืองแสงตามภาพต้นแบบ (`category_color_helper.dart`)**:
+    - **ดีไซน์ Flat Solid Circle ไร้เงาเรืองแสง (`CategoryColorHelper.buildCategoryCircleBadge`)**:
+      - เปลี่ยนรูปทรงจาก Squircle เป็นวงกลมเรียบสมบูรณ์ (`BoxShape.circle`)
+      - ใช้แผ่นวงกลมสีสดใสเต็มวง (Solid Vibrant Color) ตามชุดสี Curated Palette 16 หมวดหมู่หลัก
+      - **ถอดเงาเรืองแสง (Glow Drop Shadow) ออก 100% (`boxShadow: null`)** สบายตา ไม่แสบตา และไม่รบกวนสายตา
+      - ตัวสัญลักษณ์ไอคอนด้านในเป็นสีขาวคมชัด (หรือสีเข้มคมชัดกรณีพื้นหลังสีเหลืองสว่าง) ด้วยการคำนวณ Luminance คอนทราสต์ตัดกันชัดเจน 100%
+      - คงเมธอดเดิม `buildCategorySquircleBadge` ไว้เป็น Alias ส่งต่อไปยัง `buildCategoryCircleBadge` ทำให้อัปเดตครอบคลุมทุกจุดในแอปแบบ 100% ทันที (Home, Budget, Categories, Quick Add, Transactions, Monthly Summary ฯลฯ)
+  - **4. อัปเดตไฟล์ติดตั้ง Android Release APK สำหรับ OPPO Find X9 (`myfinance-release.apk`)**:
+    - รันคำสั่ง `flutter build apk --release` ผ่าน Gradle สำเร็จสมบูรณ์ ได้ไฟล์ติดตั้งเวอร์ชันล่าสุดขนาด 45.6MB อยู่ที่รูทของโปรเจกต์ (`c:\Projects\myfinance\myfinance-release.apk`)
+  - **5. การทดสอบและการรับรองคุณภาพ**:
+    - อัปเดต Widget Test ใน `test/core/category_color_helper_test.dart` ตรวจสอบ `BoxShape.circle` และ `boxShadow == null`
+    - `flutter test`: ผ่านทั้งหมด **229/229 tests passed** (100%)
+    - `flutter analyze`: **0 errors, 0 warnings** (No issues found)
 
 - [x] **Full Multi-Color Category Icons Overhaul & Database Auto-Update (13 ต.ค. 2026)**:
   - **1. ยกเลิกไอคอนสีเดี่ยว (Monocolor) และอัปเดตระบบไอคอนเป็นหลากสีสันสดใสตามภาพต้นแบบ**:

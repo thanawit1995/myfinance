@@ -53,7 +53,8 @@ class AuthService {
     await _client.auth.signInWithOAuth(
       OAuthProvider.google,
       redirectTo: redirectUrl,
-      authScreenLaunchMode: LaunchMode.platformDefault,
+      authScreenLaunchMode:
+          kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication,
     );
   }
 

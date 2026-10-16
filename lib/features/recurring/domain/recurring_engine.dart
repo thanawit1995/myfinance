@@ -203,9 +203,11 @@ class RecurringEngine {
     int? dayOfMonth,
     DateTime? endDate,
     int windowDays = 30,
+    DateTime? fromDate,
   }) {
     final projections = <DateTime>[];
-    final limit = DateTime.now().add(Duration(days: windowDays));
+    final base = fromDate ?? DateTime.now();
+    final limit = base.add(Duration(days: windowDays));
     var current = alignToScheduledDay(
       date: nextRunDate,
       frequency: frequency,

@@ -5,7 +5,7 @@ import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide TableUpdate;
 import 'package:uuid/uuid.dart';
 import '../database/app_database.dart';
 import '../database/database_provider.dart';
@@ -61,6 +61,13 @@ class SyncService extends StateNotifier<SyncState> {
   static const _prefQuickStartupSyncEnabled = 'pref_quick_startup_sync_enabled';
   StreamSubscription? _connectivitySub;
   StreamSubscription? _authSub;
+  StreamSubscription? _dbUpdatesSub;
+  Timer? _autoSyncDebounceTimer;
+  Timer? _periodicSyncTimer;
+  bool _isPerformingSync = false;
+  DateTime? _lastSyncCompletedAt;
+  DateTime? _lastResumeSyncTime;
+  void Function()? onSyncCompleted;
 
   /// ตั้งค่าสถานะเปิด-ปิด Quick Startup Sync
   static Future<void> setQuickStartupSyncEnabled(bool enabled) async {
@@ -141,6 +148,8 @@ class SyncService extends StateNotifier<SyncState> {
       }
     });
 
+    _initAutoSync();
+
     if (_auth.isLoggedIn) {
       final p = await SharedPreferences.getInstance();
       if (p.getBool(_prefForcePushNext) ?? false) {
@@ -151,11 +160,74 @@ class SyncService extends StateNotifier<SyncState> {
     }
   }
 
+  void _initAutoSync() {
+    // 1. Listen for local database modifications with 3-second debounce
+    _dbUpdatesSub = _db.tableUpdates().listen(_onDatabaseChanged);
+
+    // 2. Periodic background delta sync every 2 minutes when app is active & logged in
+    _periodicSyncTimer = Timer.periodic(const Duration(minutes: 2), (timer) async {
+      if (_auth.isLoggedIn && !_isPerformingSync && state.status != SyncStatus.syncing) {
+        final p = await SharedPreferences.getInstance();
+        if (p.getBool(_prefQuickStartupSyncEnabled) ?? true) {
+          debugPrint('[Sync] Periodic background delta sync triggered.');
+          await quickStartupSync();
+        }
+      }
+    });
+  }
+
+  void _onDatabaseChanged(Set<TableUpdate> updates) {
+    if (_isPerformingSync) return;
+    if (!_auth.isLoggedIn) return;
+
+    final now = DateTime.now();
+    if (_lastSyncCompletedAt != null && now.difference(_lastSyncCompletedAt!) < const Duration(seconds: 2)) {
+      return;
+    }
+
+    // Ignore tables that shouldn't trigger network sync
+    final relevantTableNames = {
+      'transactions',
+      'categories',
+      'accounts',
+      'budgets',
+      'recurring_rules',
+      'assets',
+      'liabilities',
+      'insurance_policies',
+      'projects',
+      'credit_card_installments',
+    };
+
+    final hasRelevant = updates.any((u) => relevantTableNames.contains(u.table));
+    if (!hasRelevant) return;
+
+    _autoSyncDebounceTimer?.cancel();
+    _autoSyncDebounceTimer = Timer(const Duration(seconds: 3), () async {
+      if (!_auth.isLoggedIn || _isPerformingSync || state.status == SyncStatus.syncing) return;
+      debugPrint('[Sync] Auto-sync debounced trigger executing for: ${updates.map((u) => u.table).join(", ")}...');
+      await quickStartupSync();
+    });
+  }
+
+  /// ดึงข้อมูลอัปเดตทันทีเมื่อกลับมาเปิดหน้าจอแอป (Throttle 45 วินาที)
+  Future<void> syncOnAppResumed() async {
+    final now = DateTime.now();
+    if (_lastResumeSyncTime != null && now.difference(_lastResumeSyncTime!) < const Duration(seconds: 45)) {
+      return;
+    }
+    _lastResumeSyncTime = now;
+    if (_auth.isLoggedIn && !_isPerformingSync && state.status != SyncStatus.syncing) {
+      debugPrint('[Sync] App resumed -> Triggering quick delta sync...');
+      await quickStartupSync();
+    }
+  }
+
   /// ซิงค์ด่วนเมื่อเปิดแอป (Quick Startup Sync)
   /// ซิงค์เฉพาะรายการที่มีการเปลี่ยนแปลงล่าสุด (Delta) อย่างรวดเร็ว ไม่รัน Loop ตรวจจับความซ้ำซ้อนทั้งฐานข้อมูล
   Future<void> quickStartupSync() async {
     if (!_auth.isLoggedIn) return;
-    if (state.status == SyncStatus.syncing) return;
+    if (state.status == SyncStatus.syncing || _isPerformingSync) return;
 
     final userId = _auth.currentUser!.id;
     final lastSync = state.lastSyncAt;
@@ -165,17 +237,23 @@ class SyncService extends StateNotifier<SyncState> {
       return;
     }
 
+    _isPerformingSync = true;
     state = state.copyWith(status: SyncStatus.syncing, errorMessage: null);
 
     try {
       // Purge any legacy historical settle transactions locally
       await _db.creditCardDao.purgeHistoricalSettlements();
 
-      // Delta sync for essential tables
+      // Delta sync for all tables
       await _syncAccounts(userId, lastSync);
       await _syncCategories(userId, lastSync);
+      await _syncAssets(userId, lastSync);
+      await _syncInsurance(userId, lastSync);
+      await _syncLiabilities(userId, lastSync);
       await _syncBudgets(userId, lastSync);
       await _syncRecurring(userId, lastSync);
+      await _syncProjects(userId, lastSync);
+      await _syncCreditCardInstallments(userId, lastSync);
       await _syncTransactions(userId, lastSync);
 
       // Repair erroneous recurring auto-posts and push soft-deletes to Supabase
@@ -208,6 +286,11 @@ class SyncService extends StateNotifier<SyncState> {
         }
       }
 
+      // Process due recurring rules after sync
+      try {
+        await _db.recurringTransactionsDao.processDueRules();
+      } catch (_) {}
+
       final now = DateTime.now();
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_prefLastSync, now.toIso8601String());
@@ -226,6 +309,10 @@ class SyncService extends StateNotifier<SyncState> {
     } catch (e) {
       debugPrint('[Sync] Quick startup sync error: $e');
       state = state.copyWith(status: SyncStatus.idle);
+    } finally {
+      _isPerformingSync = false;
+      _lastSyncCompletedAt = DateTime.now();
+      onSyncCompleted?.call();
     }
   }
 
@@ -233,7 +320,8 @@ class SyncService extends StateNotifier<SyncState> {
 
   /// ค้นหาและล้างรายการที่ซ้ำกันออกจากทั้งเครื่องและ Supabase
   Future<int> cleanDuplicates() async {
-    if (state.status == SyncStatus.syncing) return 0;
+    if (state.status == SyncStatus.syncing || _isPerformingSync) return 0;
+    _isPerformingSync = true;
     state = state.copyWith(status: SyncStatus.syncing, errorMessage: null);
 
     try {
@@ -302,6 +390,10 @@ class SyncService extends StateNotifier<SyncState> {
       debugPrint('[Sync] Error cleaning duplicates: $e');
       state = state.copyWith(status: SyncStatus.error, errorMessage: e.toString());
       return 0;
+    } finally {
+      _isPerformingSync = false;
+      _lastSyncCompletedAt = DateTime.now();
+      onSyncCompleted?.call();
     }
   }
 
@@ -309,9 +401,10 @@ class SyncService extends StateNotifier<SyncState> {
   /// ลบข้อมูลธุรกรรมเก่าบน Supabase และส่งข้อมูลที่สะอาด 3,881 รายการจากเครื่องขึ้นไปแทนที่
   Future<bool> forcePushLocalToCloud() async {
     if (!_auth.isLoggedIn) return false;
-    if (state.status == SyncStatus.syncing) return false;
+    if (state.status == SyncStatus.syncing || _isPerformingSync) return false;
 
     final userId = _auth.currentUser!.id;
+    _isPerformingSync = true;
     state = state.copyWith(status: SyncStatus.syncing, errorMessage: null);
 
     try {
@@ -379,6 +472,10 @@ class SyncService extends StateNotifier<SyncState> {
       debugPrint('[Sync] Error force pushing to cloud: $e');
       state = state.copyWith(status: SyncStatus.error, errorMessage: e.toString());
       return false;
+    } finally {
+      _isPerformingSync = false;
+      _lastSyncCompletedAt = DateTime.now();
+      onSyncCompleted?.call();
     }
   }
 
@@ -432,9 +529,10 @@ class SyncService extends StateNotifier<SyncState> {
   /// ดึงฐานข้อมูล Master Snapshot 25 ตารางจากคลาวด์มาเขียนทับเครื่องนี้ 100%
   Future<bool> pullMasterSnapshotFromCloud({bool isThai = true}) async {
     if (!_auth.isLoggedIn) return false;
-    if (state.status == SyncStatus.syncing) return false;
+    if (state.status == SyncStatus.syncing || _isPerformingSync) return false;
 
     final userId = _auth.currentUser!.id;
+    _isPerformingSync = true;
     state = state.copyWith(status: SyncStatus.syncing, errorMessage: null);
 
     try {
@@ -508,6 +606,10 @@ class SyncService extends StateNotifier<SyncState> {
       debugPrint('[Sync] Error pulling master snapshot from cloud: $e');
       state = state.copyWith(status: SyncStatus.error, errorMessage: e.toString());
       return false;
+    } finally {
+      _isPerformingSync = false;
+      _lastSyncCompletedAt = DateTime.now();
+      onSyncCompleted?.call();
     }
   }
 
@@ -581,9 +683,10 @@ class SyncService extends StateNotifier<SyncState> {
 
   Future<void> syncAll({bool forceFullSync = false}) async {
     if (!_auth.isLoggedIn) return;
-    if (state.status == SyncStatus.syncing) return;
+    if (state.status == SyncStatus.syncing || _isPerformingSync) return;
 
     final userId = _auth.currentUser!.id;
+    _isPerformingSync = true;
     state = state.copyWith(status: SyncStatus.syncing, errorMessage: null);
 
     try {
@@ -610,6 +713,10 @@ class SyncService extends StateNotifier<SyncState> {
         status: SyncStatus.error,
         errorMessage: e.toString(),
       );
+    } finally {
+      _isPerformingSync = false;
+      _lastSyncCompletedAt = DateTime.now();
+      onSyncCompleted?.call();
     }
   }
 
@@ -1569,6 +1676,9 @@ class SyncService extends StateNotifier<SyncState> {
   void dispose() {
     _connectivitySub?.cancel();
     _authSub?.cancel();
+    _dbUpdatesSub?.cancel();
+    _autoSyncDebounceTimer?.cancel();
+    _periodicSyncTimer?.cancel();
     super.dispose();
   }
 }
@@ -1579,5 +1689,11 @@ final syncServiceProvider = StateNotifierProvider<SyncService, SyncState>((ref) 
   final supabase = ref.watch(supabaseClientProvider);
   final db = ref.watch(databaseProvider);
   final auth = ref.watch(authServiceProvider);
-  return SyncService(supabase, db, auth);
+  final service = SyncService(supabase, db, auth);
+  service.onSyncCompleted = () {
+    try {
+      ref.read(transactionsVersionProvider.notifier).state++;
+    } catch (_) {}
+  };
+  return service;
 });

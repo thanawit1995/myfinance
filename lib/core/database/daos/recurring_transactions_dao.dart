@@ -104,6 +104,48 @@ class RecurringTransactionsDao extends DatabaseAccessor<AppDatabase> with _$Recu
     );
   }
 
+  /// Checks whether a given recurring rule has already been posted or satisfied for [targetDate].
+  /// For monthly rules: checks if any transaction exists in targetDate's calendar month matching the rule.
+  /// For non-monthly rules: checks if any transaction exists on targetDate.
+  Future<bool> isOccurrenceAlreadyPosted({
+    required RecurringRule rule,
+    required DateTime targetDate,
+  }) async {
+    final DateTime rangeStart;
+    final DateTime rangeEnd;
+    if (rule.frequency.toLowerCase() == 'monthly') {
+      rangeStart = DateTime(targetDate.year, targetDate.month, 1);
+      rangeEnd = DateTime(targetDate.year, targetDate.month + 1, 0, 23, 59, 59, 999);
+    } else {
+      rangeStart = DateTime(targetDate.year, targetDate.month, targetDate.day);
+      rangeEnd = DateTime(targetDate.year, targetDate.month, targetDate.day, 23, 59, 59, 999);
+    }
+
+    final existingTxs = await (select(transactions)
+          ..where((t) =>
+              t.deletedAt.isNull() &
+              t.transactionDate.isBiggerOrEqualValue(rangeStart) &
+              t.transactionDate.isSmallerOrEqualValue(rangeEnd) &
+              t.transactionType.equals(rule.transactionType) &
+              t.amountOriginalSatang.equals(rule.amountSatang) &
+              (t.sourceAccountId.equals(rule.sourceAccountId) | t.sourceAccountId.isNull())))
+        .get();
+
+    final rTitle = rule.title.trim().toLowerCase();
+    final rNote = (rule.note ?? '').trim().toLowerCase();
+
+    return existingTxs.any((t) {
+      final tTag = (t.tag ?? '').toLowerCase();
+      final tNote = (t.note ?? '').toLowerCase();
+      return tTag.contains('recurring_auto') ||
+          tTag.contains('recurring_manual_confirmed') ||
+          tTag.contains('recurring_early_posted') ||
+          tNote.contains(rTitle) ||
+          rTitle.contains(tNote) ||
+          (rNote.isNotEmpty && (tNote.contains(rNote) || rNote.contains(tNote)));
+    });
+  }
+
   /// Processes all due active rules.
   /// If [autoPost] is true: automatically records the transaction.
   /// If [autoPost] is false: leaves pending or records when user confirms.
@@ -132,38 +174,7 @@ class RecurringTransactionsDao extends DatabaseAccessor<AppDatabase> with _$Recu
       DateTime? lastPosted;
 
       for (final dueDate in dueDates) {
-        // Idempotency check:
-        // For monthly rules, check if this rule has already posted anywhere in dueDate's month!
-        // For non-monthly rules, check if it has already posted on dueDate.
-        final DateTime rangeStart;
-        final DateTime rangeEnd;
-        if (rule.frequency.toLowerCase() == 'monthly') {
-          rangeStart = DateTime(dueDate.year, dueDate.month, 1);
-          rangeEnd = DateTime(dueDate.year, dueDate.month + 1, 0, 23, 59, 59, 999);
-        } else {
-          rangeStart = DateTime(dueDate.year, dueDate.month, dueDate.day);
-          rangeEnd = DateTime(dueDate.year, dueDate.month, dueDate.day, 23, 59, 59, 999);
-        }
-
-        final existingTxs = await (select(transactions)
-              ..where((t) =>
-                  t.deletedAt.isNull() &
-                  t.transactionDate.isBiggerOrEqualValue(rangeStart) &
-                  t.transactionDate.isSmallerOrEqualValue(rangeEnd) &
-                  t.transactionType.equals(rule.transactionType) &
-                  t.amountOriginalSatang.equals(rule.amountSatang) &
-                  (t.sourceAccountId.equals(rule.sourceAccountId) | t.sourceAccountId.isNull())))
-            .get();
-
-        final hasAlreadyPosted = existingTxs.any((t) {
-          final tTag = t.tag ?? '';
-          final tNote = t.note ?? '';
-          return tTag.contains('recurring_auto') ||
-              tTag.contains('recurring_manual_confirmed') ||
-              tTag.contains('recurring_early_posted') ||
-              tNote.contains(rule.title) ||
-              (rule.note != null && rule.note!.isNotEmpty && tNote.contains(rule.note!));
-        });
+        final hasAlreadyPosted = await isOccurrenceAlreadyPosted(rule: rule, targetDate: dueDate);
 
         if (hasAlreadyPosted) {
           lastPosted = dueDate;
@@ -269,6 +280,29 @@ class RecurringTransactionsDao extends DatabaseAccessor<AppDatabase> with _$Recu
             updatedAt: Value(now),
           ),
         );
+      } else if (dueDates.isEmpty) {
+        // If nextRunDate is on or before now, check if this cycle was already posted/satisfied
+        final isDueOrPast = rule.nextRunDate.isBefore(now) || RecurringEngine.isSameLocalDate(rule.nextRunDate, now);
+        if (isDueOrPast) {
+          final alreadyPosted = await isOccurrenceAlreadyPosted(rule: rule, targetDate: rule.nextRunDate);
+          if (alreadyPosted) {
+            final nextDate = RecurringEngine.computeNextRunDate(
+              frequency: rule.frequency,
+              intervalUnits: rule.intervalUnits,
+              fromDate: rule.nextRunDate,
+              dayOfMonth: rule.dayOfMonth,
+            );
+            final isExpired = rule.endDate != null && nextDate.isAfter(rule.endDate!);
+            await (update(recurringRules)..where((r) => r.id.equals(rule.id))).write(
+              RecurringRulesCompanion(
+                lastPostedDate: Value(rule.nextRunDate),
+                nextRunDate: Value(nextDate),
+                isActive: Value(!isExpired),
+                updatedAt: Value(now),
+              ),
+            );
+          }
+        }
       }
     }
 
@@ -488,9 +522,11 @@ class RecurringTransactionsDao extends DatabaseAccessor<AppDatabase> with _$Recu
         final isUnaligned = rule.nextRunDate.day != expectedDay;
         final isMissingDom = rule.dayOfMonth == null;
         final noteMissingDom = !(rule.note?.contains(RegExp(r'\[(?:dom|day_of_month):\d+\]')) ?? false);
+        final isPastRunDate = rule.nextRunDate.isBefore(DateTime(now.year, now.month, now.day));
+        final alreadyPostedForCycle = await isOccurrenceAlreadyPosted(rule: rule, targetDate: rule.nextRunDate);
 
-        if (isAffected || isUnaligned || isMissingDom || noteMissingDom) {
-          final nextRun = (isAffected || isUnaligned)
+        if (isAffected || isUnaligned || isMissingDom || noteMissingDom || (isPastRunDate && alreadyPostedForCycle)) {
+          final nextRun = (isAffected || isUnaligned || (isPastRunDate && alreadyPostedForCycle))
               ? RecurringEngine.getUpcomingRunDate(
                   fromDate: now,
                   frequency: rule.frequency,
@@ -753,7 +789,7 @@ class RecurringTransactionsDao extends DatabaseAccessor<AppDatabase> with _$Recu
   }
 
   /// Returns projected occurrences for all active rules in the next [windowDays] (default 30 days)
-  Future<List<({RecurringRule rule, DateTime projectedDate})>> getUpcoming30Days({int windowDays = 30}) async {
+  Future<List<({RecurringRule rule, DateTime projectedDate})>> getUpcoming30Days({int windowDays = 30, DateTime? fromDate}) async {
     final active = await getActiveRules();
     final results = <({RecurringRule rule, DateTime projectedDate})>[];
 
@@ -765,10 +801,14 @@ class RecurringTransactionsDao extends DatabaseAccessor<AppDatabase> with _$Recu
         dayOfMonth: rule.dayOfMonth,
         endDate: rule.endDate,
         windowDays: windowDays,
+        fromDate: fromDate,
       );
 
       for (final d in dates) {
-        results.add((rule: rule, projectedDate: d));
+        final alreadyPosted = await isOccurrenceAlreadyPosted(rule: rule, targetDate: d);
+        if (!alreadyPosted) {
+          results.add((rule: rule, projectedDate: d));
+        }
       }
     }
 

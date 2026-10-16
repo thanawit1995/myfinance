@@ -1,6 +1,42 @@
 # บันทึกความคืบหน้าโครงการ MyFinance (PROGRESS.md)
 
-อัปเดตล่าสุด: 15 ตุลาคม 2026 (แก้ไขปัญหาระบบรายการประจำ Recurring Transactions ทำงานผิดวันและเบิ้ลซ้ำสองชุด Duplicate หลัง Reinstall/ต่อ Google สำเร็จสมบูรณ์ 100%, กู้คืนรอบวันจริงของทุกกฎผ่าน Historical Ledger & Domain Fallback, ล้างรายการซ้ำและรายการผิดพลาดออกจากทั้ง SQLite ในเครื่องและ Supabase บนคลาวด์, คืนยอดงบประมาณ Master Budget เป็น ฿8,009.45, ตัวเลขแจ้งเตือนกระดิ่งลดลงสู่ 3 รายการแท้จริง, และติดตั้ง Release APK ลง OPPO Find X9 เรียบร้อย)
+อัปเดตล่าสุด: 16 ตุลาคม 2026 (แก้ไขปัญหาสีหมวดหมู่บันทึกแล้วไม่เปลี่ยน, จัดระเบียบการเรียงลำดับหมวดหมู่ตรงตามไฟล์สำรอง, แก้ไข Master Download บน Android ให้ Checkpoint WAL ปลอดภัยไม่พัง, แก้ไขปัญหา PWA Recurring แจ้งเตือนเกินกำหนดผิดปกติ, พัฒนาระบบ Reactive Auto-Sync Debounce 3 วินาที และ App Resume Sync เชื่อมต่อข้อมูล Android กับ PWA อัตโนมัติ 100%)
+
+- [x] **Category Color & Order Preservation, Master Download Safe WAL Checkpoint, PWA Recurring Overdue Fix & Reactive Auto-Sync (16 ต.ค. 2026)**:
+  - **1. แก้ปัญหาสีหมวดหมู่ (Category Color Customization Retention)**:
+    - **สาเหตุรากเหง้า**: `CategoriesDao.getActiveCategories()` เรียก `ensureEssentialTaxCategories()` ทุกครั้ง ซึ่งภายในไปเรียก `updateDefaultCategoryColors()` ซ้ำทุกครั้ง โดยเขียนทับสีของหมวดหมู่ระบบกลับเป็นค่าสีเริ่มต้น (Hardcoded Palette) เสมอ ทำให้แม้ผู้ใช้จะเลือกสีใหม่และกดบันทึกแล้ว สีก็จะถูกทับกลับทันที
+    - **การแก้ไข**:
+      - ตัดการเรียก `updateDefaultCategoryColors()` ออกจาก `ensureEssentialTaxCategories()`
+      - ปรับเงื่อนไขใน `updateDefaultCategoryColors()` ให้ทำงานเฉพาะแถวที่สียังเป็น null หรือว่างเปล่า (`color.isNull() | color.equals('')`) เท่านั้น จะไม่ทับสีที่ผู้ใช้กำหนดเองเด็ดขาด
+      - ใน `CategoryFormDialog` เพิ่มการอัปเดต `syncVersion: Value(existing.syncVersion + 1)` เพื่อให้การแก้ไขสีถูกซิงก์ขึ้นคลาวด์อย่างสมบูรณ์
+  - **2. แก้ปัญหาการเรียงลำดับหมวดหมู่ (Category Ordering Preservation)**:
+    - **สาเหตุรากเหง้า**: เดิมใน `CategoriesDao.getActiveCategories` และ `watchActiveCategories` มีการเรียงลำดับด้วย `c.nameTh` เป็น Tie-breaker ทำให้เมื่อหมวดหมู่ที่ Restore มามี `sort_order` เป็น 0 เท่ากันทั้งหมด หมวดหมู่จะถูกจับเรียงตามตัวอักษรไทย ก-ฮ ทันที ส่งผลให้หมวดหมู่สำคัญอย่าง "อาหารและเครื่องดื่ม" กระเด็นตกไปอยู่ท้ายสุด
+    - **การแก้ไข**:
+      - ปรับการเรียงลำดับในฐานข้อมูลเป็น `c.sortOrder`, ตามด้วย `c.createdAt`, และ `c.id` ไม่เรียงตามตัวอักษรไทย
+      - ใน `BackupRestoreService` เมื่อ Restore ข้อมูลหมวดหมู่และพบว่า `sort_order` เป็น 0 หรือ null ทั้งหมด จะทำการกำหนดตัวเลข `sort_order` เป็น 0, 1, 2, ... เรียงตามลำดับแถวเดิมในไฟล์สำรองให้อัตโนมัติ ทำให้หมวดหมู่เรียงตรงตามไฟล์แบ็กอัปเป๊ะ 100%
+  - **3. แก้ปัญหา Master Download บน Android (`backup_restore_service.dart`)**:
+    - **สาเหตุรากเหง้า**: หลังจาก Live Data Injection นำข้อมูลลง Drift Database สำเร็จ โค้ดเดิมยังพยายามไปเขียนทับไฟล์ดิบ `.sqlite` และสั่งลบไฟล์ `-wal` และ `-shm` ในขณะที่ SQLite Connection ของ Drift ในแอปยังเปิดค้างอยู่ ส่งผลให้เกิดข้อผิดพลาด I/O / Database Locked บน Android
+    - **การแก้ไข**:
+      - เมื่อ Live Data Injection เข้าสู่ Drift สำเร็จภายใน Transaction แล้ว จะทำการ Flush ข้อมูลทุกหน้าลงดิสก์อย่างปลอดภัยด้วย `PRAGMA wal_checkpoint(TRUNCATE);` โดยไม่ไปลบไฟล์ `-wal` หรือ `-shm` ที่ Connection ถืออยู่ ทำให้การดาวน์โหลด Master Snapshot สำเร็จราบรื่น 100%
+  - **4. แก้ปัญหา PWA แจ้งเตือน Recurring เกินกำหนดผิดปกติ (PWA Recurring Ghost Due Fix)**:
+    - **สาเหตุรากเหง้า**:
+      - ฟังก์ชัน `calculateDueDates` ข้ามการเพิ่มวันเมื่อ `isSameLocalDate(lastPostedDate, current)` เป็นจริง ทำให้เมื่อ `dueDates` ว่างเปล่า `processDueRules` ไม่ได้คำนวณและเลื่อน `nextRunDate` ไปยังรอบถัดไป ส่งผลให้ `nextRunDate` ค้างอยู่ที่วันที่เดิมในอดีต (เช่น 10 ต.ค. และ 15 ต.ค.) จึงแสดงเป็น Overdue หลายวันบน PWA
+      - ฟังก์ชัน `getUpcoming30Days` คำนวณวันล่วงหน้าโดยไม่ได้ตรวจสอบว่ารายการในรอบนั้นมี Transaction ถูกบันทึกล่วงหน้าไปแล้วหรือไม่ ทำให้รายการที่จ่ายล่วงหน้าแล้ว (เช่น ค่า ER Intern) ยังคงแสดงเตือนค้าง
+    - **การแก้ไข**:
+      - พัฒนา `isOccurrenceAlreadyPosted` ใน `RecurringTransactionsDao` เพื่อตรวจสอบการบันทึกรายการในรอบนั้นๆ อย่างแม่นยำ
+      - ใน `processDueRules`: หากรอบนั้นถูกบันทึกไปแล้ว ให้คำนวณและเลื่อน `nextRunDate` ไปยังรอบถัดไปทันที
+      - ใน `repairErroneousAutoPostsAndAlignDates`: จัดการรอบที่ค้างและโพสต์แล้วให้เลื่อนวันทันที
+      - ใน `getUpcoming30Days`: กรองรายการที่บันทึกแล้วออกจากการแจ้งเตือนล่วงหน้า ทำให้ป้ายเตือนกระดิ่งไม่แสดงรายการที่จัดการไปแล้ว
+  - **5. พัฒนาระบบ Reactive Auto-Sync เชื่อมต่อ Android และ PWA อัตโนมัติ (`sync_service.dart`, `main_shell.dart`)**:
+    - **Debounced Local Auto-Sync**: ดักฟัง `_db.tableUpdates()` ของ Drift เมื่อผู้ใช้มีการเพิ่ม/แก้ไข/ลบรายการในตารางสำคัญ (transactions, categories, accounts, recurring_rules ฯลฯ) ระบบจะหน่วงเวลา 3 วินาที (Debounce) แล้วสั่ง Quick Startup Sync ส่งข้อมูลขึ้น Supabase อัตโนมัติ ป้องกันการยิง Request ถี่เกินไป
+    - **Loopback Guard**: ป้องกันไม่ให้การเขียนข้อมูลจากคลาวด์ลง SQLite ย้อนกลับมาทริกเกอร์ Auto-sync ด้วยแฟล็ก `_isPerformingSync` และระยะ Cooldown 2 วินาที
+    - **Periodic Background Sync**: ทำงานเบื้องหลังทุก 2 นาทีเพื่อดึงการเปลี่ยนแปลงใหม่จากคลาวด์เงียบๆ ขณะที่ผู้ใช้เปิดแอปค้างไว้
+    - **App Resume Sync**: เมื่อผู้ใช้สลับหน้าจอกลับมาเปิดแอป (`AppLifecycleState.resumed`) ระบบจะตรวจสอบและดึงข้อมูลอัปเดตล่าสุดจากคลาวด์ทันที (Throttle 45 วินาที)
+    - **Instant UI Refresh**: เชื่อมต่อ `onSyncCompleted` เข้ากับ `transactionsVersionProvider.notifier.state++` ทำให้หน้าจอหลัก, หน้าจอบัญชี, บัตรเครดิต, และสรุปผล รีโหลดข้อมูลใหม่จาก SQLite ทันทีโดยไม่ต้องสลับหน้าจอหรือรีสตาร์ตแอป
+  - **6. การทดสอบและรับรองคุณภาพ**:
+    - เพิ่ม Unit Tests ใน `test/features/category_order_and_color_test.dart` และ `test/features/recurring_dao_idempotency_test.dart`
+    - รัน `flutter test` ผ่านทั้งหมด **239/239 tests passed** (100%)
+    - รัน `flutter analyze`: **0 errors, 0 warnings** (No issues found)
 
 - [x] **Recurring Transactions Duplication Purge, Cloud Sync Alignment & True Schedule Restoration (15 ต.ค. 2026)**:
   - **1. วิเคราะห์สาเหตุรากเหง้าของรายการซ้ำสองชุดและการรันพร้อมกันในวันที่ 15 (Root Cause)**:

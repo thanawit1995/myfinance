@@ -205,6 +205,7 @@ class _CategoryFormDialogState extends ConsumerState<CategoryFormDialog> {
           categoryType: drift.Value(_categoryType),
           icon: drift.Value(_selectedIcon),
           color: drift.Value(colorHex),
+          syncVersion: drift.Value(existing.syncVersion + 1),
           updatedAt: drift.Value(now),
         ),
       );

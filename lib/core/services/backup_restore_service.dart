@@ -356,9 +356,11 @@ class BackupRestoreService {
     }
 
     // 1. Live Data Injection: นำข้อมูลทุกตารางเข้า Drift Database สดๆ ทันที
+    bool liveInjectionSuccess = false;
     try {
       final backupData = await readSqliteBackupData(dbBytesToWrite);
       await _applyBackupDataToDrift(backupData);
+      liveInjectionSuccess = true;
     } catch (e) {
       debugPrint('Live injection note: $e');
     }
@@ -370,20 +372,29 @@ class BackupRestoreService {
     }
 
     final localDb = await getLocalDatabaseFile();
-    if (localDb == null) return true;
+    if (localDb != null) {
+      // สร้าง Safety Backup อัตโนมัติกันเหนียว
+      await _createSafetyBackup(localDb);
+    }
 
-    // 1. สร้าง Safety Backup อัตโนมัติกันเหนียว
-    await _createSafetyBackup(localDb);
+    if (liveInjectionSuccess) {
+      // ฐานข้อมูล Drift ถูกนำเข้าและอัปเดตสดๆ ภายใน Transaction สมบูรณ์แล้ว
+      // สั่ง Checkpoint WAL เพื่อ Flush ทุก Page ลงไฟล์อย่างปลอดภัยโดยไม่รบกวน File Locks
+      try {
+        await db.customStatement('PRAGMA wal_checkpoint(TRUNCATE);');
+      } catch (_) {}
+      return true;
+    }
 
-    // 2. ปิดหรือ flush การเชื่อมต่อ
+    if (localDb == null) return false;
+
+    // Fallback: เขียนทับไฟล์ฐานข้อมูลเมื่อไม่สามารถทำ Live injection ได้
     try {
       await db.customStatement('PRAGMA wal_checkpoint(TRUNCATE);');
     } catch (_) {}
 
-    // 3. เขียนทับไฟล์ฐานข้อมูล
     await localDb.writeAsBytes(dbBytesToWrite, flush: true);
 
-    // 4. ลบไฟล์ -wal และ -shm เก่าที่อาจค้างอยู่
     try {
       final walFile = File('${localDb.path}-wal');
       final shmFile = File('${localDb.path}-shm');
@@ -400,6 +411,16 @@ class BackupRestoreService {
       await db.customStatement('PRAGMA foreign_keys = OFF;');
       Future<void> insertTableRows(String table, List<Map<String, dynamic>> rows) async {
         if (rows.isEmpty) return;
+
+        // If restoring categories, ensure sort_order preserves backup row order if all are 0 or null
+        if (table == 'categories') {
+          final allZeroOrNull = rows.every((r) => r['sort_order'] == null || r['sort_order'] == 0);
+          if (allZeroOrNull) {
+            for (var i = 0; i < rows.length; i++) {
+              rows[i]['sort_order'] = i;
+            }
+          }
+        }
 
         // ดึงรายชื่อคอลัมน์ที่มีอยู่จริงในโครงสร้างตารางปัจจุบัน
         final tableInfo = await db.customSelect('PRAGMA table_info("$table");').get();

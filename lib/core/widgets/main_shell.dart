@@ -103,6 +103,9 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
       _pausedTime = DateTime.now();
     } else if (state == AppLifecycleState.resumed) {
       _checkResumeLock();
+      try {
+        ref.read(syncServiceProvider.notifier).syncOnAppResumed();
+      } catch (_) {}
     }
   }
 

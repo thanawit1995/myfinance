@@ -14,7 +14,13 @@ class CategoriesDao extends DatabaseAccessor<AppDatabase> with _$CategoriesDaoMi
     if (type != null) {
       query.where((c) => c.categoryType.equals(type));
     }
-    return (query..orderBy([(c) => OrderingTerm(expression: c.sortOrder), (c) => OrderingTerm(expression: c.nameTh)])).watch();
+    return (query
+          ..orderBy([
+            (c) => OrderingTerm(expression: c.sortOrder),
+            (c) => OrderingTerm(expression: c.createdAt),
+            (c) => OrderingTerm(expression: c.id),
+          ]))
+        .watch();
   }
 
   Future<List<Category>> getActiveCategories([String? type]) async {
@@ -25,7 +31,11 @@ class CategoriesDao extends DatabaseAccessor<AppDatabase> with _$CategoriesDaoMi
     if (type != null) {
       query.where((c) => c.categoryType.equals(type));
     }
-    query.orderBy([(c) => OrderingTerm(expression: c.sortOrder), (c) => OrderingTerm(expression: c.nameTh)]);
+    query.orderBy([
+      (c) => OrderingTerm(expression: c.sortOrder),
+      (c) => OrderingTerm(expression: c.createdAt),
+      (c) => OrderingTerm(expression: c.id),
+    ]);
     return query.get();
   }
 
@@ -86,8 +96,6 @@ class CategoriesDao extends DatabaseAccessor<AppDatabase> with _$CategoriesDaoMi
 
     // Update standard tax types for existing databases
     await updateStandardIncomeCategoryTaxTypes();
-    // Update default categories with vibrant colors
-    await updateDefaultCategoryColors();
   }
 
   Future<void> updateDefaultCategoryColors() async {
@@ -166,8 +174,12 @@ class CategoriesDao extends DatabaseAccessor<AppDatabase> with _$CategoriesDaoMi
       'Account Transfer': '0xFF54A0FF',
     };
 
+    // Only update categories where color is missing or empty, preserving user customization
     for (final entry in defaultColorMap.entries) {
-      await (update(categories)..where((c) => c.id.equals(entry.key)))
+      await (update(categories)
+            ..where((c) =>
+                c.id.equals(entry.key) &
+                (c.color.isNull() | c.color.equals(''))))
           .write(CategoriesCompanion(color: Value(entry.value)));
     }
 
@@ -175,7 +187,8 @@ class CategoriesDao extends DatabaseAccessor<AppDatabase> with _$CategoriesDaoMi
       await (update(categories)
             ..where((c) =>
                 c.isSystem.equals(true) &
-                (c.nameTh.equals(entry.key) | c.nameEn.equals(entry.key))))
+                (c.nameTh.equals(entry.key) | c.nameEn.equals(entry.key)) &
+                (c.color.isNull() | c.color.equals(''))))
           .write(CategoriesCompanion(color: Value(entry.value)));
     }
   }

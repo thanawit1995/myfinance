@@ -139,5 +139,107 @@ void main() {
       txs = await db.transactionsDao.getAllTransactions();
       expect(txs.where((t) => t.amountOriginalSatang == 53393).length, equals(1));
     });
+
+    test('processDueRules advances nextRunDate when rule is due but occurrence is already posted', () async {
+      final accounts = await db.accountsDao.getActiveAccounts();
+      final scb = accounts.firstWhere((a) => a.name == 'SCB');
+      final oct10 = DateTime(2026, 10, 10);
+      final oct16 = DateTime(2026, 10, 16);
+
+      // Create a transaction posted on Oct 10th
+      await db.into(db.transactions).insert(
+        TransactionsCompanion.insert(
+          id: 'tx-oct10-posted',
+          transactionType: 'expense',
+          amountOriginalSatang: 120000,
+          currencyCode: 'THB',
+          amountThbSatang: 120000,
+          sourceAccountId: Value(scb.id),
+          transactionDate: oct10,
+          note: const Value('ค่าบริการ อินเทอร์เน็ต'),
+          tag: const Value('recurring_auto'),
+          createdAt: oct10,
+          updatedAt: oct10,
+        ),
+      );
+
+      // Create rule with nextRunDate = oct10, lastPostedDate = oct10 (so calculateDueDates returns empty)
+      const ruleId = 'rule-internet-due';
+      await db.recurringTransactionsDao.createRule(
+        RecurringRulesCompanion.insert(
+          id: ruleId,
+          title: 'ค่าบริการ อินเทอร์เน็ต',
+          transactionType: 'expense',
+          amountSatang: 120000,
+          currencyCode: 'THB',
+          frequency: 'monthly',
+          dayOfMonth: const Value(10),
+          nextRunDate: oct10,
+          lastPostedDate: Value(oct10),
+          autoPost: const Value(true),
+          sourceAccountId: scb.id,
+          createdAt: DateTime(2026, 9, 10),
+          updatedAt: oct10,
+        ),
+      );
+
+      // Run processDueRules on Oct 16th: should detect it's already posted and advance nextRunDate to Nov 10th
+      final posted = await db.recurringTransactionsDao.processDueRules(nowOverride: oct16);
+      expect(posted, equals(0));
+
+      final updatedRule = await db.recurringTransactionsDao.getRuleById(ruleId);
+      expect(updatedRule!.nextRunDate.month, equals(11));
+      expect(updatedRule.nextRunDate.day, equals(10));
+    });
+
+    test('getUpcoming30Days excludes occurrences that have already been posted in current month', () async {
+      final accounts = await db.accountsDao.getActiveAccounts();
+      final scb = accounts.firstWhere((a) => a.name == 'SCB');
+      final oct10 = DateTime(2026, 10, 10);
+      final oct16 = DateTime(2026, 10, 16);
+
+      // Early posted transaction on Oct 10th
+      await db.into(db.transactions).insert(
+        TransactionsCompanion.insert(
+          id: 'tx-intern-early',
+          transactionType: 'expense',
+          amountOriginalSatang: 500000,
+          currencyCode: 'THB',
+          amountThbSatang: 500000,
+          sourceAccountId: Value(scb.id),
+          transactionDate: oct10,
+          note: const Value('ค่า ER Intern - จ่ายเลขาแนน'),
+          tag: const Value('recurring_early_posted'),
+          createdAt: oct10,
+          updatedAt: oct10,
+        ),
+      );
+
+      // Recurring rule for ER Intern
+      const ruleId = 'rule-intern';
+      await db.recurringTransactionsDao.createRule(
+        RecurringRulesCompanion.insert(
+          id: ruleId,
+          title: 'ค่า ER Intern - จ่ายเลขาแนน',
+          transactionType: 'expense',
+          amountSatang: 500000,
+          currencyCode: 'THB',
+          frequency: 'monthly',
+          dayOfMonth: const Value(10),
+          nextRunDate: oct10,
+          autoPost: const Value(false),
+          sourceAccountId: scb.id,
+          createdAt: DateTime(2026, 9, 10),
+          updatedAt: oct10,
+        ),
+      );
+
+      // getUpcoming30Days from Oct 16th: should NOT include the already posted Oct 10th occurrence
+      final upcoming = await db.recurringTransactionsDao.getUpcoming30Days(fromDate: oct16);
+      final hasInternForOctober = upcoming.any(
+        (item) => item.rule.id == ruleId && item.projectedDate.month == 10,
+      );
+      expect(hasInternForOctober, isFalse);
+    });
   });
 }

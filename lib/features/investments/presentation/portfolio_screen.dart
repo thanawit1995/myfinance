@@ -507,7 +507,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                 await _showManagePortfoliosDialog(context, invDao, isThai);
                 if (mounted) _refreshData();
               } else if (val == 'new_asset') {
-                final ok = await AssetFormDialog.show(context);
+                final ok = await AssetFormDialog.show(context, initialPortfolioId: _selectedPortfolioFilter);
                 if (ok == true && mounted) _refreshData();
               } else if (val == 'income') {
                 final ok = await DividendIncomeDialog.show(context);
@@ -596,8 +596,8 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
               icon: const Icon(Icons.add),
               label: Text(isThai ? 'เพิ่มสินทรัพย์และบันทึกซื้อ' : 'Add Asset & Record Buy'),
               onPressed: () async {
-                final ok = await AssetFormDialog.show(context);
-                if (ok == true && mounted) setState(() {});
+                final ok = await AssetFormDialog.show(context, initialPortfolioId: _selectedPortfolioFilter);
+                if (ok == true && mounted) _refreshData();
               },
             ),
           ],
@@ -621,6 +621,21 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
           return h.asset.portfolioId == null;
         } else {
           return h.asset.portfolioId == _selectedPortfolioFilter;
+        }
+      }
+      return true;
+    }).toList();
+
+    // 2.1 Filter uninvested assets by Category and Portfolio
+    final filteredUninvestedAssets = summary.uninvestedAssets.where((a) {
+      if (_selectedCategoryFilter != 'all' && a.assetType != _selectedCategoryFilter) {
+        return false;
+      }
+      if (_selectedPortfolioFilter != null) {
+        if (_selectedPortfolioFilter == '__unassigned__') {
+          return a.portfolioId == null;
+        } else {
+          return a.portfolioId == _selectedPortfolioFilter;
         }
       }
       return true;
@@ -1101,8 +1116,11 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                       Icon(Icons.inventory_2_outlined, size: 36, color: theme.colorScheme.primary),
                       const SizedBox(height: 8),
                       Text(
-                        isThai ? 'ไม่พบสินทรัพย์ตามตัวกรองนี้' : 'No assets found for this filter',
+                        filteredUninvestedAssets.isNotEmpty
+                            ? (isThai ? 'ยังไม่มีรายการถือครอง (มีสินทรัพย์รอเข้าซื้อด้านล่าง)' : 'No active holdings (see uninvested assets below)')
+                            : (isThai ? 'ไม่พบสินทรัพย์ตามตัวกรองนี้' : 'No assets found for this filter'),
                         style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
+                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
@@ -1258,13 +1276,19 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
           }),
 
           // 5. Uninvested Assets List (Watchlist / 0 units)
-          if (summary.uninvestedAssets.isNotEmpty) ...[
+          if (filteredUninvestedAssets.isNotEmpty) ...[
             const SizedBox(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  isThai ? 'สินทรัพย์ที่รอเข้าซื้อ (${summary.uninvestedAssets.length})' : 'Watchlist / Uninvested (${summary.uninvestedAssets.length})',
+                  currentPortfolioName != null
+                      ? (isThai
+                          ? 'สินทรัพย์รอเข้าซื้อ ($currentPortfolioName) (${filteredUninvestedAssets.length})'
+                          : 'Uninvested in $currentPortfolioName (${filteredUninvestedAssets.length})')
+                      : (isThai
+                          ? 'สินทรัพย์ที่รอเข้าซื้อ (${filteredUninvestedAssets.length})'
+                          : 'Watchlist / Uninvested (${filteredUninvestedAssets.length})'),
                   style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 Text(
@@ -1274,7 +1298,10 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
               ],
             ),
             const SizedBox(height: 8),
-            ...summary.uninvestedAssets.map((asset) {
+            ...filteredUninvestedAssets.map((asset) {
+              final assetPortfolioName = asset.portfolioId != null
+                  ? portfolios.where((p) => p.id == asset.portfolioId).firstOrNull?.name
+                  : null;
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: Padding(
@@ -1341,6 +1368,30 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                                     child: Text(
                                       asset.market!,
                                       style: TextStyle(fontSize: 10, color: Colors.amber.shade900),
+                                    ),
+                                  ),
+                                if (assetPortfolioName != null)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.primaryContainer.withValues(alpha: 0.6),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.3)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.folder_rounded, size: 11, color: theme.colorScheme.primary),
+                                        const SizedBox(width: 3),
+                                        Text(
+                                          assetPortfolioName,
+                                          style: TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: theme.colorScheme.primary,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                               ],
@@ -1431,7 +1482,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5),
                 ),
                 onPressed: () async {
-                  final ok = await AssetFormDialog.show(context);
+                  final ok = await AssetFormDialog.show(context, initialPortfolioId: _selectedPortfolioFilter);
                   if (ok == true && mounted) _refreshData();
                 },
               ),

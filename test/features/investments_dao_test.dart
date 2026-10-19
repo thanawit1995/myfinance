@@ -1063,6 +1063,65 @@ void main() {
       expect(priceA.toString(), equals('12.3456'),
           reason: 'toString() ต้องคงทศนิยม 4 ตำแหน่งไว้');
     });
+
+    test('Asset portfolio assignment: creation, update, and uninvestedAssets grouping', () async {
+      final now = DateTime.now();
+
+      // 1. Create custom portfolio "Growth"
+      await db.investmentsDao.createPortfolio(
+        name: 'Growth',
+        description: 'หุ้นเติบโตสูง',
+      );
+      final portfolios = await db.investmentsDao.getAllPortfolios();
+      final growthPortfolio = portfolios.firstWhere((p) => p.name == 'Growth');
+      expect(growthPortfolio.id, isNotEmpty);
+
+      // 2. Create asset BDMS assigned to Growth
+      const bdmsId = 'asset-bdms';
+      await db.investmentsDao.createAsset(
+        AssetsCompanion.insert(
+          id: bdmsId,
+          symbol: 'BDMS',
+          name: 'Bangkok Dusit Medical Services',
+          assetType: 'thai_stock',
+          currencyCode: 'THB',
+          defaultAccountId: defaultAccountId,
+          portfolioId: Value(growthPortfolio.id),
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      final bdms = await db.investmentsDao.getAssetById(bdmsId);
+      expect(bdms, isNotNull);
+      expect(bdms!.portfolioId, equals(growthPortfolio.id));
+
+      // 3. getPortfolioSummary: Since BDMS has 0 lots, it must be in uninvestedAssets with portfolioId intact
+      final summary = await db.investmentsDao.getPortfolioSummary();
+      final uninvestedBdms = summary.uninvestedAssets.firstWhere((a) => a.id == bdmsId);
+      expect(uninvestedBdms.portfolioId, equals(growthPortfolio.id));
+
+      // 4. Update asset to another portfolio
+      await db.investmentsDao.createPortfolio(name: 'Dividend');
+      final updatedPortfolios = await db.investmentsDao.getAllPortfolios();
+      final dividendPortfolio = updatedPortfolios.firstWhere((p) => p.name == 'Dividend');
+
+      await db.investmentsDao.updateAsset(
+        AssetsCompanion(
+          id: const Value(bdmsId),
+          portfolioId: Value(dividendPortfolio.id),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+
+      final updatedBdms = await db.investmentsDao.getAssetById(bdmsId);
+      expect(updatedBdms!.portfolioId, equals(dividendPortfolio.id));
+
+      // 5. Unassign portfolio
+      await db.investmentsDao.setAssetPortfolio(bdmsId, null);
+      final unassignedBdms = await db.investmentsDao.getAssetById(bdmsId);
+      expect(unassignedBdms!.portfolioId, isNull);
+    });
   });
 }
 

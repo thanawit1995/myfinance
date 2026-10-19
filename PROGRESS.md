@@ -1,6 +1,23 @@
 # บันทึกความคืบหน้าโครงการ MyFinance (PROGRESS.md)
 
-อัปเดตล่าสุด: 16 ตุลาคม 2026 (แก้ไขปัญหาสีหมวดหมู่บันทึกแล้วไม่เปลี่ยน, จัดระเบียบการเรียงลำดับหมวดหมู่ตรงตามไฟล์สำรอง, แก้ไข Master Download บน Android ให้ Checkpoint WAL ปลอดภัยไม่พัง, แก้ไขปัญหา PWA Recurring แจ้งเตือนเกินกำหนดผิดปกติ, พัฒนาระบบ Reactive Auto-Sync Debounce 3 วินาที และ App Resume Sync เชื่อมต่อข้อมูล Android กับ PWA อัตโนมัติ 100%)
+อัปเดตล่าสุด: 19 ตุลาคม 2026 (แก้ไขระบบบันทึกสินทรัพย์และจัดพอร์ตลงทุน: แก้ไข Dropdown พอร์ตเด้งหลุดกลับเป็นทั่วไป, เพิ่มป้ายพอร์ตและตัวกรองสำหรับสินทรัพย์รอเข้าซื้อ, และเลือกพอร์ตเริ่มต้นอัตโนมัติ)
+
+- [x] **Asset Portfolio Assignment Fix, Preloaded Dropdowns, Uninvested Assets Filtering & Portfolio Badges (19 ต.ค. 2026)**:
+  - **1. แก้ไขปัญหากำหนดพอร์ตแล้วเด้งกลับเป็น "ทั่วไป (ไม่มีพอร์ต)" (`asset_form_dialog.dart`)**:
+    - **สาเหตุรากเหง้า (Root Cause)**: ใน `AssetFormDialog` มีการใช้ `FutureBuilder` โหลดรายชื่อพอร์ตและบัญชีในฟังก์ชัน `build()` โดยตรง ในเฟรมแรกที่เปิดหน้าต่าง รายชื่อพอร์ตยังโหลดไม่เสร็จ (`snapshot.data == null`) ตัว Dropdown จึงมีเฉพาะค่า `null` ("ไม่จัดเข้าพอร์ต (ทั่วไป)") เมื่อค่า `_selectedPortfolioId` (ID ของ Growth) ไม่อยู่ในรายการ ณ ขณะนั้น Flutter จึงรีเซ็ตค่ากลับเป็น `null` อัตโนมัติ และเมื่อผู้ใช้กดบันทึกหรือเปิดหน้าแก้ไขขึ้นมาดูอีกที ค่าจึงถูกทับกลายเป็น "ทั่วไป"
+    - **การแก้ไข**:
+      - เปลี่ยนการโหลด `_accounts` และ `_portfolios` ให้โหลดเสร็จสมบูรณ์ตั้งแต่ `initState` ผ่านฟังก์ชัน `_loadInitialData()` ก่อนเรนเดอร์ตัวเลือก พร้อมแสดง Loading Indicator ชั่วขณะ
+      - ปรับตัวเลือก Dropdown ของทั้งบัญชีและพอร์ตให้ผูกกับค่า `initialValue:` ที่มีข้อมูลครบถ้วนตั้งแต่เฟรมแรก ป้องกันการหลุดเป็นค่าว่าง 100%
+      - เพิ่มพารามิเตอร์ `initialPortfolioId` ใน `AssetFormDialog` และ `AssetFormDialog.show()` เพื่อให้เมื่อผู้ใช้เปิดฟอร์มจากหน้าพอร์ตใด จะเลือกพอร์ตนั้นเป็นค่าเริ่มต้นทันที
+  - **2. ปรับปรุงการแสดงผลสินทรัพย์รอเข้าซื้อและการกรองตามพอร์ต (`portfolio_screen.dart`)**:
+    - เพิ่มการคำนวณ `filteredUninvestedAssets` ให้กรองตามพอร์ต (`_selectedPortfolioFilter`) และหมวดหมู่สินทรัพย์ที่ผู้ใช้กำลังเลือกดูอยู่
+    - เพิ่มป้ายชื่อพอร์ต (Badge เช่น `[📁 Growth]`) บนการ์ดสินทรัพย์รอเข้าซื้อ เพื่อให้มองเห็นชัดเจนในทุกมุมมอง
+    - ปรับปรุงข้อความเมื่อยังไม่มีรายการถือครองในพอร์ตว่า "(มีสินทรัพย์รอเข้าซื้อด้านล่าง)" เพื่อไม่ให้ผู้ใช้สับสน
+    - แก้ไขปุ่มเพิ่มสินทรัพย์ใน Empty State ให้เรียก `_refreshData()` และส่ง `initialPortfolioId: _selectedPortfolioFilter`
+  - **3. การทดสอบและการรับรองคุณภาพ**:
+    - เพิ่ม Unit Test ใน `test/features/investments_dao_test.dart` เพื่อทดสอบการบันทึกสินทรัพย์พร้อมจัดเข้าพอร์ต Growth, การดึงข้อมูล Uninvested Assets พร้อมพอร์ตที่สังกัด, การย้ายพอร์ต และการยกเลิกพอร์ต
+    - `flutter test`: ผ่านทั้งหมด **240/240 tests passed** (100%)
+    - `flutter analyze`: **0 errors, 0 warnings** (No issues found)
 
 - [x] **Category Color & Order Preservation, Master Download Safe WAL Checkpoint, PWA Recurring Overdue Fix & Reactive Auto-Sync (16 ต.ค. 2026)**:
   - **1. แก้ปัญหาสีหมวดหมู่ (Category Color Customization Retention)**:

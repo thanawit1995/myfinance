@@ -11,14 +11,26 @@ import '../../../../core/widgets/category_icon_helper.dart';
 
 class AssetFormDialog extends ConsumerStatefulWidget {
   final Asset? assetToEdit;
+  final String? initialPortfolioId;
 
-  const AssetFormDialog({super.key, this.assetToEdit});
+  const AssetFormDialog({
+    super.key,
+    this.assetToEdit,
+    this.initialPortfolioId,
+  });
 
-  static Future<bool?> show(BuildContext context, {Asset? assetToEdit}) {
+  static Future<bool?> show(
+    BuildContext context, {
+    Asset? assetToEdit,
+    String? initialPortfolioId,
+  }) {
     return Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (context) => AssetFormDialog(assetToEdit: assetToEdit),
+        builder: (context) => AssetFormDialog(
+          assetToEdit: assetToEdit,
+          initialPortfolioId: initialPortfolioId,
+        ),
       ),
     );
   }
@@ -43,6 +55,10 @@ class _AssetFormDialogState extends ConsumerState<AssetFormDialog> {
   DateTime? _maturityDate;
   String _couponFrequency = 'semi_annually';
   String? _selectedIcon;
+
+  List<Account> _accounts = [];
+  List<InvestmentPortfolio> _portfolios = [];
+  bool _isLoadingInitialData = true;
 
   final _assetTypes = [
     {'key': 'thai_stock', 'label': 'หุ้นไทย'},
@@ -79,6 +95,38 @@ class _AssetFormDialogState extends ConsumerState<AssetFormDialog> {
           }
           _couponFrequency = extra['frequency'] ?? 'semi_annually';
         } catch (_) {}
+      }
+    } else {
+      if (widget.initialPortfolioId != null && widget.initialPortfolioId != '__unassigned__') {
+        _selectedPortfolioId = widget.initialPortfolioId;
+      }
+    }
+
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    try {
+      final accounts = await ref.read(accountsDaoProvider).getActiveAccounts();
+      final portfolios = await ref.read(investmentsDaoProvider).getAllPortfolios();
+      if (!mounted) return;
+      setState(() {
+        _accounts = accounts;
+        _portfolios = portfolios;
+        if (_selectedAccountId == null && accounts.isNotEmpty) {
+          _selectedAccountId = accounts.first.id;
+        } else if (_selectedAccountId != null && !accounts.any((acc) => acc.id == _selectedAccountId)) {
+          _selectedAccountId = accounts.isNotEmpty ? accounts.first.id : null;
+        }
+
+        if (_selectedPortfolioId != null && !_portfolios.any((p) => p.id == _selectedPortfolioId)) {
+          _selectedPortfolioId = null;
+        }
+        _isLoadingInitialData = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoadingInitialData = false);
       }
     }
   }
@@ -165,11 +213,13 @@ class _AssetFormDialogState extends ConsumerState<AssetFormDialog> {
       appBar: AppBar(
         title: Text(isEditing ? 'แก้ไขข้อมูลสินทรัพย์' : 'เพิ่มสินทรัพย์ใหม่'),
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Form(
-            key: _formKey,
+      body: _isLoadingInitialData
+          ? const Center(child: CircularProgressIndicator())
+          : SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Form(
+                  key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -304,62 +354,47 @@ class _AssetFormDialogState extends ConsumerState<AssetFormDialog> {
                 const SizedBox(height: 12),
 
                 // 4. Default Holding Account
-                FutureBuilder<List<Account>>(
-                  future: ref.read(accountsDaoProvider).getActiveAccounts(),
-                  builder: (context, snapshot) {
-                    final accounts = snapshot.data ?? [];
-                    if (_selectedAccountId == null && accounts.isNotEmpty) {
-                      _selectedAccountId = accounts.first.id;
-                    }
-                    return DropdownButtonFormField<String>(
-                      decoration: const InputDecoration(labelText: 'บัญชีที่ถือครอง *', border: OutlineInputBorder()),
-                      initialValue: _selectedAccountId,
-                      items: accounts.map((a) {
-                        return DropdownMenuItem(
-                          value: a.id,
-                          child: Text('${a.name} (${a.currencyCode}) [${a.isDomestic ? "ไทย" : "ต่างประเทศ"}]'),
-                        );
-                      }).toList(),
-                      onChanged: (val) => setState(() => _selectedAccountId = val),
+                DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(labelText: 'บัญชีที่ถือครอง *', border: OutlineInputBorder()),
+                  initialValue: _selectedAccountId,
+                  items: _accounts.map((a) {
+                    return DropdownMenuItem(
+                      value: a.id,
+                      child: Text('${a.name} (${a.currencyCode}) [${a.isDomestic ? "ไทย" : "ต่างประเทศ"}]'),
                     );
-                  },
+                  }).toList(),
+                  onChanged: (val) => setState(() => _selectedAccountId = val),
                 ),
                 const SizedBox(height: 12),
 
                 // 4.5 Custom Portfolio Grouping
-                FutureBuilder<List<InvestmentPortfolio>>(
-                  future: ref.read(investmentsDaoProvider).getAllPortfolios(),
-                  builder: (context, snapshot) {
-                    final portfolios = snapshot.data ?? [];
-                    return DropdownButtonFormField<String?>(
-                      decoration: const InputDecoration(
-                        labelText: 'จัดเข้าพอร์ตลงทุน (Portfolio)',
-                        hintText: 'ไม่ระบุพอร์ต (ค่าเริ่มต้น)',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.pie_chart_outline_rounded),
-                      ),
-                      initialValue: _selectedPortfolioId,
-                      items: [
-                        const DropdownMenuItem<String?>(
-                          value: null,
-                          child: Text('ไม่จัดเข้าพอร์ต (ทั่วไป)'),
+                DropdownButtonFormField<String?>(
+                  decoration: const InputDecoration(
+                    labelText: 'จัดเข้าพอร์ตลงทุน (Portfolio)',
+                    hintText: 'ไม่ระบุพอร์ต (ค่าเริ่มต้น)',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.pie_chart_outline_rounded),
+                  ),
+                  initialValue: _selectedPortfolioId,
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('ไม่จัดเข้าพอร์ต (ทั่วไป)'),
+                    ),
+                    ..._portfolios.map((p) {
+                      return DropdownMenuItem<String?>(
+                        value: p.id,
+                        child: Row(
+                          children: [
+                            Icon(Icons.folder_rounded, size: 18, color: Theme.of(context).colorScheme.primary),
+                            const SizedBox(width: 8),
+                            Text(p.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                          ],
                         ),
-                        ...portfolios.map((p) {
-                          return DropdownMenuItem<String?>(
-                            value: p.id,
-                            child: Row(
-                              children: [
-                                Icon(Icons.folder_rounded, size: 18, color: Theme.of(context).colorScheme.primary),
-                                const SizedBox(width: 8),
-                                Text(p.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                              ],
-                            ),
-                          );
-                        }),
-                      ],
-                      onChanged: (val) => setState(() => _selectedPortfolioId = val),
-                    );
-                  },
+                      );
+                    }),
+                  ],
+                  onChanged: (val) => setState(() => _selectedPortfolioId = val),
                 ),
                 const SizedBox(height: 12),
 

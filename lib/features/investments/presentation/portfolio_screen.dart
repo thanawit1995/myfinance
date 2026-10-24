@@ -611,34 +611,42 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
       availableCategories.add(h.asset.assetType);
     }
 
-    // 2. Filter holdings by Category and Portfolio
+    // 2. Filter holdings by Category or Portfolio based on active mode
     final filteredHoldings = holdings.where((h) {
-      if (_selectedCategoryFilter != 'all' && h.asset.assetType != _selectedCategoryFilter) {
-        return false;
-      }
-      if (_selectedPortfolioFilter != null) {
-        if (_selectedPortfolioFilter == '__unassigned__') {
-          return h.asset.portfolioId == null;
-        } else {
-          return h.asset.portfolioId == _selectedPortfolioFilter;
+      if (_isPortfolioFilterMode) {
+        if (_selectedPortfolioFilter != null) {
+          if (_selectedPortfolioFilter == '__unassigned__') {
+            return h.asset.portfolioId == null;
+          } else {
+            return h.asset.portfolioId == _selectedPortfolioFilter;
+          }
         }
+        return true;
+      } else {
+        if (_selectedCategoryFilter != 'all' && h.asset.assetType != _selectedCategoryFilter) {
+          return false;
+        }
+        return true;
       }
-      return true;
     }).toList();
 
-    // 2.1 Filter uninvested assets by Category and Portfolio
+    // 2.1 Filter uninvested assets by Category or Portfolio based on active mode
     final filteredUninvestedAssets = summary.uninvestedAssets.where((a) {
-      if (_selectedCategoryFilter != 'all' && a.assetType != _selectedCategoryFilter) {
-        return false;
-      }
-      if (_selectedPortfolioFilter != null) {
-        if (_selectedPortfolioFilter == '__unassigned__') {
-          return a.portfolioId == null;
-        } else {
-          return a.portfolioId == _selectedPortfolioFilter;
+      if (_isPortfolioFilterMode) {
+        if (_selectedPortfolioFilter != null) {
+          if (_selectedPortfolioFilter == '__unassigned__') {
+            return a.portfolioId == null;
+          } else {
+            return a.portfolioId == _selectedPortfolioFilter;
+          }
         }
+        return true;
+      } else {
+        if (_selectedCategoryFilter != 'all' && a.assetType != _selectedCategoryFilter) {
+          return false;
+        }
+        return true;
       }
-      return true;
     }).toList();
 
     // 3. Sort holdings (Default: value descending)
@@ -680,7 +688,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
 
     // Selected portfolio name label
     String? currentPortfolioName;
-    if (_selectedPortfolioFilter != null) {
+    if (_isPortfolioFilterMode && _selectedPortfolioFilter != null) {
       if (_selectedPortfolioFilter == '__unassigned__') {
         currentPortfolioName = isThai ? 'ทั่วไป (ไม่มีพอร์ต)' : 'Unassigned';
       } else {
@@ -722,8 +730,10 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        currentPortfolioName != null
-                            ? (isThai ? 'พอร์ต: $currentPortfolioName' : 'Portfolio: $currentPortfolioName')
+                        _isPortfolioFilterMode
+                            ? (currentPortfolioName != null
+                                ? (isThai ? 'พอร์ต: $currentPortfolioName' : 'Portfolio: $currentPortfolioName')
+                                : (isThai ? 'มูลค่าพอร์ตลงทุนทุกพอร์ตรวม' : 'Total All Portfolios Value'))
                             : (_selectedCategoryFilter == 'all'
                                 ? (isThai ? 'มูลค่าพอร์ตปัจจุบันรวม' : 'Total Portfolio Value')
                                 : (isThai
@@ -731,11 +741,6 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                                     : 'Portfolio Value (${_getCategoryName(_selectedCategoryFilter, isThai)})')),
                         style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold),
                       ),
-                      if (currentPortfolioName != null && _selectedCategoryFilter != 'all')
-                        Text(
-                          '(${_getCategoryName(_selectedCategoryFilter, isThai)})',
-                          style: TextStyle(fontSize: 12, color: theme.colorScheme.primary),
-                        ),
                     ],
                   ),
                   const SizedBox(height: 4),
@@ -907,7 +912,11 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                         borderRadius: BorderRadius.circular(9),
                         onTap: () {
                           if (_isPortfolioFilterMode) {
-                            setState(() => _isPortfolioFilterMode = false);
+                            setState(() {
+                              _isPortfolioFilterMode = false;
+                              _selectedCategoryFilter = 'all';
+                              _selectedPortfolioFilter = null;
+                            });
                           }
                         },
                         child: AnimatedContainer(
@@ -947,7 +956,11 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> with SingleTi
                         borderRadius: BorderRadius.circular(9),
                         onTap: () {
                           if (!_isPortfolioFilterMode) {
-                            setState(() => _isPortfolioFilterMode = true);
+                            setState(() {
+                              _isPortfolioFilterMode = true;
+                              _selectedCategoryFilter = 'all';
+                              _selectedPortfolioFilter = null;
+                            });
                           }
                         },
                         child: AnimatedContainer(

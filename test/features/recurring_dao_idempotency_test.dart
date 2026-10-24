@@ -140,6 +140,41 @@ void main() {
       expect(txs.where((t) => t.amountOriginalSatang == 53393).length, equals(1));
     });
 
+    test('deduplicateTransactions NEVER deletes manual user transactions with identical name, amount, and date', () async {
+      final accounts = await db.accountsDao.getActiveAccounts();
+      final scb = accounts.firstWhere((a) => a.name == 'SCB');
+      final today = DateTime(2026, 10, 24);
+
+      // Simulate user recording two cups of coffee at 60 baht on the same day (morning & afternoon)
+      for (int i = 1; i <= 2; i++) {
+        await db.into(db.transactions).insert(
+          TransactionsCompanion.insert(
+            id: 'tx-manual-coffee-$i',
+            transactionType: 'expense',
+            amountOriginalSatang: 6000,
+            currencyCode: 'THB',
+            amountThbSatang: 6000,
+            sourceAccountId: Value(scb.id),
+            transactionDate: today.add(Duration(hours: i == 1 ? 9 : 14)),
+            note: const Value('กาแฟ'),
+            tag: const Value(null),
+            createdAt: today.add(Duration(hours: i == 1 ? 9 : 14)),
+            updatedAt: today.add(Duration(hours: i == 1 ? 9 : 14)),
+          ),
+        );
+      }
+
+      var txs = await db.transactionsDao.getAllTransactions();
+      expect(txs.where((t) => t.note == 'กาแฟ').length, equals(2));
+
+      // Run deduplicateTransactions
+      final deletedIds = await db.transactionsDao.deduplicateTransactions();
+      expect(deletedIds, isEmpty); // Must NOT delete any manual transaction!
+
+      txs = await db.transactionsDao.getAllTransactions();
+      expect(txs.where((t) => t.note == 'กาแฟ').length, equals(2));
+    });
+
     test('processDueRules advances nextRunDate when rule is due but occurrence is already posted', () async {
       final accounts = await db.accountsDao.getActiveAccounts();
       final scb = accounts.firstWhere((a) => a.name == 'SCB');

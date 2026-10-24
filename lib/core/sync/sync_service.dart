@@ -193,6 +193,7 @@ class SyncService extends StateNotifier<SyncState> {
       'budgets',
       'recurring_rules',
       'assets',
+      'investment_portfolios',
       'liabilities',
       'insurance_policies',
       'projects',
@@ -247,6 +248,7 @@ class SyncService extends StateNotifier<SyncState> {
       // Delta sync for all tables
       await _syncAccounts(userId, lastSync);
       await _syncCategories(userId, lastSync);
+      await _syncInvestmentPortfolios(userId, lastSync);
       await _syncAssets(userId, lastSync);
       await _syncInsurance(userId, lastSync);
       await _syncLiabilities(userId, lastSync);
@@ -417,9 +419,10 @@ class SyncService extends StateNotifier<SyncState> {
       // 0. Push Cloud Master Snapshot (All 25 tables compressed & Base64 encoded)
       await _pushMasterSnapshot(userId);
 
-      // 1. Push ตารางหลักขึ้นไปก่อน (บัญชี หมวดหมู่ สินทรัพย์) แบบ Push-Only ห้ามดึงข้อมูลเก่ากลับมา
+      // 1. Push ตารางหลักขึ้นไปก่อน (บัญชี หมวดหมู่ พอร์ตโฟลิโอ สินทรัพย์) แบบ Push-Only ห้ามดึงข้อมูลเก่ากลับมา
       await _syncAccounts(userId, null, pushOnly: true);
       await _syncCategories(userId, null, pushOnly: true);
+      await _syncInvestmentPortfolios(userId, null, pushOnly: true);
       await _syncAssets(userId, null, pushOnly: true);
 
       // 2. ลบรายการธุรกรรมบน Supabase ของผู้ใช้นี้ทั้งหมดเพื่อเคลียร์ความซ้ำซ้อน
@@ -747,6 +750,9 @@ class SyncService extends StateNotifier<SyncState> {
     // 2. Sync Categories (with sort order & parent_id)
     await _syncCategories(userId, lastSync, pullOnly: pullOnly);
 
+    // 2.5 Sync Investment Portfolios
+    await _syncInvestmentPortfolios(userId, lastSync, pullOnly: pullOnly);
+
     // 3. Sync Assets (Investments)
     await _syncAssets(userId, lastSync, pullOnly: pullOnly);
 
@@ -987,6 +993,74 @@ class SyncService extends StateNotifier<SyncState> {
     }
   }
 
+  // ─── 2.5 Investment Portfolios ──────────────────────────────────────────────
+
+  Future<void> _syncInvestmentPortfolios(String userId, DateTime? lastSync, {bool pushOnly = false, bool pullOnly = false}) async {
+    try {
+      if (!pullOnly) {
+        final q = _db.select(_db.investmentPortfolios);
+        if (lastSync != null) q.where((t) => t.updatedAt.isBiggerThanValue(lastSync));
+        final localRows = await q.get();
+
+        if (localRows.isNotEmpty) {
+          final payload = localRows.map((p) => {
+            'id': p.id,
+            'user_id': userId,
+            'name': p.name,
+            'description': p.description,
+            'color': p.color,
+            'is_default': p.isDefault,
+            'sync_version': p.syncVersion,
+            'created_at': p.createdAt.toUtc().toIso8601String(),
+            'updated_at': p.updatedAt.toUtc().toIso8601String(),
+            'deleted_at': p.deletedAt?.toUtc().toIso8601String(),
+          }).toList();
+
+          try {
+            await _supabase.from('investment_portfolios').upsert(payload, onConflict: 'id');
+          } catch (e) {
+            debugPrint('[Sync] investment_portfolios push note: $e');
+          }
+        }
+      }
+
+      if (pushOnly) return;
+
+      try {
+        var query = _supabase.from('investment_portfolios').select().eq('user_id', userId);
+        if (lastSync != null) query = query.gt('updated_at', lastSync.toUtc().toIso8601String());
+        final cloudRows = await query as List<dynamic>;
+
+        if (cloudRows.isNotEmpty) {
+          await _db.batch((batch) {
+            for (final r in cloudRows) {
+              final row = r as Map<String, dynamic>;
+              batch.insert(
+                _db.investmentPortfolios,
+                InvestmentPortfoliosCompanion(
+                  id: Value(row['id'] as String),
+                  name: Value(row['name'] as String),
+                  description: Value(row['description'] as String?),
+                  color: Value(row['color'] as String?),
+                  isDefault: Value(row['is_default'] as bool? ?? false),
+                  syncVersion: Value((row['sync_version'] as num?)?.toInt() ?? 1),
+                  createdAt: Value(DateTime.parse(row['created_at'] as String).toLocal()),
+                  updatedAt: Value(DateTime.parse(row['updated_at'] as String).toLocal()),
+                  deletedAt: Value(row['deleted_at'] != null ? DateTime.parse(row['deleted_at'] as String).toLocal() : null),
+                ),
+                mode: InsertMode.insertOrReplace,
+              );
+            }
+          });
+        }
+      } catch (e) {
+        debugPrint('[Sync] investment_portfolios pull note: $e');
+      }
+    } catch (e) {
+      debugPrint('[Sync] _syncInvestmentPortfolios error: $e');
+    }
+  }
+
   // ─── 3. Assets (Investments) ────────────────────────────────────────────────
 
   Future<void> _syncAssets(String userId, DateTime? lastSync, {bool pushOnly = false, bool pullOnly = false}) async {
@@ -1004,8 +1078,12 @@ class SyncService extends StateNotifier<SyncState> {
             'name': a.name,
             'asset_type': a.assetType,
             'currency_code': a.currencyCode,
+            'default_account_id': a.defaultAccountId,
             'icon': a.icon,
+            'portfolio_id': a.portfolioId,
+            'market': a.market,
             'note': a.note,
+            'extra_details_json': a.extraDetailsJson,
             'created_at': a.createdAt.toUtc().toIso8601String(),
             'updated_at': a.updatedAt.toUtc().toIso8601String(),
             'deleted_at': a.deletedAt?.toUtc().toIso8601String(),
@@ -1014,13 +1092,28 @@ class SyncService extends StateNotifier<SyncState> {
           try {
             await _supabase.from('assets').upsert(payload, onConflict: 'id');
           } catch (e) {
-            if (e.toString().contains("'icon'") || e.toString().contains('PGRST204')) {
+            final errStr = e.toString();
+            if (errStr.contains("'icon'") || errStr.contains("'portfolio_id'") || errStr.contains('PGRST204')) {
               final fallbackPayload = payload.map((m) {
                 final copy = Map<String, dynamic>.from(m);
-                copy.remove('icon');
+                if (errStr.contains("'portfolio_id'")) copy.remove('portfolio_id');
+                if (errStr.contains("'icon'")) copy.remove('icon');
+                if (!errStr.contains("'portfolio_id'") && !errStr.contains("'icon'")) {
+                  copy.remove('portfolio_id');
+                }
                 return copy;
               }).toList();
-              await _supabase.from('assets').upsert(fallbackPayload, onConflict: 'id');
+              try {
+                await _supabase.from('assets').upsert(fallbackPayload, onConflict: 'id');
+              } catch (_) {
+                final secondFallback = fallbackPayload.map((m) {
+                  final copy = Map<String, dynamic>.from(m);
+                  copy.remove('portfolio_id');
+                  copy.remove('icon');
+                  return copy;
+                }).toList();
+                await _supabase.from('assets').upsert(secondFallback, onConflict: 'id');
+              }
             } else {
               rethrow;
             }
@@ -1037,6 +1130,7 @@ class SyncService extends StateNotifier<SyncState> {
       if (cloudRows.isNotEmpty) {
         final localAssets = await _db.select(_db.assets).get();
         final localIconMap = {for (final a in localAssets) a.id: a.icon};
+        final localPortfolioMap = {for (final a in localAssets) a.id: a.portfolioId};
 
         await _db.batch((batch) {
           for (final r in cloudRows) {
@@ -1044,6 +1138,9 @@ class SyncService extends StateNotifier<SyncState> {
             final assetId = row['id'] as String;
             final cloudIcon = row['icon'] as String?;
             final iconToSave = cloudIcon ?? localIconMap[assetId];
+            final cloudPortfolioId = row['portfolio_id'] as String?;
+            // Preserve local portfolioId if cloud row does not have one, so it never reverts to null
+            final portfolioIdToSave = cloudPortfolioId ?? localPortfolioMap[assetId];
 
             batch.insert(
               _db.assets,
@@ -1055,6 +1152,7 @@ class SyncService extends StateNotifier<SyncState> {
                 currencyCode: Value(row['currency_code'] as String? ?? 'THB'),
                 defaultAccountId: Value(row['default_account_id'] as String? ?? '00000000-0000-4000-8000-000000000001'),
                 icon: Value(iconToSave),
+                portfolioId: Value(portfolioIdToSave),
                 market: Value(row['market'] as String?),
                 note: Value(row['note'] as String?),
                 extraDetailsJson: Value(row['extra_details_json'] as String?),

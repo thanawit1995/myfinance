@@ -100,6 +100,7 @@ CREATE TABLE IF NOT EXISTS public.assets (
   currency_code       TEXT NOT NULL DEFAULT 'THB',
   default_account_id  TEXT,
   icon                TEXT,
+  portfolio_id        TEXT,
   market              TEXT,
   note                TEXT,
   extra_details_json  TEXT,
@@ -107,6 +108,22 @@ CREATE TABLE IF NOT EXISTS public.assets (
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   deleted_at          TIMESTAMPTZ
+);
+
+ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS portfolio_id TEXT;
+
+-- Investment Portfolios
+CREATE TABLE IF NOT EXISTS public.investment_portfolios (
+  id            TEXT PRIMARY KEY,
+  user_id       UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name          TEXT NOT NULL,
+  description   TEXT,
+  color         TEXT,
+  is_default    BOOLEAN NOT NULL DEFAULT FALSE,
+  sync_version  INTEGER NOT NULL DEFAULT 1,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_at    TIMESTAMPTZ
 );
 
 -- Insurance Policies
@@ -235,6 +252,7 @@ CREATE INDEX IF NOT EXISTS idx_acc_user_updated  ON public.accounts(user_id, upd
 CREATE INDEX IF NOT EXISTS idx_cat_user_updated  ON public.categories(user_id, updated_at);
 CREATE INDEX IF NOT EXISTS idx_bdg_user_updated  ON public.budgets(user_id, updated_at);
 CREATE INDEX IF NOT EXISTS idx_ast_user_updated  ON public.assets(user_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_inp_user_updated  ON public.investment_portfolios(user_id, updated_at);
 CREATE INDEX IF NOT EXISTS idx_ins_user_updated  ON public.insurance_policies(user_id, updated_at);
 CREATE INDEX IF NOT EXISTS idx_lia_user_updated  ON public.liabilities(user_id, updated_at);
 CREATE INDEX IF NOT EXISTS idx_rec_user_updated  ON public.recurring_rules(user_id, updated_at);
@@ -250,6 +268,7 @@ ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.budgets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.assets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.investment_portfolios ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.insurance_policies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.liabilities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.recurring_rules ENABLE ROW LEVEL SECURITY;
@@ -265,7 +284,7 @@ DECLARE
 BEGIN
   FOR tbl IN SELECT unnest(ARRAY[
     'accounts', 'categories', 'transactions', 'budgets',
-    'assets', 'insurance_policies', 'liabilities', 'recurring_rules',
+    'assets', 'investment_portfolios', 'insurance_policies', 'liabilities', 'recurring_rules',
     'projects', 'credit_card_installments', 'sync_device_state', 'cloud_vault_backup'
   ]) LOOP
     EXECUTE format('DROP POLICY IF EXISTS "Users can view own %I" ON public.%I', tbl, tbl);

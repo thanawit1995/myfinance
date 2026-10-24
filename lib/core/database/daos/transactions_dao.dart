@@ -701,19 +701,32 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
     } catch (_) {}
 
     final Map<String, Transaction> seen = {};
-    final Map<String, Transaction> seenRecurring = {};
     final List<String> duplicateIds = [];
 
     for (final tx in allTx) {
-      // NEVER delete a transaction that is backing an active investment lot
+      // 1. NEVER delete a transaction that is backing an active investment lot
       if (linkedLotTxIds.contains(tx.id)) {
+        continue;
+      }
+
+      final tagStr = tx.tag ?? '';
+      final noteStr = tx.note ?? '';
+
+      // 2. CRITICAL: Only automated recurring transactions (auto-posted from recurring rules)
+      // are eligible for deduplication. Normal manual transactions entered by the user
+      // (even with identical amount, note, and date) must NEVER be deleted!
+      final isRecurringAuto = tagStr.contains('recurring_auto') ||
+          noteStr.contains('สร้างอัตโนมัติจากกฎ:') ||
+          noteStr.contains('auto-posted from rule:');
+
+      if (!isRecurringAuto) {
         continue;
       }
 
       final d = tx.transactionDate.toLocal();
       final dateKey = '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-      String cleanNote = (tx.note ?? '').trim().toLowerCase();
+      String cleanNote = noteStr.trim().toLowerCase();
       cleanNote = cleanNote.replaceFirst('สร้างอัตโนมัติจากกฎ:', '').trim();
       cleanNote = cleanNote.replaceFirst('auto-posted from rule:', '').trim();
       cleanNote = cleanNote
@@ -724,34 +737,10 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
           .replaceAll(RegExp(r'\[day_of_month:\d+\]'), '')
           .trim();
 
-      final tagStr = tx.tag ?? '';
+      // Signature for recurring auto duplicates: same date, same amount, same type, same account, same clean note
+      final sig = '$dateKey|${tx.amountThbSatang}|${tx.transactionType}|${tx.sourceAccountId ?? ""}|$cleanNote';
 
-      final String sig;
-      if (tagStr.isNotEmpty && tagStr.startsWith('investment_')) {
-        // Investment trades include currency, original satang, and tag in signature
-        sig = '$dateKey|${tx.amountOriginalSatang}|${tx.amountThbSatang}|${tx.currencyCode}|${tx.transactionType}|$tagStr|${tx.sourceAccountId ?? ""}|$cleanNote';
-      } else if (cleanNote.isNotEmpty) {
-        sig = '$dateKey|${tx.amountThbSatang}|${tx.transactionType}|$cleanNote';
-      } else {
-        sig = '$dateKey|${tx.amountThbSatang}|${tx.transactionType}|${tx.sourceAccountId ?? ""}|$tagStr';
-      }
-
-      bool isDup = false;
       if (seen.containsKey(sig)) {
-        isDup = true;
-      }
-
-      // Check recurring auto-posts on the same day with same amount & account
-      if (!isDup && tagStr.contains('recurring_auto')) {
-        final recSig = '$dateKey|${tx.amountThbSatang}|${tx.transactionType}|${tx.sourceAccountId ?? ""}';
-        if (seenRecurring.containsKey(recSig)) {
-          isDup = true;
-        } else {
-          seenRecurring[recSig] = tx;
-        }
-      }
-
-      if (isDup) {
         duplicateIds.add(tx.id);
       } else {
         seen[sig] = tx;

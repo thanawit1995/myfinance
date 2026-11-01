@@ -1,6 +1,30 @@
 # บันทึกความคืบหน้าโครงการ MyFinance (PROGRESS.md)
 
-อัปเดตล่าสุด: 24 ตุลาคม 2026 (แก้ไขปัญหารายการธุรกรรมซ้ำถูกลบ, แก้ไขสินทรัพย์เด้งหลุดพอร์ตลงทุนระหว่าง Sync, ปรับระบบ Chip Filter การลงทุนให้รีเซ็ตเมื่อสลับโหมด, และนำคู่มือแนะนำการใช้งานออกจากแอป)
+อัปเดตล่าสุด: 1 พฤศจิกายน 2026 (ซ่อนแท็กระบบ Recurring ทุกประเภท, ปรับปรุงสรุปภาพรวมรายรับ-จ่ายตามรอบเดือนทำงานจริง, และแก้ไขให้ยอดเงินเข้าบัญชีเมื่อกดรับเงินจริงเท่านั้น)
+
+- [x] **Recurring Tags Hiding, Work Period Financial Summary Attribution & Accrued Income Deposit Timing (1 พ.ย. 2026)**:
+  - **1. ซ่อนแท็กระบบ Recurring ทุกประเภทจากหน้าจอผู้ใช้ (`transaction_list_screen.dart`, `edit_transaction_dialog.dart`, `accrued_income_screen.dart`)**:
+    - **สาเหตุรากเหง้า (Root Cause)**: เดิมตัวกรองใน `TransactionListScreen` กรองเฉพาะคำว่า `recurring_auto` ทำให้แท็กระบบอื่น ๆ เช่น `recurring_early_posted` และ `recurring_manual_confirmed` หลุดออกมาแสดงผลเป็นป้ายแท็กบนหน้าจอรายการธุรกรรม และในหน้าต่างแก้ไข/หน้าติดตามเงินค้างรับ
+    - **การแก้ไข**: ปรับตัวกรองแท็กระบบให้ครอบคลุมแท็กที่ขึ้นต้นด้วย `recurring` ทั้งหมด (`!t.startsWith('recurring')`) ซ่อนแท็กระบบภายในออกจากสายตาผู้ใช้ 100% พร้อมเพิ่ม Unit Test ใน `recurring_tags_filter_test.dart`
+  - **2. ปรับปรุงการสรุปภาพรวมรายรับ-จ่ายตามรอบเดือนทำงานจริง (Work Period Financial Summary Attribution) (`transactions_dao.dart`, `monthly_summary_screen.dart`, `financial_reports_service.dart`)**:
+    - **สาเหตุรากเหง้า (Root Cause)**: หน้าสรุปภาพรวมรายรับ-จ่าย (`MonthlySummaryScreen`) เดิมค้นหารายการธุรกรรมตามวันที่ทำรายการ (`transactionDate`) เพียงอย่างเดียว ทำให้รายการรายได้ค้างรับที่มีรอบการทำงานเป็นเดือนก่อนหน้า (เช่น บันทึกรายการวันที่ 10/10/69 แต่เป็นรายได้ของ ก.ย. 69 `workPeriod = '2026-09'`) ถูกนำไปแสดงเป็นยอดค้างรับของเดือน ต.ค. 69 แทน และเดือน ก.ย. 69 กลับไม่มียอดค้างรับนี้
+    - **การแก้ไข**:
+      - เพิ่มฟังก์ชัน `TransactionsDao.getTransactionsForSummary` ที่จัดกลุ่มรายการรายได้ตามรอบการทำงาน (`workPeriod`) ให้นำไปแสดงในรอบเดือนที่ทำงานจริง (เช่น ก.ย. 69) ไม่ว่าวันที่บันทึกรายการจะบันทึกในเดือนใด
+      - หากเป็นรายการค้างรับ (`isCleared == false`) ยอดจะแสดงเป็น `+ค้างรับ` ในรอบเดือนที่ทำงานจริง และไม่หลุดไปปนในเดือนอื่น
+      - เพิ่ม Unit Test ใน `summary_work_period_test.dart`
+  - **3. ยอดเงินเข้าบัญชีเมื่อกดรับเงินแล้วเท่านั้น (Accrued Income Deposit Timing) (`quick_add_screen.dart`, `accrued_income_screen.dart`, `transactions_dao.dart`, `account_detail_screen.dart`, `transaction_list_screen.dart`)**:
+    - **สาเหตุรากเหง้า (Root Cause)**: เมื่อผู้ใช้สร้างรายการค้างรับ ระบบเดิมผูก `sourceAccountId` เข้ากับบัญชีธนาคารทันที ทำให้ในหน้ารายละเอียดบัญชีแสดงรายการนี้ในประวัติเดินบัญชี และยอดรวมเงินเข้า (`totalInflow`) นำยอดไปคำนวณเสมือนเงินเข้าบัญชีแล้ว
+    - **การแก้ไข**:
+      - ใน `QuickAddScreen` และ `AccruedIncomeScreen`: เมื่อสร้างรายการค้างรับ (`isCleared == false`) จะกำหนด `sourceAccountId: null` เพื่อไม่ให้ยอดเงินผูกหรือไหลเข้าบัญชีธนาคารใด ๆ จนกว่าจะได้รับเงินจริง
+      - เมื่อผู้ใช้กด "ค้างรับ/ตกเบิก" ใน `QuickAddScreen`: ระบบจะตั้งค่าเริ่มต้นรอบการทำงาน (`_accruedWorkPeriod`) เป็นเดือนก่อนหน้า (N-1) ให้อัตโนมัติ
+      - ใน `TransactionsDao`: ปรับปรุง `watchTransactionsForAccount` และ `searchTransactions` สำหรับบัญชี ให้กรองเฉพาะรายการที่ได้รับเงินแล้ว (`t.isCleared == true`) รายการค้างรับจะไม่แสดงในประวัติเดินบัญชีของธนาคาร
+      - ใน `AccountDetailScreen`: ปรับการคำนวณ `totalInflow` ให้คิดเฉพาะรายการที่เคลียร์แล้ว (`t.isCleared == true`)
+      - ใน `TransactionListScreen`: เพิ่มปุ่มกด **"กดรับเงิน"** บนการ์ดธุรกรรมที่มีสถานะค้างรับโดยตรง เพื่อให้ผู้ใช้สามารถแตะเพื่อเลือกบัญชีที่เงินเข้าจริงและวันที่ได้รับเงินได้อย่างสะดวกรวดเร็ว
+      - ใน `FinancialReportsService`: ยืนยันการคิดภาษีเงินได้บุคคลธรรมดาตาม **เกณฑ์เงินสด (Cash Basis)** โดยคิดเฉพาะรายได้ที่ได้รับจริงแล้ว (`tx.isCleared == true`) ถูกต้องตามกฎหมายสรรพากรไทย 100%
+      - เพิ่ม Unit Test ใน `accrued_account_deposit_test.dart`
+  - **4. การทดสอบและการรับรองคุณภาพ**:
+    - `flutter analyze`: **0 errors, 0 warnings** (No issues found)
+    - `flutter test`: ผ่านทั้งหมด 100%
 
 - [x] **Transaction Deduplication User Protection, Asset Portfolio Cloud Sync, Portfolio Filter Independence & App Tour Removal (24 ต.ค. 2026)**:
   - **1. คุ้มครองรายการธุรกรรมทั่วไป ไม่ให้ถูกลบเมื่อชื่อ/ยอดเงิน/วันที่เหมือนกัน (`transactions_dao.dart`)**:

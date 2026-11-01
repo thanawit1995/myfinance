@@ -65,7 +65,7 @@ void main() {
       expect(balanceAfterError, equals(initialBalance - 8400));
 
       // Run repair
-      final repaired = await db.recurringTransactionsDao.repairErroneousAutoPostsAndAlignDates();
+      final repaired = await db.recurringTransactionsDao.repairErroneousAutoPostsAndAlignDates(nowOverride: oct15);
       expect(repaired.length, equals(1));
 
       // 1. Transaction should now be soft-deleted

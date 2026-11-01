@@ -77,8 +77,9 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
           t.startsWith('investment_buy:') ||
           t.startsWith('investment_sell:') ||
           t.startsWith('investment_income:') ||
-          t.startsWith('recurring_auto') ||
+          t.startsWith('recurring') ||
           t.startsWith('historical_settle') ||
+          t.startsWith('account_deleted:') ||
           t.startsWith('debt_payment:') ||
           t.startsWith('รายได้ ') ||
           t.startsWith('รายได้รอบ ')) {
@@ -322,8 +323,8 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
     final updatedTx = TransactionsCompanion(
       id: Value(widget.transaction.id),
       transactionType: Value(_transactionType),
-      sourceAccountId: Value(resolvedAccountId),
-      destinationAccountId: _transactionType == 'transfer' ? Value(_selectedDestinationAccountId) : Value(resolvedAccountId),
+      sourceAccountId: Value(_transactionType == 'income' && !_isCleared ? null : resolvedAccountId),
+      destinationAccountId: _transactionType == 'transfer' ? Value(_selectedDestinationAccountId) : Value(_transactionType == 'income' && !_isCleared ? null : resolvedAccountId),
       categoryId: _transactionType != 'transfer' ? Value(_selectedCategoryId) : const Value(null),
       amountOriginalSatang: Value(amountOriginalSatang),
       currencyCode: Value(currencyCode),

@@ -369,9 +369,10 @@ class FinancialReportsService {
     final start = DateTime(year, month, 1);
     final end = DateTime(month == 12 ? year + 1 : year, month == 12 ? 1 : month + 1, 1);
 
-    final txList = await transactionsDao.searchTransactions(
+    final txList = await transactionsDao.getTransactionsForSummary(
       startDate: start,
       endDate: end.subtract(const Duration(milliseconds: 1)),
+      targetWorkPeriod: '$year-${month.toString().padLeft(2, '0')}',
     );
 
     int income = 0;
@@ -399,9 +400,10 @@ class FinancialReportsService {
     final prevStart = DateTime(prevYear, prevMonth, 1);
     final prevEnd = DateTime(month == 1 ? year : year, month, 1);
 
-    final prevTxList = await transactionsDao.searchTransactions(
+    final prevTxList = await transactionsDao.getTransactionsForSummary(
       startDate: prevStart,
       endDate: prevEnd.subtract(const Duration(milliseconds: 1)),
+      targetWorkPeriod: '$prevYear-${prevMonth.toString().padLeft(2, '0')}',
     );
 
     int prevIncome = 0;
@@ -498,7 +500,7 @@ class FinancialReportsService {
     final prevYear = year - 1;
     final prevStart = DateTime(prevYear, 1, 1);
     final prevEnd = DateTime(year, 1, 1);
-    final prevTxList = await transactionsDao.searchTransactions(
+    final prevTxList = await transactionsDao.getTransactionsForSummary(
       startDate: prevStart,
       endDate: prevEnd.subtract(const Duration(milliseconds: 1)),
     );
@@ -774,6 +776,7 @@ class FinancialReportsService {
 
     for (final tx in txList) {
       if (tx.transactionType == 'income') {
+        if (!tx.isCleared) continue;
         final cat = tx.taxCategory ?? '40_8';
         final gross = tx.amountThbSatang;
         final wht = tx.withholdingTaxSatang;

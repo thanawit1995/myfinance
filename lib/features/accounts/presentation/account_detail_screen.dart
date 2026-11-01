@@ -324,7 +324,9 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
                   if (isExpense) {
                     totalOutflow += t.amountThbSatang;
                   } else {
-                    totalInflow += t.amountThbSatang;
+                    if (t.isCleared) {
+                      totalInflow += t.amountThbSatang;
+                    }
                   }
                 }
 

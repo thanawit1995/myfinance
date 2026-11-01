@@ -7,6 +7,7 @@ import '../../../../core/database/database_provider.dart';
 import '../../../../core/database/daos/transactions_dao.dart';
 import '../../../../core/money/money.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/vault_theme.dart';
 import '../../../../core/widgets/category_color_helper.dart';
 import '../../../../core/widgets/category_name_helper.dart';
 import '../../investments/presentation/portfolio_screen.dart';
@@ -583,8 +584,9 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
               !t.startsWith('investment_buy:') &&
               !t.startsWith('investment_sell:') &&
               !t.startsWith('investment_income:') &&
-              !t.startsWith('recurring_auto') &&
+              !t.startsWith('recurring') &&
               !t.startsWith('historical_settle') &&
+              !t.startsWith('account_deleted:') &&
               !t.startsWith('debt_payment:'))
           .toList();
       if (cleanTags.isNotEmpty) {
@@ -647,6 +649,32 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
               '${isThai ? "ค่าธรรมเนียม" : "Fee"}: ${Money(tx.feeThbSatang).format(symbol: '฿')}',
               style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant),
             ),
+          if (!tx.isCleared && isIncome) ...[
+            const SizedBox(height: 3),
+            InkWell(
+              onTap: () => _showQuickReceiveDialog(tx, isThai),
+              borderRadius: BorderRadius.circular(4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.green.shade700, width: 0.8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_circle_outline, size: 11, color: Colors.green.shade800),
+                    const SizedBox(width: 3),
+                    Text(
+                      isThai ? 'กดรับเงิน' : 'Receive',
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green.shade900),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
       onTap: () async {
@@ -660,6 +688,169 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
         }
       },
       onLongPress: () => _confirmDelete(tx, isThai),
+    );
+  }
+
+  Future<void> _showQuickReceiveDialog(Transaction tx, bool isThai) async {
+    final accounts = await ref.read(accountsDaoProvider).getActiveAccounts();
+    if (!mounted) return;
+
+    if (accounts.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(isThai ? 'กรุณาสร้างบัญชีการเงินก่อนบันทึกรับเงิน' : 'Please create an account first.')),
+      );
+      return;
+    }
+
+    String selectedAccountId = accounts.first.id;
+    DateTime receivedDate = DateTime.now();
+    final defaultAmount = (tx.expectedAmountSatang ?? tx.amountThbSatang) / 100.0;
+    final amountController = TextEditingController(text: defaultAmount.toStringAsFixed(2));
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(Icons.account_balance_wallet, color: VaultTheme.positive(ctx), size: 24),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  isThai ? 'บันทึกรับเงินเข้าบัญชี' : 'Record Deposit',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  tx.note?.isNotEmpty == true ? tx.note! : (isThai ? 'รายได้ค้างรับ' : 'Income'),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                if (tx.workPeriod != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      '${isThai ? "รอบการทำงาน" : "Period"}: ${TransactionsDao.formatPeriodToTag(tx.workPeriod!)}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    ),
+                  ),
+                const SizedBox(height: 16),
+
+                // Select Account
+                Text(isThai ? 'บัญชีที่เงินเข้า *' : 'Target Account *', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<String>(
+                  initialValue: selectedAccountId,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  items: accounts.map((a) {
+                    return DropdownMenuItem(
+                      value: a.id,
+                      child: Text('${a.name} (${a.currencyCode})', style: const TextStyle(fontSize: 13)),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) setDialogState(() => selectedAccountId = val);
+                  },
+                ),
+                const SizedBox(height: 12),
+
+                // Actual Amount Received
+                Text(isThai ? 'จำนวนเงินที่ได้รับจริง (บาท) *' : 'Actual Amount (THB) *', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: amountController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    prefixText: '฿ ',
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Received Date
+                Text(isThai ? 'วันที่เงินเข้าจริง *' : 'Deposit Date *', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.calendar_today, size: 16),
+                  label: Text(DateFormat('dd/MM/yyyy').format(receivedDate), style: const TextStyle(fontSize: 13)),
+                  style: OutlinedButton.styleFrom(
+                    alignment: Alignment.centerLeft,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () async {
+                    final picked = await showDatePicker(
+                      context: ctx,
+                      initialDate: receivedDate,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2035),
+                    );
+                    if (picked != null) {
+                      setDialogState(() => receivedDate = picked);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+            ),
+            FilledButton.icon(
+              icon: const Icon(Icons.check, size: 16),
+              label: Text(isThai ? 'ยืนยันรับเงิน' : 'Confirm'),
+              style: FilledButton.styleFrom(
+                backgroundColor: VaultTheme.positive(ctx),
+              ),
+              onPressed: () async {
+                final moneyParsed = Money.tryParse(amountController.text);
+                if (moneyParsed == null || moneyParsed.isZero) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(content: Text(isThai ? 'กรุณากรอกจำนวนเงินที่ถูกต้อง' : 'Please enter valid amount.')),
+                  );
+                  return;
+                }
+
+                Navigator.pop(ctx);
+                final success = await ref.read(transactionsDaoProvider).markIncomeAsReceived(
+                  tx.id,
+                  accountId: selectedAccountId,
+                  receivedDate: receivedDate,
+                  actualAmountSatang: moneyParsed.satang,
+                );
+
+                if (mounted) {
+                  if (success) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(isThai ? 'บันทึกรับเงินเข้าบัญชีเรียบร้อย ยอดเงินสดปรับปรุงแล้ว' : 'Income marked as received!')),
+                    );
+                    _loadTransactions();
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(isThai ? 'เกิดข้อผิดพลาดในการบันทึก' : 'Error updating income.')),
+                    );
+                  }
+                }
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 

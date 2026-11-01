@@ -85,7 +85,8 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
     return (select(transactions)
           ..where((t) =>
               t.deletedAt.isNull() &
-              (t.sourceAccountId.equals(accountId) | t.destinationAccountId.equals(accountId)))
+              (t.sourceAccountId.equals(accountId) | t.destinationAccountId.equals(accountId)) &
+              (t.isCleared.equals(true) | t.transactionType.equals('income').not()))
           ..orderBy([(t) => OrderingTerm.desc(t.transactionDate)])
           ..limit(limit))
         .watch();
@@ -297,7 +298,9 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
       q.where((t) => t.transactionDate.isSmallerOrEqualValue(endDate));
     }
     if (accountId != null) {
-      q.where((t) => t.sourceAccountId.equals(accountId) | t.destinationAccountId.equals(accountId));
+      q.where((t) =>
+          (t.sourceAccountId.equals(accountId) | t.destinationAccountId.equals(accountId)) &
+          (t.isCleared.equals(true) | t.transactionType.equals('income').not()));
     }
     if (categoryId != null) {
       q.where((t) => t.categoryId.equals(categoryId));
@@ -315,6 +318,75 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
 
     q.orderBy([(t) => OrderingTerm.desc(t.transactionDate)]);
     return q.get();
+  }
+
+  /// ดึงข้อมูลรายการธุรกรรมสำหรับหน้ารายงานสรุปภาพรวม (Financial Summary)
+  /// โดยจัดกลุ่มรายได้ที่มีรอบการทำงาน (workPeriod) ให้อยู่ในรอบเดือนที่ทำงานจริง
+  /// ไม่ว่าวันที่บันทึกรายการ (transactionDate) จะเป็นวันใด
+  Future<List<Transaction>> getTransactionsForSummary({
+    required DateTime startDate,
+    required DateTime endDate,
+    String? targetWorkPeriod,
+  }) async {
+    // 1. Transactions within date range
+    final dateTxs = await (select(transactions)
+          ..where((t) =>
+              t.deletedAt.isNull() &
+              t.transactionDate.isBiggerOrEqualValue(startDate) &
+              t.transactionDate.isSmallerOrEqualValue(endDate)))
+        .get();
+
+    // 2. Income transactions with workPeriod
+    final workPeriodTxs = await (select(transactions)
+          ..where((t) =>
+              t.deletedAt.isNull() &
+              t.transactionType.equals('income') &
+              t.workPeriod.isNotNull()))
+        .get();
+
+    final allMap = <String, Transaction>{};
+    for (final t in dateTxs) {
+      allMap[t.id] = t;
+    }
+    for (final t in workPeriodTxs) {
+      allMap[t.id] = t;
+    }
+
+    final result = <Transaction>[];
+    for (final t in allMap.values) {
+      if (t.transactionType == 'income' && t.workPeriod != null && t.workPeriod!.trim().isNotEmpty) {
+        final wp = t.workPeriod!.trim();
+        if (targetWorkPeriod != null) {
+          // Explicit target workPeriod (e.g. '2026-09')
+          if (wp == targetWorkPeriod) {
+            result.add(t);
+          }
+        } else {
+          // Range-based workPeriod check
+          final parts = wp.split('-');
+          if (parts.length == 2) {
+            final y = int.tryParse(parts[0]);
+            final m = int.tryParse(parts[1]);
+            if (y != null && m != null && m >= 1 && m <= 12) {
+              final wpStart = DateTime(y, m, 1);
+              final wpEnd = DateTime(y, m + 1, 0, 23, 59, 59, 999);
+              if (wpStart.isBefore(endDate) && wpEnd.isAfter(startDate)) {
+                result.add(t);
+              }
+            }
+          }
+        }
+      } else {
+        // Transactions without workPeriod: must fall strictly inside transactionDate range
+        if ((t.transactionDate.isAfter(startDate) || t.transactionDate.isAtSameMomentAs(startDate)) &&
+            (t.transactionDate.isBefore(endDate) || t.transactionDate.isAtSameMomentAs(endDate))) {
+          result.add(t);
+        }
+      }
+    }
+
+    result.sort((a, b) => b.transactionDate.compareTo(a.transactionDate));
+    return result;
   }
 
   /// Calculates monthly expense totals broken down by category for Donut chart.

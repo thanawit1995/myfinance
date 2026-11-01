@@ -425,18 +425,42 @@ class _AccruedIncomeScreenState extends ConsumerState<AccruedIncomeScreen> {
                 const SizedBox(height: 2),
                 Row(
                   children: [
-                    if (tx.tag != null && tx.tag!.isNotEmpty) ...[
-                      Text(
-                        tx.tag!,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: VaultTheme.secondaryText(context),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text('•', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
-                      const SizedBox(width: 6),
-                    ],
+                    Builder(
+                      builder: (context) {
+                        if (tx.tag == null || tx.tag!.trim().isEmpty) return const SizedBox.shrink();
+                        final cleanTags = tx.tag!
+                            .split(',')
+                            .map((t) => t.trim())
+                            .where((t) =>
+                                !t.startsWith('project:') &&
+                                !t.startsWith('policy:') &&
+                                !t.startsWith('deduction:') &&
+                                !t.startsWith('investment_') &&
+                                !t.startsWith('recurring') &&
+                                !t.startsWith('historical_settle') &&
+                                !t.startsWith('account_deleted:') &&
+                                !t.startsWith('debt_payment:') &&
+                                !t.startsWith('รายได้ ') &&
+                                !t.startsWith('รายได้รอบ '))
+                            .toList();
+                        if (cleanTags.isEmpty) return const SizedBox.shrink();
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              cleanTags.join(', '),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: VaultTheme.secondaryText(context),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text('•', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
+                            const SizedBox(width: 6),
+                          ],
+                        );
+                      },
+                    ),
                     Text(
                       dateFormat.format(tx.transactionDate),
                       style: TextStyle(
@@ -1122,8 +1146,8 @@ class _AccruedIncomeScreenState extends ConsumerState<AccruedIncomeScreen> {
                 await txDao.insertTransaction(
                   TransactionsCompanion.insert(
                     id: txId,
-                        transactionType: 'income',
-                        sourceAccountId: drift.Value(defaultAccId),
+                    transactionType: 'income',
+                    sourceAccountId: const drift.Value(null),
                         categoryId: drift.Value(selectedCategoryId),
                         amountOriginalSatang: moneyParsed.satang,
                         amountThbSatang: moneyParsed.satang,

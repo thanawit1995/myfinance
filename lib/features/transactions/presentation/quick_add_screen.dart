@@ -451,7 +451,7 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
     final newTx = TransactionsCompanion.insert(
       id: _uuid.v4(),
       transactionType: _transactionType,
-      sourceAccountId: Value(_selectedAccountId),
+      sourceAccountId: Value(isAccrued ? null : _selectedAccountId),
       destinationAccountId: _transactionType == 'transfer' ? Value(_selectedDestinationAccountId) : const Value(null),
       categoryId: _transactionType != 'transfer' ? Value(_selectedCategoryId) : const Value(null),
       amountOriginalSatang: amountOriginalSatang,
@@ -1620,9 +1620,11 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
             style: const TextStyle(fontSize: 11.5),
           ),
           onPressed: () {
+            final prevMonthDate = DateTime(_transactionDate.year, _transactionDate.month - 1, 1);
             setState(() {
               _isAccruedIncome = true;
               _recurringWorkPeriodOffset = 'prev_month';
+              _accruedWorkPeriod = '${prevMonthDate.year}-${prevMonthDate.month.toString().padLeft(2, '0')}';
             });
           },
         ),

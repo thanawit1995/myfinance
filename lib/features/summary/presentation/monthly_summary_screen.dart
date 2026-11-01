@@ -253,8 +253,16 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
     final start = range.start;
     final end = range.end;
 
+    final targetWorkPeriod = _granularity == ReportGranularity.monthly
+        ? '${start.year}-${start.month.toString().padLeft(2, '0')}'
+        : null;
+
     final txsDao = ref.read(transactionsDaoProvider);
-    final currentTxs = await txsDao.searchTransactions(startDate: start, endDate: end);
+    final currentTxs = await txsDao.getTransactionsForSummary(
+      startDate: start,
+      endDate: end,
+      targetWorkPeriod: targetWorkPeriod,
+    );
     final allCats = await ref.read(categoriesDaoProvider).getAllCategories();
     final catMap = {for (final c in allCats) c.id: c};
 

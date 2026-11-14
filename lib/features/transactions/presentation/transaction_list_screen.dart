@@ -17,6 +17,7 @@ class TransactionListScreen extends ConsumerStatefulWidget {
   final String? initialTransactionType; // 'income', 'expense', 'transfer'
   final DateTimeRange? initialDateRange;
   final String? initialCategoryId;
+  final String? initialWorkPeriod;
   final String? title;
 
   const TransactionListScreen({
@@ -24,6 +25,7 @@ class TransactionListScreen extends ConsumerStatefulWidget {
     this.initialTransactionType,
     this.initialDateRange,
     this.initialCategoryId,
+    this.initialWorkPeriod,
     this.title,
   });
 
@@ -40,6 +42,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
   String? _selectedAccountId;
   String? _selectedCategoryId;
   DateTimeRange? _selectedDateRange;
+  String? _selectedWorkPeriod;
   String? _selectedType; // null = ทั้งหมด, 'income', 'expense', 'transfer'
   bool _isSearchExpanded = false;
 
@@ -55,6 +58,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
     _selectedType = widget.initialTransactionType;
     _selectedDateRange = widget.initialDateRange;
     _selectedCategoryId = widget.initialCategoryId;
+    _selectedWorkPeriod = widget.initialWorkPeriod;
     _loadTransactions();
     // Silent background sync with database updates
     _dbSubscription = ref.read(transactionsDaoProvider).watchRecentTransactions(limit: 1).listen((_) {
@@ -85,6 +89,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
         accountId: _selectedAccountId,
         categoryId: _selectedCategoryId,
         transactionType: _selectedType,
+        workPeriod: _selectedWorkPeriod,
         excludeInvestments: false,
       );
       if (mounted) {
@@ -115,6 +120,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
         accountId: _selectedAccountId,
         categoryId: _selectedCategoryId,
         transactionType: _selectedType,
+        workPeriod: _selectedWorkPeriod,
         excludeInvestments: false,
       );
       if (mounted) {
@@ -236,12 +242,21 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
           ),
 
           // Active filter chips
-          if (_selectedAccountId != null || _selectedCategoryId != null || _selectedDateRange != null)
+          if (_selectedAccountId != null || _selectedCategoryId != null || _selectedDateRange != null || _selectedWorkPeriod != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Wrap(
                 spacing: 8,
                 children: [
+                  if (_selectedWorkPeriod != null)
+                    Chip(
+                      avatar: const Icon(Icons.work_history_outlined, size: 16),
+                      label: Text(TransactionsDao.formatPeriodToTag(_selectedWorkPeriod!)),
+                      onDeleted: () {
+                        setState(() => _selectedWorkPeriod = null);
+                        _loadTransactions();
+                      },
+                    ),
                   if (_selectedDateRange != null)
                     Chip(
                       label: Text('${DateFormat('d/M').format(_selectedDateRange!.start)} - ${DateFormat('d/M').format(_selectedDateRange!.end)}'),
@@ -522,6 +537,18 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
 
     if (isIncome && tx.workPeriod != null && tx.workPeriod!.trim().isNotEmpty) {
       final periodTag = TransactionsDao.formatPeriodToTag(tx.workPeriod!);
+      final parts = tx.workPeriod!.trim().split('-');
+      bool isArrears = false;
+      if (parts.length == 2) {
+        final y = int.tryParse(parts[0]);
+        final m = int.tryParse(parts[1]);
+        if (y != null && m != null) {
+          if (tx.transactionDate.year != y || tx.transactionDate.month != m) {
+            isArrears = true;
+          }
+        }
+      }
+
       if (!tx.isCleared) {
         subBadges.add(
           Container(
@@ -552,20 +579,26 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
             decoration: BoxDecoration(
-              color: const Color(0xFF673AB7).withValues(alpha: 0.12),
+              color: isArrears
+                  ? Colors.teal.withValues(alpha: 0.15)
+                  : const Color(0xFF673AB7).withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(4),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.label_outline_rounded, size: 11, color: Color(0xFF673AB7)),
+                Icon(
+                  isArrears ? Icons.history_edu_rounded : Icons.label_outline_rounded,
+                  size: 11,
+                  color: isArrears ? Colors.teal.shade800 : const Color(0xFF673AB7),
+                ),
                 const SizedBox(width: 3),
                 Text(
-                  periodTag,
-                  style: const TextStyle(
+                  isArrears ? 'ตกเบิก ($periodTag)' : periodTag,
+                  style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF673AB7),
+                    color: isArrears ? Colors.teal.shade900 : const Color(0xFF673AB7),
                   ),
                 ),
               ],
@@ -687,8 +720,153 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
           _loadTransactions();
         }
       },
-      onLongPress: () => _confirmDelete(tx, isThai),
+      onLongPress: () => _showTransactionActionSheet(tx, isThai),
     );
+  }
+
+  Future<void> _showTransactionActionSheet(Transaction tx, bool isThai) async {
+    final isInvestTrade = tx.tag != null &&
+        (tx.tag!.startsWith('investment_buy:') ||
+            tx.tag!.startsWith('investment_sell:') ||
+            tx.tag!.startsWith('dividend:') ||
+            tx.tag!.startsWith('interest:'));
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          tx.note?.isNotEmpty == true ? tx.note! : (isThai ? 'ธุรกรรม' : 'Transaction'),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Text(
+                        '฿${Money(tx.amountThbSatang).format(symbol: "")}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: tx.transactionType == 'expense' ? Colors.red : Colors.green,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(),
+                if (!isInvestTrade) ...[
+                  ListTile(
+                    leading: const Icon(Icons.edit_outlined),
+                    title: Text(isThai ? 'แก้ไขรายการ' : 'Edit Transaction'),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      final changed = await EditTransactionDialog.show(context, tx);
+                      if (changed == true && mounted) {
+                        _loadTransactions();
+                      }
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.copy_rounded, color: Colors.blue),
+                    title: Text(isThai ? 'ทำซ้ำรายการ (Duplicate)' : 'Duplicate Transaction'),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      _duplicateTransaction(tx, isThai);
+                    },
+                  ),
+                ],
+                ListTile(
+                  leading: const Icon(Icons.delete_outline, color: Colors.red),
+                  title: Text(
+                    isThai ? 'ลบรายการ' : 'Delete',
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _confirmDelete(tx, isThai);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _duplicateTransaction(Transaction tx, bool isThai) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.copy_rounded, color: VaultTheme.accent(ctx), size: 22),
+            const SizedBox(width: 8),
+            Text(isThai ? 'ทำซ้ำรายการนี้?' : 'Duplicate Transaction?'),
+          ],
+        ),
+        content: Text(
+          isThai
+              ? 'ต้องการทำซ้ำรายการ "${tx.note?.isNotEmpty == true ? tx.note : (isThai ? "ธุรกรรม" : "Transaction")}" จำนวน ฿${Money(tx.amountThbSatang).format(symbol: "")} โดยบันทึกเป็นรายการของวันนี้หรือไม่?'
+              : 'Do you want to duplicate "${tx.note?.isNotEmpty == true ? tx.note : "Transaction"}" (฿${Money(tx.amountThbSatang).format(symbol: "")}) as a new transaction for today?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: VaultTheme.accent(ctx)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(isThai ? 'ทำซ้ำทันที' : 'Duplicate'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final newTx = await ref.read(transactionsDaoProvider).duplicateTransaction(tx.id);
+      if (newTx != null && mounted) {
+        _loadTransactions();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isThai ? 'ทำซ้ำรายการเรียบร้อยแล้ว' : 'Transaction duplicated successfully'),
+            backgroundColor: VaultTheme.positive(context),
+            action: SnackBarAction(
+              label: isThai ? 'แก้ไข' : 'Edit',
+              textColor: Colors.white,
+              onPressed: () async {
+                final changed = await EditTransactionDialog.show(context, newTx);
+                if (changed == true && mounted) {
+                  _loadTransactions();
+                }
+              },
+            ),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _showQuickReceiveDialog(Transaction tx, bool isThai) async {

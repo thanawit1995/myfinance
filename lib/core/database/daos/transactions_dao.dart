@@ -280,6 +280,7 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
     int? minSatang,
     int? maxSatang,
     bool excludeInvestments = false,
+    String? workPeriod,
   }) {
     final q = select(transactions)..where((t) => t.deletedAt.isNull());
 
@@ -289,6 +290,10 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
 
     if (transactionType != null) {
       q.where((t) => t.transactionType.equals(transactionType));
+    }
+
+    if (workPeriod != null && workPeriod.trim().isNotEmpty) {
+      q.where((t) => t.workPeriod.equals(workPeriod.trim()));
     }
 
     if (startDate != null) {
@@ -323,10 +328,12 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
   /// ดึงข้อมูลรายการธุรกรรมสำหรับหน้ารายงานสรุปภาพรวม (Financial Summary)
   /// โดยจัดกลุ่มรายได้ที่มีรอบการทำงาน (workPeriod) ให้อยู่ในรอบเดือนที่ทำงานจริง
   /// ไม่ว่าวันที่บันทึกรายการ (transactionDate) จะเป็นวันใด
+  /// หรือหาก [isCashBasis] เป็น true จะคำนวณตามวันที่รับ/จ่ายเงินจริง (transactionDate) 100%
   Future<List<Transaction>> getTransactionsForSummary({
     required DateTime startDate,
     required DateTime endDate,
     String? targetWorkPeriod,
+    bool isCashBasis = false,
   }) async {
     // 1. Transactions within date range
     final dateTxs = await (select(transactions)
@@ -335,6 +342,12 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
               t.transactionDate.isBiggerOrEqualValue(startDate) &
               t.transactionDate.isSmallerOrEqualValue(endDate)))
         .get();
+
+    // หากอยู่ในโหมด Cash Basis: ยึดตามวันที่เงินเข้า/ออกจริง (transactionDate) 100%
+    if (isCashBasis) {
+      dateTxs.sort((a, b) => b.transactionDate.compareTo(a.transactionDate));
+      return dateTxs;
+    }
 
     // 2. Income transactions with workPeriod
     final workPeriodTxs = await (select(transactions)
@@ -526,15 +539,20 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
     final now = DateTime.now();
     final updatedAmount = actualAmountSatang ?? existing.amountThbSatang;
 
-    // ติด tag รอบรายได้ถ้ามี workPeriod เพื่อให้ค้นหา/ดูย้อนหลังได้ชัดเจน
+    // รักษารอบเดือนของรายได้ไว้เสมอ:
+    // หากเดิมมี workPeriod ให้ใช้ค่าเดิม หากเดิมยังไม่มี ให้คำนวณจาก transactionDate เดิมของรายการนั้น
+    String? effectiveWorkPeriod = existing.workPeriod;
+    if (effectiveWorkPeriod == null || effectiveWorkPeriod.trim().isEmpty) {
+      effectiveWorkPeriod = '${existing.transactionDate.year}-${existing.transactionDate.month.toString().padLeft(2, '0')}';
+    }
+
+    // ติด tag รอบรายได้เพื่อให้ค้นหา/ดูย้อนหลังได้ชัดเจน
     String? updatedTag = existing.tag;
-    if (existing.workPeriod != null && existing.workPeriod!.trim().isNotEmpty) {
-      final periodTag = formatPeriodToTag(existing.workPeriod!);
-      if (updatedTag == null || updatedTag.trim().isEmpty) {
-        updatedTag = periodTag;
-      } else if (!updatedTag.contains(periodTag) && !updatedTag.contains(existing.workPeriod!)) {
-        updatedTag = '$updatedTag, $periodTag';
-      }
+    final periodTag = formatPeriodToTag(effectiveWorkPeriod);
+    if (updatedTag == null || updatedTag.trim().isEmpty) {
+      updatedTag = periodTag;
+    } else if (!updatedTag.contains(periodTag) && !updatedTag.contains(effectiveWorkPeriod)) {
+      updatedTag = '$updatedTag, $periodTag';
     }
 
     final updated = await (update(transactions)..where((t) => t.id.equals(transactionId))).write(
@@ -544,6 +562,7 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
         transactionDate: Value(receivedDate),
         amountThbSatang: Value(updatedAmount),
         amountOriginalSatang: Value(updatedAmount),
+        workPeriod: Value(effectiveWorkPeriod),
         tag: Value(updatedTag),
         updatedAt: Value(now),
       ),
@@ -561,6 +580,7 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
             'source_account_id': existing.sourceAccountId,
             'transaction_date': existing.transactionDate.toIso8601String(),
             'amount_thb_satang': existing.amountThbSatang,
+            'work_period': existing.workPeriod,
             'tag': existing.tag,
           })),
           afterDataJson: Value(jsonEncode({
@@ -568,6 +588,7 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
             'source_account_id': accountId,
             'transaction_date': receivedDate.toIso8601String(),
             'amount_thb_satang': updatedAmount,
+            'work_period': effectiveWorkPeriod,
             'tag': updatedTag,
           })),
           changeTimestamp: now,
@@ -578,6 +599,71 @@ class TransactionsDao extends DatabaseAccessor<AppDatabase> with _$TransactionsD
       return true;
     }
     return false;
+  }
+
+  /// ทำซ้ำรายการธุรกรรม (Duplicate Transaction)
+  Future<Transaction?> duplicateTransaction(
+    String transactionId, {
+    DateTime? newDate,
+  }) async {
+    final existing = await getTransactionById(transactionId);
+    if (existing == null) return null;
+
+    final now = DateTime.now();
+    final targetDate = newDate ?? now;
+    final newId = _uuid.v4();
+
+    // หากเป็น income ให้ปรับ workPeriod ให้ตรงกับรอบเดือนของ targetDate ถ้ามี
+    String? newWorkPeriod = existing.workPeriod;
+    if (existing.transactionType == 'income') {
+      newWorkPeriod = '${targetDate.year}-${targetDate.month.toString().padLeft(2, '0')}';
+    }
+
+    final newTx = TransactionsCompanion.insert(
+      id: newId,
+      transactionType: existing.transactionType,
+      amountOriginalSatang: existing.amountOriginalSatang,
+      currencyCode: existing.currencyCode,
+      amountThbSatang: existing.amountThbSatang,
+      feeThbSatang: Value(existing.feeThbSatang),
+      fxRate: Value(existing.fxRate),
+      note: Value(existing.note),
+      categoryId: Value(existing.categoryId),
+      sourceAccountId: Value(existing.sourceAccountId),
+      destinationAccountId: Value(existing.destinationAccountId),
+      transactionDate: targetDate,
+      tag: Value(existing.tag),
+      taxCategory: Value(existing.taxCategory),
+      withholdingTaxSatang: Value(existing.withholdingTaxSatang),
+      workPeriod: Value(newWorkPeriod),
+      isCleared: Value(existing.isCleared),
+      expectedAmountSatang: Value(existing.expectedAmountSatang),
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    await insertTransaction(newTx);
+    return getTransactionById(newId);
+  }
+
+  /// ดึงประวัติรายการธุรกรรมตามประเภท ย้อนหลังตามช่วงเวลา (สำหรับหน้า Quick Add History)
+  Future<List<Transaction>> getRecentTransactionsByType({
+    required String transactionType,
+    required DateTime sinceDate,
+    int limit = 100,
+  }) {
+    final q = select(transactions)
+      ..where((t) =>
+          t.deletedAt.isNull() &
+          t.transactionType.equals(transactionType) &
+          t.transactionDate.isBiggerOrEqualValue(sinceDate))
+      ..orderBy([
+        (t) => OrderingTerm.desc(t.transactionDate),
+        (t) => OrderingTerm.desc(t.createdAt),
+      ])
+      ..limit(limit);
+
+    return q.get();
   }
 
   /// ติด tag รอบรายได้ให้กับรายการ accrued income ทั้งหมดที่ยังไม่มี tag ย้อนหลัง

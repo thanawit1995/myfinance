@@ -409,6 +409,51 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
     }
   }
 
+  Future<void> _duplicate() async {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.copy_rounded, color: VaultTheme.accent(ctx), size: 22),
+            const SizedBox(width: 8),
+            Text(isThai ? 'ทำซ้ำรายการนี้?' : 'Duplicate Transaction?'),
+          ],
+        ),
+        content: Text(
+          isThai
+              ? 'ต้องการทำซ้ำรายการ "${widget.transaction.note?.isNotEmpty == true ? widget.transaction.note : (isThai ? "ธุรกรรม" : "Transaction")}" เป็นรายการของวันนี้หรือไม่?'
+              : 'Do you want to duplicate this transaction for today?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(isThai ? 'ยกเลิก' : 'Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: VaultTheme.accent(ctx)),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(isThai ? 'ทำซ้ำทันที' : 'Duplicate'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final newTx = await ref.read(transactionsDaoProvider).duplicateTransaction(widget.transaction.id);
+      if (newTx != null && mounted) {
+        Navigator.of(context).pop(true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isThai ? 'ทำซ้ำรายการเรียบร้อยแล้ว' : 'Transaction duplicated successfully'),
+            backgroundColor: VaultTheme.positive(context),
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _updateWidget() async {
     try {
       final now = DateTime.now();
@@ -645,11 +690,22 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
               _buildTypeBadge(context),
             ],
           ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.red),
-            tooltip: 'ลบรายการนี้',
-            visualDensity: VisualDensity.compact,
-            onPressed: _delete,
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.copy_rounded, color: Colors.blue),
+                tooltip: 'ทำซ้ำรายการนี้ (Duplicate)',
+                visualDensity: VisualDensity.compact,
+                onPressed: _duplicate,
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                tooltip: 'ลบรายการนี้',
+                visualDensity: VisualDensity.compact,
+                onPressed: _delete,
+              ),
+            ],
           ),
         ],
       ),

@@ -259,39 +259,204 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
   }
 
 
-  Future<void> _duplicateLastTransaction() async {
-    final last = await ref.read(transactionsDaoProvider).getLastTransaction();
-    if (last == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ยังไม่มีรายการล่าสุดในระบบ')),
-        );
-      }
-      return;
+  Future<void> _showHistorySheet() async {
+    final isThai = Localizations.localeOf(context).languageCode == 'th';
+    final sinceDate = DateTime.now().subtract(const Duration(days: 30));
+    final historyList = await ref.read(transactionsDaoProvider).getRecentTransactionsByType(
+      transactionType: _transactionType,
+      sinceDate: sinceDate,
+      limit: 50,
+    );
+    final allCats = await ref.read(categoriesDaoProvider).getAllCategories();
+    final catMap = {for (final c in allCats) c.id: c};
+
+    if (!mounted) return;
+
+    String typeTitle;
+    if (_transactionType == 'expense') {
+      typeTitle = isThai ? 'ประวัติรายจ่าย (30 วัน)' : 'Expense History (30 Days)';
+    } else if (_transactionType == 'income') {
+      typeTitle = isThai ? 'ประวัติรายรับ (30 วัน)' : 'Income History (30 Days)';
+    } else {
+      typeTitle = isThai ? 'ประวัติโอนเงิน (30 วัน)' : 'Transfer History (30 Days)';
     }
 
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        String searchQuery = '';
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            final filtered = historyList.where((tx) {
+              if (searchQuery.trim().isEmpty) return true;
+              final q = searchQuery.toLowerCase();
+              final note = (tx.note ?? '').toLowerCase();
+              final cat = tx.categoryId != null ? catMap[tx.categoryId] : null;
+              final catName = '${cat?.nameTh ?? ''} ${cat?.nameEn ?? ''}'.toLowerCase();
+              return note.contains(q) || catName.contains(q);
+            }).toList();
+
+            return DraggableScrollableSheet(
+              initialChildSize: 0.65,
+              minChildSize: 0.4,
+              maxChildSize: 0.9,
+              expand: false,
+              builder: (ctx, scrollController) {
+                return SafeArea(
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 4,
+                        margin: const EdgeInsets.only(top: 10, bottom: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        child: Row(
+                          children: [
+                            Icon(Icons.history_rounded, color: VaultTheme.accent(ctx), size: 22),
+                            const SizedBox(width: 8),
+                            Text(
+                              typeTitle,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                            const Spacer(),
+                            IconButton(
+                              icon: const Icon(Icons.close, size: 20),
+                              onPressed: () => Navigator.pop(ctx),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        child: TextField(
+                          decoration: InputDecoration(
+                            hintText: isThai ? 'ค้นหาชื่อรายการ/หมวดหมู่...' : 'Search note or category...',
+                            prefixIcon: const Icon(Icons.search, size: 20),
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onChanged: (val) => setSheetState(() => searchQuery = val),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Expanded(
+                        child: filtered.isEmpty
+                            ? Center(
+                                child: Text(
+                                  isThai ? 'ไม่พบประวัติรายการในช่วง 30 วันที่ผ่านมา' : 'No history found in the last 30 days',
+                                  style: TextStyle(color: Colors.grey.shade600),
+                                ),
+                              )
+                            : ListView.separated(
+                                controller: scrollController,
+                                itemCount: filtered.length,
+                                separatorBuilder: (context, index) => const Divider(height: 1),
+                                itemBuilder: (ctx, i) {
+                                  final tx = filtered[i];
+                                  final cat = tx.categoryId != null ? catMap[tx.categoryId] : null;
+                                  final catName = cat != null
+                                      ? (isThai ? cat.nameTh : cat.nameEn)
+                                      : (isThai ? 'ไม่ระบุหมวดหมู่' : 'Uncategorized');
+                                  final displayName = tx.note?.isNotEmpty == true ? tx.note! : catName;
+                                  final dateStr = DateFormat('d/M/yyyy').format(tx.transactionDate);
+                                  final amountStr = '฿${Money(tx.amountOriginalSatang).format(symbol: "")}';
+
+                                  return ListTile(
+                                    leading: CircleAvatar(
+                                      radius: 18,
+                                      backgroundColor: _transactionType == 'expense'
+                                          ? Colors.red.withValues(alpha: 0.12)
+                                          : _transactionType == 'income'
+                                              ? Colors.green.withValues(alpha: 0.12)
+                                              : Colors.blue.withValues(alpha: 0.12),
+                                      child: Icon(
+                                        _transactionType == 'expense'
+                                            ? Icons.arrow_upward_rounded
+                                            : _transactionType == 'income'
+                                                ? Icons.arrow_downward_rounded
+                                                : Icons.swap_horiz,
+                                        size: 18,
+                                        color: _transactionType == 'expense'
+                                            ? Colors.red
+                                            : _transactionType == 'income'
+                                                ? Colors.green
+                                                : Colors.blue,
+                                      ),
+                                    ),
+                                    title: Text(
+                                      displayName,
+                                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    subtitle: Text(
+                                      '$catName • $dateStr',
+                                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                    ),
+                                    trailing: Text(
+                                      amountStr,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                        color: _transactionType == 'expense'
+                                            ? Colors.red
+                                            : _transactionType == 'income'
+                                                ? Colors.green
+                                                : Colors.blue,
+                                      ),
+                                    ),
+                                    onTap: () {
+                                      Navigator.pop(ctx);
+                                      _applyTransactionFromHistory(tx);
+                                    },
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _applyTransactionFromHistory(Transaction tx) {
     setState(() {
-      _transactionType = last.transactionType;
-      _amountString = (last.amountOriginalSatang / 100.0).toStringAsFixed(2);
+      _amountString = (tx.amountOriginalSatang / 100.0).toStringAsFixed(2);
       if (_amountString.endsWith('.00')) {
         _amountString = _amountString.substring(0, _amountString.length - 3);
       }
       _amountController.text = _amountString;
-      _selectedAccountId = last.sourceAccountId;
-      _selectedDestinationAccountId = last.destinationAccountId;
-      _selectedCategoryId = last.categoryId;
-      _note = last.note ?? '';
+      _selectedAccountId = tx.sourceAccountId;
+      _selectedDestinationAccountId = tx.destinationAccountId;
+      _selectedCategoryId = tx.categoryId;
+      if (tx.taxCategory != null) {
+        _selectedTaxCategory = tx.taxCategory!;
+      }
+      _note = tx.note ?? '';
       _noteController.text = _note;
-      _tag = last.tag;
-      _feeThbSatang = last.feeThbSatang;
+      _tag = tx.tag;
+      _feeThbSatang = tx.feeThbSatang;
       _transactionDate = DateTime.now();
     });
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('คัดลอกข้อมูลจากรายการล่าสุดเรียบร้อยแล้ว')),
-      );
-    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('ดึงข้อมูลจากประวัติเรียบร้อยแล้ว')),
+    );
   }
 
   Future<void> _submitTransaction() async {
@@ -640,9 +805,9 @@ class _QuickAddScreenState extends ConsumerState<QuickAddScreen> {
         title: Text(l10n?.quickAddKeypad ?? (isThai ? 'บันทึกด่วน' : 'Quick Add')),
         actions: [
           TextButton.icon(
-            icon: const Icon(Icons.history, size: 18),
-            label: Text(l10n?.duplicateLast ?? (isThai ? 'ทำซ้ำล่าสุด' : 'Repeat Last')),
-            onPressed: _duplicateLastTransaction,
+            icon: const Icon(Icons.history_rounded, size: 18),
+            label: Text(isThai ? 'ประวัติ' : 'History'),
+            onPressed: _showHistorySheet,
           ),
         ],
       ),

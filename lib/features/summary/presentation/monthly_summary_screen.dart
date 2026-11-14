@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/database/daos/transactions_dao.dart';
 import '../../../../core/database/database_provider.dart';
 import '../../../../core/money/money.dart';
 import '../../../../core/theme/vault_theme.dart';
@@ -95,6 +96,7 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
   late DateTime _cursorDate;
   DateTimeRange? _customRange;
   bool _showIncomeCategories = false;
+  bool _isCashBasis = false; // เกณฑ์รอบงาน (false) vs เกณฑ์เงินเข้าจริง (true)
   static const int _basePageIndex = 1000;
   late final PageController _pageController;
   late final DateTime _initialAnchorDate;
@@ -262,6 +264,7 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
       startDate: start,
       endDate: end,
       targetWorkPeriod: targetWorkPeriod,
+      isCashBasis: _isCashBasis,
     );
     final allCats = await ref.read(categoriesDaoProvider).getAllCategories();
     final catMap = {for (final c in allCats) c.id: c};
@@ -504,6 +507,11 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
 
                   // 2. Navigation Header with Date Title
                   _buildNavigationHeader(context, isLumi, isThai),
+                  if (_granularity == ReportGranularity.monthly) ...[
+                    const SizedBox(height: 10),
+                    // 2.5 Accounting Basis Selector (Work Period vs Cash Inflow)
+                    _buildAccountingBasisSelector(context, isThai),
+                  ],
                 ],
               ),
             ),
@@ -727,6 +735,97 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
     );
   }
 
+  Widget _buildAccountingBasisSelector(BuildContext context, bool isThai) {
+    final surface = VaultTheme.surface(context);
+    final border = VaultTheme.border(context);
+    final primaryText = VaultTheme.primaryText(context);
+    final accent = VaultTheme.accent(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: border, width: 0.75),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              onTap: () => setState(() => _isCashBasis = false),
+              borderRadius: BorderRadius.circular(9),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                decoration: BoxDecoration(
+                  color: !_isCashBasis ? accent.withValues(alpha: 0.15) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(9),
+                  border: !_isCashBasis ? Border.all(color: accent, width: 1) : null,
+                ),
+                alignment: Alignment.center,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.work_history_outlined,
+                      size: 14,
+                      color: !_isCashBasis ? accent : primaryText.withValues(alpha: 0.6),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      isThai ? 'ตามรอบงาน (งวดผลงาน)' : 'Work Period',
+                      style: TextStyle(
+                        fontFamily: VaultTheme.fontFamily,
+                        fontSize: 11.5,
+                        fontWeight: !_isCashBasis ? FontWeight.bold : FontWeight.normal,
+                        color: !_isCashBasis ? accent : primaryText.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: InkWell(
+              onTap: () => setState(() => _isCashBasis = true),
+              borderRadius: BorderRadius.circular(9),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                decoration: BoxDecoration(
+                  color: _isCashBasis ? accent.withValues(alpha: 0.15) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(9),
+                  border: _isCashBasis ? Border.all(color: accent, width: 1) : null,
+                ),
+                alignment: Alignment.center,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.account_balance_wallet_outlined,
+                      size: 14,
+                      color: _isCashBasis ? accent : primaryText.withValues(alpha: 0.6),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      isThai ? 'เงินเข้าจริง (Cash Basis)' : 'Cash Inflow',
+                      style: TextStyle(
+                        fontFamily: VaultTheme.fontFamily,
+                        fontSize: 11.5,
+                        fontWeight: _isCashBasis ? FontWeight.bold : FontWeight.normal,
+                        color: _isCashBasis ? accent : primaryText.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildUnifiedSummaryCard(
     BuildContext context,
     _PeriodReportData data,
@@ -846,12 +945,24 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
                       : null,
                   context: context,
                   onTap: () {
+                    final targetWorkPeriod = _granularity == ReportGranularity.monthly
+                        ? '${data.startDate.year}-${data.startDate.month.toString().padLeft(2, '0')}'
+                        : null;
                     Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => TransactionListScreen(
                           initialTransactionType: 'income',
-                          initialDateRange: DateTimeRange(start: data.startDate, end: data.endDate),
-                          title: isThai ? 'รายรับ (${_formatPeriodTitle(isThai)})' : 'Income (${_formatPeriodTitle(isThai)})',
+                          initialDateRange: _isCashBasis
+                              ? DateTimeRange(start: data.startDate, end: data.endDate)
+                              : null,
+                          initialWorkPeriod: !_isCashBasis ? targetWorkPeriod : null,
+                          title: !_isCashBasis && targetWorkPeriod != null
+                              ? (isThai
+                                  ? 'รายรับ (${TransactionsDao.formatPeriodToTag(targetWorkPeriod)})'
+                                  : 'Income (${TransactionsDao.formatPeriodToTag(targetWorkPeriod)})')
+                              : (isThai
+                                  ? 'รายรับ (${_formatPeriodTitle(isThai)})'
+                                  : 'Income (${_formatPeriodTitle(isThai)})'),
                         ),
                       ),
                     );
@@ -1608,13 +1719,23 @@ class _MonthlySummaryScreenState extends ConsumerState<MonthlySummaryScreen> {
                         child: InkWell(
                           borderRadius: BorderRadius.circular(10),
                           onTap: () {
+                            final targetWorkPeriod = _granularity == ReportGranularity.monthly
+                                ? '${data.startDate.year}-${data.startDate.month.toString().padLeft(2, '0')}'
+                                : null;
                             Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (_) => TransactionListScreen(
                                   initialTransactionType: _showIncomeCategories ? 'income' : 'expense',
                                   initialCategoryId: item.categoryId,
-                                  initialDateRange: DateTimeRange(start: data.startDate, end: data.endDate),
-                                  title: '${item.name} (${_formatPeriodTitle(isThai)})',
+                                  initialDateRange: (_isCashBasis || !_showIncomeCategories)
+                                      ? DateTimeRange(start: data.startDate, end: data.endDate)
+                                      : null,
+                                  initialWorkPeriod: (!_isCashBasis && _showIncomeCategories)
+                                      ? targetWorkPeriod
+                                      : null,
+                                  title: (!_isCashBasis && _showIncomeCategories && targetWorkPeriod != null)
+                                      ? '${item.name} (${TransactionsDao.formatPeriodToTag(targetWorkPeriod)})'
+                                      : '${item.name} (${_formatPeriodTitle(isThai)})',
                                 ),
                               ),
                             );

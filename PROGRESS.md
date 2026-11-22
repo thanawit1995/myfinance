@@ -3,19 +3,23 @@
 อัปเดตล่าสุด: 22 พฤศจิกายน 2026 (แก้ไขปัญหาขอบล่างบน iOS WebApp / PWA Chin Gap & Dynamic Safe Area Insets)
 
 - [x] **iOS WebApp Bottom Chin Gap & Dynamic Safe Area Insets Fix (22 พ.ย. 2026)**:
-  - **1. แก้ไขปัญหา Flutter Web Engine ลบ Tag `viewport-fit=cover` ทิ้ง (`web/index.html`)**:
-    - **สาเหตุรากเหง้า (Root Cause)**: แม้จะประกาศ `viewport-fit=cover` ใน `index.html` แต่ Flutter Web engine (`FullPageEmbeddingStrategy._applyViewportMeta`) จะสั่งลบ `<meta name="viewport">` เดิมทิ้งแล้วแทนที่ด้วยแท็กใหม่ที่ไม่มี `viewport-fit=cover` ส่งผลให้ iOS WebKit บีบความสูง `documentElement.clientHeight` สั้นลง ทำให้หน้าจอ Flutter ถูกตัดจบก่อนถึงขอบล่าง 70-80px ปรากฏเป็นแถบสีครีม (`#FAF8F5`) โผล่ขึ้นมาใต้ Navigation Bar
-    - **การแก้ไข**: ติดตั้ง `MutationObserver` ใน JavaScript เพื่อดักจับและบังคับให้ `<meta name="viewport">` มี `viewport-fit=cover` เสมอแม้ Flutter Web engine จะพยายามเขียนทับ
-  - **2. ปรับปรุง CSS Layout รองรับ Dynamic Viewport (`100dvh`) และ iOS WebKit Standalone PWA (`web/index.html`)**:
-    - ปรับ CSS `html` และ `body` ให้ใช้ `height: 100dvh; min-height: -webkit-fill-available;`
-    - กำหนด `@supports (-webkit-touch-callout: none)` ขยาย `body` ให้ครอบคลุม Safe Area ด้านล่างเต็มความสูงจอ (`height: calc(100% + env(safe-area-inset-bottom, 0px))`)
-    - ปลด `width: 100%; height: 100%;` ออกจาก inline style ของแท็ก `<body>` เพื่อไม่ให้บล็อกการขยายตัวตาม CSS
+  - **1. ปลดล็อกปัญหา WebKit Status Bar Bug ด้วยการเปลี่ยนจาก `black-translucent` เป็น `default` (`web/index.html`)**:
+    - **สาเหตุรากเหง้า (Root Cause)**: ใน WebKit (iOS Safari/PWA) เมื่อเปิดใช้ `<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">` คู่กับ `viewport-fit=cover` จะเกิดบั๊กที่ WebKit ชิฟต์ Container ทั้งหมดขึ้นด้านบนเท่ากับความสูงของ Status Bar (~59px) ส่งผลให้เกิดช่องว่าง Chin Gap ขนาด ~59-74px ด้านล่างสุดเสมอ
+    - **การแก้ไข**: เปลี่ยนเป็น `content="default"` เพื่อให้ iOS ใช้สี `theme-color` ประสานกับ Status Bar อย่างเป็นธรรมชาติโดยไม่ทำให้หน้าจอด้านล่างหดสั้นลง
+  - **2. แก้ไขปัญหา Flutter Web Engine ลบ Tag `viewport-fit=cover` ทิ้ง และ Patch `document.documentElement.clientHeight` (`web/index.html`)**:
+    - **สาเหตุรากเหง้า (Root Cause)**: ตัว Flutter Web engine (`FullPageEmbeddingStrategy._applyViewportMeta`) จะสั่งลบ `<meta name="viewport">` เดิมทิ้งแล้วแทนที่ด้วยแท็กใหม่ที่ไม่มี `viewport-fit=cover` และในคลาส `FullPageDimensionsProvider` บน iOS จะวัดความสูงหน้าจอจาก `document.documentElement.clientHeight` ซึ่ง WebKit จะหักค่า Safe Area ด้านล่างออกเสมอ ทำให้ Flutter วาดภาพสั้นกว่าจอจริง
+    - **การแก้ไข**:
+      - ติดตั้ง `MutationObserver` ใน JavaScript เพื่อดักจับและบังคับให้ `<meta name="viewport">` มี `viewport-fit=cover` เสมอแม้ Flutter Web engine จะพยายามเขียนทับ
+      - Patch Getter `document.documentElement.clientHeight` ใน JavaScript ให้รวมค่า `getSafeAreaBottom()` เข้าไปด้วย ทำให้ Flutter Web Engine คำนวณความสูงหน้าจอบน iOS ได้เต็ม 100% ครอบคลุมถึงขอบล่าง
+  - **3. ปรับปรุง CSS Layout และระบบ PWA Service Worker Auto-Update (`web/index.html`)**:
+    - ปรับ CSS `html` และ `body` ให้ใช้ `height: 100dvh; min-height: -webkit-fill-available;` และกำหนด `@supports (-webkit-touch-callout: none)` ขยายทั้ง `html` และ `body` ด้วย `height: calc(100% + env(safe-area-inset-bottom, 0px)) !important`
+    - ติดตั้งระบบ Auto-Update ให้กับ Service Worker เพื่อตรวจจับการปล่อยเวอร์ชันใหม่บน GitHub Pages และบังคับ Reload เพื่อให้ผู้ใช้ได้รับไฟล์ล่าสุดทันทีโดยไม่ต้องล้างแคชด้วยตนเอง
     - ติดตั้ง `<div id="safe-area-detector">` เพื่อใช้วัดค่า `env(safe-area-inset-bottom)` และ `env(safe-area-inset-top)` ในหน่วยพิกเซลจริง
-  - **3. สร้างระบบอ่าน Safe Area ฝั่ง Web และป้อนเข้า `MediaQuery` อัตโนมัติ (`lib/core/utils/web_safe_area.dart`, `lib/main.dart`, `lib/core/widgets/main_shell.dart`)**:
-    - สร้าง Utility แบบ Conditional Export (`web_safe_area_stub.dart` สำหรับ Android APK / Windows และ `web_safe_area_web.dart` สำหรับ Web)
-    - ใน `MaterialApp.builder`: ตรวจสอบหากรันบน Web (`kIsWeb`) และ `mediaQuery.padding.bottom == 0` ให้ดึงค่า Safe Area จาก detector มาฉีดเข้า `MediaQuery` ของแอปทั้งระบบ ทำให้ `MainShell`, ทุก Dialog, ทุก Form, และ Bottom Navigation Bar ได้รับค่า Safe Area ด้านล่างของ iOS อย่างถูกต้อง
+  - **4. สร้างระบบอ่าน Safe Area ฝั่ง Web พร้อม Fallback อัตโนมัติ (`lib/core/utils/web_safe_area_web.dart`, `lib/main.dart`, `lib/core/widgets/main_shell.dart`)**:
+    - ใน `web_safe_area_web.dart`: เพิ่มระบบตรวจจับอุปกรณ์ iOS หาก DOM detector ยังอ่านค่าไม่ได้ในเสี้ยววินาทีแรก จะมี Fallback ค่ามาตรฐาน 34.0 pt สำหรับ iPhone จอยาว เพื่อไม่ให้เกิดภาวะค่า Safe Area เป็น 0
+    - ใน `MaterialApp.builder`: ดึงค่า Safe Area จาก detector/fallback มาฉีดเข้า `MediaQuery` (padding และ viewPadding)
     - ใน `MainShell`: ปรับการคำนวณ `safeBottom` ให้มี Fallback ดึงค่า Web Safe Area โดยตรง ทำให้แถบ Bottom Bar แผ่พื้นหลังสีขาวเต็มจรดขอบล่าง และไอคอน/ข้อความลอยอยู่เหนือ Home Indicator สวยงาม ไม่โดนขอบล่างบัง
-  - **4. การทดสอบและการรับรองคุณภาพ**:
+  - **5. การทดสอบและการรับรองคุณภาพ**:
     - เพิ่ม Unit Test ใน `test/core/web_safe_area_test.dart`
     - `flutter analyze`: **0 errors, 0 warnings** (No issues found)
     - `flutter test`: ผ่านทั้งหมด **253/253 tests passed** (100%)

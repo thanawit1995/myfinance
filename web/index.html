@@ -11,7 +11,7 @@
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="OURS">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
@@ -59,9 +59,10 @@
     }
     /* Fix for iOS Safari & Standalone PWA Bottom Chin Gap */
     @supports (-webkit-touch-callout: none) {
-      body {
-        height: calc(100% + env(safe-area-inset-bottom, 0px));
-        min-height: calc(100dvh + env(safe-area-inset-bottom, 0px));
+      html, body {
+        height: 100% !important;
+        height: calc(100% + env(safe-area-inset-bottom, 0px)) !important;
+        min-height: calc(100dvh + env(safe-area-inset-bottom, 0px)) !important;
       }
     }
     flutter-view {
@@ -113,6 +114,50 @@
       }
       return 0;
     };
+
+    // Guarantee that Flutter Web engine's query to document.documentElement.clientHeight
+    // does not shortchange the iOS safe area bottom inset
+    try {
+      var origClientHeight = Object.getOwnPropertyDescriptor(Element.prototype, 'clientHeight').get;
+      Object.defineProperty(document.documentElement, 'clientHeight', {
+        get: function() {
+          var h = origClientHeight.call(this);
+          var safeBottom = window.getSafeAreaBottom ? window.getSafeAreaBottom() : 0;
+          return h + safeBottom;
+        },
+        configurable: true
+      });
+    } catch (e) {
+      console.warn("Could not patch clientHeight:", e);
+    }
+
+    // PWA Service Worker Auto-Update: ensure new versions deploy without manual cache clear
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('controllerchange', function() {
+        console.log('[PWA] New service worker activated. Reloading page...');
+        window.location.reload();
+      });
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.getRegistration().then(function(reg) {
+          if (reg) {
+            reg.update();
+            if (reg.waiting) {
+              reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+            }
+            reg.addEventListener('updatefound', function() {
+              var newWorker = reg.installing;
+              if (newWorker) {
+                newWorker.addEventListener('statechange', function() {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    newWorker.postMessage({ type: 'SKIP_WAITING' });
+                  }
+                });
+              }
+            });
+          }
+        });
+      });
+    }
   </script>
   <script>
     function resetViewportScroll() {

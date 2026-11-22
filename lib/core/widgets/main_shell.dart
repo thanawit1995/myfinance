@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +7,7 @@ import '../security/auth_provider.dart';
 import '../sync/sync_service.dart';
 import '../theme/app_theme_style.dart';
 import '../theme/vault_theme.dart';
+import '../utils/web_safe_area.dart';
 import 'pin_lock_dialog.dart';
 import '../../features/auth/sync_status_widget.dart';
 import '../../features/home/presentation/vault_home_screen.dart';
@@ -176,8 +178,9 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
 
     final isLumi = VaultTheme.isLumi(context);
     final mediaBottom = MediaQuery.paddingOf(context).bottom;
+    final webBottom = kIsWeb ? getWebSafeAreaBottom() : 0.0;
     // Sit snug against the bottom edge while preserving physical device bottom gesture insets
-    final safeBottom = mediaBottom > 0 ? mediaBottom : 0.0;
+    final safeBottom = mediaBottom > 0 ? mediaBottom : (webBottom > 0 ? webBottom : 0.0);
 
     final screens = [
       VaultHomeScreen(

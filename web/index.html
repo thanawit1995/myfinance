@@ -18,7 +18,7 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="screen-orientation" content="portrait">
   <meta name="x5-orientation" content="portrait">
 
@@ -26,7 +26,17 @@
   <link rel="manifest" href="manifest.json">
   <meta name="google-signin-client_id" content="25761984668-bisj0948pdlu6k6s1hvlpvbmqi9bb2r3.apps.googleusercontent.com">
   <style>
-    html, body {
+    html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      height: -webkit-fill-available;
+      overflow: hidden;
+      background-color: #FAF8F5;
+    }
+    body {
       position: fixed;
       top: 0;
       left: 0;
@@ -36,6 +46,8 @@
       padding: 0;
       width: 100%;
       height: 100%;
+      height: 100dvh;
+      min-height: -webkit-fill-available;
       overflow: hidden;
       overscroll-behavior: none;
       -webkit-overflow-scrolling: auto;
@@ -43,8 +55,65 @@
       -webkit-tap-highlight-color: transparent;
       user-select: none;
       -webkit-user-select: none;
+      background-color: #FAF8F5;
+    }
+    /* Fix for iOS Safari & Standalone PWA Bottom Chin Gap */
+    @supports (-webkit-touch-callout: none) {
+      body {
+        height: calc(100% + env(safe-area-inset-bottom, 0px));
+        min-height: calc(100dvh + env(safe-area-inset-bottom, 0px));
+      }
+    }
+    flutter-view {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100%;
+      height: 100%;
     }
   </style>
+  <script>
+    // Enforce viewport-fit=cover even when Flutter Web engine attempts to replace the meta tag
+    (function() {
+      function enforceViewportFit() {
+        var metas = document.querySelectorAll('meta[name="viewport"]');
+        for (var i = 0; i < metas.length; i++) {
+          var meta = metas[i];
+          var content = meta.getAttribute('content') || '';
+          if (!content.includes('viewport-fit=cover')) {
+            meta.setAttribute('content', content + (content ? ', ' : '') + 'viewport-fit=cover');
+          }
+        }
+      }
+      enforceViewportFit();
+      if (window.MutationObserver) {
+        var observer = new MutationObserver(function() {
+          enforceViewportFit();
+        });
+        observer.observe(document.head, { childList: true, subtree: true, attributes: true, attributeFilter: ['content'] });
+      }
+    })();
+
+    // Helper functions to read true CSS safe-area insets in physical pixels
+    window.getSafeAreaBottom = function() {
+      var el = document.getElementById('safe-area-detector');
+      if (el) {
+        var style = window.getComputedStyle(el);
+        return parseFloat(style.paddingBottom) || 0;
+      }
+      return 0;
+    };
+    window.getSafeAreaTop = function() {
+      var el = document.getElementById('safe-area-detector');
+      if (el) {
+        var style = window.getComputedStyle(el);
+        return parseFloat(style.paddingTop) || 0;
+      }
+      return 0;
+    };
+  </script>
   <script>
     function resetViewportScroll() {
       if (window.scrollY !== 0 || window.scrollX !== 0) {
@@ -192,7 +261,8 @@
     window.MyFinanceWebAuthn = MyFinanceWebAuthn;
   </script>
 </head>
-<body style="margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #FAF8F5;">
+<body style="margin: 0; padding: 0; overflow: hidden; background-color: #FAF8F5;">
+  <div id="safe-area-detector" style="position: fixed; left: 0; bottom: 0; width: 0; height: 0; padding-bottom: env(safe-area-inset-bottom, 0px); padding-top: env(safe-area-inset-top, 0px); visibility: hidden; pointer-events: none;"></div>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

@@ -13,6 +13,7 @@ import 'core/theme/app_theme_style.dart';
 import 'core/theme/lumi_theme.dart';
 import 'core/theme/vault_theme.dart';
 import 'core/services/web_theme_helper/web_theme_helper.dart';
+import 'core/utils/web_safe_area.dart';
 import 'core/widgets/main_shell.dart';
 import 'features/auth/login_screen.dart';
 import 'features/backup/presentation/backup_restore_screen.dart';
@@ -197,7 +198,40 @@ class _MyFinanceAppState extends State<MyFinanceApp> {
           theme.scaffoldBackgroundColor,
           isDark: theme.brightness == Brightness.dark,
         );
-        return child ?? const SizedBox.shrink();
+
+        Widget currentChild = child ?? const SizedBox.shrink();
+
+        if (kIsWeb) {
+          final mediaQuery = MediaQuery.of(context);
+          final webSafeBottom = getWebSafeAreaBottom();
+          final webSafeTop = getWebSafeAreaTop();
+
+          final double targetBottom = mediaQuery.padding.bottom > 0
+              ? mediaQuery.padding.bottom
+              : (webSafeBottom > 0 ? webSafeBottom : 0.0);
+
+          final double targetTop = mediaQuery.padding.top > 0
+              ? mediaQuery.padding.top
+              : (webSafeTop > 0 ? webSafeTop : 0.0);
+
+          if (targetBottom != mediaQuery.padding.bottom || targetTop != mediaQuery.padding.top) {
+            currentChild = MediaQuery(
+              data: mediaQuery.copyWith(
+                padding: mediaQuery.padding.copyWith(
+                  bottom: targetBottom,
+                  top: targetTop,
+                ),
+                viewPadding: mediaQuery.viewPadding.copyWith(
+                  bottom: targetBottom,
+                  top: targetTop,
+                ),
+              ),
+              child: currentChild,
+            );
+          }
+        }
+
+        return currentChild;
       },
     );
   }

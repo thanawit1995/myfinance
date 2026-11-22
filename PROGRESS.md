@@ -1,6 +1,24 @@
 # บันทึกความคืบหน้าโครงการ MyFinance (PROGRESS.md)
 
-อัปเดตล่าสุด: 14 พฤศจิกายน 2026 (ปรับปรุงหน้าสรุปภาพรวมรองรับโหมดเงินเข้าจริงและรอบงาน, แก้ไขเงินตกเบิกข้ามเดือน, ระบบรักษารอบเดือนอัตโนมัติ, เพิ่มฟีเจอร์ Duplicate Transaction, และหน้า Quick Add History 1 เดือน)
+อัปเดตล่าสุด: 22 พฤศจิกายน 2026 (แก้ไขปัญหาขอบล่างบน iOS WebApp / PWA Chin Gap & Dynamic Safe Area Insets)
+
+- [x] **iOS WebApp Bottom Chin Gap & Dynamic Safe Area Insets Fix (22 พ.ย. 2026)**:
+  - **1. แก้ไขปัญหา Flutter Web Engine ลบ Tag `viewport-fit=cover` ทิ้ง (`web/index.html`)**:
+    - **สาเหตุรากเหง้า (Root Cause)**: แม้จะประกาศ `viewport-fit=cover` ใน `index.html` แต่ Flutter Web engine (`FullPageEmbeddingStrategy._applyViewportMeta`) จะสั่งลบ `<meta name="viewport">` เดิมทิ้งแล้วแทนที่ด้วยแท็กใหม่ที่ไม่มี `viewport-fit=cover` ส่งผลให้ iOS WebKit บีบความสูง `documentElement.clientHeight` สั้นลง ทำให้หน้าจอ Flutter ถูกตัดจบก่อนถึงขอบล่าง 70-80px ปรากฏเป็นแถบสีครีม (`#FAF8F5`) โผล่ขึ้นมาใต้ Navigation Bar
+    - **การแก้ไข**: ติดตั้ง `MutationObserver` ใน JavaScript เพื่อดักจับและบังคับให้ `<meta name="viewport">` มี `viewport-fit=cover` เสมอแม้ Flutter Web engine จะพยายามเขียนทับ
+  - **2. ปรับปรุง CSS Layout รองรับ Dynamic Viewport (`100dvh`) และ iOS WebKit Standalone PWA (`web/index.html`)**:
+    - ปรับ CSS `html` และ `body` ให้ใช้ `height: 100dvh; min-height: -webkit-fill-available;`
+    - กำหนด `@supports (-webkit-touch-callout: none)` ขยาย `body` ให้ครอบคลุม Safe Area ด้านล่างเต็มความสูงจอ (`height: calc(100% + env(safe-area-inset-bottom, 0px))`)
+    - ปลด `width: 100%; height: 100%;` ออกจาก inline style ของแท็ก `<body>` เพื่อไม่ให้บล็อกการขยายตัวตาม CSS
+    - ติดตั้ง `<div id="safe-area-detector">` เพื่อใช้วัดค่า `env(safe-area-inset-bottom)` และ `env(safe-area-inset-top)` ในหน่วยพิกเซลจริง
+  - **3. สร้างระบบอ่าน Safe Area ฝั่ง Web และป้อนเข้า `MediaQuery` อัตโนมัติ (`lib/core/utils/web_safe_area.dart`, `lib/main.dart`, `lib/core/widgets/main_shell.dart`)**:
+    - สร้าง Utility แบบ Conditional Export (`web_safe_area_stub.dart` สำหรับ Android APK / Windows และ `web_safe_area_web.dart` สำหรับ Web)
+    - ใน `MaterialApp.builder`: ตรวจสอบหากรันบน Web (`kIsWeb`) และ `mediaQuery.padding.bottom == 0` ให้ดึงค่า Safe Area จาก detector มาฉีดเข้า `MediaQuery` ของแอปทั้งระบบ ทำให้ `MainShell`, ทุก Dialog, ทุก Form, และ Bottom Navigation Bar ได้รับค่า Safe Area ด้านล่างของ iOS อย่างถูกต้อง
+    - ใน `MainShell`: ปรับการคำนวณ `safeBottom` ให้มี Fallback ดึงค่า Web Safe Area โดยตรง ทำให้แถบ Bottom Bar แผ่พื้นหลังสีขาวเต็มจรดขอบล่าง และไอคอน/ข้อความลอยอยู่เหนือ Home Indicator สวยงาม ไม่โดนขอบล่างบัง
+  - **4. การทดสอบและการรับรองคุณภาพ**:
+    - เพิ่ม Unit Test ใน `test/core/web_safe_area_test.dart`
+    - `flutter analyze`: **0 errors, 0 warnings** (No issues found)
+    - `flutter test`: ผ่านทั้งหมด **253/253 tests passed** (100%)
 
 - [x] **Financial Summary Dual-Basis (Cash vs Work Period), Arrears Attribution, Duplicate Transaction & Quick Add History (14 พ.ย. 2026)**:
   - **1. ปรับปรุงหน้าสรุปภาพรวมให้รองรับ 2 มุมมอง (Dual-Basis Accounting: Cash Basis & Work Period) (`monthly_summary_screen.dart`, `transactions_dao.dart`)**:

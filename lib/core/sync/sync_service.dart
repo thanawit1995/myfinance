@@ -260,18 +260,32 @@ class SyncService extends StateNotifier<SyncState> {
 
       // Repair erroneous recurring auto-posts and push soft-deletes to Supabase
       final repairedTxIds = await _db.recurringTransactionsDao.repairErroneousAutoPostsAndAlignDates();
-      if (repairedTxIds.isNotEmpty && _auth.isLoggedIn) {
-        const chunkSize = 150;
-        for (var i = 0; i < repairedTxIds.length; i += chunkSize) {
-          final chunk = repairedTxIds.sublist(i, math.min(i + chunkSize, repairedTxIds.length));
-          try {
-            await _supabase.from('transactions').update({
-              'deleted_at': DateTime.now().toUtc().toIso8601String(),
-              'updated_at': DateTime.now().toUtc().toIso8601String(),
-            }).inFilter('id', chunk);
-          } catch (_) {}
+      if (_auth.isLoggedIn) {
+        if (repairedTxIds.isNotEmpty) {
+          const chunkSize = 150;
+          for (var i = 0; i < repairedTxIds.length; i += chunkSize) {
+            final chunk = repairedTxIds.sublist(i, math.min(i + chunkSize, repairedTxIds.length));
+            try {
+              await _supabase.from('transactions').update({
+                'deleted_at': DateTime.now().toUtc().toIso8601String(),
+                'updated_at': DateTime.now().toUtc().toIso8601String(),
+              }).inFilter('id', chunk);
+            } catch (_) {}
+          }
         }
         try {
+          // If any legitimate recurring transactions were restored, push their un-deleted state to Supabase
+          final restoredTxs = await (_db.select(_db.transactions)
+                ..where((t) =>
+                    t.deletedAt.isNull() &
+                    t.updatedAt.isBiggerThanValue(DateTime.now().subtract(const Duration(minutes: 5))) &
+                    (t.tag.contains('recurring_auto') |
+                     t.tag.contains('recurring_manual_confirmed'))))
+              .get();
+          if (restoredTxs.isNotEmpty) {
+            final payload = restoredTxs.map((tx) => _txToJson(tx, userId)).toList();
+            await _supabase.from('transactions').upsert(payload, onConflict: 'id');
+          }
           await _syncRecurring(userId, null, pushOnly: true);
         } catch (_) {}
       }
@@ -342,6 +356,18 @@ class SyncService extends StateNotifier<SyncState> {
           }
         }
         try {
+          // If any legitimate recurring transactions were restored, push their un-deleted state to Supabase
+          final restoredTxs = await (_db.select(_db.transactions)
+                ..where((t) =>
+                    t.deletedAt.isNull() &
+                    t.updatedAt.isBiggerThanValue(DateTime.now().subtract(const Duration(minutes: 5))) &
+                    (t.tag.contains('recurring_auto') |
+                     t.tag.contains('recurring_manual_confirmed'))))
+              .get();
+          if (restoredTxs.isNotEmpty) {
+            final payload = restoredTxs.map((tx) => _txToJson(tx, _auth.currentUser!.id)).toList();
+            await _supabase.from('transactions').upsert(payload, onConflict: 'id');
+          }
           await _syncRecurring(_auth.currentUser!.id, null, pushOnly: true);
         } catch (_) {}
       }
@@ -795,6 +821,18 @@ class SyncService extends StateNotifier<SyncState> {
         }
       }
       try {
+        // If any legitimate recurring transactions were restored, push their un-deleted state to Supabase
+        final restoredTxs = await (_db.select(_db.transactions)
+              ..where((t) =>
+                  t.deletedAt.isNull() &
+                  t.updatedAt.isBiggerThanValue(DateTime.now().subtract(const Duration(minutes: 5))) &
+                  (t.tag.contains('recurring_auto') |
+                   t.tag.contains('recurring_manual_confirmed'))))
+            .get();
+        if (restoredTxs.isNotEmpty) {
+          final payload = restoredTxs.map((tx) => _txToJson(tx, userId)).toList();
+          await _supabase.from('transactions').upsert(payload, onConflict: 'id');
+        }
         await _syncRecurring(userId, null, pushOnly: true);
       } catch (_) {}
     }

@@ -816,9 +816,9 @@ class VaultHomeScreen extends ConsumerWidget {
     final upcoming = await ref.read(recurringTransactionsDaoProvider).getUpcoming30Days(windowDays: 7);
     final rawRecent = await (db.select(db.transactions)
           ..where((t) =>
-              (t.tag.equals('recurring_auto') |
-               t.tag.equals('recurring_manual_confirmed') |
-               t.tag.equals('recurring_early_posted')) &
+              (t.tag.contains('recurring_auto') |
+               t.tag.contains('recurring_manual_confirmed') |
+               t.tag.contains('recurring_early_posted')) &
               t.deletedAt.isNull())
           ..orderBy([(t) => OrderingTerm.desc(t.transactionDate), (t) => OrderingTerm.desc(t.createdAt)])
           ..limit(30))
@@ -1986,7 +1986,7 @@ class VaultHomeScreen extends ConsumerWidget {
                     : tx.amountThbSatang / 100.0;
 
                 final locale = Localizations.localeOf(context).languageCode;
-                final dateStr = DateFormat('d MMM', locale).format(tx.transactionDate);
+                final dateStr = DateFormat('d MMM', locale).format(tx.transactionDate.toLocal());
 
                 return ListTile(
                   dense: true,
@@ -2232,9 +2232,9 @@ class VaultHomeScreen extends ConsumerWidget {
 
       final recentRecurring = await (db.select(db.transactions)
             ..where((t) =>
-                (t.tag.equals('recurring_auto') |
-                 t.tag.equals('recurring_manual_confirmed') |
-                 t.tag.equals('recurring_early_posted')) &
+                (t.tag.contains('recurring_auto') |
+                 t.tag.contains('recurring_manual_confirmed') |
+                 t.tag.contains('recurring_early_posted')) &
                 t.deletedAt.isNull())
             ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
             ..limit(30))

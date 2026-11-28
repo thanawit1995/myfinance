@@ -61,7 +61,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
     _selectedDestinationAccountId = tx.destinationAccountId ?? tx.sourceAccountId;
     _selectedCategoryId = tx.categoryId;
     _selectedTaxCategory = tx.taxCategory;
-    _transactionDate = tx.transactionDate;
+    _transactionDate = tx.transactionDate.toLocal();
     _workPeriod = tx.workPeriod;
     _isCleared = tx.isCleared;
 
@@ -84,7 +84,11 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
           t.startsWith('รายได้ ') ||
           t.startsWith('รายได้รอบ ')) {
         if (!t.startsWith('รายได้ ') && !t.startsWith('รายได้รอบ ')) {
-          _systemTags.add(t);
+          if (t == 'recurring_auto') {
+            _systemTags.add('recurring_manual_confirmed');
+          } else {
+            _systemTags.add(t);
+          }
         }
       } else {
         userTags.add(t);
@@ -151,9 +155,10 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
   }
 
   Future<void> _pickDate() async {
+    final localDate = _transactionDate.toLocal();
     final picked = await showDatePicker(
       context: context,
-      initialDate: _transactionDate,
+      initialDate: localDate,
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
     );
@@ -161,7 +166,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
       if (!mounted) return;
       final time = await showTimePicker(
         context: context,
-        initialTime: TimeOfDay.fromDateTime(_transactionDate),
+        initialTime: TimeOfDay.fromDateTime(localDate),
       );
       if (!mounted) return;
       setState(() {
@@ -174,7 +179,13 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
             time.minute,
           );
         } else {
-          _transactionDate = picked;
+          _transactionDate = DateTime(
+            picked.year,
+            picked.month,
+            picked.day,
+            localDate.hour,
+            localDate.minute,
+          );
         }
       });
     }
@@ -543,7 +554,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
             Icon(Icons.calendar_today, size: 16, color: theme.colorScheme.onSurfaceVariant),
             const SizedBox(width: 8),
             Text(
-              DateFormat('d MMMM yyyy, HH:mm', 'th').format(_transactionDate),
+              DateFormat('d MMMM yyyy, HH:mm', 'th').format(_transactionDate.toLocal()),
               style: const TextStyle(fontSize: 14),
             ),
           ],

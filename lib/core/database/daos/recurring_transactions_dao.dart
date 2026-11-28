@@ -111,14 +111,15 @@ class RecurringTransactionsDao extends DatabaseAccessor<AppDatabase> with _$Recu
     required RecurringRule rule,
     required DateTime targetDate,
   }) async {
+    final localTarget = targetDate.toLocal();
     final DateTime rangeStart;
     final DateTime rangeEnd;
     if (rule.frequency.toLowerCase() == 'monthly') {
-      rangeStart = DateTime(targetDate.year, targetDate.month, 1);
-      rangeEnd = DateTime(targetDate.year, targetDate.month + 1, 0, 23, 59, 59, 999);
+      rangeStart = DateTime(localTarget.year, localTarget.month, 1);
+      rangeEnd = DateTime(localTarget.year, localTarget.month + 1, 0, 23, 59, 59, 999);
     } else {
-      rangeStart = DateTime(targetDate.year, targetDate.month, targetDate.day);
-      rangeEnd = DateTime(targetDate.year, targetDate.month, targetDate.day, 23, 59, 59, 999);
+      rangeStart = DateTime(localTarget.year, localTarget.month, localTarget.day);
+      rangeEnd = DateTime(localTarget.year, localTarget.month, localTarget.day, 23, 59, 59, 999);
     }
 
     final existingTxs = await (select(transactions)
@@ -127,7 +128,6 @@ class RecurringTransactionsDao extends DatabaseAccessor<AppDatabase> with _$Recu
               t.transactionDate.isBiggerOrEqualValue(rangeStart) &
               t.transactionDate.isSmallerOrEqualValue(rangeEnd) &
               t.transactionType.equals(rule.transactionType) &
-              t.amountOriginalSatang.equals(rule.amountSatang) &
               (t.sourceAccountId.equals(rule.sourceAccountId) | t.sourceAccountId.isNull())))
         .get();
 
@@ -137,12 +137,18 @@ class RecurringTransactionsDao extends DatabaseAccessor<AppDatabase> with _$Recu
     return existingTxs.any((t) {
       final tTag = (t.tag ?? '').toLowerCase();
       final tNote = (t.note ?? '').toLowerCase();
-      return tTag.contains('recurring_auto') ||
+      final hasRecurringTag = tTag.contains('recurring_auto') ||
           tTag.contains('recurring_manual_confirmed') ||
-          tTag.contains('recurring_early_posted') ||
-          tNote.contains(rTitle) ||
+          tTag.contains('recurring_early_posted');
+      final hasTitleMatch = tNote.contains(rTitle) ||
           rTitle.contains(tNote) ||
           (rNote.isNotEmpty && (tNote.contains(rNote) || rNote.contains(tNote)));
+
+      // 1. If it has recurring tag and title match, it is definitely this occurrence (even if amount was adjusted)
+      if (hasRecurringTag && hasTitleMatch) return true;
+      // 2. If it has exact amount and either recurring tag or title match
+      if (t.amountOriginalSatang == rule.amountSatang && (hasRecurringTag || hasTitleMatch)) return true;
+      return false;
     });
   }
 
@@ -455,8 +461,12 @@ class RecurringTransactionsDao extends DatabaseAccessor<AppDatabase> with _$Recu
               final expectedDay = dom > daysInMonth ? daysInMonth : dom;
 
               final isEarly = tx.tag?.contains('recurring_early_posted') ?? false;
-              // If not early-posted and the day does not match expected day, it is erroneous
-              if (!isEarly && txDate.day != expectedDay) {
+              // CRITICAL: Only transactions erroneously auto-posted on the Oct 15, 2026 sync bug date
+              // (2026-10-15) where the rule was NOT scheduled for the 15th should be treated as erroneous.
+              // Normal transactions in other months or legitimate user-scheduled transactions must NEVER be deleted!
+              final isOct15Bug = txDate.year == 2026 && txDate.month == 10 && txDate.day == 15 && expectedDay != 15;
+              final isPureAuto = (tx.tag?.contains('recurring_auto') ?? false) && !(tx.tag?.contains('recurring_manual_confirmed') ?? false);
+              if (isOct15Bug && isPureAuto && !isEarly && txDate.day != expectedDay) {
                 erroneousTxIds.add(tx.id);
                 affectedRuleIds.add(rule.id);
               }
@@ -464,18 +474,24 @@ class RecurringTransactionsDao extends DatabaseAccessor<AppDatabase> with _$Recu
           }
 
           // If there are multiple transactions for this rule in the same month,
-          // only keep ONE (preferring early-posted or the one on expectedDay or earliest)
+          // only keep ONE if it was affected by the Oct 15 erroneous sync duplicate bug
           final remainingInMonth = txList.where((t) => !erroneousTxIds.contains(t.id)).toList();
           if (remainingInMonth.length > 1) {
-            remainingInMonth.sort((a, b) {
-              final aSpecial = (a.tag?.contains('early') ?? false) ? 0 : 1;
-              final bSpecial = (b.tag?.contains('early') ?? false) ? 0 : 1;
-              if (aSpecial != bSpecial) return aSpecial.compareTo(bSpecial);
-              return a.createdAt.compareTo(b.createdAt);
+            final hasOct15Erroneous = remainingInMonth.any((t) {
+              final d = t.transactionDate.toLocal();
+              return d.year == 2026 && d.month == 10 && d.day == 15 && (dom != null && dom != 15);
             });
-            for (var i = 1; i < remainingInMonth.length; i++) {
-              erroneousTxIds.add(remainingInMonth[i].id);
-              affectedRuleIds.add(rule.id);
+            if (hasOct15Erroneous) {
+              remainingInMonth.sort((a, b) {
+                final aSpecial = (a.tag?.contains('early') ?? false) ? 0 : 1;
+                final bSpecial = (b.tag?.contains('early') ?? false) ? 0 : 1;
+                if (aSpecial != bSpecial) return aSpecial.compareTo(bSpecial);
+                return a.createdAt.compareTo(b.createdAt);
+              });
+              for (var i = 1; i < remainingInMonth.length; i++) {
+                erroneousTxIds.add(remainingInMonth[i].id);
+                affectedRuleIds.add(rule.id);
+              }
             }
           }
         }
@@ -505,6 +521,56 @@ class RecurringTransactionsDao extends DatabaseAccessor<AppDatabase> with _$Recu
         );
       }
     }
+
+    // Auto-restore any legitimate recurring transactions that were accidentally soft-deleted outside the Oct 15 bug
+    try {
+      final erroneouslyDeleted = await (select(transactions)
+            ..where((t) =>
+                t.deletedAt.isNotNull() &
+                (t.transactionDate.isSmallerThanValue(DateTime(2026, 10, 15)) |
+                 t.transactionDate.isBiggerThanValue(DateTime(2026, 10, 15, 23, 59, 59))) &
+                (t.tag.contains('recurring_auto') |
+                 t.tag.contains('recurring_manual_confirmed') |
+                 t.tag.contains('recurring_early_posted'))))
+          .get();
+
+      final restoredIds = <String>[];
+      for (final tx in erroneouslyDeleted) {
+        final deleteLog = await (select(auditLogs)
+              ..where((a) =>
+                  a.entityTable.equals('transactions') &
+                  a.entityId.equals(tx.id) &
+                  a.action.equals('SOFT_DELETE_ERRONEOUS_RECURRING'))
+              ..limit(1))
+            .getSingleOrNull();
+
+        if (deleteLog != null) {
+          restoredIds.add(tx.id);
+        }
+      }
+
+      if (restoredIds.isNotEmpty) {
+        await (update(transactions)..where((t) => t.id.isIn(restoredIds))).write(
+          TransactionsCompanion(
+            deletedAt: const Value(null),
+            updatedAt: Value(now),
+          ),
+        );
+        for (final id in restoredIds) {
+          await into(auditLogs).insert(
+            AuditLogsCompanion.insert(
+              id: _uuid.v4(),
+              entityTable: 'transactions',
+              entityId: id,
+              action: 'RESTORE_LEGITIMATE_RECURRING',
+              changeTimestamp: now,
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+        }
+      }
+    } catch (_) {}
 
     // Now re-align all rules to their true upcoming schedule
     for (final rule in allRules) {
